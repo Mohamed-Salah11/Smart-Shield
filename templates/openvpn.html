@@ -1,6 +1,2456 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to OpenVPN</h1>
-<p>This is an empty placeholder page for VPN &gt; OpenVPN.</p>
+<div class="container-fluid p-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-4">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="#">VPN</a></li>
+            <li class="breadcrumb-item active">OpenVPN</li>
+        </ol>
+    </nav>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="servers-tab" data-bs-toggle="tab" data-bs-target="#servers" type="button" role="tab" aria-controls="servers" aria-selected="true">Servers</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab" aria-controls="clients" aria-selected="false">Clients</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="overrides-tab" data-bs-toggle="tab" data-bs-target="#overrides" type="button" role="tab" aria-controls="overrides" aria-selected="false">Client Specific Overrides</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="wizards-tab" data-bs-toggle="tab" data-bs-target="#wizards" type="button" role="tab" aria-controls="wizards" aria-selected="false">Wizards</button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Servers Tab -->
+        <div class="tab-pane fade show active" id="servers" role="tabpanel" aria-labelledby="servers-tab">
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    OpenVPN Servers
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Interface</th>
+                                <th>Protocol / Port</th>
+                                <th>Tunnel Network</th>
+                                <th>Mode / Crypto</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox"></i> No OpenVPN servers configured.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServerModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clients Tab -->
+        <div class="tab-pane fade" id="clients" role="tabpanel" aria-labelledby="clients-tab">
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    OpenVPN Clients
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Interface</th>
+                                <th>Protocol</th>
+                                <th>Server</th>
+                                <th>Mode / Crypto</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox"></i> No OpenVPN clients configured.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Specific Overrides Tab -->
+        <div class="tab-pane fade" id="overrides" role="tabpanel" aria-labelledby="overrides-tab">
+            <div class="mt-3">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    CSC Overrides
+                </div>
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Disabled</th>
+                            <th>Common Name</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">
+                                <em>No Client Specific Overrides configured.</em>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCSCModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wizards Tab -->
+        <div class="tab-pane fade" id="wizards" role="tabpanel" aria-labelledby="wizards-tab">
+            <div class="mt-3">
+                <!-- Step 1: Select Authentication Backend Type -->
+                <div id="wizardStep1" class="wizard-step">
+                    <div class="p-4 mb-4" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <h5 class="mb-3"><strong>OpenVPN Remote Access Server Setup</strong></h5>
+                        <p class="mb-2">This wizard will provide guidance through an OpenVPN Remote Access Server Setup.</p>
+                        <p class="mb-0">The wizard may be stopped at any time by clicking the logo image at the top of the screen.</p>
+                    </div>
+
+                    <div class="p-4 mb-4" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <h6 class="mb-4"><strong>Select an Authentication Backend Type</strong></h6>
+
+                        <div class="mb-4">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardAuthType" class="form-label"><strong>Type of Server</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="wizardAuthType">
+                                        <option value="local" selected>Local User Access</option>
+                                        <option value="ldap">LDAP</option>
+                                        <option value="radius">RADIUS</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">NOTE: If unsure, leave this set to "Local User Access."</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('wizardStep1').style.display='none'; document.getElementById('wizardStep2').style.display='block';">
+                            <i class="bi bi-chevron-right"></i> Next
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Certificate Authority Selection -->
+                <div id="wizardStep2" class="wizard-step" style="display: none;">
+                    <div class="mb-3" style="background-color: #555; color: white; padding: 10px; border-radius: 4px; font-weight: bold;">
+                        Certificate Authority Selection
+                    </div>
+                    <div style="background-color: #f8f9fa; padding: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #dee2e6; border-radius: 4px;">
+                        OpenVPN Remote Access Server Setup Wizard
+                    </div>
+
+                    <div class="mb-4" style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 20px; border-radius: 4px;">
+                        <div class="mb-4" style="background-color: #555; color: white; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;">
+                            Create a New Certificate Authority (CA) Certificate
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCADescriptiveName" class="form-label"><strong>Descriptive name</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCADescriptiveName" placeholder="">
+                                    <small class="text-muted d-block mt-2">A name for administrative reference, to identify this certificate.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCARandomize" class="form-label"><strong>Randomize Serial</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="wizardCARandomize" name="wizardCARandomize" checked>
+                                        <label class="form-check-label" for="wizardCARandomize">
+                                            Use random serial numbers when signing certificates.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">When enabled, serial numbers for certificates signed by this CA will be automatically randomized and checked for uniqueness instead of using sequential values.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCAKeyLength" class="form-label"><strong>Key length</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="wizardCAKeyLength">
+                                        <option value="2048" selected>2048 bit</option>
+                                        <option value="1024">1024 bit</option>
+                                        <option value="3072">3072 bit</option>
+                                        <option value="4096">4096 bit</option>
+                                        <option value="6144">6144 bit</option>
+                                        <option value="7680">7680 bit</option>
+                                        <option value="8192">8192 bit</option>
+                                        <option value="15360">15360 bit</option>
+                                        <option value="16384">16384 bit</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Size of the key which will be generated. The larger the key, the more security it offers, but larger keys take considerably more time to generate, and take slightly longer to validate leading to a slight slowdown in setting up new sessions (not always noticeable). As of 2016, 2048 bit is the minimum and most common selection and 4096 is the maximum in common use. For more information see <a href="https://keylength.com" target="_blank">keylength.com</a></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCALifetime" class="form-label"><strong>Lifetime</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="wizardCALifetime" value="3650" placeholder="3650">
+                                    <small class="text-muted d-block mt-2">Lifetime in days. This is commonly set to 3650 (Approximately 10 years.)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCACommonName" class="form-label"><strong>Common Name</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCACommonName" placeholder="">
+                                    <small class="text-muted d-block mt-2">The internal name of the CA, used as a part of the CA subject. If left blank, the descriptive name will be used instead.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCACountryCode" class="form-label"><strong>Country Code</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCACountryCode" placeholder="">
+                                    <small class="text-muted d-block mt-2">Two-letter ISO country code (e.g. US, AU, CA)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCAStateProvince" class="form-label"><strong>State or Province</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCAStateProvince" placeholder="">
+                                    <small class="text-muted d-block mt-2">Full State or Province name, not abbreviated (e.g. Texas, Indiana, Ontario).</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCACity" class="form-label"><strong>City</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCACity" placeholder="">
+                                    <small class="text-muted d-block mt-2">City or other Locality name (e.g. Austin, Indianapolis, Toronto).</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCAOrganization" class="form-label"><strong>Organization</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCAOrganization" placeholder="">
+                                    <small class="text-muted d-block mt-2">Organization name, often the company or group name.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="wizardCAOrgUnit" class="form-label"><strong>Organizational Unit</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="wizardCAOrgUnit" placeholder="">
+                                    <small class="text-muted d-block mt-2">Organizational Unit name, often a department or team name.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('wizardStep2').style.display='none'; document.getElementById('wizardStep3').style.display='block';">
+                            <i class="bi bi-chevron-right"></i> Add new CA
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Next Wizard Step (after adding CA) -->
+                <div id="wizardStep3" class="wizard-step" style="display: none;">
+                    <div class="p-4 mb-4" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <h5 class="mb-3"><strong>Certificate Authority Created Successfully</strong></h5>
+                        <p class="mb-2">Your Certificate Authority has been created. You can now create certificates or add additional CAs if needed.</p>
+                        <p class="mb-0">Click Next to continue with the OpenVPN Remote Access Server Setup.</p>
+                    </div>
+
+                    <div class="p-4 mb-4" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <button type="button" class="btn btn-primary me-2" onclick="document.getElementById('wizardStep3').style.display='none'; document.getElementById('wizardStep2').style.display='block';">
+                            <i class="bi bi-chevron-left"></i> Add Another CA
+                        </button>
+                        <button type="button" class="btn btn-primary">
+                            <i class="bi bi-chevron-right"></i> Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add Server -->
+<div class="modal fade" id="addServerModal" tabindex="-1" aria-labelledby="addServerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addServerModalLabel">Add OpenVPN Server</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addServerForm">
+                    <!-- General Information Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            General Information
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="description" class="form-label"><strong>Description</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="description" placeholder="">
+                                    <small class="text-muted d-block mt-2">A description of this VPN for administrative reference.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="disabled" class="form-label"><strong>Disabled</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="disabled" name="disabled">
+                                        <label class="form-check-label" for="disabled">
+                                            Disable this server
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Set this option to disable this server without removing it from the list.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Mode Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="serverMode" class="form-label"><strong>Server mode</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="serverMode">
+                                        <option value="peer2peer" selected>Peer to Peer ( SSL/TLS )</option>
+                                        <option value="peer2peer_shared">Peer to Peer ( Shared Key )</option>
+                                        <option value="remote_access_ssltls">Remote Access ( SSL/TLS )</option>
+                                        <option value="remote_access_userauth">Remote Access ( User Auth )</option>
+                                        <option value="remote_access_hybrid">Remote Access ( SSL/TLS + User Auth )</option>
+                                        <option value="static">Static Key</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="deviceMode" class="form-label"><strong>Device mode</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="deviceMode">
+                                        <option value="tun" selected>tun - Layer 3 Tunnel Mode</option>
+                                        <option value="tap">tap - Layer 2 Tap Mode</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">"tun" mode carries IPv4 and IPv6 (OSI layer 3) and is the most common and compatible mode across all platforms.<br>"tap" mode is capable of carrying 802.3 (OSI Layer 2.)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Endpoint Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Endpoint Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="protocol" class="form-label"><strong>Protocol</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="protocol">
+                                        <option value="udp4" selected>UDP on IPv4 only</option>
+                                        <option value="udp6">UDP on IPv6 only</option>
+                                        <option value="tcp4">TCP on IPv4 only</option>
+                                        <option value="tcp6">TCP on IPv6 only</option>
+                                        <option value="udpboth">UDP IPv4 and IPv6 on all interfaces (multihome)</option>
+                                        <option value="tcpboth">TCP IPv4 and IPv6 on all interfaces (multihome)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="interface" class="form-label"><strong>Interface</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="interface">
+                                        <option value="wan" selected>WAN</option>
+                                        <option value="lan">LAN</option>
+                                        <option value="localhost">Localhost</option>
+                                        <option value="any">any</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The interface or Virtual IP address where OpenVPN will receive client connections.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="localPort" class="form-label"><strong>Local port</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="localPort" value="1194" placeholder="1194">
+                                    <small class="text-muted d-block mt-2">The port used by OpenVPN to receive client connections.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cryptographic Settings Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Cryptographic Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="tlsConfig" class="form-label"><strong>TLS Configuration</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="useTLSKey" name="useTLSKey" checked>
+                                        <label class="form-check-label" for="useTLSKey">
+                                            Use a TLS Key
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">A TLS key enhances security of an OpenVPN connection by requiring both parties to have a common key before a peer can perform a TLS handshake. This layer of HMAC authentication allows control channel packets without the proper key to be dropped, protecting the peers from attack or unauthorized connections. The TLS key does not have an effect on tunnel data.</small>
+                                    
+                                    <div class="form-check mt-3">
+                                        <input class="form-check-input" type="checkbox" id="autoGenTLS" name="autoGenTLS" checked>
+                                        <label class="form-check-label" for="autoGenTLS">
+                                            Automatically generate a TLS Key.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="peerCertAuth" class="form-label"><strong>Peer Certificate Authority</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="alert alert-info mb-2" role="alert">
+                                        No Certificate Authorities defined. One may be created here: <a href="#" class="alert-link">System > Cert. Manager</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="peerCertRevocation" class="form-label"><strong>Peer Certificate Revocation list</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="alert alert-info mb-2" role="alert">
+                                        No Certificate Revocation Lists defined. One may be created here: <a href="#" class="alert-link">System > Cert. Manager</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ocspCheck" class="form-label"><strong>OCSP Check</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="ocspCheck" name="ocspCheck">
+                                        <label class="form-check-label" for="ocspCheck">
+                                            Check client certificates with OCSP
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="serverCert" class="form-label"><strong>Server certificate</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="serverCert">
+                                        <option value="" selected>===== Server Certificates =====</option>
+                                        <option value="">GUI default (68e626ba9a349) (Server: Yes, In Use)</option>
+                                        <option value="" disabled>===== Non-Server Certificates =====</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Certificates known to be incompatible with use for OpenVPN are not included in this list, such as certificates using incompatible ECDSA curves or weak digest algorithms.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="dhLength" class="form-label"><strong>DH Parameter Length</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="dhLength">
+                                        <option value="2048" selected>2048 bit</option>
+                                        <option value="1024">1024 bit</option>
+                                        <option value="3072">3072 bit</option>
+                                        <option value="4096">4096 bit</option>
+                                        <option value="6144">6144 bit</option>
+                                        <option value="8192">8192 bit</option>
+                                        <option value="ecdh">ECDH Only</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Diffie-Hellman (DH) parameter set used for key exchange. <i class="bi bi-info-circle"></i></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ecdhCurve" class="form-label"><strong>ECDH Curve</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="ecdhCurve">
+                                        <option value="default" selected>Use Default</option>
+                                        <option value="prime256v1">prime256v1</option>
+                                        <option value="secp384r1">secp384r1</option>
+                                        <option value="secp521r1">secp521r1</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The Elliptic Curve to use for key exchange.<br>The curve from the server certificate is used by default when the server uses an ECDSA certificate. Otherwise, secp384r1 is used as a fallback.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="dataEncryption" class="form-label"><strong>Data Encryption Algorithms</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; background-color: #f8f9fa;">
+                                                <div style="font-size: 0.85rem;">
+                                                    <div>AES-128-CBC (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB1 (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB8 (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-GCM (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-OFB (128 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CBC (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB1 (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB8 (192 bit key, 128 bit block)</div>
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">Available Data Encryption Algorithms<br>Click to add or remove an algorithm from the list</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; background-color: #f8f9fa;">
+                                                <div style="font-size: 0.85rem;">
+                                                    <div>AES-256-GCM</div>
+                                                    <div>AES-128-GCM</div>
+                                                    <div>CHACHA20-POLY1305</div>
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">Allowed Data Encryption Algorithms. Click an algorithm name to remove it from the list</small>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-3">The order of the selected Data Encryption Algorithms is respected by OpenVPN. This list is ignored in Shared Key mode. <i class="bi bi-info-circle"></i></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="fallbackEncryption" class="form-label"><strong>Fallback Data Encryption Algorithm</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="fallbackEncryption">
+                                        <option value="aes-256-cbc" selected>AES-256-CBC (256 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cbc">AES-128-CBC (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb">AES-128-CFB (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb1">AES-128-CFB1 (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb8">AES-128-CFB8 (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-ofb">AES-128-OFB (128 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cbc">AES-192-CBC (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb">AES-192-CFB (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb1">AES-192-CFB1 (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb8">AES-192-CFB8 (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-ofb">AES-192-OFB (192 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb">AES-256-CFB (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb1">AES-256-CFB1 (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb8">AES-256-CFB8 (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-gcm">AES-256-GCM (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-ofb">AES-256-OFB (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cbc">CAMELLIA-128-CBC (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb">CAMELLIA-128-CFB (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb1">CAMELLIA-128-CFB1 (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb8">CAMELLIA-128-CFB8 (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-ofb">CAMELLIA-128-OFB (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cbc">CAMELLIA-192-CBC (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb">CAMELLIA-192-CFB (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb1">CAMELLIA-192-CFB1 (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb8">CAMELLIA-192-CFB8 (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-ofb">CAMELLIA-192-OFB (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cbc">CAMELLIA-256-CBC (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb">CAMELLIA-256-CFB (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb1">CAMELLIA-256-CFB1 (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb8">CAMELLIA-256-CFB8 (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-ofb">CAMELLIA-256-OFB (256 bit key, 128 bit block)</option>
+                                        <option value="chacha20-poly1305">CHACHA20-POLY1305 (256 bit key, 256 bit auth)</option>
+                                        <option value="des-ede-cbc">DES-EDE-CBC (128 bit key, 64 bit block)</option>
+                                        <option value="des-ede-cfb">DES-EDE-CFB (128 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cbc">DES-EDE3-CBC (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb">DES-EDE3-CFB (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb1">DES-EDE3-CFB1 (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb8">DES-EDE3-CFB8 (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-ofb">DES-EDE3-OFB (192 bit key, 64 bit block)</option>
+                                        <option value="none">None (No Encryption)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The Fallback Data Encryption Algorithm used for data channel packets when communicating with clients that do not support data encryption algorithm negotiation (e.g. Shared Key). This algorithm is automatically included in the Data Encryption Algorithms list.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="authDigest" class="form-label"><strong>Auth digest algorithm</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="authDigest">
+                                        <option value="sha256" selected>SHA256 (256-bit)</option>
+                                        <option value="blake2b512">BLAKE2b512 (512-bit)</option>
+                                        <option value="blake2s256">BLAKE2s256 (256-bit)</option>
+                                        <option value="keccak-kmac-128">KECCAK-KMAC-128 (256-bit)</option>
+                                        <option value="keccak-kmac-256">KECCAK-KMAC-256 (512-bit)</option>
+                                        <option value="md5">MD5 (128-bit)</option>
+                                        <option value="md5-sha1">MD5-SHA1 (288-bit)</option>
+                                        <option value="null">NULL (0-bit)</option>
+                                        <option value="ripemd160">RIPEMD160 (160-bit)</option>
+                                        <option value="sha1">SHA1 (160-bit)</option>
+                                        <option value="sha224">SHA224 (224-bit)</option>
+                                        <option value="sha256">SHA256 (256-bit)</option>
+                                        <option value="sha3-224">SHA3-224 (224-bit)</option>
+                                        <option value="sha3-256">SHA3-256 (256-bit)</option>
+                                        <option value="sha3-384">SHA3-384 (384-bit)</option>
+                                        <option value="sha3-512">SHA3-512 (512-bit)</option>
+                                        <option value="sha384">SHA384 (384-bit)</option>
+                                        <option value="sha512">SHA512 (512-bit)</option>
+                                        <option value="sha512-224">SHA512-224 (224-bit)</option>
+                                        <option value="sha512-256">SHA512-256 (256-bit)</option>
+                                        <option value="shake128">SHAKE128 (128-bit)</option>
+                                        <option value="shake256">SHAKE256 (256-bit)</option>
+                                        <option value="none">None (No Authentication)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The algorithm used to authenticate data channel packets, and control channel packets if a TLS Key is present.<br>When an AEAD Encryption Algorithm mode is used, such as AES-GCM, this digest is used for the control channel only, not the data channel.<br>The server and all clients must have the same setting. While SHA1 is the default for OpenVPN, this algorithm is insecure.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="certDepth" class="form-label"><strong>Certificate Depth</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="certDepth">
+                                        <option value="one" selected>One (Client+Server)</option>
+                                        <option value="no_check">Do Not Check</option>
+                                        <option value="two">Two (Client+Intermediate+Server)</option>
+                                        <option value="three">Three (Client+2Intermediate+Server)</option>
+                                        <option value="four">Four (Client+3Intermediate+Server)</option>
+                                        <option value="five">Five (Client+4Intermediate+Server)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">When a certificate-based client logs in, do not accept certificates below this depth. Useful for denying certificates made with intermediate CAs generated from the same CA as the server.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="certKeyUsage" class="form-label"><strong>Client Certificate Key Usage Validation</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="certKeyUsage" name="certKeyUsage" checked>
+                                        <label class="form-check-label" for="certKeyUsage">
+                                            Enforce key usage
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Verify that only hosts with a client certificate can connect (EKU: "TLS Web Client Authentication").</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Tunnel Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Tunnel Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv4TunnelNetwork" class="form-label"><strong>IPv4 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv4TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv4 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed using CIDR notation (e.g. 10.0.8.0/24). The first usable address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.<br><br>A tunnel network of /30 or smaller puts OpenVPN into a special peer-to-peer mode which cannot push settings to clients. This mode is not compatible with several options, including Exit Notify, and Inactive.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv6TunnelNetwork" class="form-label"><strong>IPv6 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv6TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv6 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed using CIDR notation (e.g. fe80::/64). The ::1 address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="redirectIPv4" class="form-label"><strong>Redirect IPv4 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="redirectIPv4" name="redirectIPv4">
+                                        <label class="form-check-label" for="redirectIPv4">
+                                            Force all client-generated IPv4 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="redirectIPv6" class="form-label"><strong>Redirect IPv6 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="redirectIPv6" name="redirectIPv6">
+                                        <label class="form-check-label" for="redirectIPv6">
+                                            Force all client-generated IPv6 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv4LocalNetworks" class="form-label"><strong>IPv4 Local network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv4LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv4 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv6LocalNetworks" class="form-label"><strong>IPv6 Local network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv6LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv6 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv4RemoteNetworks" class="form-label"><strong>IPv4 Remote network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv4RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv4 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="ipv6RemoteNetworks" class="form-label"><strong>IPv6 Remote network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="ipv6RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv6 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="concurrentConnections" class="form-label"><strong>Concurrent connections</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="concurrentConnections" placeholder="">
+                                    <small class="text-muted d-block mt-2">Specify the maximum number of clients allowed to concurrently connect to this server.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="allowCompression" class="form-label"><strong>Allow Compression</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="allowCompression">
+                                        <option value="refuse" selected>Refuse any non-stub compression (Most secure)</option>
+                                        <option value="asymmetric">Decompress incoming, do not compress outgoing (Asymmetric)</option>
+                                        <option value="allow">Compress packets (WARNING: Potentially dangerous)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Allow compression to be used with this VPN instance. Compression can potentially increase throughput but may allow an attacker to extract secrets if they can control compressed plaintext traversing the VPN (e.g. HTTP). Before enabling compression, consult information about the VORACLE, CRIME, TIME, and BREACH attacks against TLS to decide if the use case for this specific VPN is vulnerable to attack.<br><br>Asymmetric compression allows an easier transition when connecting with older peers.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="typeOfService" class="form-label"><strong>Type-of-Service</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="typeOfService" name="typeOfService">
+                                        <label class="form-check-label" for="typeOfService">
+                                            Set the TOS IP header value of tunnel packets to match the encapsulated packet value.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="interClientComm" class="form-label"><strong>Inter-client communication</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="interClientComm" name="interClientComm">
+                                        <label class="form-check-label" for="interClientComm">
+                                            Allow communication between clients connected to this server
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="duplicateConnection" class="form-label"><strong>Duplicate Connection</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="duplicateConnection" name="duplicateConnection">
+                                        <label class="form-check-label" for="duplicateConnection">
+                                            Allow multiple concurrent connections from the same user
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">When set, the same user may connect multiple times. When unset, a new connection from a user will disconnect the previous session.<br><br>Users are identified by their username or certificate properties, depending on the VPN configuration. This practice is discouraged security reasons, but may be necessary in some environments.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Client Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Client Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="dynamicIP" class="form-label"><strong>Dynamic IP</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="dynamicIP" name="dynamicIP">
+                                        <label class="form-check-label" for="dynamicIP">
+                                            Allow connected clients to retain their connections if their IP address changes.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="topology" class="form-label"><strong>Topology</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="topology">
+                                        <option value="subnet" selected>Subnet – One IP address per client in a common subnet</option>
+                                        <option value="net30">net30 – Isolated /30 network per client</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Specifies the method used to supply a virtual adapter IP address to clients when using TUN mode on IPv4. Some clients may require this be set to "subnet" even for IPv6, such as OpenVPN Connect (iOS/Android). Older versions of OpenVPN (before 2.0.9) or clients such as Yealink phones may require "net30".</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Ping settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Ping settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="inactivityTimeout" class="form-label"><strong>Inactivity Timeout</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="inactivityTimeout" value="300" placeholder="300">
+                                    <small class="text-muted d-block mt-2">Causes OpenVPN to close a client connection after n seconds of inactivity on the TUN/TAP device. Activity is based on the last incoming or outgoing tunnel packet. A value of 0 disables this feature. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="pingMethod" class="form-label"><strong>Ping method</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="pingMethod">
+                                        <option value="keepalive" selected>keepalive -- Use keepalive helper to define ping configuration</option>
+                                        <option value="ping">ping -- Define ping/ping-exit/ping-restart manually</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">keepalive helper uses interval and timeout parameters to define ping and ping-restart values as follows:<br>ping = interval<br>ping-restart = timeout*2<br>push ping = interval<br>push ping-restart = timeout</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="pingInterval" class="form-label"><strong>Interval</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="pingInterval" value="10" placeholder="10">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="pingTimeout" class="form-label"><strong>Timeout</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="pingTimeout" value="60" placeholder="60">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Advanced Configuration Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Advanced Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="customOptions" class="form-label"><strong>Custom options</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <textarea class="form-control" id="customOptions" rows="4" placeholder=""></textarea>
+                                    <small class="text-muted d-block mt-2">Enter any additional options to add to the OpenVPN server configuration here, separated by semicolon. EXAMPLE: push "route 10.0.0.0 255.255.255.0"</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="udpFastIO" class="form-label"><strong>UDP Fast I/O</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="udpFastIO" name="udpFastIO">
+                                        <label class="form-check-label" for="udpFastIO">
+                                            Use fast I/O operations with UDP writes to tun/tap. Experimental.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Optimizes the packet write event loop, improving CPU efficiency by 5% to 10%. Not compatible with all platforms, and not compatible with OpenVPN bandwidth limiting.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="exitNotify" class="form-label"><strong>Exit Notify</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="exitNotify">
+                                        <option value="reconnect" selected>Reconnect to this server / Retry once</option>
+                                        <option value="disabled">Disabled</option>
+                                        <option value="next_server">Reconnect to next server / Retry twice</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Send an explicit exit notification to connected clients/peers when restarting or shutting down, so they may immediately disconnect rather than waiting for a timeout. In SSL/TLS Server modes, clients are directed to reconnect or use the next server. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="sendReceiveBuffer" class="form-label"><strong>Send/Receive Buffer</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="sendReceiveBuffer">
+                                        <option value="default" selected>Default</option>
+                                        <option value="64kib">64 KiB</option>
+                                        <option value="128kib">128 KiB</option>
+                                        <option value="256kib">256 KiB</option>
+                                        <option value="512kib">512 KiB</option>
+                                        <option value="1mib">1.00 MiB</option>
+                                        <option value="2mib">2.00 MiB</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Configure a Send and Receive Buffer size for OpenVPN. The default buffer size can be too small in many cases, depending on hardware and network uplink speeds. Finding the best buffer size can take some experimentation. To test the best value for a site, start at 512KiB and test higher and lower values.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="gatewayCreation" class="form-label"><strong>Gateway creation</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="gwBoth" name="gatewayCreation" value="both" checked>
+                                        <label class="form-check-label" for="gwBoth">
+                                            Both
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="gwIPv4" name="gatewayCreation" value="ipv4">
+                                        <label class="form-check-label" for="gwIPv4">
+                                            IPv4 only
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="gwIPv6" name="gatewayCreation" value="ipv6">
+                                        <label class="form-check-label" for="gwIPv6">
+                                            IPv6 only
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">If you assign a virtual interface to this OpenVPN server, this setting controls which gateway types will be created. The default setting is 'both'.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="verbosityLevel" class="form-label"><strong>Verbosity level</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="verbosityLevel">
+                                        <option value="default" selected>default</option>
+                                        <option value="none">none</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3 (recommended)</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                        <option value="9">9</option>
+                                        <option value="10">10</option>
+                                        <option value="11">11</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Each level shows all info from the previous levels. Level 3 is recommended for a good summary of what's happening without being swamped by output.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save Server</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add Client -->
+<div class="modal fade" id="addClientModal" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addClientModalLabel">Add OpenVPN Client</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addClientForm">
+                    <!-- General Information Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            General Information
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDescription" class="form-label"><strong>Description</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientDescription" placeholder="">
+                                    <small class="text-muted d-block mt-2">A description of this VPN for administrative reference.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDisabled" class="form-label"><strong>Disabled</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientDisabled" name="clientDisabled">
+                                        <label class="form-check-label" for="clientDisabled">
+                                            Disable this client
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Set this option to disable this client without removing it from the list.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Mode Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientServerMode" class="form-label"><strong>Server mode</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientServerMode">
+                                        <option value="peer2peer" selected>Peer to Peer ( SSL/TLS )</option>
+                                        <option value="peer2peer_shared">Peer to Peer ( Shared Key )</option>
+                                        <option value="remote_access_ssltls">Remote Access ( SSL/TLS )</option>
+                                        <option value="remote_access_userauth">Remote Access ( User Auth )</option>
+                                        <option value="remote_access_hybrid">Remote Access ( SSL/TLS + User Auth )</option>
+                                        <option value="static">Static Key</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDeviceMode" class="form-label"><strong>Device mode</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientDeviceMode">
+                                        <option value="tun" selected>tun - Layer 3 Tunnel Mode</option>
+                                        <option value="tap">tap - Layer 2 Tap Mode</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">"tun" mode carries IPv4 and IPv6 (OSI layer 3) and is the most common and compatible mode across all platforms.<br>"tap" mode is capable of carrying 802.3 (OSI Layer 2.)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Endpoint Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Endpoint Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientProtocol" class="form-label"><strong>Protocol</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientProtocol">
+                                        <option value="udp4" selected>UDP on IPv4 only</option>
+                                        <option value="udp6">UDP on IPv6 only</option>
+                                        <option value="tcp4">TCP on IPv4 only</option>
+                                        <option value="tcp6">TCP on IPv6 only</option>
+                                        <option value="udpboth">UDP IPv4 and IPv6 on all interfaces (multihome)</option>
+                                        <option value="tcpboth">TCP IPv4 and IPv6 on all interfaces (multihome)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientInterface" class="form-label"><strong>Interface</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientInterface">
+                                        <option value="wan" selected>WAN</option>
+                                        <option value="lan">LAN</option>
+                                        <option value="localhost">Localhost</option>
+                                        <option value="any">any</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The interface or Virtual IP address where OpenVPN will receive client connections.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientLocalPort" class="form-label"><strong>Local port</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="clientLocalPort" value="1194" placeholder="1194">
+                                    <small class="text-muted d-block mt-2">The port used by OpenVPN to receive client connections.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cryptographic Settings Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Cryptographic Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientTlsConfig" class="form-label"><strong>TLS Configuration</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientUseTLSKey" name="clientUseTLSKey" checked>
+                                        <label class="form-check-label" for="clientUseTLSKey">
+                                            Use a TLS Key
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">A TLS key enhances security of an OpenVPN connection by requiring both parties to have a common key before a peer can perform a TLS handshake. This layer of HMAC authentication allows control channel packets without the proper key to be dropped, protecting the peers from attack or unauthorized connections. The TLS key does not have an effect on tunnel data.</small>
+                                    
+                                    <div class="form-check mt-3">
+                                        <input class="form-check-input" type="checkbox" id="clientAutoGenTLS" name="clientAutoGenTLS" checked>
+                                        <label class="form-check-label" for="clientAutoGenTLS">
+                                            Automatically generate a TLS Key.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientPeerCertAuth" class="form-label"><strong>Peer Certificate Authority</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="alert alert-info mb-2" role="alert">
+                                        No Certificate Authorities defined. One may be created here: <a href="#" class="alert-link">System > Cert. Manager</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientPeerCertRevocation" class="form-label"><strong>Peer Certificate Revocation list</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="alert alert-info mb-2" role="alert">
+                                        No Certificate Revocation Lists defined. One may be created here: <a href="#" class="alert-link">System > Cert. Manager</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientOcspCheck" class="form-label"><strong>OCSP Check</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientOcspCheck" name="clientOcspCheck">
+                                        <label class="form-check-label" for="clientOcspCheck">
+                                            Check client certificates with OCSP
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientServerCert" class="form-label"><strong>Server certificate</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientServerCert">
+                                        <option value="" selected>===== Server Certificates =====</option>
+                                        <option value="">GUI default (68e626ba9a349) (Server: Yes, In Use)</option>
+                                        <option value="" disabled>===== Non-Server Certificates =====</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Certificates known to be incompatible with use for OpenVPN are not included in this list, such as certificates using incompatible ECDSA curves or weak digest algorithms.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDhLength" class="form-label"><strong>DH Parameter Length</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientDhLength">
+                                        <option value="2048" selected>2048 bit</option>
+                                        <option value="1024">1024 bit</option>
+                                        <option value="3072">3072 bit</option>
+                                        <option value="4096">4096 bit</option>
+                                        <option value="6144">6144 bit</option>
+                                        <option value="8192">8192 bit</option>
+                                        <option value="ecdh">ECDH Only</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Diffie-Hellman (DH) parameter set used for key exchange. <i class="bi bi-info-circle"></i></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientEcdhCurve" class="form-label"><strong>ECDH Curve</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientEcdhCurve">
+                                        <option value="default" selected>Use Default</option>
+                                        <option value="prime256v1">prime256v1</option>
+                                        <option value="secp384r1">secp384r1</option>
+                                        <option value="secp521r1">secp521r1</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The Elliptic Curve to use for key exchange.<br>The curve from the server certificate is used by default when the server uses an ECDSA certificate. Otherwise, secp384r1 is used as a fallback.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDataEncryption" class="form-label"><strong>Data Encryption Algorithms</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; background-color: #f8f9fa;">
+                                                <div style="font-size: 0.85rem;">
+                                                    <div>AES-128-CBC (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB1 (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-CFB8 (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-GCM (128 bit key, 128 bit block)</div>
+                                                    <div>AES-128-OFB (128 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CBC (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB1 (192 bit key, 128 bit block)</div>
+                                                    <div>AES-192-CFB8 (192 bit key, 128 bit block)</div>
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">Available Data Encryption Algorithms<br>Click to add or remove an algorithm from the list</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div style="border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; height: 180px; overflow-y: auto; background-color: #f8f9fa;">
+                                                <div style="font-size: 0.85rem;">
+                                                    <div>AES-256-GCM</div>
+                                                    <div>AES-128-GCM</div>
+                                                    <div>CHACHA20-POLY1305</div>
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">Allowed Data Encryption Algorithms. Click an algorithm name to remove it from the list</small>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-3">The order of the selected Data Encryption Algorithms is respected by OpenVPN. This list is ignored in Shared Key mode. <i class="bi bi-info-circle"></i></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientFallbackEncryption" class="form-label"><strong>Fallback Data Encryption Algorithm</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientFallbackEncryption">
+                                        <option value="aes-256-cbc" selected>AES-256-CBC (256 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cbc">AES-128-CBC (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb">AES-128-CFB (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb1">AES-128-CFB1 (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-cfb8">AES-128-CFB8 (128 bit key, 128 bit block)</option>
+                                        <option value="aes-128-ofb">AES-128-OFB (128 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cbc">AES-192-CBC (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb">AES-192-CFB (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb1">AES-192-CFB1 (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-cfb8">AES-192-CFB8 (192 bit key, 128 bit block)</option>
+                                        <option value="aes-192-ofb">AES-192-OFB (192 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb">AES-256-CFB (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb1">AES-256-CFB1 (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-cfb8">AES-256-CFB8 (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-gcm">AES-256-GCM (256 bit key, 128 bit block)</option>
+                                        <option value="aes-256-ofb">AES-256-OFB (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cbc">CAMELLIA-128-CBC (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb">CAMELLIA-128-CFB (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb1">CAMELLIA-128-CFB1 (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-cfb8">CAMELLIA-128-CFB8 (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-128-ofb">CAMELLIA-128-OFB (128 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cbc">CAMELLIA-192-CBC (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb">CAMELLIA-192-CFB (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb1">CAMELLIA-192-CFB1 (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-cfb8">CAMELLIA-192-CFB8 (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-192-ofb">CAMELLIA-192-OFB (192 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cbc">CAMELLIA-256-CBC (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb">CAMELLIA-256-CFB (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb1">CAMELLIA-256-CFB1 (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-cfb8">CAMELLIA-256-CFB8 (256 bit key, 128 bit block)</option>
+                                        <option value="camellia-256-ofb">CAMELLIA-256-OFB (256 bit key, 128 bit block)</option>
+                                        <option value="chacha20-poly1305">CHACHA20-POLY1305 (256 bit key, 256 bit auth)</option>
+                                        <option value="des-ede-cbc">DES-EDE-CBC (128 bit key, 64 bit block)</option>
+                                        <option value="des-ede-cfb">DES-EDE-CFB (128 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cbc">DES-EDE3-CBC (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb">DES-EDE3-CFB (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb1">DES-EDE3-CFB1 (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-cfb8">DES-EDE3-CFB8 (192 bit key, 64 bit block)</option>
+                                        <option value="des-ede3-ofb">DES-EDE3-OFB (192 bit key, 64 bit block)</option>
+                                        <option value="none">None (No Encryption)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The Fallback Data Encryption Algorithm used for data channel packets when communicating with clients that do not support data encryption algorithm negotiation (e.g. Shared Key). This algorithm is automatically included in the Data Encryption Algorithms list.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientAuthDigest" class="form-label"><strong>Auth digest algorithm</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientAuthDigest">
+                                        <option value="sha256" selected>SHA256 (256-bit)</option>
+                                        <option value="blake2b512">BLAKE2b512 (512-bit)</option>
+                                        <option value="blake2s256">BLAKE2s256 (256-bit)</option>
+                                        <option value="keccak-kmac-128">KECCAK-KMAC-128 (256-bit)</option>
+                                        <option value="keccak-kmac-256">KECCAK-KMAC-256 (512-bit)</option>
+                                        <option value="md5">MD5 (128-bit)</option>
+                                        <option value="md5-sha1">MD5-SHA1 (288-bit)</option>
+                                        <option value="null">NULL (0-bit)</option>
+                                        <option value="ripemd160">RIPEMD160 (160-bit)</option>
+                                        <option value="sha1">SHA1 (160-bit)</option>
+                                        <option value="sha224">SHA224 (224-bit)</option>
+                                        <option value="sha256">SHA256 (256-bit)</option>
+                                        <option value="sha3-224">SHA3-224 (224-bit)</option>
+                                        <option value="sha3-256">SHA3-256 (256-bit)</option>
+                                        <option value="sha3-384">SHA3-384 (384-bit)</option>
+                                        <option value="sha3-512">SHA3-512 (512-bit)</option>
+                                        <option value="sha384">SHA384 (384-bit)</option>
+                                        <option value="sha512">SHA512 (512-bit)</option>
+                                        <option value="sha512-224">SHA512-224 (224-bit)</option>
+                                        <option value="sha512-256">SHA512-256 (256-bit)</option>
+                                        <option value="shake128">SHAKE128 (128-bit)</option>
+                                        <option value="shake256">SHAKE256 (256-bit)</option>
+                                        <option value="none">None (No Authentication)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">The algorithm used to authenticate data channel packets, and control channel packets if a TLS Key is present.<br>When an AEAD Encryption Algorithm mode is used, such as AES-GCM, this digest is used for the control channel only, not the data channel.<br>The server and all clients must have the same setting. While SHA1 is the default for OpenVPN, this algorithm is insecure.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientCertDepth" class="form-label"><strong>Certificate Depth</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientCertDepth">
+                                        <option value="one" selected>One (Client+Server)</option>
+                                        <option value="no_check">Do Not Check</option>
+                                        <option value="two">Two (Client+Intermediate+Server)</option>
+                                        <option value="three">Three (Client+2Intermediate+Server)</option>
+                                        <option value="four">Four (Client+3Intermediate+Server)</option>
+                                        <option value="five">Five (Client+4Intermediate+Server)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">When a certificate-based client logs in, do not accept certificates below this depth. Useful for denying certificates made with intermediate CAs generated from the same CA as the server.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientCertKeyUsage" class="form-label"><strong>Client Certificate Key Usage Validation</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientCertKeyUsage" name="clientCertKeyUsage" checked>
+                                        <label class="form-check-label" for="clientCertKeyUsage">
+                                            Enforce key usage
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Verify that only hosts with a client certificate can connect (EKU: "TLS Web Client Authentication").</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Tunnel Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Tunnel Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv4TunnelNetwork" class="form-label"><strong>IPv4 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv4TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv4 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed using CIDR notation (e.g. 10.0.8.0/24). The first usable address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.<br><br>A tunnel network of /30 or smaller puts OpenVPN into a special peer-to-peer mode which cannot push settings to clients. This mode is not compatible with several options, including Exit Notify, and Inactive.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv6TunnelNetwork" class="form-label"><strong>IPv6 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv6TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv6 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed using CIDR notation (e.g. fe80::/64). The ::1 address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientRedirectIPv4" class="form-label"><strong>Redirect IPv4 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientRedirectIPv4" name="clientRedirectIPv4">
+                                        <label class="form-check-label" for="clientRedirectIPv4">
+                                            Force all client-generated IPv4 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientRedirectIPv6" class="form-label"><strong>Redirect IPv6 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientRedirectIPv6" name="clientRedirectIPv6">
+                                        <label class="form-check-label" for="clientRedirectIPv6">
+                                            Force all client-generated IPv6 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv4LocalNetworks" class="form-label"><strong>IPv4 Local network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv4LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv4 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv6LocalNetworks" class="form-label"><strong>IPv6 Local network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv6LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv6 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv4RemoteNetworks" class="form-label"><strong>IPv4 Remote network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv4RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">IPv4 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientIpv6RemoteNetworks" class="form-label"><strong>IPv6 Remote network(s)</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="clientIpv6RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv6 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientConcurrentConnections" class="form-label"><strong>Concurrent connections</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="clientConcurrentConnections" placeholder="">
+                                    <small class="text-muted d-block mt-2">Specify the maximum number of clients allowed to concurrently connect to this server.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientAllowCompression" class="form-label"><strong>Allow Compression</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientAllowCompression">
+                                        <option value="refuse" selected>Refuse any non-stub compression (Most secure)</option>
+                                        <option value="asymmetric">Decompress incoming, do not compress outgoing (Asymmetric)</option>
+                                        <option value="allow">Compress packets (WARNING: Potentially dangerous)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Allow compression to be used with this VPN instance. Compression can potentially increase throughput but may allow an attacker to extract secrets if they can control compressed plaintext traversing the VPN (e.g. HTTP). Before enabling compression, consult information about the VORACLE, CRIME, TIME, and BREACH attacks against TLS to decide if the use case for this specific VPN is vulnerable to attack.<br><br>Asymmetric compression allows an easier transition when connecting with older peers.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientTypeOfService" class="form-label"><strong>Type-of-Service</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientTypeOfService" name="clientTypeOfService">
+                                        <label class="form-check-label" for="clientTypeOfService">
+                                            Set the TOS IP header value of tunnel packets to match the encapsulated packet value.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientInterClientComm" class="form-label"><strong>Inter-client communication</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientInterClientComm" name="clientInterClientComm">
+                                        <label class="form-check-label" for="clientInterClientComm">
+                                            Allow communication between clients connected to this server
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDuplicateConnection" class="form-label"><strong>Duplicate Connection</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientDuplicateConnection" name="clientDuplicateConnection">
+                                        <label class="form-check-label" for="clientDuplicateConnection">
+                                            Allow multiple concurrent connections from the same user
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">When set, the same user may connect multiple times. When unset, a new connection from a user will disconnect the previous session.<br><br>Users are identified by their username or certificate properties, depending on the VPN configuration. This practice is discouraged security reasons, but may be necessary in some environments.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Client Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Client Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientDynamicIP" class="form-label"><strong>Dynamic IP</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientDynamicIP" name="clientDynamicIP">
+                                        <label class="form-check-label" for="clientDynamicIP">
+                                            Allow connected clients to retain their connections if their IP address changes.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientTopology" class="form-label"><strong>Topology</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientTopology">
+                                        <option value="subnet" selected>Subnet – One IP address per client in a common subnet</option>
+                                        <option value="net30">net30 – Isolated /30 network per client</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Specifies the method used to supply a virtual adapter IP address to clients when using TUN mode on IPv4. Some clients may require this be set to "subnet" even for IPv6, such as OpenVPN Connect (iOS/Android). Older versions of OpenVPN (before 2.0.9) or clients such as Yealink phones may require "net30".</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Ping settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Ping settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientInactivityTimeout" class="form-label"><strong>Inactivity Timeout</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="clientInactivityTimeout" value="300" placeholder="300">
+                                    <small class="text-muted d-block mt-2">Causes OpenVPN to close a client connection after n seconds of inactivity on the TUN/TAP device. Activity is based on the last incoming or outgoing tunnel packet. A value of 0 disables this feature. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientPingMethod" class="form-label"><strong>Ping method</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientPingMethod">
+                                        <option value="keepalive" selected>keepalive -- Use keepalive helper to define ping configuration</option>
+                                        <option value="ping">ping -- Define ping/ping-exit/ping-restart manually</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">keepalive helper uses interval and timeout parameters to define ping and ping-restart values as follows:<br>ping = interval<br>ping-restart = timeout*2<br>push ping = interval<br>push ping-restart = timeout</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientPingInterval" class="form-label"><strong>Interval</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="clientPingInterval" value="10" placeholder="10">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientPingTimeout" class="form-label"><strong>Timeout</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="clientPingTimeout" value="60" placeholder="60">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Advanced Configuration Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Advanced Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientCustomOptions" class="form-label"><strong>Custom options</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <textarea class="form-control" id="clientCustomOptions" rows="4" placeholder=""></textarea>
+                                    <small class="text-muted d-block mt-2">Enter any additional options to add to the OpenVPN server configuration here, separated by semicolon. EXAMPLE: push "route 10.0.0.0 255.255.255.0"</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientUdpFastIO" class="form-label"><strong>UDP Fast I/O</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="clientUdpFastIO" name="clientUdpFastIO">
+                                        <label class="form-check-label" for="clientUdpFastIO">
+                                            Use fast I/O operations with UDP writes to tun/tap. Experimental.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Optimizes the packet write event loop, improving CPU efficiency by 5% to 10%. Not compatible with all platforms, and not compatible with OpenVPN bandwidth limiting.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientExitNotify" class="form-label"><strong>Exit Notify</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientExitNotify">
+                                        <option value="reconnect" selected>Reconnect to this server / Retry once</option>
+                                        <option value="disabled">Disabled</option>
+                                        <option value="next_server">Reconnect to next server / Retry twice</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Send an explicit exit notification to connected clients/peers when restarting or shutting down, so they may immediately disconnect rather than waiting for a timeout. In SSL/TLS Server modes, clients are directed to reconnect or use the next server. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientSendReceiveBuffer" class="form-label"><strong>Send/Receive Buffer</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientSendReceiveBuffer">
+                                        <option value="default" selected>Default</option>
+                                        <option value="64kib">64 KiB</option>
+                                        <option value="128kib">128 KiB</option>
+                                        <option value="256kib">256 KiB</option>
+                                        <option value="512kib">512 KiB</option>
+                                        <option value="1mib">1.00 MiB</option>
+                                        <option value="2mib">2.00 MiB</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Configure a Send and Receive Buffer size for OpenVPN. The default buffer size can be too small in many cases, depending on hardware and network uplink speeds. Finding the best buffer size can take some experimentation. To test the best value for a site, start at 512KiB and test higher and lower values.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientGatewayCreation" class="form-label"><strong>Gateway creation</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="clientGwBoth" name="clientGatewayCreation" value="both" checked>
+                                        <label class="form-check-label" for="clientGwBoth">
+                                            Both
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="clientGwIPv4" name="clientGatewayCreation" value="ipv4">
+                                        <label class="form-check-label" for="clientGwIPv4">
+                                            IPv4 only
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="clientGwIPv6" name="clientGatewayCreation" value="ipv6">
+                                        <label class="form-check-label" for="clientGwIPv6">
+                                            IPv6 only
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">If you assign a virtual interface to this OpenVPN server, this setting controls which gateway types will be created. The default setting is 'both'.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="clientVerbosityLevel" class="form-label"><strong>Verbosity level</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="clientVerbosityLevel">
+                                        <option value="default" selected>default</option>
+                                        <option value="none">none</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3 (recommended)</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                        <option value="9">9</option>
+                                        <option value="10">10</option>
+                                        <option value="11">11</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Each level shows all info from the previous levels. Level 3 is recommended for a good summary of what's happening without being swamped by output.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save Client</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add CSC Override -->
+<div class="modal fade" id="addCSCModal" tabindex="-1" aria-labelledby="addCSCModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addCSCModalLabel">Add Client Specific Override</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCSCForm">
+                    <!-- General Information Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            General Information
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscDescription" class="form-label"><strong>Description</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscDescription" placeholder="">
+                                    <small class="text-muted d-block mt-2">A description of this override for administrative reference.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscDisabled" class="form-label"><strong>Disable</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscDisabled" name="cscDisabled">
+                                        <label class="form-check-label" for="cscDisabled">
+                                            Disable this override
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Set this option to disable this client-specific override without removing it from the list.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Override Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Override Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscCommonName" class="form-label"><strong>Common Name</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscCommonName" placeholder="">
+                                    <small class="text-muted d-block mt-2">Enter the X.509 common name for the client certificate, or the username for VPNs utilizing password authentication. This match is case sensitive.<br>Enter "DEFAULT" to override default client behavior.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscConnectionBlocking" class="form-label"><strong>Connection blocking</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscConnectionBlocking" name="cscConnectionBlocking">
+                                        <label class="form-check-label" for="cscConnectionBlocking">
+                                            Block this client connection based on its common name.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Prevents the client from connecting to this server. Do not use this option to permanently disable a client due to a compromised key or password. Use a CRL (certificate revocation list) instead.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscServerList" class="form-label"><strong>Server List</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <textarea class="form-control" id="cscServerList" rows="4" placeholder=""></textarea>
+                                    <small class="text-muted d-block mt-2">Select the servers that will utilize this override. When no servers are selected, the override will apply to all servers.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscResetServerOptions" class="form-label"><strong>Reset Server Options</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="cscResetServerOptions">
+                                        <option value="keep_default" selected>Keep all server options (default)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Prevent this client from receiving server-defined client settings. Other client-specific options on this page will supersede these options.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Tunnel Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Tunnel Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv4TunnelNetwork" class="form-label"><strong>IPv4 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv4TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">The virtual IPv4 network or network type alias with a single entry used for private communications between this client and the server expressed using CIDR (e.g. 10.0.8.5/24).<br>With net30 topology, enter the client IP address and the subnet mask must match the IPv4 Tunnel Network on the server. With net30 topology, the first network address of the /30 is assumed to be the server address and the second network address will be assigned to the client.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv6TunnelNetwork" class="form-label"><strong>IPv6 Tunnel Network</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv6TunnelNetwork" placeholder="">
+                                    <small class="text-muted d-block mt-2">The virtual IPv6 network or network type alias with a single entry used for private communications between this client and the server expressed using prefix (e.g. 2001:db9:1:1::100/64).<br>Enter the client IPv6 address and prefix. The prefix must match the IPv6 Tunnel Network prefix on the server.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv4Gateway" class="form-label"><strong>IPv4 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv4Gateway" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv4 Gateway to push to the client. Normally it is left blank and determined automatically.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv6Gateway" class="form-label"><strong>IPv6 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv6Gateway" placeholder="">
+                                    <small class="text-muted d-block mt-2">This is the IPv6 Gateway to push to the client. Normally it is left blank and determined automatically.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscRedirectIPv4" class="form-label"><strong>Redirect IPv4 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscRedirectIPv4" name="cscRedirectIPv4">
+                                        <label class="form-check-label" for="cscRedirectIPv4">
+                                            Force all client-generated IPv4 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscRedirectIPv6" class="form-label"><strong>Redirect IPv6 Gateway</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscRedirectIPv6" name="cscRedirectIPv6">
+                                        <label class="form-check-label" for="cscRedirectIPv6">
+                                            Force all client-generated IPv6 traffic through the tunnel.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv4LocalNetworks" class="form-label"><strong>IPv4 Local Network/s</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv4LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv4 server-side networks that will be accessible from this particular client. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases.<br>NOTE: Networks do not need to be specified here if they have already been defined on the main server configuration.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv6LocalNetworks" class="form-label"><strong>IPv6 Local Network/s</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv6LocalNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv6 server-side networks that will be accessible from this particular client. Expressed as a comma-separated list of one or more IP/PREFIX networks.<br>NOTE: Networks do not need to be specified here if they have already been defined on the main server configuration.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv4RemoteNetworks" class="form-label"><strong>IPv4 Remote Network/s</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv4RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv4 client-side networks that will be routed to this client specifically using iroute, so that a site-to-site VPN can be established. Expressed as a comma-separated list of one or more CIDR ranges. May be left blank if there are no client-side networks to be routed.<br>NOTE: Remember to add these subnets to the IPv4 Remote Networks list on the corresponding OpenVPN server settings.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscIpv6RemoteNetworks" class="form-label"><strong>IPv6 Remote Network/s</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="text" class="form-control" id="cscIpv6RemoteNetworks" placeholder="">
+                                    <small class="text-muted d-block mt-2">These are the IPv6 client-side networks that will be routed to this client specifically using iroute, so that a site-to-site VPN can be established. Expressed as a comma-separated list of one or more IP/PREFIX networks. May be left blank if there are no client-side networks to be routed.<br>NOTE: Remember to add these subnets to the IPv6 Remote Networks list on the corresponding OpenVPN server settings.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" style="border: 1px solid #dee2e6;">
+
+                        <!-- Other Client Settings Section -->
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Other Client Settings
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscInactivityTimeout" class="form-label"><strong>Inactivity Timeout</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="cscInactivityTimeout" placeholder="">
+                                    <small class="text-muted d-block mt-2">Set connection inactivity timeout</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscPingInterval" class="form-label"><strong>Ping Interval</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <input type="number" class="form-control" id="cscPingInterval" placeholder="">
+                                    <small class="text-muted d-block mt-2">Set peer ping interval</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscPingAction" class="form-label"><strong>Ping Action</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <select class="form-select" id="cscPingAction">
+                                        <option value="default" selected>Don't override option (default)</option>
+                                        <option value="ping_restart">ping-restart -- Restart OpenVPN after timeout</option>
+                                        <option value="ping_exit">ping-exit -- Exit OpenVPN after timeout</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">Exit or restart OpenVPN client after server timeout</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscDnsDefaultDomain" class="form-label"><strong>DNS Default Domain</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscDnsDefaultDomain" name="cscDnsDefaultDomain">
+                                        <label class="form-check-label" for="cscDnsDefaultDomain">
+                                            Provide a default domain name to clients
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscDnsServers" class="form-label"><strong>DNS Servers</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscDnsServers" name="cscDnsServers">
+                                        <label class="form-check-label" for="cscDnsServers">
+                                            Provide a DNS server list to clients
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscBlockOutsideDns" class="form-label"><strong>Block Outside DNS</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscBlockOutsideDns" name="cscBlockOutsideDns">
+                                        <label class="form-check-label" for="cscBlockOutsideDns">
+                                            Make Windows 10 Clients Block access to DNS servers except across OpenVPN while connected, forcing clients to use only VPN DNS servers.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">Requires Windows 10 and OpenVPN 2.3.9 or later. Only Windows 10 is prone to DNS leakage in this way, other clients will ignore the option as they are not affected.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscForceDnsCacheUpdate" class="form-label"><strong>Force DNS cache update</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscForceDnsCacheUpdate" name="cscForceDnsCacheUpdate">
+                                        <label class="form-check-label" for="cscForceDnsCacheUpdate">
+                                            Run "net stop dnscache", "net start dnscache", "ipconfig /flushdns" and "ipconfig /registerdns" on connection initiation.
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">This is known to kick Windows into recognizing pushed DNS servers.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscNtpServers" class="form-label"><strong>NTP Servers</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscNtpServers" name="cscNtpServers">
+                                        <label class="form-check-label" for="cscNtpServers">
+                                            Provide an NTP server list to clients
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscNetbiosOptions" class="form-label"><strong>NetBIOS Options</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="cscNetbiosOptions" name="cscNetbiosOptions">
+                                        <label class="form-check-label" for="cscNetbiosOptions">
+                                            Enable NetBIOS over TCP/IP
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">If this option is not set, all NetBIOS-over-TCP/IP options (including WINS) will be disabled.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="cscAdvanced" class="form-label"><strong>Advanced</strong></label>
+                                </div>
+                                <div class="col-md-9">
+                                    <textarea class="form-control" id="cscAdvanced" rows="4" placeholder=""></textarea>
+                                    <small class="text-muted d-block mt-2">Enter any additional options to add for this client specific override, separated by a semicolon.<br>EXAMPLE: push "route 10.0.0.0 255.255.255.0"</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save Override</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
