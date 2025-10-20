@@ -1,10 +1,1299 @@
-{% extends 'base.html' %}
-
-{% block content %}
-<h1>Welcome to IPsec</h1>
-<p>This is an empty placeholder page for VPN &gt; IPsec.</p>
-{% endblock %}
+{% extends "base.html" %}
 {% block main %}
-<h1>IPsec</h1>
-<p>Placeholder for IPsec VPN page.</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>VPN / IPsec / Tunnels</h2>
+    <div>
+        <button class="btn btn-sm btn-outline-secondary me-2">
+            <i class="bi bi-arrow-repeat"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary me-2">
+            <i class="bi bi-arrow-down-up"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-x-circle"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Navigation tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tunnels-tab" data-bs-toggle="tab" data-bs-target="#tunnels" type="button" role="tab" aria-controls="tunnels" aria-selected="true">
+            Tunnels
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mobile-clients-tab" data-bs-toggle="tab" data-bs-target="#mobile-clients" type="button" role="tab" aria-controls="mobile-clients" aria-selected="false">
+            Mobile Clients
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pre-shared-keys-tab" data-bs-toggle="tab" data-bs-target="#pre-shared-keys" type="button" role="tab" aria-controls="pre-shared-keys" aria-selected="false">
+            Pre-Shared Keys
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="advanced-settings-tab" data-bs-toggle="tab" data-bs-target="#advanced-settings" type="button" role="tab" aria-controls="advanced-settings" aria-selected="false">
+            Advanced Settings
+        </button>
+    </li>
+</ul>
+
+<!-- Tab content -->
+<div class="tab-content">
+    <!-- Tunnels tab -->
+    <div class="tab-pane fade show active" id="tunnels" role="tabpanel" aria-labelledby="tunnels-tab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>IPsec Tunnels</h5>
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addP1Modal">
+                <i class="bi bi-plus"></i> Add P1
+            </button>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>IKE</th>
+                        <th>Remote Gateway</th>
+                        <th>Auth/Mode</th>
+                        <th>P1 Protocol</th>
+                        <th>P1 Transforms</th>
+                        <th>P1 DH-Group</th>
+                        <th>P1 Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="9" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-info-circle"></i> No IPsec tunnels configured.
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Mobile Clients tab -->
+    <div class="tab-pane fade" id="mobile-clients" role="tabpanel" aria-labelledby="mobile-clients-tab">
+        <form id="mobileClientsForm">
+            <!-- Enable IPsec Mobile Client Support Section -->
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    Enable IPsec Mobile Client Support
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="enableMobileClientSupport" name="enableMobileClientSupport">
+                        <label class="form-check-label" for="enableMobileClientSupport">
+                            <strong>IKE Extensions</strong> - Enable IPsec Mobile Client Support
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Extended Authentication (Xauth) Section -->
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    Extended Authentication (Xauth)
+                </div>
+
+                <div class="mb-3">
+                    <label for="userAuthentication" class="form-label"><strong>User Authentication</strong></label>
+                    <textarea class="form-control" id="userAuthentication" rows="4" placeholder="Local Database">Local Database</textarea>
+                    <small class="text-muted">Source</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="groupAuthentication" name="groupAuthentication">
+                        <label class="form-check-label" for="groupAuthentication">
+                            <strong>Group Authentication</strong> - Authenticate members of groups which have either "User - VPN: IPsec with Dialin" or "WebCfg - All pages" privileges.
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="radiusAccounting" name="radiusAccounting">
+                        <label class="form-check-label" for="radiusAccounting">
+                            <strong>RADIUS Accounting</strong> - Enable RADIUS Accounting
+                        </label>
+                    </div>
+                    <small class="text-muted">When enabled, the IPsec daemon will attempt to send RADIUS accounting data for mobile IPsec connections with Virtual IP addresses. Do not enable this option unless the selected RADIUS servers are online and capable of receiving RADIUS accounting data. If RADIUS accounting data is enabled and fails to send, tunnels will be disconnected.</small>
+                </div>
+            </div>
+
+            <!-- Client Configuration (mode-cfg) Section -->
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    Client Configuration (mode-cfg)
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="virtualAddressPool" name="virtualAddressPool">
+                        <label class="form-check-label" for="virtualAddressPool">
+                            <strong>Virtual Address Pool</strong> - Provide a virtual IP address to clients
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="virtualIPv6AddressPool" name="virtualIPv6AddressPool">
+                        <label class="form-check-label" for="virtualIPv6AddressPool">
+                            <strong>Virtual IPv6 Address Pool</strong> - Provide a virtual IPv6 address to clients
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="radiusIPPriority" name="radiusIPPriority">
+                        <label class="form-check-label" for="radiusIPPriority">
+                            <strong>RADIUS IP address priority</strong> - IPv4/IPv6 address pool is used if address is not supplied by RADIUS server
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="radiusAdvanced" name="radiusAdvanced">
+                        <label class="form-check-label" for="radiusAdvanced">
+                            <strong>RADIUS Advanced Parameters</strong> - Set Advanced RADIUS parameters
+                        </label>
+                    </div>
+                    <small class="text-muted">May only be required when using 2FA/MFA with RADIUS or under high load.</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="networkList" name="networkList">
+                        <label class="form-check-label" for="networkList">
+                            <strong>Network List</strong> - Provide a list of accessible networks to clients
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="saveXauthPassword" name="saveXauthPassword">
+                        <label class="form-check-label" for="saveXauthPassword">
+                            <strong>Save Xauth Password</strong> - Allow clients to save Xauth passwords (Cisco VPN client only).
+                        </label>
+                    </div>
+                    <small class="text-muted">NOTE: With iPhone clients, this does not work when deployed via the iPhone configuration utility, only by manual entry.</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="dnsDefaultDomain" name="dnsDefaultDomain">
+                        <label class="form-check-label" for="dnsDefaultDomain">
+                            <strong>DNS Default Domain</strong> - Provide a default domain name to clients
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="splitDns" name="splitDns">
+                        <label class="form-check-label" for="splitDns">
+                            <strong>Split DNS</strong> - Provide a list of split DNS domain names to clients. Enter a space separated list.
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="dnsServers" name="dnsServers">
+                        <label class="form-check-label" for="dnsServers">
+                            <strong>DNS Servers</strong> - Provide a DNS server list to clients
+                        </label>
+                    </div>
+                    <small class="text-muted">NOTE: IPv4-mapped IPv6 addresses (ex: fd00::1.2.3.4) are not supported.</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="winsServers" name="winsServers">
+                        <label class="form-check-label" for="winsServers">
+                            <strong>WINS Servers</strong> - Provide a WINS server list to clients
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="phase2PFSGroup" name="phase2PFSGroup">
+                        <label class="form-check-label" for="phase2PFSGroup">
+                            <strong>Phase2 PFS Group</strong> - Provide the Phase2 PFS group to clients ( overrides all mobile phase2 settings )
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="loginBanner" name="loginBanner">
+                        <label class="form-check-label" for="loginBanner">
+                            <strong>Login Banner</strong> - Provide a login banner to clients
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <button type="button" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Pre-Shared Keys tab -->
+    <div class="tab-pane fade" id="pre-shared-keys" role="tabpanel" aria-labelledby="pre-shared-keys-tab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Pre-Shared Keys</h5>
+            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addPSKModal">
+                <i class="bi bi-plus"></i> Add PSK
+            </button>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Identifier</th>
+                        <th>Secret Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="3" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-info-circle"></i> No Pre-Shared Keys configured.
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Advanced Settings tab -->
+    <div class="tab-pane fade" id="advanced-settings" role="tabpanel" aria-labelledby="advanced-settings-tab">
+        <form id="advancedSettingsForm">
+            <!-- IPsec Logging Controls Section -->
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    IPsec Logging Controls
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <td><strong>Daemon</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>SA Manager</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>IKE SA</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>IKE Child SA</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Job Processing</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Configuration backend</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Kernel Interface</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Networking</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>ASN encoding</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Message encoding</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Integrity checker</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Integrity Verifier</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Platform Trust Service</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>TLS handler</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>IPsec traffic</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>StrongSwan Lib</strong></td>
+                                <td>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <small class="text-muted d-block mt-3">Changes the log verbosity for the IPsec daemon, so that more detail will be generated to aid in troubleshooting.</small>
+            </div>
+
+            <!-- Advanced IPsec Settings Section -->
+            <div class="mb-4">
+                <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                    Advanced IPsec Settings
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="configureUniqueIDs" class="form-label"><strong>Configure Unique IDs as</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <select class="form-select" id="configureUniqueIDs">
+                                <option value="yes" selected>Yes (Replace)</option>
+                                <option value="no">No</option>
+                                <option value="never">Never</option>
+                                <option value="keep">Keep</option>
+                            </select>
+                            <small class="text-muted d-block mt-2">Whether a particular participant ID should be kept unique, with any new IKE_SA using an ID deemed to replace all old ones using that ID. Participant IDs normally are unique, so a new IKE_SA using the same ID is almost invariably intended to replace an old one. The difference between <strong>no</strong> and <strong>never</strong> is that the old IKE_SAs will be replaced when receiving an INITIAL_CONTACT notify if the option is not set. The daemon also accepts the value <strong>keep</strong> to reject new IKE_SA setups and keep the duplicate established earlier. Defaults to Yes.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="ipsecFilterMode" class="form-label"><strong>IPsec Filter Mode</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <select class="form-select" id="ipsecFilterMode">
+                                <option value="tunnel" selected>Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)</option>
+                                <option value="vti_transport">Filter [IPsec VTI and Transport on assigned interfaces, block all tunnel mode traffic]</option>
+                            </select>
+                            <small class="text-muted d-block mt-2">Experimental. Controls how the firewall will filter IPsec traffic. By default, rules on the IPsec tab filter all IPsec traffic, including tunnel mode, transport mode, and VTI mode.<br><br>This is limited in that it does not allow for filtering on assigned VTI or transport mode interfaces (e.g. GRE), and it does not support features such as NAT rules and reply-to for return routing. When set to filter on assigned VTI and transport interfaces, <strong>all tunnel mode traffic is blocked</strong>. Do not set this option unless <strong>all IPsec tunnels are using VTI or transport mode</strong>.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="ikev2Retransmission" class="form-label"><strong>IKEv2 Retransmission Parameters</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ikev2Retransmission" name="ikev2Retransmission">
+                                <label class="form-check-label" for="ikev2Retransmission">
+                                    Set IKEv2 Retransmission parameters
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Retransmission timeout parameters for IKEv2.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="ipCompression" class="form-label"><strong>IP Compression</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ipCompression" name="ipCompression">
+                                <label class="form-check-label" for="ipCompression">
+                                    Enable IPCompression
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">IPComp compression of content is proposed on the connection.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="pkcs11Support" class="form-label"><strong>PKCS#11 Support</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="pkcs11Support" name="pkcs11Support">
+                                <label class="form-check-label" for="pkcs11Support">
+                                    Enable PKCS#11
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Allow use of PKCS#11 tokens for Phase 1 authentication. Note that restarting the PS/SC Smart Card service will restart IPsec and vice versa.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="strictInterfaceBinding" class="form-label"><strong>Strict interface binding</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="strictInterfaceBinding" name="strictInterfaceBinding">
+                                <label class="form-check-label" for="strictInterfaceBinding">
+                                    Enable strict interface binding
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Enable strongSwan's interfaces_use option to bind specific interfaces only. This option is known to break IPsec with dynamic IP interfaces. This is not recommended at this time.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="unencryptedPayloads" class="form-label"><strong>Unencrypted payloads in IKEv1 Main Mode</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="unencryptedPayloads" name="unencryptedPayloads">
+                                <label class="form-check-label" for="unencryptedPayloads">
+                                    Accept unencrypted ID and HASH payloads in IKEv1 Main Mode
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Some implementations send the third Main Mode message unencrypted, probably to find the PSKs for the specified ID for authentication. This is very similar to Aggressive Mode, and has the same security implications: A passive attacker can sniff the negotiated identity, and start brute forcing the PSK using the HASH payload. It is recommended to keep this option to no, unless the exact implications are known and compatibility is required for such devices (for example, some SonicWall boxes).</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="maxIKEv1Phase2" class="form-label"><strong>Maximum IKEv1 Phase 2 Exchanges</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <input type="number" class="form-control" id="maxIKEv1Phase2" value="3" placeholder="3">
+                            <small class="text-muted d-block mt-2">IKEv1 phase 2 rekeying for one VPN gateway can be initiated in parallel. By default only 3 parallel rekeys are allowed. Undersized values can break VPN connections with many phase 2 definitions. If unsure, set this value to match the largest number of phase 2 entries on any phase 1.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="ciscoExtensions" class="form-label"><strong>Enable Cisco Extensions</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ciscoExtensions" name="ciscoExtensions">
+                                <label class="form-check-label" for="ciscoExtensions">
+                                    Enable Unity Plugin
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Enable Unity Plugin which provides Cisco Extension support such as Split-Include, Split-Exclude and Split-Dns.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="strictCRLChecking" class="form-label"><strong>Strict CRL Checking</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="strictCRLChecking" name="strictCRLChecking">
+                                <label class="form-check-label" for="strictCRLChecking">
+                                    Enable strict Certificate Revocation List checking
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Check this to require availability of a fresh CRL for peer authentication based on certificate signatures to succeed.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="fqdnResolveInterval" class="form-label"><strong>FQDN Endpoints Resolve Interval</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <input type="number" class="form-control" id="fqdnResolveInterval" value="60" placeholder="60">
+                            <small class="text-muted d-block mt-2">Interval, in seconds, that will be used to resolve FQDN remote gateways.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="makeBeforeBreak" class="form-label"><strong>Make before Break</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="makeBeforeBreak" name="makeBeforeBreak">
+                                <label class="form-check-label" for="makeBeforeBreak">
+                                    Initiate IKEv2 reauthentication with a make-before-break
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Instead of a break-before-make scheme. Make-before-break uses overlapping IKE and CHILD_SA during reauthentication by first recreating all new SAs before deleting the old ones. This behavior can be beneficial to avoid connectivity gaps during reauthentication, but requires support for overlapping SAs by the peer.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="asyncCrypto" class="form-label"><strong>Asynchronous Cryptography</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="asyncCrypto" name="asyncCrypto">
+                                <label class="form-check-label" for="asyncCrypto">
+                                    Use asynchronous mode to parallelize multiple cryptography jobs
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Allow crypto(9) jobs to be dispatched multi-threaded to increase performance. Jobs are handled in the order they are received so that packets will be reinjected in the correct order.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="customPorts" class="form-label"><strong>Custom ports</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control" id="ikePorts" placeholder="IKE port" value="500">
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control" id="nattPorts" placeholder="NAT-T port" value="4500">
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2"><strong>IKE port</strong> - Local UDP port for IKE (Default: 500)<br><strong>NAT-T port</strong> - Local UDP port for NAT-T (Default: 4500)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3" style="border-bottom: 1px solid #dee2e6;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="autoExcludeLAN" class="form-label"><strong>Auto-exclude LAN address</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="autoExcludeLAN" name="autoExcludeLAN" checked>
+                                <label class="form-check-label" for="autoExcludeLAN">
+                                    Enable bypass for LAN interface IP
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Exclude traffic from LAN subnet to LAN IP address from IPsec.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 pb-3">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="additionalBypass" class="form-label"><strong>Additional IPsec bypass</strong></label>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="additionalBypass" name="additionalBypass">
+                                <label class="form-check-label" for="additionalBypass">
+                                    Enable extra IPsec bypass rules
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-2">Create extra rules to exclude specific traffic from IPsec.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="button" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Save
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for Add P1 -->
+<div class="modal fade" id="addP1Modal" tabindex="-1" aria-labelledby="addP1ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addP1ModalLabel">Add Phase 1 (P1) Configuration</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addP1Form">
+                    <!-- General Information Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            General Information
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label"><strong>Description</strong></label>
+                            <input type="text" class="form-control" id="description" placeholder="">
+                            <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="disabled" name="disabled">
+                                <label class="form-check-label" for="disabled">
+                                    <strong>Disabled</strong> - Set this option to disable this phase1 without removing it from the list.
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IKE Endpoint Configuration Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            IKE Endpoint Configuration
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="keyExchange" class="form-label"><strong>Key Exchange version</strong></label>
+                            <select class="form-select" id="keyExchange">
+                                <option value="auto">Auto</option>
+                                <option value="ikev1">IKEv1</option>
+                                <option value="ikev2" selected>IKEv2</option>
+                            </select>
+                            <small class="text-muted">Select the Internet Key Exchange protocol version to be used. Auto uses IKEv2 when initiator, and accepts either IKEv1 or IKEv2 as responder.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="protocol" class="form-label"><strong>Internet Protocol</strong></label>
+                            <select class="form-select" id="protocol">
+                                <option value="ipv4" selected>IPv4</option>
+                                <option value="ipv6">IPv6</option>
+                                <option value="both">Both</option>
+                            </select>
+                            <small class="text-muted">Select the Internet Protocol family.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="interface" class="form-label"><strong>Interface</strong></label>
+                            <select class="form-select" id="interface">
+                                <option value="wan" selected>WAN</option>
+                                <option value="lan">LAN</option>
+                            </select>
+                            <small class="text-muted">Select the interface for the local endpoint of this phase1 entry.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="remoteGateway" class="form-label"><strong>Remote Gateway</strong></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="remoteGateway" placeholder="">
+                                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="tooltip" data-bs-title="Info">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Enter the public IP address or host name of the remote gateway.</small>
+                        </div>
+                    </div>
+
+                    <!-- Phase 1 Proposal (Authentication) Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Phase 1 Proposal (Authentication)
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="authMethod" class="form-label"><strong>Authentication Method</strong></label>
+                            <select class="form-select" id="authMethod">
+                                <option value="mutual-psk" selected>Mutual PSK</option>
+                                <option value="mutual-rsa">Mutual RSA</option>
+                            </select>
+                            <small class="text-muted">Must match the setting chosen on the remote side.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="myIdentifier" class="form-label"><strong>My identifier</strong></label>
+                            <select class="form-select" id="myIdentifier">
+                                <option value="my-ip" selected>My IP address</option>
+                                <option value="ip-address">IP address</option>
+                                <option value="fqdn">Fully qualified domain name</option>
+                                <option value="user-fqdn">User fully qualified domain name / E-mail</option>
+                                <option value="asn1-dn">ASN.1 distinguished Name</option>
+                                <option value="keyid">KeyID tag</option>
+                                <option value="ddns">Dynamic DNS</option>
+                                <option value="auto">Automatic based on content</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="peerIdentifier" class="form-label"><strong>Peer identifier</strong></label>
+                            <select class="form-select" id="peerIdentifier">
+                                <option value="peer-ip" selected>Peer IP address</option>
+                                <option value="ip-address">IP address</option>
+                                <option value="fqdn">Fully qualified domain name</option>
+                                <option value="user-fqdn">User fully qualified domain name / E-mail</option>
+                                <option value="asn1-dn">ASN.1 distinguished Name</option>
+                                <option value="keyid">KeyID tag</option>
+                                <option value="ddns">Dynamic DNS</option>
+                                <option value="auto">Automatic based on content</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="preSharedKey" class="form-label"><strong>Pre-Shared Key</strong></label>
+                            <textarea class="form-control" id="preSharedKey" rows="3" placeholder=""></textarea>
+                            <small class="text-muted">Enter the Pre-Shared Key string. This key must match on both peers. This key should be long and random to protect the tunnel and its contents. A weak Pre-Shared Key can lead to a tunnel compromise.</small>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-warning btn-sm">
+                                    <i class="bi bi-lightning"></i> Generate new Pre-Shared Key
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 1 Proposal (Encryption Algorithm) Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Phase 1 Proposal (Encryption Algorithm)
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="encryptionAlgorithm" class="form-label"><strong>Encryption Algorithm</strong></label>
+                            <div id="algorithmsContainer">
+                                <!-- First algorithm row (template) -->
+                                <div class="algorithm-row mb-3">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-3">
+                                            <select class="form-select algorithm-encryption">
+                                                <option value="aes" selected>AES</option>
+                                                <option value="aes128-gcm">AES128-GCM</option>
+                                                <option value="aes192-gcm">AES192-GCM</option>
+                                                <option value="aes256-gcm">AES256-GCM</option>
+                                                <option value="chacha20-poly1305">CHACHA20-POLY1305</option>
+                                            </select>
+                                            <small class="text-muted">Algorithm</small>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-select algorithm-keylength">
+                                                <option value="128" selected>128 bits</option>
+                                                <option value="192">192 bits</option>
+                                                <option value="256">256 bits</option>
+                                            </select>
+                                            <small class="text-muted">Key length</small>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <select class="form-select algorithm-hash">
+                                                <option value="sha256" selected>SHA256</option>
+                                                <option value="sha1">SHA1</option>
+                                                <option value="sha384">SHA384</option>
+                                                <option value="sha512">SHA512</option>
+                                                <option value="aes-xcbc">AES-XCBC</option>
+                                            </select>
+                                            <small class="text-muted">Hash</small>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <select class="form-select algorithm-dhgroup">
+                                                <option value="14" selected>14 (2048 bit)</option>
+                                                <option value="1">1 (768 bit)</option>
+                                                <option value="2">2 (1024 bit)</option>
+                                                <option value="5">5 (1536 bit)</option>
+                                                <option value="15">15 (3072 bit)</option>
+                                                <option value="16">16 (4096 bit)</option>
+                                                <option value="17">17 (6144 bit)</option>
+                                                <option value="18">18 (8192 bit)</option>
+                                                <option value="19">19 (nist ecp256)</option>
+                                                <option value="20">20 (nist ecp384)</option>
+                                                <option value="21">21 (nist ecp521)</option>
+                                                <option value="22">22 (1024(sub 160) bit)</option>
+                                                <option value="23">23 (2048(sub 224) bit)</option>
+                                                <option value="24">24 (2048(sub 256) bit)</option>
+                                                <option value="25">25 (nist ecp192)</option>
+                                                <option value="26">26 (nist ecp224)</option>
+                                                <option value="27">27 (brainpool ecp224)</option>
+                                                <option value="28">28 (brainpool ecp256)</option>
+                                                <option value="29">29 (brainpool ecp384)</option>
+                                                <option value="30">30 (brainpool ecp512)</option>
+                                                <option value="31">31 (Elliptic Curve 25519, 256 bit)</option>
+                                                <option value="32">32 (Elliptic Curve 448, 448 bit)</option>
+                                            </select>
+                                            <small class="text-muted">DH Group</small>
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button" class="btn btn-danger btn-sm w-100 delete-algorithm-btn" style="padding: 0.375rem 0.5rem;">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-2">Note: SHA1 and DH groups 1, 2, 22, 23, and 24 provide weak security and should be avoided.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-success btn-sm" id="addAlgorithmBtn">
+                                <i class="bi bi-plus"></i> Add Algorithm
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Expiration and Replacement Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Expiration and Replacement
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="lifeTime" class="form-label"><strong>Life Time</strong></label>
+                            <input type="number" class="form-control" id="lifeTime" value="28800" placeholder="">
+                            <small class="text-muted">Hard IKE SA life time, in seconds, after which the IKE SA will be expired. Must be larger than Rekey Time and Reauth Time. Cannot be set to the same value as Rekey Time or Reauth Time. If left empty, defaults to 110% of whichever timer is higher (reauth or rekey)</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="rekeyTime" class="form-label"><strong>Rekey Time</strong></label>
+                            <input type="number" class="form-control" id="rekeyTime" value="25920" placeholder="">
+                            <small class="text-muted">Time, in seconds, before an IKE SA establishes new keys. This works without interruption. Cannot be set to the same value as Life Time. Only supported by IKEv2, and is recommended for use with IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv2. Enter a value of 0 to disable.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="reAuthTime" class="form-label"><strong>Reauth Time</strong></label>
+                            <input type="number" class="form-control" id="reAuthTime" value="0" placeholder="">
+                            <small class="text-muted">Time, in seconds, before an IKE SA is torn down and recreated from scratch, including authentication. This can be disruptive unless both sides support make-before-break and overlapping IKE SA entries. Cannot be set to the same value as Life Time. Supported by IKEv1 and IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv1. Enter a value of 0 to disable.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="randTime" class="form-label"><strong>Rand Time</strong></label>
+                            <input type="number" class="form-control" id="randTime" value="2880" placeholder="">
+                            <small class="text-muted">A random value up to this amount will be subtracted from Rekey Time/Reauth Time to avoid simultaneous renegotiation. If left empty, defaults to 10% of Life Time. Enter 0 to disable randomness, but be aware that simultaneous renegotiation can lead to duplicate security associations.</small>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options Section -->
+                    <div class="mb-4">
+                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
+                            Advanced Options
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="childSAStartAction" class="form-label"><strong>Child SA Start Action</strong></label>
+                            <select class="form-select" id="childSAStartAction">
+                                <option value="default" selected>Default</option>
+                                <option value="none">None (Responder Only)</option>
+                                <option value="initiate-start">Initiate at start (VTI or Tunnel Mode)</option>
+                                <option value="initiate-demand">Initiate on demand (Tunnel mode only)</option>
+                            </select>
+                            <small class="text-muted">Set this option to force specific initiation/responder behavior for child SA (P2) entries</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="childSACloseAction" class="form-label"><strong>Child SA Close Action</strong></label>
+                            <select class="form-select" id="childSACloseAction">
+                                <option value="default" selected>Default</option>
+                                <option value="close-clear">Close connection and clear SA</option>
+                                <option value="restart-reconnect">Restart/Reconnect</option>
+                                <option value="close-demand">Close connection and reconnect on demand</option>
+                            </select>
+                            <small class="text-muted">Set this option to control the behavior when the remote peer unexpectedly closes a child SA (P2)</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="natTraversal" class="form-label"><strong>NAT Traversal</strong></label>
+                            <select class="form-select" id="natTraversal">
+                                <option value="auto" selected>Auto</option>
+                                <option value="force">Force</option>
+                            </select>
+                            <small class="text-muted">Set this option to enable the use of NAT-T (i.e. the encapsulation of ESP in UDP packets) if needed, which can help with clients that are behind restrictive firewalls.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="mobike" class="form-label"><strong>MOBIKE</strong></label>
+                            <select class="form-select" id="mobike">
+                                <option value="disable" selected>Disable</option>
+                                <option value="enable">Enable</option>
+                            </select>
+                            <small class="text-muted">Set this option to control the use of MOBIKE</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="gatewayDuplicates" name="gatewayDuplicates">
+                                <label class="form-check-label" for="gatewayDuplicates">
+                                    <strong>Gateway duplicates</strong> - Enable this to allow multiple phase 1 configurations with the same endpoint. When enabled, pfSense does not manage routing to the remote gateway and traffic will follow the default route without regard for the chosen interface. Static routes can override this behavior.
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="splitConnections" name="splitConnections">
+                                <label class="form-check-label" for="splitConnections">
+                                    <strong>Split connections</strong> - Enable this to split connection entries with multiple phase 2 configuration. Required for remote endpoints that support only a single traffic selector per child SA.
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="prfSelection" name="prfSelection">
+                                <label class="form-check-label" for="prfSelection">
+                                    <strong>PRF Selection</strong> - Enable manual Pseudo-Random Function (PRF) selection
+                                </label>
+                            </div>
+                            <small class="text-muted">Manual PRF selection is typically not required, but can be useful in combination with AEAD Encryption Algorithms such as AES-GCM</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customIKEPorts" class="form-label"><strong>Custom IKE/NAT-T Ports</strong></label>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control" id="remoteIKEPort" placeholder="Remote IKE Port">
+                                    <small class="text-muted">UDP port for IKE on the remote gateway. Leave empty for default automatic behavior (500/4500).</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="remoteNATTPort" placeholder="Remote NAT-T Port">
+                                        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="tooltip" data-bs-title="Info">
+                                            <i class="bi bi-info-circle"></i>
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">UDP port for NAT-T on the remote gateway.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enableDPD" name="enableDPD" checked>
+                                <label class="form-check-label" for="enableDPD">
+                                    <strong>Dead Peer Detection</strong> - Enable DPD
+                                </label>
+                            </div>
+                            <small class="text-muted">Check the liveness of a peer by using IKEv2 INFORMATIONAL exchanges or IKEv1 R_U_THERE messages. Active DPD checking is only enforced if no IKE or ESP/AH packet has been received for the configured DPD delay.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="dpdDelay" class="form-label"><strong>Delay</strong></label>
+                            <input type="number" class="form-control" id="dpdDelay" value="10" placeholder="">
+                            <small class="text-muted">Delay between sending peer acknowledgement messages. In IKEv2, a value of 0 sends no additional messages and only standard messages (such as those to rekey) are used to detect dead peers.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="maxFailures" class="form-label"><strong>Max failures</strong></label>
+                            <input type="number" class="form-control" id="maxFailures" value="5" placeholder="">
+                            <small class="text-muted">Number of consecutive failures allowed before disconnecting. This only applies to IKEv1; in IKEv2 the <a href="#" style="color: #0d6efd;">retransmission timeout</a> is used instead.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save P1 Configuration</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add PSK -->
+<div class="modal fade" id="addPSKModal" tabindex="-1" aria-labelledby="addPSKModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addPSKModalLabel">Edit Pre-Shared-Secret</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addPSKForm">
+                    <div class="mb-3">
+                        <label for="pskIdentifier" class="form-label"><strong>Identifier</strong></label>
+                        <input type="text" class="form-control" id="pskIdentifier" placeholder="">
+                        <small class="text-muted">This can be either an IP address, fully qualified domain name or an e-mail address.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="pskSecretType" class="form-label"><strong>Secret type</strong></label>
+                        <select class="form-select" id="pskSecretType">
+                            <option value="psk" selected>PSK</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="pskSecret" class="form-label"><strong>Pre-Shared Key</strong></label>
+                        <input type="text" class="form-control" id="pskSecret" placeholder="">
+                    </div>
+                </form>
+
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i> <strong>PSK for any user can be set by using an identifier of any.</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle Add Algorithm button
+document.getElementById('addAlgorithmBtn').addEventListener('click', function() {
+    const container = document.getElementById('algorithmsContainer');
+    const newRow = document.createElement('div');
+    newRow.className = 'algorithm-row mb-3';
+    newRow.innerHTML = `
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <select class="form-select algorithm-encryption">
+                    <option value="aes" selected>AES</option>
+                    <option value="aes128-gcm">AES128-GCM</option>
+                    <option value="aes192-gcm">AES192-GCM</option>
+                    <option value="aes256-gcm">AES256-GCM</option>
+                    <option value="chacha20-poly1305">CHACHA20-POLY1305</option>
+                </select>
+                <small class="text-muted">Algorithm</small>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select algorithm-keylength">
+                    <option value="128" selected>128 bits</option>
+                    <option value="192">192 bits</option>
+                    <option value="256">256 bits</option>
+                </select>
+                <small class="text-muted">Key length</small>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select algorithm-hash">
+                    <option value="sha256" selected>SHA256</option>
+                    <option value="sha1">SHA1</option>
+                    <option value="sha384">SHA384</option>
+                    <option value="sha512">SHA512</option>
+                    <option value="aes-xcbc">AES-XCBC</option>
+                </select>
+                <small class="text-muted">Hash</small>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select algorithm-dhgroup">
+                    <option value="14" selected>14 (2048 bit)</option>
+                    <option value="1">1 (768 bit)</option>
+                    <option value="2">2 (1024 bit)</option>
+                    <option value="5">5 (1536 bit)</option>
+                    <option value="15">15 (3072 bit)</option>
+                    <option value="16">16 (4096 bit)</option>
+                    <option value="17">17 (6144 bit)</option>
+                    <option value="18">18 (8192 bit)</option>
+                    <option value="19">19 (nist ecp256)</option>
+                    <option value="20">20 (nist ecp384)</option>
+                    <option value="21">21 (nist ecp521)</option>
+                    <option value="22">22 (1024(sub 160) bit)</option>
+                    <option value="23">23 (2048(sub 224) bit)</option>
+                    <option value="24">24 (2048(sub 256) bit)</option>
+                    <option value="25">25 (nist ecp192)</option>
+                    <option value="26">26 (nist ecp224)</option>
+                    <option value="27">27 (brainpool ecp224)</option>
+                    <option value="28">28 (brainpool ecp256)</option>
+                    <option value="29">29 (brainpool ecp384)</option>
+                    <option value="30">30 (brainpool ecp512)</option>
+                    <option value="31">31 (Elliptic Curve 25519, 256 bit)</option>
+                    <option value="32">32 (Elliptic Curve 448, 448 bit)</option>
+                </select>
+                <small class="text-muted">DH Group</small>
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-danger btn-sm w-100 delete-algorithm-btn" style="padding: 0.375rem 0.5rem;">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newRow);
+    
+    // Add delete event listener to new button
+    newRow.querySelector('.delete-algorithm-btn').addEventListener('click', function() {
+        newRow.remove();
+    });
+});
+
+// Add delete event listener to initial delete button
+document.querySelectorAll('.delete-algorithm-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        this.closest('.algorithm-row').remove();
+    });
+});
+</script>
+
 {% endblock %}
