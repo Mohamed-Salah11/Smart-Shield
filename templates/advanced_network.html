@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced.css') }}">
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tunnelCheckbox = document.getElementById('ipv6_over_ipv4_tunneling');
+        const tunnelPeerField = document.getElementById('tunnel_peer_field');
+        
+        function toggleTunnelPeerField() {
+            if (tunnelCheckbox.checked) {
+                tunnelPeerField.style.display = 'flex';
+            } else {
+                tunnelPeerField.style.display = 'none';
+            }
+        }
+        
+        // Initialize on page load
+        toggleTunnelPeerField();
+        
+        // Add event listener
+        tunnelCheckbox.addEventListener('change', toggleTunnelPeerField);
+    });
+</script>
+
+<div class="breadcrumb">
+    System / <a href="{{ url_for('admin_access') }}">Advanced</a> / Network
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('admin_access') }}">Admin Access</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_firewall_nat') }}">Firewall & NAT</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('advanced_network') }}">Network</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_miscellaneous') }}">Miscellaneous</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_system_tunables') }}">System Tunables</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('notifications') }}">Notifications</a>
+    </li>
+</ul>
+
+<form method="POST" action="{{ url_for('advanced_network') }}">
+
+<div class="settings-section">
+    <h5>DHCP Options</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="server_backend">Server Backend</label>
+            <div class="form-group-content">
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="server_backend_kea" name="server_backend" value="kea_dhcp" checked>
+                        <label class="form-check-label" for="server_backend_kea">Kea DHCP</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="server_backend_isc" name="server_backend" value="isc_dhcp">
+                        <label class="form-check-label" for="server_backend_isc">ISC DHCP (Deprecated)</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="ignore_deprecation" name="ignore_deprecation">
+                        <label class="form-check-label" for="ignore_deprecation">Ignore Deprecation Warning</label>
+                    </div>
+                </div>
+                <div class="help-text">
+                    ISC DHCP has reached end-of-life and will be removed from a future version of pfSense. Kea DHCP is the newer, modern DHCP distribution from ISC that includes the most-requested features.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="radvd_debug">RADVD Debug</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="radvd_debug" name="radvd_debug">
+                    <label class="form-check-label" for="radvd_debug">Log all radvd log levels</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dhcp6_debug">DHCPv6 Debug</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="dhcp6_debug" name="dhcp6_debug">
+                    <label class="form-check-label" for="dhcp6_debug">Start DHCPv6 client in debug mode</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="do_not_allow_release">Do not allow PD/Address release</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="do_not_allow_release" name="do_not_allow_release">
+                    <label class="form-check-label" for="do_not_allow_release">dhcp6c will send a release to the ISP on exit, some ISP's then release the allocated address or prefix. This option prevents that signal ever being sent</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dhcpv6_duid">DHCPv6 DUID</label>
+            <div class="form-group-content">
+                <select id="dhcpv6_duid" name="dhcpv6_duid" class="form-control" style="max-width: 500px;">
+                    <option value="raw_duid" selected>Raw DUID: As stored in DUID file or seen in firewall logs</option>
+                    <option value="duid_llt">DUID-LLT: Based on Link-layer Address Plus Time</option>
+                    <option value="duid_en">DUID-EN: Assigned by Vendor Based on Enterprise Number</option>
+                    <option value="duid_ll">DUID-LL: Based on Link-layer Address</option>
+                    <option value="duid_uuid">DUID-UUID: Based on Universally Unique Identifier</option>
+                </select>
+                <div class="help-text">
+                    A DHCPv6 Unique Identifier (DUID) is used by the firewall when requesting an IPv6 address.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    By default, the firewall automatically creates a dynamic DUID-LLT which is not saved in the firewall configuration. To ensure that the same DUID is retained by the firewall at all times, enter a DUID in this section. The new DUID will take effect after a reboot or when the WAN interface(s) are reconfigured by the firewall.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    If the firewall is configured to use a RAM disk for /var, the best practice is to store a DUID here, otherwise, the DUID will change on each reboot.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="raw_duid">Raw DUID</label>
+            <div class="form-group-content">
+                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <textarea id="raw_duid" name="raw_duid" class="form-control" rows="5" style="max-width: 400px; resize: vertical;" placeholder="0e:00:00:01:00:01:30:78:04:cc:00:0c:29:ed:cb:ae"></textarea>
+                    <button type="button" class="btn-save" style="padding: 6px 15px; height: fit-content;">
+                        Copy DUID
+                    </button>
+                </div>
+                <div class="help-text" style="margin-top: 10px;">
+                    You may use the Copy DUID button to copy the system detected DUID shown in the placeholder.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>IPv6 Options</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="allow_ipv6">Allow IPv6</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="allow_ipv6" name="allow_ipv6" checked>
+                    <label class="form-check-label" for="allow_ipv6">All IPv6 traffic will be blocked by the firewall unless this box is checked</label>
+                </div>
+                <div class="help-text">
+                    NOTE: This does not disable any IPv6 features on the firewall, it only blocks traffic.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ipv6_over_ipv4_tunneling">IPv6 over IPv4 Tunneling</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ipv6_over_ipv4_tunneling" name="ipv6_over_ipv4_tunneling">
+                    <label class="form-check-label" for="ipv6_over_ipv4_tunneling">Enable IPv6 over IPv4 tunneling</label>
+                </div>
+                <div class="help-text">
+                    These options create an RFC 2893 compatible mechanism for IPv4 NAT encapsulation of IPv6 packets, that can be used to tunnel IPv6 packets over IPv4 routing infrastructures. IPv6 firewall rules are also required, to control and pass encapsulated traffic.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group" id="tunnel_peer_field">
+            <label for="ipv4_address_tunnel_peer">IPv4 address of Tunnel Peer</label>
+            <div class="form-group-content">
+                <input type="text" id="ipv4_address_tunnel_peer" name="ipv4_address_tunnel_peer" class="form-control" style="max-width: 400px;" placeholder="">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="prefer_ipv4_over_ipv6">Prefer IPv4 over IPv6</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="prefer_ipv4_over_ipv6" name="prefer_ipv4_over_ipv6">
+                    <label class="form-check-label" for="prefer_ipv4_over_ipv6">Prefer to use IPv4 even if IPv6 is available</label>
+                </div>
+                <div class="help-text">
+                    By default, if IPv6 is configured and a hostname resolves IPv6 and IPv4 addresses, IPv6 will be used. If this option is selected, IPv4 will be preferred over IPv6.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ipv6_dns_entry">IPv6 DNS entry</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ipv6_dns_entry" name="ipv6_dns_entry">
+                    <label class="form-check-label" for="ipv6_dns_entry">Do not generate local IPv6 DNS entries for LAN interfaces</label>
+                </div>
+                <div class="help-text">
+                    If a LAN interface's IPv6 configuration is set to Track, and the tracked interface loses connectivity, it can cause connections to this firewall that were established via hostname to fail. This can happen unintentionally when accessing the firewall by hostname, since by default both IPv4 and IPv6 entries are added to the system's DNS. Enabling this option prevents those IPv6 records from being created.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Network Interfaces</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="hardware_checksum_offloading">Hardware Checksum Offloading</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="hardware_checksum_offloading" name="hardware_checksum_offloading">
+                    <label class="form-check-label" for="hardware_checksum_offloading">Disable hardware checksum offload</label>
+                </div>
+                <div class="help-text">
+                    Checking this option will disable hardware checksum offloading.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    Checksum offloading is broken in some hardware, particularly some Realtek cards. Rarely, drivers may have problems with checksum offloading and some specific NICs. This will take effect after a machine reboot or re-configure of each interface.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="hardware_tcp_segmentation">Hardware TCP Segmentation Offloading</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="hardware_tcp_segmentation" name="hardware_tcp_segmentation">
+                    <label class="form-check-label" for="hardware_tcp_segmentation">Disable hardware TCP segmentation offload</label>
+                </div>
+                <div class="help-text">
+                    Checking this option will disable hardware TCP segmentation offloading (TSO, TSO4, TSO6). This offloading is broken in some hardware drivers, and may impact performance with some specific NICs. This will take effect after a machine reboot or re-configure of each interface.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="hardware_large_receive">Hardware Large Receive Offloading</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="hardware_large_receive" name="hardware_large_receive">
+                    <label class="form-check-label" for="hardware_large_receive">Disable hardware large receive offload</label>
+                </div>
+                <div class="help-text">
+                    Checking this option will disable hardware large receive offloading (LRO). This offloading is broken in some hardware drivers, and may impact performance with some specific NICs. This will take effect after a machine reboot or re-configure of each interface.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="hn_altq_support">hn ALTQ support</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="hn_altq_support" name="hn_altq_support">
+                    <label class="form-check-label" for="hn_altq_support">Enable the ALTQ support for hn NICs</label>
+                </div>
+                <div class="help-text">
+                    Checking this option will enable the ALTQ support for hn NICs. The ALTQ support disables the multiqueue API and may reduce the system capability to handle traffic. This will take effect after a machine reboot.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="arp_handling">ARP Handling</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="arp_handling" name="arp_handling">
+                    <label class="form-check-label" for="arp_handling">Suppress ARP messages</label>
+                </div>
+                <div class="help-text">
+                    This option will suppress ARP log messages when multiple interfaces reside on the same broadcast domain.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="reset_all_states">Reset All States</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="reset_all_states" name="reset_all_states">
+                    <label class="form-check-label" for="reset_all_states">Reset all states if WAN IP Address changes</label>
+                </div>
+                <div class="help-text">
+                    This option resets all states when a WAN IP Address changes instead of only states associated with the previous IP Address.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="if_pppoe_kernel">Use if_pppoe kernel module for PPPoE client</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="if_pppoe_kernel" name="if_pppoe_kernel">
+                    <label class="form-check-label" for="if_pppoe_kernel">Use if_pppoe kernel module for PPPoE client</label>
+                </div>
+                <div class="help-text">
+                    Checking this option will set the system to use the new if_pppoe kernel driver for PPPoE client connections. Keep it unchecked to use the deprecated PPPoE support from mpd5.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    NOTE: Changing this option interrupts connectivity for affected interfaces and requires a system reboot.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label></label>
+            <div class="form-group-content">
+                <button type="submit" class="btn-save" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                    </svg>
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</form>
+
+{% endblock %}

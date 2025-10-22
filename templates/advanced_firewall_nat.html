@@ -1,0 +1,657 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced.css') }}">
+
+<script>
+    // Toggle Maximum MSS field visibility based on Enable Maximum MSS checkbox
+    document.addEventListener('DOMContentLoaded', function() {
+        const enableMssCheckbox = document.getElementById('enable_mss');
+        const maxMssField = document.getElementById('max_mss_field');
+        
+        function toggleMaxMss() {
+            if (enableMssCheckbox.checked) {
+                maxMssField.style.display = 'flex';
+            } else {
+                maxMssField.style.display = 'none';
+            }
+        }
+        
+        // Set initial state
+        toggleMaxMss();
+        
+        // Add event listener
+        enableMssCheckbox.addEventListener('change', toggleMaxMss);
+    });
+</script>
+
+<div class="breadcrumb">
+    System / <a href="{{ url_for('admin_access') }}">Advanced</a> / Firewall & NAT
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('admin_access') }}">Admin Access</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('advanced_firewall_nat') }}">Firewall & NAT</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_network') }}">Network</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_miscellaneous') }}">Miscellaneous</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_system_tunables') }}">System Tunables</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('notifications') }}">Notifications</a>
+    </li>
+</ul>
+
+<form method="POST" action="{{ url_for('advanced_firewall_nat') }}">
+
+<div class="settings-section">
+    <h5>Packet Processing</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="ip_fragment">IP Do-Not-Fragment compatibility</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ip_fragment" name="ip_fragment">
+                    <label class="form-check-label" for="ip_fragment">
+                        Clear invalid DF bits instead of dropping the packets
+                    </label>
+                </div>
+                <div class="help-text">
+                    This allows for communications with hosts that generate fragmented packets with the dont fragment (DF) bit set. Linux NFS is known to do this. This will cause the filter to not drop such packets but instead clear the dont fragment bit.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ip_random">IP Random id generation</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ip_random" name="ip_random">
+                    <label class="form-check-label" for="ip_random">
+                        Insert a stronger ID into IP header of packets passing through the filter.
+                    </label>
+                </div>
+                <div class="help-text">
+                    Replaces the IP identification field of packets with random values to compensate for operating systems that use predictable values. This option only applies to packets that are not fragmented after the optional packet reassembly.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="firewall_optimization">Firewall Optimization Options</label>
+            <div class="form-group-content">
+                <select id="firewall_optimization" name="firewall_optimization" class="form-control" style="max-width: 400px;">
+                    <option value="normal" selected>Normal</option>
+                    <option value="high-latency">High-latency</option>
+                    <option value="aggressive">Aggressive</option>
+                    <option value="conservative">Conservative</option>
+                </select>
+                <div class="help-text">
+                    The <a href="#">default optimization algorithm</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_scrub">Disable Firewall Scrub</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_scrub" name="disable_scrub">
+                    <label class="form-check-label" for="disable_scrub">
+                        Disables the PF scrubbing option which can sometimes interfere with NFS traffic.
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="adaptive_timeouts">Firewall Adaptive Timeouts</label>
+            <div class="form-group-content">
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 5px;">
+                    <input type="number" id="adaptive_start" name="adaptive_start" class="form-control" style="max-width: 150px;" value="1134000" placeholder="1134000">
+                    <input type="number" id="adaptive_end" name="adaptive_end" class="form-control" style="max-width: 150px;" value="2333332" placeholder="2333332">
+                </div>
+                <div class="help-text">
+                    When the number of state entries exceeds this value adaptive scaling begins. All timeout values are scaled linearly with factor (adaptive.end - number of states) / (adaptive.end - adaptive.start). Defaults to 60% of the Firewall Maximum States value.
+                </div>
+                <div class="help-text" style="margin-top: 10px;">
+                    When reaching this number of state entries, adaptive scaling gradually reduces all timeout values to zero, effectively rendering this state table entries slowly. Setting this value higher than the Firewall Maximum States value will allow the system to fill the state table (not a lower value), effectively decreasing the rate entries immediately. This value is used to define the state factor. If undefined actually no reached (not a lower value), and defaults to 120% of the Firewall Maximum States value.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="firewall_max_states">Firewall Maximum States</label>
+            <div class="form-group-content">
+                <input type="number" id="firewall_max_states" name="firewall_max_states" class="form-control" style="max-width: 200px;" value="1990000" placeholder="1990000">
+                <div class="help-text">
+                    Maximum number of connections to hold in the firewall state table. Leave blank for the system dependent default (1990000). Note: Changing this value will require a reboot to take which requires a reboot to take effect.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="firewall_max_table">Firewall Maximum Table Entries</label>
+            <div class="form-group-content">
+                <input type="number" id="firewall_max_table" name="firewall_max_table" class="form-control" style="max-width: 200px;" value="400000" placeholder="400000">
+                <div class="help-text">
+                    Maximum number of table entries for systems such as aliases, sshlguard, snort etc, combined. Note: Leave this blank for the default.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="firewall_max_fragment">Firewall Maximum Fragment Entries</label>
+            <div class="form-group-content">
+                <input type="number" id="firewall_max_fragment" name="firewall_max_fragment" class="form-control" style="max-width: 200px;" value="5000" placeholder="5000">
+                <div class="help-text">
+                    Maximum number of packet fragments to hold for reassembly by scrub rules. Leave this blank for the default (5000)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>VPN Packet Processing</h5>
+    
+    <div style="padding: 20px;">
+        <div style="margin-bottom: 15px; color: #6c757d; font-size: 0.9em;">
+            These setting will affect IPsec, OpenVPN and PPPoE Server network traffic.
+        </div>
+
+        <div class="form-group">
+            <label for="vpn_ip_fragment">IP Do-Not-Fragment compatibility</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="vpn_ip_fragment" name="vpn_ip_fragment">
+                    <label class="form-check-label" for="vpn_ip_fragment">
+                        Clear invalid DF bits instead of dropping the packets
+                    </label>
+                </div>
+                <div class="help-text">
+                    This allows for communications with hosts that generate fragmented packets with the don't fragment (DF) bit set. Linux NFS is known to do this. This will cause the filter to not drop such packets but instead clear the don't fragment bit.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ip_fragment_reassemble">IP Fragment Reassemble</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="ip_fragment_reassemble" name="ip_fragment_reassemble">
+                    <label class="form-check-label" for="ip_fragment_reassemble">
+                        Reassemble IP fragments until they form a complete packet
+                    </label>
+                </div>
+                <div class="help-text">
+                    When this option is enabled, fragments will remain in this core, fragments are buffered until they form a complete packet, and only the completed packet is passed on to the filter. The advantage is less filter rules have to explicitly pass the unordered fragment packets, and can ignore fragments. The drawback of caching fragments is the additional memory cost.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="enable_mss">Enable Maximum MSS</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="enable_mss" name="enable_mss">
+                    <label class="form-check-label" for="enable_mss">
+                        Enable MSS clamping on VPN traffic
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group" id="max_mss_field">
+            <label for="maximum_mss">Maximum MSS</label>
+            <div class="form-group-content">
+                <input type="number" id="maximum_mss" name="maximum_mss" class="form-control" style="max-width: 200px;" value="1400" placeholder="1400">
+                <div class="help-text">
+                    Enable MSS clamping on TCP flows over VPN. This helps overcome problems with PMTUD on IPsec VPN links. The default value is 1400 bytes.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Advanced Options</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="disable_firewall">Disable Firewall</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_firewall" name="disable_firewall">
+                    <label class="form-check-label" for="disable_firewall">
+                        Disable all packet filtering
+                    </label>
+                </div>
+                <div class="help-text">
+                    Note: This converts pfSense into a routing only platform!
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    Note: This will also turn off NAT! To only disable NAT, and not firewall rules, visit the <a href="#" style="color: #007bff;">Outbound NAT</a> page.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="firewall_state_policy">Firewall State Policy</label>
+            <div class="form-group-content">
+                <select id="firewall_state_policy" name="firewall_state_policy" class="form-control" style="max-width: 400px;">
+                    <option value="interface_bound" selected>Interface Bound States</option>
+                    <option value="floating">Floating States</option>
+                </select>
+                <div class="help-text">
+                    • Interface Bound States are more strict and secure. States are bound to specific interfaces by their OS/state name (e.g. igb3). If a packet matches the same source destination and protocol but arrives on any other interface, it will be dropped and not allowed. Floating States will match regardless of the interface on which the packet arrives. This is the most secure but in certain use cases a state table may be reset to handle packets from any network where state table rules may be duplicated or interface with no inbound path may continue.
+                </div>
+                <div class="help-text" style="margin-top: 10px;">
+                    • Floating States are less secure, more lenient in their checks, and are not strictly associated with any interface. The interface is tracked in state information and not enforced. The policy affects NAT and filter rules, with both of these policies allows a gateway to be assigned per interface. However, this relaxed policy may allow connections to be monitored or take unexpected paths if the routing table can be manipulated.
+                </div>
+                <div class="help-text" style="margin-top: 10px;">
+                    Firewall rules must have a 'Strict' tag or state to view all rules between traffic flow.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_static_policy">Disable static policy</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_static_policy" name="disable_static_policy">
+                    <label class="form-check-label" for="disable_static_policy">
+                        Don't automatically use floating states for IPsec rules
+                    </label>
+                </div>
+                <div class="help-text">
+                    When Interface Bound States and Firewall State Policy are selected above, checking this option allows IPsec rules to automatically use floating states where needed. This option is ignored when IPsec Filter Mode is set to assigned interfaces.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="static_route_filtering">Static route filtering</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="static_route_filtering" name="static_route_filtering">
+                    <label class="form-check-label" for="static_route_filtering">
+                        Bypass firewall rules for traffic on the same interface
+                    </label>
+                </div>
+                <div class="help-text">
+                    This option only applies if one or more static routes have been defined. If it is enabled, traffic that enters and leaves through the same interface will not be checked by the firewall. This allows for routing without firewall rules where multiple subnets exist on the same physical or VLAN interface.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_auto_added_vpn">Disable Auto-added VPN rules</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_auto_added_vpn" name="disable_auto_added_vpn">
+                    <label class="form-check-label" for="disable_auto_added_vpn">
+                        Disable auto-added VPN rules
+                    </label>
+                </div>
+                <div class="help-text">
+                    Note: This disables automatically added rules for IPsec.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_reply_to">Disable reply-to</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_reply_to" name="disable_reply_to">
+                    <label class="form-check-label" for="disable_reply_to">
+                        Disable reply-to on WAN rules
+                    </label>
+                </div>
+                <div class="help-text">
+                    With Multi-WAN it is generally desired to ensure traffic leaves the same interface it arrives on, hence reply-to is added automatically by default. When using bridging, this behavior must be disabled if the WAN gateway IP is different from the gateway IP of the hosts behind the bridge.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_negate_rules">Disable Negate rules</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_negate_rules" name="disable_negate_rules">
+                    <label class="form-check-label" for="disable_negate_rules">
+                        Disable Negate rule on policy routing rules
+                    </label>
+                </div>
+                <div class="help-text">
+                    With Multi-WAN it is generally desired to ensure traffic reaches directly connected networks and VPN networks using policy routing. This can be disabled for special purposes but it requires manually creating rules for these networks.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="allow_apipa">Allow APIPA</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="allow_apipa" name="allow_apipa">
+                    <label class="form-check-label" for="allow_apipa">
+                        Allow APIPA traffic
+                    </label>
+                </div>
+                <div class="help-text">
+                    Normally this traffic is dropped by the firewall, as APIPA traffic cannot be routed, but some providers may utilize APIPA space for interconnect.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="aliases_hostnames_interval">Aliases Hostnames Resolve Interval</label>
+            <div class="form-group-content">
+                <input type="number" id="aliases_hostnames_interval" name="aliases_hostnames_interval" class="form-control" style="max-width: 200px;" value="300" placeholder="300">
+                <div class="help-text">
+                    Interval, in seconds, that will be used to resolve hostnames configured on aliases.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    Note: Leave blank for the default (300s).
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="check_certificate_aliases_urls">Check certificate of aliases URLs</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="check_certificate_aliases_urls" name="check_certificate_aliases_urls">
+                    <label class="form-check-label" for="check_certificate_aliases_urls">
+                        Verify HTTPS certificates when downloading data URLs
+                    </label>
+                </div>
+                <div class="help-text">
+                    Make sure the certificate is valid for all HTTPS addresses on aliases. If it's not valid or is revoked, do not download it.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Bogon Networks</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="update_frequency">Update Frequency</label>
+            <div class="form-group-content">
+                <select id="update_frequency" name="update_frequency" class="form-control" style="max-width: 400px;">
+                    <option value="monthly" selected>Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                </select>
+                <div class="help-text">
+                    The frequency of updating the lists of IP addresses that are reserved (but not RFC 1918) or not yet assigned by IANA.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Network Address Translation</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="nat_reflection_mode">NAT Reflection mode for port forwards</label>
+            <div class="form-group-content">
+                <select id="nat_reflection_mode" name="nat_reflection_mode" class="form-control" style="max-width: 400px;">
+                    <option value="disabled" selected>disabled</option>
+                    <option value="pure-nat">Pure NAT</option>
+                    <option value="nat-proxy">NAT + proxy</option>
+                </select>
+                <div class="help-text">
+                    The pure NAT mode uses a set of NAT rules to direct packets to the target of the port forward. It has better scalability, but it must be possible to accurately determine the interface and gateway IP used for communication with the target at the time the rules are loaded. There are no inbound limits to the number of ports other than the limits of the protocols. All protocols available for port forwards are supported.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    The NAT + proxy mode uses a helper program to send packets to the target of the port forward. It is useful in setups where the interface and/or gateway IP used for communication with the target cannot be accurately determined at the time the rules are loaded. Reflection rules are not created for ranges larger than 500 ports and will not be used for more than 1000 ports total between all port forwards. This helper only supports TCP and UDP protocols. The Pure and UDP protocols are supported.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    Individual rules may be configured to override this system setting on a per-rule basis.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="reflection_timeout">Reflection Timeout</label>
+            <div class="form-group-content">
+                <input type="number" id="reflection_timeout" name="reflection_timeout" class="form-control" style="max-width: 200px;" placeholder="2000">
+                <div class="help-text">
+                    Enter value for Reflection timeout in seconds.
+                </div>
+                <div class="help-text" style="margin-top: 5px;">
+                    Note: Only applies to Reflection on port forwards in NAT + proxy mode.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="enable_nat_reflection">Enable NAT Reflection for 1:1 NAT</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="enable_nat_reflection" name="enable_nat_reflection">
+                    <label class="form-check-label" for="enable_nat_reflection">
+                        Automatic creation of additional NAT redirect rules from within the internal networks
+                    </label>
+                </div>
+                <div class="help-text">
+                    Automatic create outbound NAT rules which redirect packets back to the internal IP address that should be forwarded to (on port forwards or 1:1 mappings). This functions the same as the pure NAT mode for port forwards. For more details, refer to the pure NAT mode description above. Individual rules may be configured to override this system setting on a per-rule basis.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="enable_automatic_outbound">Enable automatic outbound NAT for Reflection</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="enable_automatic_outbound" name="enable_automatic_outbound">
+                    <label class="form-check-label" for="enable_automatic_outbound">
+                        Automatic create outbound NAT rules that direct traffic back out to the same subnet it originated from
+                    </label>
+                </div>
+                <div class="help-text">
+                    Required for full functionality of the pure NAT mode of NAT Reflection for port forwards or NAT Reflection for 1:1 NAT. Note: This only works for assigned interfaces. Other interfaces require manually creating the outbound NAT rules that direct reply packets back through the router.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tftp_proxy">TFTP Proxy</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="tftp_proxy_wan" name="tftp_proxy_wan" value="WAN">
+                    <label class="form-check-label" for="tftp_proxy_wan">
+                        WAN
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="tftp_proxy_lan" name="tftp_proxy_lan" value="LAN">
+                    <label class="form-check-label" for="tftp_proxy_lan">
+                        LAN
+                    </label>
+                </div>
+                <div class="help-text">
+                    Choose the interface(s) on which to enable TFTP proxy helper.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>State Timeouts (seconds - blank for default)</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="tcp_first">TCP First</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_first" name="tcp_first" class="form-control" style="max-width: 200px;" placeholder="60">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_opening">TCP Opening</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_opening" name="tcp_opening" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_established">TCP Established</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_established" name="tcp_established" class="form-control" style="max-width: 200px;" placeholder="86400">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_closing">TCP Closing</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_closing" name="tcp_closing" class="form-control" style="max-width: 200px;" placeholder="900">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_fin_wait">TCP FIN Wait</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_fin_wait" name="tcp_fin_wait" class="form-control" style="max-width: 200px;" placeholder="45">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_closed">TCP Closed</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_closed" name="tcp_closed" class="form-control" style="max-width: 200px;" placeholder="90">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="tcp_tsdiff">TCP TSDiff</label>
+            <div class="form-group-content">
+                <input type="number" id="tcp_tsdiff" name="tcp_tsdiff" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="sctp_first">SCTP First</label>
+            <div class="form-group-content">
+                <input type="number" id="sctp_first" name="sctp_first" class="form-control" style="max-width: 200px;" placeholder="120">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="sctp_opening">SCTP Opening</label>
+            <div class="form-group-content">
+                <input type="number" id="sctp_opening" name="sctp_opening" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="sctp_established">SCTP Established</label>
+            <div class="form-group-content">
+                <input type="number" id="sctp_established" name="sctp_established" class="form-control" style="max-width: 200px;" placeholder="86400">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="sctp_closing">SCTP Closing</label>
+            <div class="form-group-content">
+                <input type="number" id="sctp_closing" name="sctp_closing" class="form-control" style="max-width: 200px;" placeholder="900">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="sctp_closed">SCTP Closed</label>
+            <div class="form-group-content">
+                <input type="number" id="sctp_closed" name="sctp_closed" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="udp_first">UDP First</label>
+            <div class="form-group-content">
+                <input type="number" id="udp_first" name="udp_first" class="form-control" style="max-width: 200px;" placeholder="60">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="udp_single">UDP Single</label>
+            <div class="form-group-content">
+                <input type="number" id="udp_single" name="udp_single" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="udp_multiple">UDP Multiple</label>
+            <div class="form-group-content">
+                <input type="number" id="udp_multiple" name="udp_multiple" class="form-control" style="max-width: 200px;" placeholder="60">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="icmp_first">ICMP First</label>
+            <div class="form-group-content">
+                <input type="number" id="icmp_first" name="icmp_first" class="form-control" style="max-width: 200px;" placeholder="20">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="icmp_error">ICMP Error</label>
+            <div class="form-group-content">
+                <input type="number" id="icmp_error" name="icmp_error" class="form-control" style="max-width: 200px;" placeholder="10">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="other_first">Other First</label>
+            <div class="form-group-content">
+                <input type="number" id="other_first" name="other_first" class="form-control" style="max-width: 200px;" placeholder="60">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="other_single">Other Single</label>
+            <div class="form-group-content">
+                <input type="number" id="other_single" name="other_single" class="form-control" style="max-width: 200px;" placeholder="30">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="other_multiple">Other Multiple</label>
+            <div class="form-group-content">
+                <input type="number" id="other_multiple" name="other_multiple" class="form-control" style="max-width: 200px;" placeholder="60">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label></label>
+            <div class="form-group-content">
+                <button type="submit" class="btn-save" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                    </svg>
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</form>
+
+{% endblock %}
