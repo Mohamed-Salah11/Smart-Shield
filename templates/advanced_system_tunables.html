@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<style>
+    .breadcrumb {
+        background-color: #e9ecef;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .breadcrumb a {
+        color: #007bff;
+        text-decoration: none;
+    }
+    .breadcrumb a:hover {
+        text-decoration: underline;
+    }
+    .nav-tabs {
+        margin-bottom: 20px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .nav-tabs .nav-link {
+        color: #495057;
+        border: none;
+        background: none;
+        padding: 10px 15px;
+    }
+    .nav-tabs .nav-link.active {
+        color: #d9534f;
+        border-bottom: 2px solid #d9534f;
+        background: none;
+    }
+    .nav-tabs .nav-link:hover {
+        border: none;
+    }
+    .settings-section {
+        background-color: #fff;
+        padding: 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .settings-section h5 {
+        background-color: #555;
+        color: white;
+        padding: 8px 12px;
+        margin: 0;
+        border-radius: 4px 4px 0 0;
+        font-size: 14px;
+    }
+    .alert-info {
+        background-color: #d9edf7;
+        border: 1px solid #bce8f1;
+        color: #31708f;
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+    }
+    .table thead {
+        background-color: #f5f5f5;
+    }
+    .table th {
+        padding: 10px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #ddd;
+        font-size: 0.95em;
+    }
+    .table td {
+        padding: 10px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.9em;
+    }
+    .table tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+    .btn-new {
+        background-color: #5cb85c;
+        color: white;
+        border: none;
+        padding: 6px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-bottom: 15px;
+        text-decoration: none;
+    }
+    .btn-new:hover {
+        background-color: #4cae4c;
+        color: white;
+        text-decoration: none;
+    }
+    .btn-edit {
+        background-color: transparent;
+        border: none;
+        color: #337ab7;
+        cursor: pointer;
+        padding: 3px 8px;
+    }
+    .btn-edit:hover {
+        color: #23527c;
+    }
+</style>
+
+<div class="breadcrumb">
+    System / <a href="{{ url_for('admin_access') }}">Advanced</a> / System Tunables
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('admin_access') }}">Admin Access</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_firewall_nat') }}">Firewall & NAT</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_network') }}">Network</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_miscellaneous') }}">Miscellaneous</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('advanced_system_tunables') }}">System Tunables</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('notifications') }}">Notifications</a>
+    </li>
+</ul>
+
+<div class="settings-section">
+    <h5>System Tunables</h5>
+    
+    <div style="padding: 20px;">
+        <div class="alert-info">
+            <strong>NOTE:</strong> The options on this page are intended for use by advanced users only.
+        </div>
+
+        <a href="{{ url_for('advanced_system_tunables_edit') }}" class="btn-new">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
+            New
+        </a>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tunable Name</th>
+                    <th>Description</th>
+                    <th>Value</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tunable in tunables %}
+                <tr>
+                    <td>{{ tunable.name }}</td>
+                    <td>{{ tunable.description }}</td>
+                    <td>{{ tunable.value }}</td>
+                    <td>
+                        <a href="{{ url_for('advanced_system_tunables_edit', index=loop.index0) }}" class="btn-edit" title="Edit">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                            </svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
