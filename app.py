@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-here'  # Required for session
 
 # login credentials
 USER = {"username": "admin", "password": "1234"}
@@ -37,7 +38,93 @@ def system():
 # System submenu pages
 @app.route('/system/advanced')
 def advanced():
-    return render_template('advanced.html')
+    return redirect(url_for('admin_access'))
+
+
+@app.route('/system/advanced/admin-access')
+def admin_access():
+    return render_template('admin_access.html')
+
+
+@app.route('/system/advanced/firewall-nat')
+def advanced_firewall_nat():
+    return render_template('advanced_firewall_nat.html')
+
+
+@app.route('/system/advanced/network')
+def advanced_network():
+    return render_template('advanced_network.html')
+
+
+@app.route('/system/advanced/miscellaneous')
+def advanced_miscellaneous():
+    return render_template('advanced_miscellaneous.html')
+
+
+@app.route('/system/advanced/system-tunables')
+def advanced_system_tunables():
+    # Get tunables from session (in a real app, this would be from a database)
+    tunables = session.get('tunables', [
+        {'name': 'net.inet.ip.portrange.first', 'value': '1024', 'description': ''}
+    ])
+    return render_template('advanced_system_tunables.html', tunables=tunables)
+
+
+@app.route('/system/advanced/system-tunables/edit', methods=['GET', 'POST'])
+@app.route('/system/advanced/system-tunables/edit/<int:index>', methods=['GET', 'POST'])
+def advanced_system_tunables_edit(index=None):
+    tunables = session.get('tunables', [
+        {'name': 'net.inet.ip.portrange.first', 'value': '1024', 'description': ''}
+    ])
+    
+    tunable = tunables[index] if index is not None and index < len(tunables) else None
+    return render_template('advanced_system_tunables_edit.html', tunable=tunable, index=index)
+
+
+@app.route('/system/advanced/system-tunables/save', methods=['POST'])
+def advanced_system_tunables_save():
+    tunables = session.get('tunables', [
+        {'name': 'net.inet.ip.portrange.first', 'value': '1024', 'description': ''}
+    ])
+    
+    tunable_name = request.form.get('tunable_name')
+    tunable_value = request.form.get('tunable_value')
+    tunable_description = request.form.get('tunable_description', '')
+    index = request.form.get('index')
+    
+    new_tunable = {
+        'name': tunable_name,
+        'value': tunable_value,
+        'description': tunable_description
+    }
+    
+    if index is not None and index.isdigit():
+        # Update existing tunable
+        tunables[int(index)] = new_tunable
+    else:
+        # Add new tunable
+        tunables.append(new_tunable)
+    
+    session['tunables'] = tunables
+    return redirect(url_for('advanced_system_tunables'))
+
+
+@app.route('/system/advanced/system-tunables/delete/<int:index>', methods=['POST'])
+def advanced_system_tunables_delete(index):
+    tunables = session.get('tunables', [
+        {'name': 'net.inet.ip.portrange.first', 'value': '1024', 'description': ''}
+    ])
+    
+    if index < len(tunables):
+        tunables.pop(index)
+        session['tunables'] = tunables
+    
+    return redirect(url_for('advanced_system_tunables'))
+
+
+@app.route('/system/advanced/notifications')
+def notifications():
+    return render_template('notifications.html')
 
 
 @app.route('/system/certificates')
@@ -85,6 +172,16 @@ def user_manager():
 @app.route('/system/user-password-manager')
 def user_password_manager():
     return render_template('user_password_manager.html')
+
+
+@app.route('/system/register')
+def register():
+    return render_template('register.html')
+
+
+@app.route('/system/routing')
+def routing():
+    return render_template('routing.html')
 
 
 @app.route('/interfaces')
