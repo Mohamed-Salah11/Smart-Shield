@@ -1,0 +1,271 @@
+/* Advanced Settings Pages Common Styles */
+
+/* Breadcrumb */
+.breadcrumb {
+    background-color: #e9ecef;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.breadcrumb a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+    margin-bottom: 20px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    border: none;
+    background: none;
+    padding: 10px 15px;
+}
+
+.nav-tabs .nav-link.active {
+    color: #d9534f;
+    border-bottom: 2px solid #d9534f;
+    background: none;
+}
+
+.nav-tabs .nav-link:hover {
+    border: none;
+}
+
+/* Settings Section */
+.settings-section {
+    background-color: #fff;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.settings-section h5 {
+    background-color: #555;
+    color: white;
+    padding: 8px 12px;
+    margin: 0;
+    border-radius: 4px 4px 0 0;
+    font-size: 14px;
+}
+
+.settings-section form {
+    padding: 20px;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+}
+
+.form-group > label:first-child {
+    font-weight: bold;
+    width: 200px;
+    padding-top: 7px;
+    flex-shrink: 0;
+    text-align: right;
+    padding-right: 15px;
+}
+
+.form-group-content {
+    flex: 1;
+}
+
+/* Help Text */
+.help-text {
+    color: #6c757d;
+    font-size: 0.9em;
+    margin-top: 5px;
+    line-height: 1.5;
+}
+
+.help-text a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.help-text a:hover {
+    text-decoration: underline;
+}
+
+/* Buttons */
+.btn-save {
+    background-color: #5cb85c;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-save:hover {
+    background-color: #4cae4c;
+}
+
+.btn-remove {
+    background-color: #d9534f;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.btn-remove:hover {
+    background-color: #c9302c;
+}
+
+.btn-add {
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-add:hover {
+    background-color: #4cae4c;
+}
+
+.btn-primary {
+    background-color: #5bc0de;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background-color: #46b8da;
+}
+
+/* Form Controls */
+.form-control {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 12px;
+}
+
+.form-check {
+    margin-bottom: 5px;
+}
+
+.form-check-label {
+    font-weight: normal;
+    margin-left: 5px;
+}
+
+.form-check-input {
+    margin-top: 4px;
+}
+
+/* Pass List Items */
+.pass-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+/* Alert Boxes */
+.alert {
+    padding: 12px 20px;
+    background-color: #d9edf7;
+    border: 1px solid #bce8f1;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    color: #31708f;
+}
+
+.alert-info {
+    background-color: #d9edf7;
+    border-color: #bce8f1;
+    color: #31708f;
+}
+
+.alert-warning {
+    background-color: #fcf8e3;
+    border-color: #faebcc;
+    color: #8a6d3b;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+}
+
+table thead {
+    background-color: #f5f5f5;
+}
+
+table th {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 2px solid #ddd;
+    font-weight: bold;
+}
+
+table td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+/* Action Icons */
+.action-icon {
+    cursor: pointer;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.action-icon:hover {
+    color: #0056b3;
+}
+
+/* New Button */
+.btn-new {
+    background-color: #5cb85c;
+    color: white;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    margin-bottom: 15px;
+}
+
+.btn-new:hover {
+    background-color: #4cae4c;
+    color: white;
+    text-decoration: none;
+}
+
+/* Input Groups */
+select.form-control {
+    appearance: auto;
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 80px;
+}
