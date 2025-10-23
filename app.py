@@ -139,6 +139,7 @@ def general_setup():
 
 @app.route('/system/high-availability')
 def high_availability():
+    
     return render_template('high_availability.html')
 
 
@@ -151,6 +152,7 @@ def logout():
 
 @app.route('/system/package-manager')
 def package_manager():
+    
     return render_template('package_manager.html')
 
 

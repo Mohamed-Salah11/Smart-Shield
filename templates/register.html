@@ -1,6 +1,147 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block main %}
-<h1>Register</h1>
-<p>System registration page.</p>
-{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <title>System / Register</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f8f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ===== Header ===== */
+        .breadcrumb {
+            background: #e5e5e5;
+            padding: 15px 30px;
+            font-size: 18px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .breadcrumb strong {
+            color: #222;
+        }
+
+        .breadcrumb span {
+            color: #888;
+        }
+
+        /* ===== Info and Error Boxes ===== */
+        .info-box,
+        .error-box {
+            border-radius: 4px;
+            margin: 20px 30px;
+            padding: 15px 20px;
+        }
+
+        .info-box {
+            background: #e7f3fe;
+            color: #0c5460;
+            border: 1px solid #b8daff;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* ===== Form Section ===== */
+        .section {
+            background: #fff;
+            margin: 20px 30px;
+            border: 1px solid #ccc;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            background: #444;
+            color: #fff;
+            padding: 10px 15px;
+            font-weight: bold;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .form-group label {
+            width: 180px;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .form-group textarea {
+            width: 60%;
+            height: 100px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        /* ===== Button ===== */
+        .button-container {
+            padding: 20px 40px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0069d9;
+        }
+
+        button i {
+            margin-right: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== Header ===== -->
+    <div class="breadcrumb">
+        <strong>System /</strong> <span>Register</span>
+    </div>
+
+    <!-- ===== Info Box ===== -->
+    <div class="info-box">
+        ℹ️ Thank you for choosing Netgate pfSense®
+    </div>
+
+    <!-- ===== Error Box ===== -->
+    <div class="error-box">
+        The registration system is not currently available. Please check your network connection and try again.
+    </div>
+
+    <!-- ===== Register Section ===== -->
+    <div class="section">
+        <div class="section-header">Register pfSense</div>
+
+        <div class="form-group">
+            <label for="token">Activation token</label>
+            <textarea id="token" placeholder=""></textarea>
+        </div>
+    </div>
+
+    <div class="button-container">
+        <button type="submit"><i>Ⓡ</i>Register</button>
+    </div>
+
+</body>
+
+</html>
