@@ -1,6 +1,215 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Update</h1>
-<p>This is an empty placeholder page for Update.</p>
+{% block main %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row">
+        <div class="col-12">
+            <h2>System / Update / System Update</h2>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs" id="updateTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if active_tab == 'system' or not active_tab else '' }}" 
+                    id="system-update-tab" data-bs-toggle="tab" data-bs-target="#system-update" 
+                    type="button" role="tab" aria-controls="system-update" 
+                    aria-selected="{{ 'true' if active_tab == 'system' or not active_tab else 'false' }}">
+                System Update
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if active_tab == 'settings' else '' }}" 
+                    id="update-settings-tab" data-bs-toggle="tab" data-bs-target="#update-settings" 
+                    type="button" role="tab" aria-controls="update-settings" 
+                    aria-selected="{{ 'true' if active_tab == 'settings' else 'false' }}">
+                Update Settings
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="updateTabsContent">
+        <!-- System Update Tab -->
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'system' or not active_tab else '' }}" 
+             id="system-update" role="tabpanel" aria-labelledby="system-update-tab">
+            
+            <div class="card mt-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Confirmation Required to update ZGate system.</h5>
+                </div>
+                <div class="card-body">
+                    {% if message %}
+                    <div class="alert alert-info">{{ message }}</div>
+                    {% endif %}
+
+                    <form method="POST">
+                        <div class="row mb-3">
+                            <label for="branch" class="col-sm-2 col-form-label">Branch</label>
+                            <div class="col-sm-4">
+                                <select class="form-select" id="branch" name="branch">
+                                    <option value="current" selected>Current Stable Version (2.8.1)</option>
+                                    <option value="development">Development Version</option>
+                                    <option value="beta">Beta Version</option>
+                                </select>
+                                <div class="form-text">
+                                    Please select the branch from which to update the system firmware.<br>
+                                    Use of the development version is at your own risk!
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-2 col-form-label">Messages</label>
+                            <div class="col-sm-6">
+                                <div class="form-control" style="min-height: 60px; background-color: #f8f9fa;">
+                                    ZGate-repo: failed to fetch the repo data
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-2 col-form-label">Current Base System</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control" value="ZGate 2.8.1-RELEASE" readonly>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-2 col-form-label">Latest Base System</label>
+                            <div class="col-sm-6">
+                                <input type="text" class="form-control" value="Checking..." readonly>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-2 col-form-label">Retrieving</label>
+                            <div class="col-sm-6">
+                                <div class="form-control" style="background-color: #f8f9fa;">
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">Unable to check for updates</span>
+                                        <button type="submit" name="check_updates" class="btn btn-sm btn-primary">
+                                            Check for Updates
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text">
+                                    Release notes and version information
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-sm-2"></div>
+                            <div class="col-sm-6">
+                                <button type="submit" name="update_system" class="btn btn-success me-2">
+                                    Confirm Update
+                                </button>
+                                <button type="button" class="btn btn-secondary">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Settings Tab -->
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'settings' else '' }}" 
+             id="update-settings" role="tabpanel" aria-labelledby="update-settings-tab">
+            
+            <!-- Firmware Branch Section -->
+            <div class="card mt-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Firmware Branch</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <label for="branch_settings" class="col-sm-2 col-form-label">Branch</label>
+                        <div class="col-sm-4">
+                            <select class="form-select" id="branch_settings" name="branch_settings">
+                                <option value="current" selected>Current Stable Version (2.8.1)</option>
+                                <option value="development">Development Version</option>
+                                <option value="beta">Beta Version</option>
+                            </select>
+                            <div class="form-text">
+                                Please select the branch from which to update the system firmware.<br>
+                                Use of the development version is at your own risk!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Update Settings Section -->
+            <div class="card mt-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Update Settings</h5>
+                </div>
+                <div class="card-body">
+                    {% if message and active_tab == 'settings' %}
+                    <div class="alert alert-info">{{ message }}</div>
+                    {% endif %}
+
+                    <form method="POST">
+                        <div class="row mb-3">
+                            <label class="col-sm-2 col-form-label">Dashboard Check</label>
+                            <div class="col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="disable_dashboard_check" name="disable_dashboard_check">
+                                    <label class="form-check-label" for="disable_dashboard_check">
+                                        Disable the dashboard auto-update check
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-sm-2"></div>
+                            <div class="col-sm-6">
+                                <button type="submit" name="save_settings" class="btn btn-primary">
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.alert-warning {
+    border-left: 4px solid #fd7e14;
+}
+.card-header.bg-dark {
+    background-color: #343a40 !important;
+}
+.form-text {
+    font-size: 0.875em;
+    color: #6c757d;
+}
+.nav-tabs .nav-link.active {
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+}
+</style>
+
+<script>
+// Initialize Bootstrap tabs
+document.addEventListener('DOMContentLoaded', function() {
+    var triggerTabList = [].slice.call(document.querySelectorAll('#updateTabs button'))
+    triggerTabList.forEach(function (triggerEl) {
+        var tabTrigger = new bootstrap.Tab(triggerEl)
+        
+        triggerEl.addEventListener('click', function (event) {
+            event.preventDefault()
+            tabTrigger.show()
+        })
+    })
+});
+</script>
 {% endblock %}
