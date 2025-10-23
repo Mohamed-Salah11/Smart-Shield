@@ -159,14 +159,48 @@ def setup_wizard():
     return render_template('setup_wizard.html')
 
 
-@app.route('/system/update')
+@app.route('/system/update', methods=['GET', 'POST'])
 def update_page():
-    return render_template('update.html')
+    if request.method == 'POST':
+        # Handle form submissions for both tabs
+        if 'check_updates' in request.form:
+            # Handle check for updates
+            return render_template('update.html', message="Checking for updates...", active_tab="system")
+        elif 'update_system' in request.form:
+            # Handle system update
+            return render_template('update.html', message="System update initiated...", active_tab="system")
+        elif 'save_settings' in request.form:
+            # Handle update settings save
+            return render_template('update.html', message="Settings saved successfully", active_tab="settings")
+    
+    return render_template('update.html', active_tab="system")
 
 
-@app.route('/system/user-manager')
+@app.route('/system/user-manager', methods=['GET', 'POST'])
 def user_manager():
-    return render_template('user_manager.html')
+    if request.method == 'POST':
+        # Handle form submissions
+        if 'add_user' in request.form:
+            # Handle add user
+            return render_template('user_manager.html', message="User added successfully")
+        elif 'delete_user' in request.form:
+            # Handle delete user
+            return render_template('user_manager.html', message="User deleted successfully")
+        elif 'change_password' in request.form:
+            # Handle password change
+            return render_template('user_manager.html', message="Password changed successfully")
+    
+    # Sample user data (in a real app, this would come from a database)
+    users = [
+        {
+            'username': 'admin',
+            'full_name': 'System Administrator',
+            'status': 'active',
+            'groups': 'admins'
+        }
+    ]
+    
+    return render_template('user_manager.html', users=users)
 
 
 @app.route('/system/user-password-manager')
