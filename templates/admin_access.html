@@ -37,6 +37,29 @@
             item.remove();
         }
     }
+
+    // Protocol toggle function
+    function toggleProtocolFields() {
+        const httpRadio = document.getElementById('http');
+        const httpsRadio = document.getElementById('https');
+        const isHTTP = httpRadio.checked;
+        
+        // Show/hide SSL certificate field (only for HTTPS)
+        document.getElementById('ssl_cert_group').style.display = isHTTP ? 'none' : 'flex';
+        
+        // Show/hide HTTPS-only fields
+        document.getElementById('hsts_group').style.display = isHTTP ? 'none' : 'flex';
+        document.getElementById('ocsp_stapling_group').style.display = isHTTP ? 'none' : 'flex';
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleProtocolFields();
+        
+        // Add event listeners to radio buttons
+        document.getElementById('http').addEventListener('change', toggleProtocolFields);
+        document.getElementById('https').addEventListener('change', toggleProtocolFields);
+    });
 </script>
 
 <div class="breadcrumb">
@@ -83,7 +106,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="ssl_cert_group" style="display: flex;">
             <label for="ssl_cert">SSL/TLS Certificate</label>
             <div class="form-group-content">
                 <select id="ssl_cert" name="ssl_cert" class="form-control" style="max-width: 400px;">
@@ -95,7 +118,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="tcp_port_group">
             <label for="tcp_port">TCP port</label>
             <div class="form-group-content">
                 <input type="number" id="tcp_port" name="tcp_port" class="form-control" style="max-width: 200px;" placeholder="">
@@ -105,7 +128,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="max_processes_group">
             <label for="max_processes">Max Processes</label>
             <div class="form-group-content">
                 <input type="number" id="max_processes" name="max_processes" class="form-control" style="max-width: 200px;" value="2" placeholder="2">
@@ -115,7 +138,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="webgui_redirect_group">
             <label for="webgui_redirect">WebGUI redirect</label>
             <div class="form-group-content">
                 <div class="form-check">
@@ -125,27 +148,12 @@
                     </label>
                 </div>
                 <div class="help-text">
-                    When this is unchecked, access to the webConfigurator is always permitted even on port 80, regardless of the listening port configured. Check this box to disable this automatically added redirect rule.
+                    When this is unchecked, access to the webConfigurator is always permitted on the LAN interface, regardless of the listening port configured. Check this box to disable this automatically added redirect rule.
                 </div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="hsts">HSTS</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="hsts" name="hsts">
-                    <label class="form-check-label" for="hsts">
-                        Disable HTTP Strict Transport Security
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, Strict-Transport-Security HTTPS response header is sent by the webConfigurator to the browser. This will force the browser to use only HTTPS for future requests to the firewall FQDN. Check this box to disable HSTS. (NOTE: Browser-specific steps are required for disabling to take effect once the browser already visited the FQDN while HSTS was enabled.)
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
+        <div class="form-group" id="ocsp_stapling_group" style="display: none;">
             <label for="ocsp_stapling">OCSP Must-Staple</label>
             <div class="form-group-content">
                 <div class="form-check">
@@ -160,7 +168,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="webgui_autocomplete_group">
             <label for="webgui_autocomplete">WebGUI Login Autocomplete</label>
             <div class="form-group-content">
                 <div class="form-check">
@@ -175,7 +183,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="gui_login_messages_group">
             <label for="gui_login_messages">GUI login messages</label>
             <div class="form-group-content">
                 <div class="form-check">
@@ -190,7 +198,7 @@
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="roaming_group">
             <label for="roaming">Roaming</label>
             <div class="form-group-content">
                 <div class="form-check">
@@ -201,6 +209,21 @@
                 </div>
                 <div class="help-text">
                     When this is checked, the login session to the webConfigurator remains valid if the client source IP address changes.
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group" id="hsts_group" style="display: none;">
+            <label for="hsts">HSTS</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="hsts" name="hsts">
+                    <label class="form-check-label" for="hsts">
+                        Disable HTTP Strict Transport Security
+                    </label>
+                </div>
+                <div class="help-text">
+                    When this is unchecked, Strict-Transport-Security HTTPS response header is sent by the webConfigurator to the browser. This will force the browser to use only HTTPS for future requests to the firewall FQDN. Check this box to disable HSTS. (NOTE: Browser-specific steps are required for disabling to take effect once the browser already visited the FQDN while HSTS was enabled.)
                 </div>
             </div>
         </div>
