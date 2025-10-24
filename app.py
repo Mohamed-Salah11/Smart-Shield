@@ -159,6 +159,40 @@ def setup_wizard():
     return render_template('setup_wizard.html')
 
 
+@app.route('/system/setup-wizard/step/<int:step>')
+def setup_wizard_step(step):
+    # Simple step router: render the template for the requested step if it exists.
+    # For now we only implement step 2 as the next page shown in the attachment.
+    if step == 2:
+        return render_template('setup_wizard_step2.html')
+    if step == 3:
+        return render_template('setup_wizard_step3.html')
+    if step == 4:
+        return render_template('setup_wizard_step4.html')
+    if step == 5:
+        return render_template('setup_wizard_step5.html')
+    if step == 6:
+        return render_template('setup_wizard_step6.html')
+    if step == 7:
+        return render_template('setup_wizard_step7.html')
+    if step == 8:
+        return render_template('setup_wizard_step8.html')
+    if step == 9:
+        return render_template('setup_wizard_step9.html')
+    if step == 10:
+        return render_template('setup_wizard_step10.html')
+    
+
+@app.route('/system/copyright', methods=['GET', 'POST'])
+def copyright_page():
+    # Simple accept flow: on POST (Accept) redirect to dashboard
+    if request.method == 'POST':
+        return redirect(url_for('dashboard'))
+    return render_template('copyright.html')
+    # Fallback to the main wizard page for unknown steps
+    return render_template('setup_wizard.html')
+
+
 @app.route('/system/update', methods=['GET', 'POST'])
 def update_page():
     if request.method == 'POST':
@@ -215,7 +249,205 @@ def register():
 
 @app.route('/system/routing')
 def routing():
-    return render_template('routing.html')
+    # Provide gateways and current default selections to the template
+    gateways = session.get('gateways', [
+        {'name': 'WAN_DHCP', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface WAN_DHCP Gateway', 'disabled': False, 'address_family': 'IPv4'},
+        {'name': 'WAN_DHCP6', 'interface': 'WAN', 'gateway': 'dynamic', 'monitor': 'dynamic', 'description': 'Interface WAN_DHCP6 Gateway', 'disabled': False, 'address_family': 'IPv6'},
+        {'name': 'WANGW', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface wan Gateway', 'disabled': False, 'address_family': 'IPv4'},
+    ])
+    # Default selection fallbacks: prefer WANGW for IPv4 (matches UI image),
+    # and Automatic (empty string) for IPv6.
+    default_ipv4 = session.get('default_gateway_ipv4', 'WANGW')
+    default_ipv6 = session.get('default_gateway_ipv6', '')
+    return render_template('routing.html', gateways=gateways, default_ipv4=default_ipv4, default_ipv6=default_ipv6)
+
+
+@app.route('/system/routing/gateway/edit', methods=['GET', 'POST'])
+@app.route('/system/routing/gateway/edit/<int:index>', methods=['GET', 'POST'])
+def routing_edit_gateway(index=None):
+    # Load gateways from session or use sample data
+    gateways = session.get('gateways', [
+        {'name': 'WAN_DHCP', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface WAN_DHCP Gateway', 'disabled': False, 'address_family': 'IPv4'},
+        {'name': 'WAN_DHCP6', 'interface': 'WAN', 'gateway': 'dynamic', 'monitor': 'dynamic', 'description': 'Interface WAN_DHCP6 Gateway', 'disabled': False, 'address_family': 'IPv4'},
+        {'name': 'WANGW', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface wan Gateway', 'disabled': False, 'address_family': 'IPv4'},
+    ])
+
+    gateway = gateways[index] if index is not None and 0 <= index < len(gateways) else None
+
+    if request.method == 'POST':
+        # collect form values
+        disabled = bool(request.form.get('disabled'))
+        interface = request.form.get('interface')
+        address_family = request.form.get('address_family')
+        name = request.form.get('name')
+        gw = request.form.get('gateway')
+        monitor = request.form.get('monitor')
+        description = request.form.get('description')
+        # additional fields: force state and state killing behavior
+        force_state = bool(request.form.get('force_state'))
+        state_killing = request.form.get('state_killing')
+        disable_monitoring = bool(request.form.get('disable_monitoring'))
+        disable_monitoring_action = bool(request.form.get('disable_monitoring_action'))
+
+        new_gateway = {
+            'disabled': disabled,
+            'interface': interface,
+            'address_family': address_family,
+            'name': name,
+            'gateway': gw,
+            'monitor': monitor,
+            'description': description,
+            'force_state': force_state,
+            'state_killing': state_killing,
+            'disable_monitoring': disable_monitoring,
+            'disable_monitoring_action': disable_monitoring_action,
+        }
+
+        if index is not None and 0 <= index < len(gateways):
+            gateways[index] = new_gateway
+        else:
+            gateways.append(new_gateway)
+
+        session['gateways'] = gateways
+        return redirect(url_for('routing'))
+
+    return render_template('routing_edit_gateway.html', gateway=gateway, index=index)
+
+
+@app.route('/system/routing/static')
+def routing_static():
+    # Render the static routes page (empty list for now)
+    static_routes = session.get('static_routes', [])
+    return render_template('static_routes.html', static_routes=static_routes)
+
+
+@app.route('/system/routing/static/edit', methods=['GET', 'POST'])
+@app.route('/system/routing/static/edit/<int:index>', methods=['GET', 'POST'])
+def routing_static_edit(index=None):
+    # Load static routes and available gateways
+    static_routes = session.get('static_routes', [])
+    gateways = session.get('gateways', [
+        {'name': 'WAN_DHCP', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface WAN_DHCP Gateway', 'disabled': False, 'address_family': 'IPv4'},
+        {'name': 'WAN_DHCP6', 'interface': 'WAN', 'gateway': 'dynamic', 'monitor': 'dynamic', 'description': 'Interface WAN_DHCP6 Gateway', 'disabled': False, 'address_family': 'IPv6'},
+        {'name': 'WANGW', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface wan Gateway', 'disabled': False, 'address_family': 'IPv4'},
+    ])
+
+    route = static_routes[index] if index is not None and 0 <= index < len(static_routes) else None
+
+    if request.method == 'POST':
+        network = request.form.get('network')
+        prefix = request.form.get('prefix')
+        gateway = request.form.get('gateway')
+        disabled = bool(request.form.get('disabled'))
+        description = request.form.get('description', '')
+
+        new_route = {
+            'network': network,
+            'prefix': prefix,
+            'gateway': gateway,
+            'disabled': disabled,
+            'description': description,
+        }
+
+        if index is not None and 0 <= index < len(static_routes):
+            static_routes[index] = new_route
+        else:
+            static_routes.append(new_route)
+
+        session['static_routes'] = static_routes
+        return redirect(url_for('routing_static'))
+
+    return render_template('static_route_edit.html', route=route, index=index, gateways=gateways)
+
+
+@app.route('/system/routing/static/delete/<int:index>', methods=['POST'])
+def routing_static_delete(index):
+    static_routes = session.get('static_routes', [])
+    if 0 <= index < len(static_routes):
+        static_routes.pop(index)
+        session['static_routes'] = static_routes
+    return redirect(url_for('routing_static'))
+
+
+@app.route('/system/routing/groups')
+def routing_groups():
+    # Render the gateway groups page
+    gateway_groups = session.get('gateway_groups', [])
+    return render_template('gateway_groups.html', gateway_groups=gateway_groups)
+
+
+@app.route('/system/routing/groups/edit', methods=['GET', 'POST'])
+@app.route('/system/routing/groups/edit/<int:index>', methods=['GET', 'POST'])
+def routing_groups_edit(index=None):
+    # Load existing groups and gateways
+    gateway_groups = session.get('gateway_groups', [])
+    gateways = session.get('gateways', [
+        {'name': 'WAN_DHCP', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface WAN_DHCP Gateway', 'disabled': False, 'address_family': 'IPv4'},
+        {'name': 'WAN_DHCP6', 'interface': 'WAN', 'gateway': 'dynamic', 'monitor': 'dynamic', 'description': 'Interface WAN_DHCP6 Gateway', 'disabled': False, 'address_family': 'IPv6'},
+        {'name': 'WANGW', 'interface': 'WAN', 'gateway': '8.8.8.8', 'monitor': '8.8.8.8', 'description': 'Interface wan Gateway', 'disabled': False, 'address_family': 'IPv4'},
+    ])
+
+    group = gateway_groups[index] if index is not None and 0 <= index < len(gateway_groups) else None
+
+    if request.method == 'POST':
+        name = request.form.get('group_name')
+        description = request.form.get('description', '')
+        keep_failover = request.form.get('keep_failover', '')
+        trigger_level = request.form.get('trigger_level', '')
+
+        # collect per-gateway settings from form; expect fields like tier_<name>, vip_<name>, desc_<name>
+        members = []
+        for g in gateways:
+            key = g.get('name')
+            tier = request.form.get(f'tier_{key}', 'Never')
+            vip = request.form.get(f'vip_{key}', '')
+            member_desc = request.form.get(f'desc_{key}', '')
+            members.append({'gateway': key, 'tier': tier, 'vip': vip, 'description': member_desc})
+
+        new_group = {
+            'name': name,
+            'members': members,
+            'keep_failover': keep_failover,
+            'trigger_level': trigger_level,
+            'description': description,
+        }
+
+        if index is not None and 0 <= index < len(gateway_groups):
+            gateway_groups[index] = new_group
+        else:
+            gateway_groups.append(new_group)
+
+        session['gateway_groups'] = gateway_groups
+        return redirect(url_for('routing_groups'))
+
+    return render_template('gateway_group_edit.html', group=group, index=index, gateways=gateways)
+
+
+@app.route('/system/routing/groups/delete/<int:index>', methods=['POST'])
+def routing_groups_delete(index):
+    gateway_groups = session.get('gateway_groups', [])
+    if 0 <= index < len(gateway_groups):
+        gateway_groups.pop(index)
+        session['gateway_groups'] = gateway_groups
+    return redirect(url_for('routing_groups'))
+
+
+@app.route('/system/routing/save', methods=['POST'])
+def routing_save():
+    # expects form fields: gateways (json), default_ipv4, default_ipv6
+    import json
+    gateways_json = request.form.get('gateways')
+    default_ipv4 = request.form.get('default_ipv4')
+    default_ipv6 = request.form.get('default_ipv6')
+    try:
+        gateways = json.loads(gateways_json) if gateways_json else []
+    except Exception:
+        gateways = session.get('gateways', [])
+
+    session['gateways'] = gateways
+    session['default_gateway_ipv4'] = default_ipv4
+    session['default_gateway_ipv6'] = default_ipv6
+    return redirect(url_for('routing'))
 
 
 @app.route('/interfaces')

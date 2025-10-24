@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb bg-transparent p-0">
+            <li class="breadcrumb-item">Wizard</li>
+            <li class="breadcrumb-item"><a href="{{ url_for('setup_wizard') }}">ZGate Setup</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Time Server Information</li>
+        </ol>
+    </nav>
+
+    <div class="mb-2">
+        <div class="progress" style="height:6px;">
+            <div class="progress-bar bg-danger" role="progressbar" style="width:33%;" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="mt-2">
+            <span class="badge bg-danger">Step 3 of 9</span>
+        </div>
+    </div>
+
+    <form method="post" action="#">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                Time Server Information
+            </div>
+            <div class="card-body">
+                <p>Please enter the time, date and time zone.</p>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Time server hostname</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" name="ntp_server" value="2.pfsense.pool.ntp.org">
+                        <div class="form-text">Enter the hostname (FQDN) of the time server.</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Timezone</label>
+                    <div class="col-sm-6">
+                        <select class="form-select" name="timezone">
+                            <!-- Large timezone list (includes Etc/GMT and common aliases) -->
+                            <option>Etc/GMT-14</option>
+                            <option>Etc/GMT-13</option>
+                            <option>Etc/GMT-12</option>
+                            <option>Etc/GMT-11</option>
+                            <option>Etc/GMT-10</option>
+                            <option>Etc/GMT-9</option>
+                            <option>Etc/GMT-8</option>
+                            <option>Etc/GMT-7</option>
+                            <option>Etc/GMT-6</option>
+                            <option>Etc/GMT-5</option>
+                            <option>Etc/GMT-4</option>
+                            <option>Etc/GMT-3</option>
+                            <option>Etc/GMT-2</option>
+                            <option>Etc/GMT-1</option>
+                            <option>Etc/GMT0</option>
+                            <option>Etc/GMT</option>
+                            <option>Etc/Greenwich</option>
+                            <option>Etc/UCT</option>
+                            <option selected>Etc/UTC</option>
+                            <option>Etc/GMT+1</option>
+                            <option>Etc/GMT+2</option>
+                            <option>Etc/GMT+3</option>
+                            <option>Etc/GMT+4</option>
+                            <option>Etc/GMT+5</option>
+                            <option>Etc/GMT+6</option>
+                            <option>Etc/GMT+7</option>
+                            <option>Etc/GMT+8</option>
+                            <option>Etc/GMT+9</option>
+                            <option>Etc/GMT+10</option>
+                            <option>Etc/GMT+11</option>
+                            <option>Etc/GMT+12</option>
+
+                            <!-- Common named timezones -->
+                            <option>UTC</option>
+                            <option>GMT</option>
+                            <option>Europe/London</option>
+                            <option>Europe/Paris</option>
+                            <option>Europe/Berlin</option>
+                            <option>America/New_York</option>
+                            <option>America/Chicago</option>
+                            <option>America/Denver</option>
+                            <option>America/Los_Angeles</option>
+                            <option>Asia/Tokyo</option>
+                            <option>Asia/Shanghai</option>
+                            <option>Asia/Kolkata</option>
+                            <option>Australia/Sydney</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{{ url_for('setup_wizard_step', step=5) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

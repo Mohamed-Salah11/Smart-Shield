@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% set title = "System - Static Routes" %}
+
+{% block main %}
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb" class="bg-light rounded p-3 mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="#">System</a></li>
+            <li class="breadcrumb-item"><a href="#">Routing</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Static Routes</li>
+        </ol>
+    </nav>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link" href="/system/routing">Gateways</a></li>
+        <li class="nav-item"><a class="nav-link active" href="/system/routing/static">Static Routes</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/routing/groups">Gateway Groups</a></li>
+    </ul>
+
+    <div class="card">
+        <div class="card-header bg-dark text-white">Static Routes</div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Network</th>
+                        <th>Gateway</th>
+                        <th>Interface</th>
+                        <th>Description</th>
+                        <th style="width:120px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if static_routes %}
+                        {% for r in static_routes %}
+                        <tr>
+                            <td>{{ r.network }}{% if r.prefix %}/{{ r.prefix }}{% endif %}</td>
+                            <td>{{ r.gateway }}</td>
+                            <td>{{ r.interface or '' }}</td>
+                            <td>{{ r.description }}</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-link" href="/system/routing/static/edit/{{ loop.index0 }}">✏️</a>
+                                <form method="post" action="/system/routing/static/delete/{{ loop.index0 }}" style="display:inline">
+                                    <button class="btn btn-sm btn-link">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-muted py-5 text-center">No static routes defined.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-end">
+            <a href="/system/routing/static/edit" class="btn btn-success">➕ Add</a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
