@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Add/Sign a New Certificate - pfSense Style</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .form-header {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            background: #ecf0f1;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            margin-bottom: 10px;
+        }
+
+        .form-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 5px 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-save {
+            background: #27ae60;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="form-header">Add/Sign a New Certificate</div>
+
+    <div class="form-group">
+        <div class="form-label">Method</div>
+        <select class="form-select">
+            <option value="internal">Create an Internal Certificate</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Descriptive name</div>
+        <input type="text" class="form-input"
+            placeholder="The name of this entry as displayed in the GUI for reference">
+        <div style="font-size: 12px; color: #7f8c8d;">This name can contain spaces but it cannot contain any of the
+            following characters: ?, &, $, ", '.</div>
+    </div>
+
+    <div class="form-header">Internal Certificate</div>
+
+    <div class="form-group">
+        <div class="form-label">Certificate authority</div>
+        <select class="form-select">
+            <option value="none">None</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Key type</div>
+        <select class="form-select">
+            <option value="rsa">RSA</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Key Length</div>
+        <select class="form-select">
+            <option value="2048">2048</option>
+        </select>
+        <div style="font-size: 12px; color: #7f8c8d;">The Key Length should not be lower than 2048 or some platforms may
+            consider the certificate invalid.</div>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Digest Algorithm</div>
+        <select class="form-select">
+            <option value="sha256">sha256</option>
+        </select>
+        <div style="font-size: 12px; color: #7f8c8d;">The best practice is to use SHA256 or higher. Some services and
+            platforms, such as the GUI web server and OpenVPN, consider weaker digest algorithms invalid.</div>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Lifetime (days)</div>
+        <input type="number" class="form-input" value="3650">
+        <div style="font-size: 12px; color: #7f8c8d;">Server certificates should not have a lifetime over 398 days or
+            some platforms may consider the certificate invalid.</div>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Common Name</div>
+        <input type="text" class="form-input" placeholder="e.g. www.example.com">
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Country Code</div>
+        <select class="form-select">
+            <option value="none">None</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">State or Province</div>
+        <input type="text" class="form-input" placeholder="e.g. Texas">
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">City</div>
+        <input type="text" class="form-input" placeholder="e.g. Austin">
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Organization</div>
+        <input type="text" class="form-input" placeholder="e.g. My Company Inc">
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Organizational Unit</div>
+        <input type="text" class="form-input" placeholder="e.g. My Department Name (optional)">
+    </div>
+
+    <div class="form-header">Certificate Attributes</div>
+
+    <div class="form-group">
+        <div class="form-label">Certificate Type</div>
+        <select class="form-select">
+            <option value="user">User Certificate</option>
+        </select>
+        <div style="font-size: 12px; color: #7f8c8d;">Add type-specific usage attributes to the signed certificate. Used
+            for placing usage restrictions on, or granting abilities to, the signed certificate.</div>
+    </div>
+
+    <div class="form-group">
+        <div class="form-label">Alternative Names</div>
+        <select class="form-select">
+            <option value="fqdn_or_hostname">FQDN or hostname</option>
+        </select>
+        <input type="text" class="form-input" placeholder="Value">
+        <div style="font-size: 12px; color: #7f8c8d;">Enter additional identifiers for the certificate in this list. The
+            Common Name field is automatically added to the certificate as an Alternative Name. The signing CA may
+            ignore or change these values.</div>
+        <button class="btn">+ Add SAN Row</button>
+    </div>
+
+    <button class="btn btn-save">Save</button>
+</body>
+
+</html>
