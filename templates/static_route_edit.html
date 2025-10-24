@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% set title = "System - Static Route Edit" %}
+
+{% block main %}
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb" class="bg-light rounded p-3 mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="#">System</a></li>
+            <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
+            <li class="breadcrumb-item"><a href="/system/routing/static">Static Routes</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        </ol>
+    </nav>
+
+    <div class="card">
+        <div class="card-header bg-dark text-white">Edit Route Entry</div>
+        <form method="post" class="card-body">
+            <!-- Destination network + prefix (split layout, prefix select descending 128->1) -->
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-2">
+                    <label class="form-label">Destination network</label>
+                </div>
+                <div class="col-md-8">
+                    <input type="text" name="network" class="form-control" placeholder="e.g. 192.0.2.0" value="{{ route.network if route else '' }}">
+                    <div class="form-text">Destination network for this static route</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group">
+                        <span class="input-group-text">/</span>
+                        <select name="prefix" class="form-select">
+                            {% for p in range(128,0,-1) %}
+                                <option value="{{ p }}" {% if route and route.prefix and route.prefix|int == p %}selected{% endif %}>{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gateway row -->
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Gateway</label>
+                </div>
+                <div class="col-md-10">
+                    <select name="gateway" class="form-select w-50">
+                        <option value="">Select a gateway</option>
+                        {% for g in gateways %}
+                            <option value="{{ g.name }}" {% if route and route.gateway == g.name %}selected{% endif %}>{{ g.name }}{% if g.gateway %} - {{ g.gateway }}{% endif %}</option>
+                        {% endfor %}
+                        <!-- Special null routes always available -->
+                        <option value="Null4" {% if route and route.gateway == 'Null4' %}selected{% endif %}>Null4 - 127.0.0.1</option>
+                        <option value="Null6" {% if route and route.gateway == 'Null6' %}selected{% endif %}>Null6 - ::1</option>
+                    </select>
+                    <div class="form-text">Choose which gateway this route applies to or <a href="/system/routing/gateway/edit">add a new one first</a></div>
+                </div>
+            </div>
+
+            <!-- Disabled row: label on left, checkbox on right aligned -->
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-2">
+                    <label class="form-label">Disabled</label>
+                </div>
+                <div class="col-md-10">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="disabled" id="disabled" {% if route and route.disabled %}checked{% endif %}>
+                        <label class="form-check-label ms-2" for="disabled">Disable this static route</label>
+                    </div>
+                    <div class="form-text">Set this option to disable this static route without removing it from the list.</div>
+                </div>
+            </div>
+
+            <!-- Description row -->
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Description</label>
+                </div>
+                <div class="col-md-10">
+                    <input type="text" name="description" class="form-control" value="{{ route.description if route else '' }}">
+                    <div class="form-text">A description may be entered here for administrative reference (not parsed).</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">💾 Save</button>
+                <a class="btn btn-secondary" href="/system/routing/static">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

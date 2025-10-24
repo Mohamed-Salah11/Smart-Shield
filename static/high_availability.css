@@ -1,0 +1,213 @@
+/* General Styles for a clean, system-like interface */
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    background-color: #f0f4f8;
+    /* Light blue-gray background */
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    /* Rounded corners for the main container */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Navigation (Breadcrumb) */
+.header {
+    background-color: #e9ecef;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 25px;
+    font-size: 0.9em;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+.header span {
+    font-weight: 600;
+    color: #343a40;
+}
+
+/* Section Headings */
+h1 {
+    color: #1e3a8a;
+    /* Dark blue for primary title */
+    font-size: 1.8em;
+    font-weight: 700;
+    margin-bottom: 25px;
+}
+
+h2 {
+    color: #007bff;
+    /* Primary blue for section titles */
+    font-size: 1.3em;
+    font-weight: 600;
+    margin-top: 35px;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e0f2fe;
+    /* Light blue underline */
+    padding-bottom: 8px;
+}
+
+/* Form Layout - Using Flex for responsive grouping */
+.form-group {
+    display: flex;
+    flex-wrap: wrap;
+    /* Allows wrapping on smaller screens */
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+    /* Highlight bar */
+}
+
+.label-cell {
+    width: 250px;
+    min-width: 150px;
+    font-weight: bold;
+    color: #343a40;
+    padding-right: 20px;
+    align-self: flex-start;
+    padding-top: 5px;
+}
+
+.input-cell {
+    flex-grow: 1;
+    /* Takes up remaining space */
+    min-width: 280px;
+    /* Ensures minimum space for inputs */
+}
+
+/* Input Styling */
+input[type="text"],
+input[type="password"],
+select {
+    width: 100%;
+    max-width: 350px;
+    /* Max width for desktop readability */
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 1em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+small {
+    display: block;
+    margin-top: 5px;
+    color: #6c757d;
+    font-size: 0.85em;
+}
+
+/* Checkbox Grid Layout */
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px 20px;
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px dashed #ced4da;
+    border-radius: 6px;
+    background-color: #ffffff;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: flex-start;
+    font-size: 0.95em;
+    color: #343a40;
+}
+
+.checkbox-item input[type="checkbox"] {
+    margin-top: 3px;
+    margin-right: 10px;
+    transform: scale(1.1);
+    /* Slightly larger checkbox */
+    min-width: 16px;
+    min-height: 16px;
+}
+
+/* Save Button Styling (prominent and styled) */
+.save-bar {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+    text-align: left;
+}
+
+.save-button {
+    background-color: #28a745;
+    /* Green for success/save */
+    color: white;
+    padding: 14px 30px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.15em;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);
+    transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+}
+
+.save-button:hover {
+    background-color: #218838;
+    box-shadow: 0 6px 15px rgba(40, 167, 69, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Icon for Save Button */
+.save-button:before {
+    content: '💾';
+    /* Floppy disk icon */
+    margin-right: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+
+    .form-group {
+        border-left: none;
+        border-top: 4px solid #007bff;
+        padding: 10px;
+    }
+
+    .label-cell {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+
+    .input-cell {
+        min-width: 100%;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select {
+        max-width: 100%;
+    }
+
+    .checkbox-grid {
+        grid-template-columns: 1fr;
+        /* Single column on mobile */
+    }
+}
