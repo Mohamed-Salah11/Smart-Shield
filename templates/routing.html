@@ -1,6 +1,203 @@
 {% extends 'base.html' %}
+{% set title = "System - Routing" %}
 
 {% block main %}
-<h1>Routing</h1>
-<p>Routing configuration page.</p>
+<div class="container-fluid mt-3">
+    <!-- Breadcrumb (large pill) -->
+    <nav aria-label="breadcrumb" class="bg-light rounded p-3 mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="#">System</a></li>
+            <li class="breadcrumb-item"><a href="#">Routing</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Gateways</li>
+        </ol>
+    </nav>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link active" href="/system/routing">Gateways</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/routing/static">Static Routes</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/routing/groups">Gateway Groups</a></li>
+    </ul>
+
+    <!-- Gateways card -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            Gateways
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-secondary">
+                    <tr>
+                        <th style="width:40px"></th>
+                        <th>Name</th>
+                        <th>Default</th>
+                        <th>Interface</th>
+                        <th>Gateway</th>
+                        <th>Monitor IP</th>
+                        <th>Description</th>
+                        <th style="width:120px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-index="0">
+                        <td class="align-middle"><input type="checkbox" class="select-gateway" checked></td>
+                        <td class="align-middle name">WAN_DHCP <span title="external">🌐</span></td>
+                        <td class="align-middle default"></td>
+                        <td class="align-middle interface">WAN</td>
+                        <td class="align-middle gateway">8.8.8.8</td>
+                        <td class="align-middle monitor">8.8.8.8</td>
+                        <td class="align-middle description">Interface WAN_DHCP Gateway</td>
+                        <td class="align-middle text-end">
+                            <button type="button" class="btn btn-sm btn-link edit-row" title="Edit">✏️</button>
+                            <button type="button" class="btn btn-sm btn-link duplicate-row" title="Duplicate">📄</button>
+                            <button type="button" class="btn btn-sm btn-link delete-row" title="Delete">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr data-index="1">
+                        <td class="align-middle"><input type="checkbox" class="select-gateway"></td>
+                        <td class="align-middle name">WAN_DHCP6</td>
+                        <td class="align-middle default"></td>
+                        <td class="align-middle interface">WAN</td>
+                        <td class="align-middle gateway">dynamic</td>
+                        <td class="align-middle monitor">dynamic</td>
+                        <td class="align-middle description">Interface WAN_DHCP6 Gateway</td>
+                        <td class="align-middle text-end">
+                            <button type="button" class="btn btn-sm btn-link edit-row" title="Edit">✏️</button>
+                            <button type="button" class="btn btn-sm btn-link duplicate-row" title="Duplicate">📄</button>
+                            <button type="button" class="btn btn-sm btn-link delete-row" title="Delete">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr data-index="2">
+                        <td class="align-middle"><input type="checkbox" class="select-gateway"></td>
+                        <td class="align-middle name">WANGW <span title="external">🌐</span></td>
+                        <td class="align-middle default">Default (IPv4)</td>
+                        <td class="align-middle interface">WAN</td>
+                        <td class="align-middle gateway">8.8.8.8</td>
+                        <td class="align-middle monitor">8.8.8.8</td>
+                        <td class="align-middle description">Interface wan Gateway</td>
+                        <td class="align-middle text-end">
+                            <button type="button" class="btn btn-sm btn-link edit-row" title="Edit">✏️</button>
+                            <button type="button" class="btn btn-sm btn-link duplicate-row" title="Duplicate">📄</button>
+                            <button type="button" class="btn btn-sm btn-link delete-row" title="Delete">🗑️</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-end gap-2">
+            <button id="openEditBtn" type="button" class="btn btn-primary">💾 Save</button>
+            <button id="addGatewayBtn" type="button" class="btn btn-success">➕ Add</button>
+        </div>
+    </div>
+
+    <!-- Default gateway card -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">Default gateway</div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="default_ipv4" class="form-label">Default gateway IPv4</label>
+                    <select id="default_ipv4" class="form-select">
+                        <option value="">Automatic</option>
+                        {% for g in gateways %}
+                            {% if not g.address_family or g.address_family == 'IPv4' or g.address_family == 'Both' %}
+                                <option value="{{ g.name }}" {% if g.name == default_ipv4 %}selected{% endif %}>{{ g.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                        <option value="None" {% if default_ipv4 == 'None' %}selected{% endif %}>None</option>
+                    </select>
+                    <div class="form-text">Select a gateway or failover gateway group to use as the default IPv4 gateway.</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="default_ipv6" class="form-label">Default gateway IPv6</label>
+                    <select id="default_ipv6" class="form-select">
+                        <option value="">Automatic</option>
+                        {% for g in gateways %}
+                            {% if not g.address_family or g.address_family == 'IPv6' or g.address_family == 'Both' %}
+                                <option value="{{ g.name }}" {% if g.name == default_ipv6 %}selected{% endif %}>{{ g.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                        <option value="None" {% if default_ipv6 == 'None' %}selected{% endif %}>None</option>
+                    </select>
+                    <div class="form-text">Select a gateway or failover gateway group to use as the default IPv6 gateway.</div>
+                </div>
+            </div>
+            <form id="saveForm" method="post" action="/system/routing/save">
+                <input type="hidden" name="gateways" id="gatewaysInput">
+                <input type="hidden" name="default_ipv4" id="defaultIpv4Input">
+                <input type="hidden" name="default_ipv6" id="defaultIpv6Input">
+                <div class="d-flex justify-content-start">
+                    <button id="saveBtn" type="button" class="btn btn-primary">💾 Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    // Wire Save to serialize table and post to server; Add opens edit page
+    window.addEventListener('load', function(){
+        const openEditBtn = document.getElementById('openEditBtn');
+        const addBtn = document.getElementById('addGatewayBtn');
+        const table = document.querySelector('table.table tbody');
+        const saveBtn = document.getElementById('saveBtn');
+
+        function gotoEdit(index){
+            if(typeof index === 'number' || String(index).match(/^\d+$/)){
+                window.location.href = '/system/routing/gateway/edit/' + index;
+            } else {
+                window.location.href = '/system/routing/gateway/edit';
+            }
+        }
+
+        // row actions (edit/delete/duplicate)
+        table.addEventListener('click', function(e){
+            if(e.target.closest('.edit-row')){
+                const tr = e.target.closest('tr');
+                const idx = tr.getAttribute('data-index');
+                gotoEdit(idx);
+            } else if(e.target.closest('.delete-row')){
+                const tr = e.target.closest('tr');
+                tr.remove();
+            } else if(e.target.closest('.duplicate-row')){
+                const tr = e.target.closest('tr');
+                const clone = tr.cloneNode(true);
+                const lastIndex = table.querySelectorAll('tr').length;
+                clone.setAttribute('data-index', lastIndex);
+                clone.querySelector('.select-gateway').checked = false;
+                table.appendChild(clone);
+            }
+        });
+
+        // Blue Save button should do nothing (per user request)
+        openEditBtn.addEventListener('click', function(){
+            // intentionally noop
+            return;
+        });
+
+        addBtn.addEventListener('click', function(){
+            gotoEdit();
+        });
+
+        saveBtn.addEventListener('click', function(){
+            // collect gateways from table
+            const rows = table.querySelectorAll('tr');
+            const data = [];
+            rows.forEach(function(r){
+                data.push({
+                    name: r.querySelector('.name')?.textContent.trim() || '',
+                    interface: r.querySelector('.interface')?.textContent.trim() || '',
+                    gateway: r.querySelector('.gateway')?.textContent.trim() || '',
+                    monitor: r.querySelector('.monitor')?.textContent.trim() || '',
+                    description: r.querySelector('.description')?.textContent.trim() || '',
+                });
+            });
+
+            document.getElementById('gatewaysInput').value = JSON.stringify(data);
+            document.getElementById('defaultIpv4Input').value = document.getElementById('default_ipv4').value || '';
+            document.getElementById('defaultIpv6Input').value = document.getElementById('default_ipv6').value || '';
+            document.getElementById('saveForm').submit();
+        });
+    });
+    </script>
+
+    </div>
 {% endblock %}

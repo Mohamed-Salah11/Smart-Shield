@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% set title = "System - Gateway Group Edit" %}
+
+{% block main %}
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb" class="bg-light rounded p-3 mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="#">System</a></li>
+            <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
+            <li class="breadcrumb-item"><a href="/system/routing/groups">Gateway Groups</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        </ol>
+    </nav>
+
+    <div class="card">
+        <div class="card-header bg-dark text-white">Edit Gateway Group Entry</div>
+        <form method="post" class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Group Name</label>
+                </div>
+                <div class="col-md-10">
+                    <input type="text" name="group_name" class="form-control w-50" value="{{ group.name if group else '' }}">
+                </div>
+            </div>
+
+            <h5 class="mb-3">Gateway Priority</h5>
+            <div class="mb-4">
+                {% for g in gateways %}
+                <div class="row mb-3 align-items-center">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" readonly value="{{ g.name }}">
+                    </div>
+                    <div class="col-md-2">
+                        <select name="tier_{{ g.name }}" class="form-select">
+                            <option value="Never" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Never' %}selected{% endif %}>Never</option>
+                            <option value="Tier 1" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Tier 1' %}selected{% endif %}>Tier 1</option>
+                            <option value="Tier 2" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Tier 2' %}selected{% endif %}>Tier 2</option>
+                            <option value="Tier 3" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Tier 3' %}selected{% endif %}>Tier 3</option>
+                            <option value="Tier 4" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Tier 4' %}selected{% endif %}>Tier 4</option>
+                            <option value="Tier 5" {% if group and group.members and group.members | selectattr('gateway','equalto',g.name) | list | length and (group.members | selectattr('gateway','equalto',g.name) | list)[0].tier == 'Tier 5' %}selected{% endif %}>Tier 5</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="vip_{{ g.name }}" class="form-select">
+                            <option value="">Interface Address</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" readonly value="{{ g.description if g.description else '' }}">
+                        <input type="hidden" name="desc_{{ g.name }}" value="{{ g.description if g.description else '' }}">
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Column labels row -->
+                <div class="row mt-3 pt-2 border-top text-muted small">
+                    <div class="col-md-3"><strong>Gateway</strong></div>
+                    <div class="col-md-2"><strong>Tier</strong></div>
+                    <div class="col-md-3"><strong>Virtual IP</strong></div>
+                    <div class="col-md-4"><strong>Description</strong></div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Link Priority</label>
+                </div>
+                <div class="col-md-10">
+                    <div class="form-text">The priority selected here defines in what order failover and balancing of links will be done. Multiple links of the same priority will balance connections until all links in the priority will be exhausted. If all links in a priority level are exhausted then the next available link(s) in the next priority level will be used.</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Virtual IP</label>
+                </div>
+                <div class="col-md-10">
+                    <div class="form-text">The virtual IP field selects which (virtual) IP should be used when this group applies to a local Dynamic DNS, IPsec or OpenVPN endpoint.</div>
+                </div>
+            </div>
+
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-2">
+                    <label class="form-label">Keep Failover States</label>
+                </div>
+                <div class="col-md-10">
+                    <select name="keep_failover" class="form-select w-50">
+                        <option value="global" {% if group and group.keep_failover == 'global' %}selected{% endif %}>Use global behavior (default)</option>
+                        <option value="keep" {% if group and group.keep_failover == 'keep' %}selected{% endif %}>Keep states on gateway recovery</option>
+                        <option value="kill" {% if group and group.keep_failover == 'kill' %}selected{% endif %}>Kill states on gateway recovery</option>
+                    </select>
+                    <div class="form-text">Keep states on gateway recovery: states for this gateway group are unaffected. Kill states on gateway recovery: states created for lower-priority gateways by policy-routing firewall rules will be killed.</div>
+                </div>
+            </div>
+
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-2">
+                    <label class="form-label">Trigger Level</label>
+                </div>
+                <div class="col-md-10">
+                    <select name="trigger_level" class="form-select w-50">
+                        <option value="member_down" {% if group and group.trigger_level == 'member_down' %}selected{% endif %}>Member Down</option>
+                        <option value="packet_loss" {% if group and group.trigger_level == 'packet_loss' %}selected{% endif %}>Packet Loss</option>
+                        <option value="high_latency" {% if group and group.trigger_level == 'high_latency' %}selected{% endif %}>High Latency</option>
+                        <option value="packet_loss_or_high_latency" {% if group and group.trigger_level == 'packet_loss_or_high_latency' %}selected{% endif %}>Packet Loss or High Latency</option>
+                    </select>
+                    <div class="form-text">When to trigger exclusion of a member</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-2">
+                    <label class="form-label">Description</label>
+                </div>
+                <div class="col-md-10">
+                    <input type="text" name="description" class="form-control w-50" value="{{ group.description if group else '' }}">
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">💾 Save</button>
+                <a class="btn btn-secondary" href="/system/routing/groups">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

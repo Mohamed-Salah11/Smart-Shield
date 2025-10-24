@@ -1,6 +1,316 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-<h1>Welcome to High Availability</h1>
-<p>This is an empty placeholder page for High Availability.</p>
-{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System / High Availability</title>
+    <style>
+        /* General Styles for a clean, system-like interface */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 25px;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header Navigation */
+        .header {
+            background-color: #e9e9e9;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .header span {
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Section Headings */
+        h1 {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #007bff;
+            /* Blue to match the theme in images */
+            font-size: 1.2em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        /* Form Layout */
+        .form-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 3px solid #ddd;
+        }
+
+        .label-cell {
+            display: inline-block;
+            width: 250px;
+            font-weight: bold;
+            color: #555;
+            vertical-align: top;
+            padding-top: 5px;
+        }
+
+        .input-cell {
+            display: inline-block;
+            width: calc(100% - 260px);
+        }
+
+        /* Input Styling */
+        input[type="text"],
+        input[type="password"],
+        select {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+
+        /* Checkbox Grid Layout */
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Save Button Styling (prominent blue) */
+        .save-bar {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            text-align: left;
+        }
+
+        .save-button {
+            background-color: #4CAF50;
+            /* Green/Blue color typical for save buttons */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+
+        .save-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <span>System</span> &gt; High Availability
+        </div>
+
+        <h1>High Availability</h1>
+        <p>This page allows you to configure state and configuration synchronization for setting up a firewall cluster
+            for failover.</p>
+
+        <form action="/api/save_ha_settings" method="POST">
+            <h2>State Synchronization Settings (pfsync)</h2>
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="pfsync_enabled">Synchronize states</label>
+                </div>
+                <div class="input-cell">
+                    <input type="checkbox" id="pfsync_enabled" name="pfsync_enabled" checked>
+                    pfsync transfers state insertion, update, and deletion messages between firewalls.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="sync_interface">Synchronize Interface</label>
+                </div>
+                <div class="input-cell">
+                    <select id="sync_interface" name="sync_interface">
+                        <option value="WAN" selected>WAN</option>
+                        <option value="LAN">LAN</option>
+                        <option value="SYNC_DEDICATED">SYNC (Dedicated)</option>
+                    </select>
+                    <br><small>Recommended to set this to an interface other than LAN. A dedicated interface works best.
+                        An IP must be assigned to the interface on all participating sync nodes.</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="filter_host_id">Filter Host ID</label>
+                </div>
+                <div class="input-cell">
+                    <input type="text" id="filter_host_id" name="filter_host_id" value="fa94412b"
+                        placeholder="Max 8 hex chars">
+                    <br><small>Custom pf host identifier (max 8 non-zero hexadecimal characters) to uniquely identify
+                        which host created a firewall state. Each node must have a different ID.</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="pfsync_peer_ip">pfsync Synchronize Peer IP</label>
+                </div>
+                <div class="input-cell">
+                    <input type="text" id="pfsync_peer_ip" name="pfsync_peer_ip" placeholder="e.g., 192.168.1.2">
+                    <br><small>Setting this option will force pfsync to synchronize its state table to this IP address.
+                        The default is directed multicast.</small>
+                </div>
+            </div>
+
+
+            <h2>Configuration Synchronization Settings (XMLRPC Sync)</h2>
+            <p>XMLRPC sync is currently only supported over connections using the same protocol and port as this system.
+                <strong>Do not use the Synchronize Config to IP and password option on backup cluster members!</strong>
+            </p>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="sync_config_ip">Synchronize Config to IP</label>
+                </div>
+                <div class="input-cell">
+                    <input type="text" id="sync_config_ip" name="sync_config_ip" placeholder="e.g., 192.168.1.2">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="remote_username">Remote System Username</label>
+                </div>
+                <div class="input-cell">
+                    <input type="text" id="remote_username" name="remote_username"
+                        placeholder="Enter the WebConfigurator username">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="remote_password">Remote System Password</label>
+                </div>
+                <div class="input-cell">
+                    <input type="password" id="remote_password" name="remote_password"
+                        placeholder="Remote System Password">
+                    <input type="password" id="remote_password_confirm" placeholder="Confirm">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="label-cell">
+                    <label for="sync_admin">Synchronize admin</label>
+                </div>
+                <div class="input-cell">
+                    <input type="checkbox" id="sync_admin" name="sync_admin">
+                    Synchronize admin accounts and autoupdate sync password
+                </div>
+            </div>
+
+            <p style="font-weight: bold; margin-top: 20px;">Select options to sync:</p>
+
+            <div class="checkbox-grid">
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="user_managers">User
+                    managers and groups</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="nat_config" checked>NAT
+                    configuration</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="dhcpv6_relay">DHCPv6 Relay
+                    settings</div>
+
+                <div class="checkbox-item"><input type="checkbox" name="sync_options"
+                        value="auth_servers">Authentication servers (e.g. LDAP, RADIUS)</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="ipsec_config">IPsec
+                    configuration</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="wol_server">WoL Server
+                    settings</div>
+
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="certs_ca_crl">Certificate
+                    Authorities, Certificates, and CRLs</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="openvpn_config">OpenVPN
+                    configuration (implies CA/Cert/CRL Sync)</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="static_routes">Static Route
+                    configuration</div>
+
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="firewall_rules"
+                        checked>Firewall rules</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="dhcp_server">DHCP Server
+                    settings</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="virtual_ips">Virtual IPs
+                </div>
+
+                <div class="checkbox-item"><input type="checkbox" name="sync_options"
+                        value="firewall_schedules">Firewall schedules</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="dhcp_relay">DHCP Relay
+                    settings</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="traffic_shaper">Traffic
+                    Shaper configuration</div>
+
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="firewall_aliases">Firewall
+                    aliases</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="shaper_limiters">Traffic
+                    Shaper Limiters configuration</div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="dns_forwarder">DNS
+                    Forwarder and DNS Resolver configurations</div>
+
+                <div class="checkbox-item"></div>
+                <div class="checkbox-item"></div>
+                <div class="checkbox-item"><input type="checkbox" name="sync_options" value="captive_portal">Captive
+                    Portal</div>
+            </div>
+
+            <div class="checkbox-item" style="margin-top: 20px;"><input type="checkbox" id="toggle_all"
+                    onclick="toggleAllCheckboxes(this)"> <strong>Toggle All</strong></div>
+
+            <div class="save-bar">
+                <button type="submit" class="save-button">
+                    &#128427; Save
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function toggleAllCheckboxes(source) {
+            const checkboxes = document.querySelectorAll('input[name="sync_options"]');
+            for (let i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = source.checked;
+            }
+        }
+    </script>
+
+</body>
+
+</html>
