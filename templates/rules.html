@@ -1,6 +1,820 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Rules</h1>
-<p>This is an empty placeholder page for Firewall &gt; Rules.</p>
+<style>
+	.nf-header { background:#f8f9fa;border-bottom:1px solid #ddd;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin:-12px -12px 12px -12px }
+	.nf-tabs { display:flex;gap:0;border-bottom:2px solid #ddd;margin-bottom:12px }
+	.nf-tab { padding:10px 16px;cursor:pointer;border:none;background:none;color:#666;font-weight:600;position:relative }
+	.nf-tab.active { color:#d32f2f;border-bottom:2px solid #d32f2f;margin-bottom:-2px }
+	.nf-card { display:none }
+	.nf-card.active { display:block }
+	.nf-table { width:100%;border-collapse:collapse;background:#fff;margin-bottom:12px }
+	.nf-table thead { background:#555;color:#fff }
+	.nf-table th { padding:10px;text-align:left;font-weight:700;font-size:13px }
+	.nf-table td { padding:8px 10px;border-bottom:1px solid #ddd;font-size:13px }
+	.nf-table tbody tr:hover { background:#f5f5f5 }
+	.nf-empty { background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px 14px;margin-bottom:12px;color:#856404 }
+	.btn { padding:8px 12px;border-radius:4px;border:none;cursor:pointer;font-weight:600;font-size:13px }
+	.btn-green { background:#28a745;color:#fff }
+	.btn-red { background:#dc3545;color:#fff }
+	.btn-blue { background:#007bff;color:#fff }
+	.btn-orange { background:#fd7e14;color:#fff }
+	.footer-actions { display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap }
+	.separator { width:1px;background:#ddd;height:30px;margin:0 8px }
+	.checkbox-cell { text-align:center;width:30px }
+</style>
+
+<div class="nf-header">
+	<div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#666">
+		<span>Firewall</span>
+		<span style="color:#999">/</span>
+		<span>Rules</span>
+		<span style="color:#999">/</span>
+		<span class="nf-active-section" style="color:#d32f2f">Floating</span>
+	</div>
+	<div style="display:flex;gap:6px">
+		<button style="background:none;border:none;cursor:pointer;color:#666;font-size:16px" title="List view">📋</button>
+		<button style="background:none;border:none;cursor:pointer;color:#666;font-size:16px" title="Table view">▦</button>
+		<button style="background:none;border:none;cursor:pointer;color:#d32f2f;font-size:16px" title="Delete">🗑️</button>
+	</div>
+</div>
+
+<div class="nf-tabs">
+	<button class="nf-tab active" data-tab="floating">Floating</button>
+	<button class="nf-tab" data-tab="wan">WAN</button>
+	<button class="nf-tab" data-tab="lan">LAN</button>
+</div>
+
+<!-- Floating Rules Card -->
+<div id="card-floating" class="nf-card active">
+	<div class="nf-empty">No floating rules are currently defined. Click the button to add a new rule.</div>
+	<table class="nf-table">
+		<thead>
+			<tr>
+				<th class="checkbox-cell"><input type="checkbox" id="floatingCheckAll"></th>
+				<th>States</th>
+				<th>Interfaces</th>
+				<th>Protocol</th>
+				<th>Source</th>
+				<th>Port</th>
+				<th>Destination</th>
+				<th>Port</th>
+				<th>Gateway</th>
+				<th>Queue</th>
+				<th>Schedule</th>
+				<th>Description</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="floating-tbody">
+		</tbody>
+	</table>
+</div>
+
+<!-- WAN Rules Card -->
+<div id="card-wan" class="nf-card">
+	<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:0;display:flex;justify-content:space-between;align-items:center">
+		<span>Rules (Drag to Change Order)</span>
+		<button class="btn btn-green" id="wanAddBtn" title="Add a new rule" style="padding:6px 12px;font-size:13px">
+			Add
+		</button>
+	</div>
+	
+	<!-- WAN Add Rule Form (Hidden by default) -->
+	<div id="wanAddForm" style="display:none;background:#fff;padding:14px;border-bottom:1px solid #ddd">
+		<form id="wanRuleEditForm" style="padding:0">
+			<!-- Action Section -->
+			<div style="margin-bottom:16px">
+				<label style="display:block;font-weight:700;margin-bottom:8px;text-decoration:underline">Action</label>
+				<select id="wan_rule_action" style="width:300px;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:8px">
+					<option>Pass</option>
+					<option>Block</option>
+					<option>Reject</option>
+					<option>Match</option>
+				</select>
+				<div style="color:#777;font-size:13px;margin-bottom:8px">Choose what to do with packets that match the criteria specified below.<br>Hint: the difference between block and reject is that with reject, a packet (TCP RST or ICMP port unreachable for UDP) is returned to the sender, whereas with block the packet is dropped silently. In either case, the original packet is discarded.</div>
+			</div>
+
+			<!-- Disabled Checkbox -->
+			<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+				<input type="checkbox" id="wan_rule_disabled"> <label for="wan_rule_disabled"><strong>Disabled</strong></label>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Disable this rule<br>Set this option to disable this rule without removing it from the list.</div>
+
+			<!-- Quick Checkbox -->
+			<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+				<input type="checkbox" id="wan_rule_quick"> <label for="wan_rule_quick"><strong>Quick</strong></label>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Apply the action immediately on match.<br>Set this option to apply this action to traffic that matches this rule immediately.</div>
+
+			<!-- Interface Selection -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Interface</label>
+				<select id="wan_rule_interface" style="flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:4px;background-color:#fff;cursor:pointer;font-size:14px">
+					<option>Any</option>
+					<option>WAN</option>
+					<option>LAN</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Choose the interface from which packets must come to match this rule.</div>
+
+			<!-- Direction -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Direction</label>
+				<select id="wan_rule_direction" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>any</option>
+					<option>in</option>
+					<option>out</option>
+				</select>
+			</div>
+
+			<!-- Address Family -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Address Family</label>
+				<select id="wan_rule_addr_family" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>IPv4</option>
+					<option>IPv6</option>
+					<option>IPv4+IPv6</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Select the Internet Protocol version this rule applies to.</div>
+
+			<!-- Protocol -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Protocol</label>
+				<select id="wan_rule_protocol" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>TCP</option>
+					<option>UDP</option>
+					<option>TCP/UDP</option>
+					<option>ICMP</option>
+					<option>ESP</option>
+					<option>AH</option>
+					<option>GRE</option>
+					<option>IPV6</option>
+					<option>IGMP</option>
+					<option>SCTP</option>
+					<option>CARP</option>
+					<option>PFSYNC</option>
+					<option>Any</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:16px">Choose which IP protocol this rule should match.</div>
+
+			<!-- Source Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Source</div>
+
+			<!-- Source -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Source</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="wan_rule_source_invert"> <label for="wan_rule_source_invert">Invert match</label>
+						<select id="wan_rule_source_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>Any</option>
+							<option>Address or Alias</option>
+							<option>Network</option>
+							<option>This Firewall (self)</option>
+							<option>PPTP clients</option>
+							<option>PPPoE clients</option>
+							<option>L2TP clients</option>
+							<option>WAN address</option>
+							<option>LAN address</option>
+							<option>WAN subnets</option>
+							<option>LAN subnets</option>
+						</select>
+						<input type="text" id="wan_rule_source_addr" placeholder="Source Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+						<span style="color:#999">/</span>
+						<input type="text" id="wan_rule_source_port" placeholder="Port" style="width:80px;padding:8px;border:1px solid #ddd;border-radius:4px">
+					</div>
+					<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;padding:8px;margin-bottom:8px;color:#1976d2;font-size:13px">
+						<strong>ℹ️ Display Advanced</strong> The Source Port Range for a connection is typically random and almost never equal to the destination port. In most cases this setting must remain at its default value, any.
+					</div>
+				</div>
+			</div>
+
+			<!-- Destination Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Destination</div>
+
+			<!-- Destination -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Destination</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="wan_rule_dest_invert"> <label for="wan_rule_dest_invert">Invert match</label>
+						<select id="wan_rule_dest_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>Any</option>
+							<option>Address or Alias</option>
+							<option>Network</option>
+							<option>This Firewall (self)</option>
+							<option>PPTP clients</option>
+							<option>PPPoE clients</option>
+							<option>L2TP clients</option>
+							<option>WAN address</option>
+							<option>LAN address</option>
+							<option>WAN subnets</option>
+							<option>LAN subnets</option>
+						</select>
+						<input type="text" id="wan_rule_dest_addr" placeholder="Destination Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+						<span style="color:#999">/</span>
+						<select id="wan_rule_dest_port" style="width:100px;padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>(other)</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<!-- Destination Port Range -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Destination Port Range</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<div style="display:flex;gap:4px;align-items:center;flex:1">
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">From</div>
+								<select style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+									<option>(other)</option>
+									<option>any</option>
+									<option>HTTP (80)</option>
+									<option>HTTPS (443)</option>
+									<option>SSH (22)</option>
+									<option>DNS (53)</option>
+								</select>
+							</div>
+							<div style="flex:2">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">Custom</div>
+								<input type="text" placeholder="" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+							</div>
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">To</div>
+								<select style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+									<option>(other)</option>
+									<option>any</option>
+									<option>HTTP (80)</option>
+									<option>HTTPS (443)</option>
+									<option>SSH (22)</option>
+									<option>DNS (53)</option>
+								</select>
+							</div>
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">Custom</div>
+								<input type="text" placeholder="" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+							</div>
+						</div>
+					</div>
+					<div style="color:#777;font-size:13px">Specify the destination port or port range for this rule. The "To" field may be left empty if only filtering a single port.</div>
+				</div>
+			</div>
+
+			<!-- Extra Options Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Extra Options</div>
+
+			<!-- Log -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Log</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="wan_rule_log"> <label for="wan_rule_log">Log packets that are handled by this rule</label>
+					</div>
+					<div style="color:#777;font-size:13px">Hint: the firewall has limited local log space. Don't turn on logging for everything. If doing a lot of logging, consider using a remote syslog server (see the <span style="color:#0066cc">Status: System Logs: Settings</span> page).</div>
+				</div>
+			</div>
+
+			<!-- Description -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Description</label>
+				<div style="flex:1">
+					<textarea id="wan_rule_desc" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;min-height:60px;font-family:Arial,sans-serif"></textarea>
+					<div style="color:#777;font-size:13px;margin-top:8px">A description may be entered here for administrative reference. A maximum of 52 characters will be used in the ruleset label and displayed in the firewall log.</div>
+				</div>
+			</div>
+
+			<!-- Save Button -->
+			<div style="display:flex;justify-content:flex-start;gap:8px;padding-top:12px;border-top:1px solid #ddd">
+				<button type="button" id="wanRuleSaveBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#007bff;color:#fff">Save</button>
+				<button type="button" id="wanRuleCancelBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#6c757d;color:#fff">Cancel</button>
+			</div>
+		</form>
+	</div>
+
+	<table class="nf-table" style="margin-bottom:0">
+		<thead>
+			<tr>
+				<th class="checkbox-cell"><input type="checkbox" id="wanCheckAll"></th>
+				<th>States</th>
+				<th>Protocol</th>
+				<th>Source</th>
+				<th>Port</th>
+				<th>Destination</th>
+				<th>Port</th>
+				<th>Gateway</th>
+				<th>Queue</th>
+				<th>Schedule</th>
+				<th>Description</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="wan-tbody">
+			<tr>
+				<td class="checkbox-cell"><input type="checkbox"></td>
+				<td style="text-align:center"><span style="color:#d32f2f;font-weight:700;font-size:18px">✕</span></td>
+				<td style="color:#0275d8;font-weight:600">0/3 KiB</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>RFC 1918 networks</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>Block private networks</td>
+				<td style="text-align:center"><button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Edit">⚙️</button></td>
+			</tr>
+			<tr>
+				<td class="checkbox-cell"><input type="checkbox"></td>
+				<td style="text-align:center"><span style="color:#d32f2f;font-weight:700;font-size:18px">✕</span></td>
+				<td style="color:#0275d8;font-weight:600">0/316 B</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>Reserved<br>Not assigned by IANA</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>Block bogon networks</td>
+				<td style="text-align:center"><button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Edit">⚙️</button></td>
+			</tr>
+		</tbody>
+	</table>
+	<div class="nf-empty" style="margin:0;border-radius:0;border-top:1px solid #ffc107">No rules are currently defined for this interface<br>All incoming connections on this interface will be blocked until pass rules are added. Click the button to add a new rule.</div>
+</div>
+
+<!-- LAN Rules Card -->
+<div id="card-lan" class="nf-card">
+	<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:0">Rules (Drag to Change Order)</div>
+	<table class="nf-table" style="margin-bottom:0">
+		<thead>
+			<tr>
+				<th class="checkbox-cell"><input type="checkbox" id="lanCheckAll"></th>
+				<th>States</th>
+				<th>Interfaces</th>
+				<th>Protocol</th>
+				<th>Source</th>
+				<th>Port</th>
+				<th>Destination</th>
+				<th>Port</th>
+				<th>Gateway</th>
+				<th>Queue</th>
+				<th>Schedule</th>
+				<th>Description</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="lan-tbody">
+			<tr>
+				<td class="checkbox-cell"><input type="checkbox"></td>
+				<td style="text-align:center"><span style="color:#28a745;font-weight:700;font-size:18px">✓</span></td>
+				<td style="color:#0275d8;font-weight:600">2/882 KiB</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>LAN Address</td>
+				<td style="color:#999">443, 80</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>Anti-Lockout Rule</td>
+				<td style="text-align:center"><button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Edit">⚙️</button></td>
+			</tr>
+			<tr>
+				<td class="checkbox-cell"><input type="checkbox"></td>
+				<td style="text-align:center"><span style="color:#28a745;font-weight:700;font-size:18px">✓</span></td>
+				<td style="color:#0275d8;font-weight:600">4/69 KiB</td>
+				<td>IPv4 *</td>
+				<td style="color:#0275d8">LAN subnets</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>none</td>
+				<td>Default allow LAN to any rule</td>
+				<td style="text-align:center">
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Edit">⚙️</button>
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Copy">📋</button>
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Trash">🗑️</button>
+				</td>
+			</tr>
+			<tr>
+				<td class="checkbox-cell"><input type="checkbox"></td>
+				<td style="text-align:center"><span style="color:#28a745;font-weight:700;font-size:18px">✓</span></td>
+				<td style="color:#0275d8;font-weight:600">0/0 B</td>
+				<td>IPv6 *</td>
+				<td style="color:#0275d8">LAN subnets</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td style="color:#999">*</td>
+				<td>none</td>
+				<td>Default allow LAN IPv6 to any rule</td>
+				<td style="text-align:center">
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Edit">⚙️</button>
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Copy">📋</button>
+					<button style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#0275d8" title="Trash">🗑️</button>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+	<div class="nf-empty" style="margin:0;border-radius:0;border-top:1px solid #ffc107">No LAN rules are currently defined for this interface<br>All incoming connections on this interface will be blocked until pass rules are added. Click the button to add a new rule.</div>
+</div>
+
+<!-- Footer Action Buttons -->
+<div class="footer-actions">
+	<button class="btn btn-green" id="rulesAdd1" title="Add a new rule">
+		<span style="font-size:16px;margin-right:4px">⬇</span>Add
+	</button>
+	<button class="btn btn-green" id="rulesAdd2" title="Add a new rule">
+		<span style="font-size:16px;margin-right:4px">⬇</span>Add
+	</button>
+	<button class="btn btn-red" id="rulesDelete" title="Delete selected rules">
+		🗑️ Delete
+	</button>
+	<button class="btn btn-blue" id="rulesToggle" title="Toggle enable/disable">
+		⚡ Toggle
+	</button>
+	<button class="btn btn-blue" id="rulesSave" title="Save changes">
+		💾 Save
+	</button>
+	<div class="separator"></div>
+</div>
+
+<script>
+	// Tab switching for Rules
+	const rulesTabs = document.querySelectorAll('.nf-tab');
+	const rulesCards = document.querySelectorAll('.nf-card');
+	
+	rulesTabs.forEach(tab => {
+		tab.addEventListener('click', function() {
+			const tabName = this.getAttribute('data-tab');
+			
+			// Update active tab
+			rulesTabs.forEach(t => t.classList.remove('active'));
+			this.classList.add('active');
+			
+			// Update section name in header
+			const sectionSpan = document.querySelector('.nf-active-section');
+			sectionSpan.textContent = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+			
+			// Show/hide cards
+			rulesCards.forEach(card => card.classList.remove('active'));
+			document.getElementById('card-' + tabName).classList.add('active');
+		});
+	});
+	
+	// Rules buttons wiring
+	const rulesAdd1 = document.getElementById('rulesAdd1');
+	const rulesAdd2 = document.getElementById('rulesAdd2');
+	const wanAddBtn = document.getElementById('wanAddBtn');
+	const wanAddForm = document.getElementById('wanAddForm');
+	const wanRuleSaveBtn = document.getElementById('wanRuleSaveBtn');
+	const wanRuleCancelBtn = document.getElementById('wanRuleCancelBtn');
+	const rulesDelete = document.getElementById('rulesDelete');
+	const rulesToggle = document.getElementById('rulesToggle');
+	const rulesSave = document.getElementById('rulesSave');
+	
+	// WAN Add button - show form
+	if(wanAddBtn) wanAddBtn.addEventListener('click', function(e){ 
+		e.preventDefault(); 
+		if(wanAddForm) wanAddForm.style.display = (wanAddForm.style.display === 'none') ? 'block' : 'none';
+	});
+	
+	// WAN Save button - hide form
+	if(wanRuleSaveBtn) wanRuleSaveBtn.addEventListener('click', function(e){ 
+		e.preventDefault(); 
+		if(wanAddForm) wanAddForm.style.display = 'none';
+		/* placeholder: save WAN rule to backend */
+	});
+	
+	// WAN Cancel button - hide form
+	if(wanRuleCancelBtn) wanRuleCancelBtn.addEventListener('click', function(e){ 
+		e.preventDefault(); 
+		if(wanAddForm) wanAddForm.style.display = 'none';
+	});
+	
+	if(rulesAdd1) rulesAdd1.addEventListener('click', function(e){ e.preventDefault(); if(ruleEditModal) ruleEditModal.style.display='flex'; });
+	if(rulesAdd2) rulesAdd2.addEventListener('click', function(e){ e.preventDefault(); if(ruleEditModal) ruleEditModal.style.display='flex'; });
+	if(rulesDelete) rulesDelete.addEventListener('click', function(e){ e.preventDefault(); /* placeholder: delete selected rules */ });
+	if(rulesToggle) rulesToggle.addEventListener('click', function(e){ e.preventDefault(); /* placeholder: toggle rule state */ });
+	if(rulesSave) rulesSave.addEventListener('click', function(e){ e.preventDefault(); /* placeholder: save rule changes */ });
+</script>
+
+<!-- Edit Firewall Rule Modal -->
+<div id="ruleEditModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.6);z-index:1400;align-items:center;justify-content:center;padding:20px">
+	<div style="background:#fff;border-radius:4px;max-width:1000px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:auto;max-height:92vh">
+		<div style="background:#333;color:#fff;padding:10px 14px;font-weight:700">Firewall / Rules / Floating / Edit</div>
+		<div style="background:#4a4a4a;color:#fff;padding:10px 14px;font-weight:700">Edit Firewall Rule</div>
+		<form id="ruleEditForm" style="padding:14px">
+			<!-- Action Section -->
+			<div style="margin-bottom:16px">
+				<label style="display:block;font-weight:700;margin-bottom:8px;text-decoration:underline">Action</label>
+				<select id="rule_action" style="width:300px;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:8px">
+					<option>Pass</option>
+					<option>Block</option>
+					<option>Reject</option>
+					<option>Match</option>
+				</select>
+				<div style="color:#777;font-size:13px;margin-bottom:8px">Choose what to do with packets that match the criteria specified below.<br>Hint: the difference between block and reject is that with reject, a packet (TCP RST or ICMP port unreachable for UDP) is returned to the sender, whereas with block the packet is dropped silently. In either case, the original packet is discarded.</div>
+			</div>
+
+			<!-- Disabled Checkbox -->
+			<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+				<input type="checkbox" id="rule_disabled"> <label for="rule_disabled"><strong>Disabled</strong></label>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Disable this rule<br>Set this option to disable this rule without removing it from the list.</div>
+
+			<!-- Quick Checkbox -->
+			<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+				<input type="checkbox" id="rule_quick"> <label for="rule_quick"><strong>Quick</strong></label>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Apply the action immediately on match.<br>Set this option to apply this action to traffic that matches this rule immediately.</div>
+
+			<!-- Interface Selection -->
+			<div style="margin-bottom:16px">
+  <label style="display:block;font-weight:700;margin-bottom:8px;text-decoration:underline">
+    Interface
+  </label>
+  <select id="rule_interface" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:8px">
+    <option>Any</option>
+    <option>WAN</option>
+    <option>LAN</option>
+  </select>
+  <div style="color:#777;font-size:13px">Choose the interface(s) for this rule.</div>
+</div>
+
+
+			<!-- Direction -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Direction</label>
+				<select id="rule_direction" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>any</option>
+					<option>in</option>
+					<option>out</option>
+				</select>
+			</div>
+
+			<!-- Address Family -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Address Family</label>
+				<select id="rule_addr_family" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>IPv4</option>
+					<option>IPv6</option>
+					<option>IPv4+IPv6</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Select the Internet Protocol version this rule applies to.</div>
+
+			<!-- Protocol -->
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline">Protocol</label>
+				<select id="rule_protocol" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>TCP</option>
+					<option>UDP</option>
+					<option>TCP/UDP</option>
+					<option>ICMP</option>
+					<option>ESP</option>
+					<option>AH</option>
+					<option>GRE</option>
+					<option>IPV6</option>
+					<option>IGMP</option>
+					<option>SCTP</option>
+					<option>CARP</option>
+					<option>PFSYNC</option>
+					<option>Any</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:16px">Choose which IP protocol this rule should match.</div>
+
+			<!-- Source Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Source</div>
+
+			<!-- Source -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Source</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="rule_source_invert"> <label for="rule_source_invert">Invert match</label>
+						<select id="rule_source_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>Any</option>
+							<option>Address or Alias</option>
+							<option>Network</option>
+							<option>This Firewall (self)</option>
+							<option>PPTP clients</option>
+							<option>PPPoE clients</option>
+							<option>L2TP clients</option>
+							<option>WAN address</option>
+							<option>LAN address</option>
+							<option>WAN subnets</option>
+							<option>LAN subnets</option>
+						</select>
+						<input type="text" id="rule_source_addr" placeholder="Source Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+						<span style="color:#999">/</span>
+						<input type="text" id="rule_source_port" placeholder="Port" style="width:80px;padding:8px;border:1px solid #ddd;border-radius:4px">
+					</div>
+					<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;padding:8px;margin-bottom:8px;color:#1976d2;font-size:13px">
+						<strong>ℹ️ Display Advanced</strong> The Source Port Range for a connection is typically random and almost never equal to the destination port. In most cases this setting must remain at its default value, any.
+					</div>
+				</div>
+			</div>
+
+			<!-- Destination Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Destination</div>
+
+			<!-- Destination -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Destination</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="rule_dest_invert"> <label for="rule_dest_invert">Invert match</label>
+						<select id="rule_dest_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>Any</option>
+							<option>Address or Alias</option>
+							<option>Network</option>
+							<option>This Firewall (self)</option>
+							<option>PPTP clients</option>
+							<option>PPPoE clients</option>
+							<option>L2TP clients</option>
+							<option>WAN address</option>
+							<option>LAN address</option>
+							<option>WAN subnets</option>
+							<option>LAN subnets</option>
+						</select>
+						<input type="text" id="rule_dest_addr" placeholder="Destination Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+						<span style="color:#999">/</span>
+						<select id="rule_dest_port" style="width:100px;padding:8px;border:1px solid #ddd;border-radius:4px">
+							<option>(other)</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<!-- Destination Port Range -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Destination Port Range</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<div style="display:flex;gap:4px;align-items:center;flex:1">
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">From</div>
+								<select style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+									<option>(other)</option>
+									<option>any</option>
+									<option>BGP (179)</option>
+									<option>CVSup (5999)</option>
+									<option>DNS (53)</option>
+									<option>DNS over TLS (853)</option>
+									<option>FTP (21)</option>
+									<option>HBCI (3000)</option>
+									<option>HTTP (80)</option>
+									<option>HTTPS (443)</option>
+									<option>ICQ (5190)</option>
+									<option>IDENT/AUTH (113)</option>
+									<option>IMAP (143)</option>
+									<option>IMAP/S (993)</option>
+									<option>IPsec NAT-T (4500)</option>
+									<option>ISAKMP (500)</option>
+									<option>L2TP (1701)</option>
+									<option>LDAP (389)</option>
+									<option>LDAP/S (636)</option>
+									<option>MMS/TCP (1755)</option>
+									<option>MMS/UDP (7000)</option>
+									<option>MS DS (445)</option>
+									<option>MS RDP (3389)</option>
+									<option>MS WINS (1512)</option>
+									<option>NFS (111)</option>
+									<option>NNTP (119)</option>
+									<option>NTP (123)</option>
+									<option>PPTP (1723)</option>
+									<option>POP3 (110)</option>
+									<option>POP3/S (995)</option>
+									<option>Radius (1812)</option>
+									<option>Rsync (873)</option>
+									<option>RTSP (554)</option>
+									<option>SIP (5060)</option>
+									<option>SIPS (5061)</option>
+									<option>SMTP (25)</option>
+									<option>SMTPS (465)</option>
+									<option>SNMP (161)</option>
+									<option>SNMPTRAP (162)</option>
+									<option>SSH (22)</option>
+									<option>Telnet (23)</option>
+									<option>Whois (43)</option>
+								</select>
+							</div>
+							<div style="flex:2">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">Custom</div>
+								<input type="text" placeholder="" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+							</div>
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">To</div>
+								<select style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+									<option>(other)</option>
+									<option>any</option>
+									<option>BGP (179)</option>
+									<option>CVSup (5999)</option>
+									<option>DNS (53)</option>
+									<option>DNS over TLS (853)</option>
+									<option>FTP (21)</option>
+									<option>HBCI (3000)</option>
+									<option>HTTP (80)</option>
+									<option>HTTPS (443)</option>
+									<option>ICQ (5190)</option>
+									<option>IDENT/AUTH (113)</option>
+									<option>IMAP (143)</option>
+									<option>IMAP/S (993)</option>
+									<option>IPsec NAT-T (4500)</option>
+									<option>ISAKMP (500)</option>
+									<option>L2TP (1701)</option>
+									<option>LDAP (389)</option>
+									<option>LDAP/S (636)</option>
+									<option>MMS/TCP (1755)</option>
+									<option>MMS/UDP (7000)</option>
+									<option>MS DS (445)</option>
+									<option>MS RDP (3389)</option>
+									<option>MS WINS (1512)</option>
+									<option>NFS (111)</option>
+									<option>NNTP (119)</option>
+									<option>NTP (123)</option>
+									<option>PPTP (1723)</option>
+									<option>POP3 (110)</option>
+									<option>POP3/S (995)</option>
+									<option>Radius (1812)</option>
+									<option>Rsync (873)</option>
+									<option>RTSP (554)</option>
+									<option>SIP (5060)</option>
+									<option>SIPS (5061)</option>
+									<option>SMTP (25)</option>
+									<option>SMTPS (465)</option>
+									<option>SNMP (161)</option>
+									<option>SNMPTRAP (162)</option>
+									<option>SSH (22)</option>
+									<option>Telnet (23)</option>
+									<option>Whois (43)</option>
+								</select>
+							</div>
+							<div style="flex:1">
+								<div style="font-size:12px;color:#666;margin-bottom:4px">Custom</div>
+								<input type="text" placeholder="" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+							</div>
+						</div>
+					</div>
+					<div style="color:#777;font-size:13px">Specify the destination port or port range for this rule. The "To" field may be left empty if only filtering a single port.</div>
+				</div>
+			</div>
+
+			<!-- Extra Options Section Header -->
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:12px;margin-left:-14px;margin-right:-14px;padding-left:14px">Extra Options</div>
+
+			<!-- Log -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Log</label>
+				<div style="flex:1">
+					<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+						<input type="checkbox" id="rule_log"> <label for="rule_log">Log packets that are handled by this rule</label>
+					</div>
+					<div style="color:#777;font-size:13px">Hint: the firewall has limited local log space. Don't turn on logging for everything. If doing a lot of logging, consider using a remote syslog server (see the <span style="color:#0066cc">Status: System Logs: Settings</span> page).</div>
+				</div>
+			</div>
+
+			<!-- Description -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Description</label>
+				<div style="flex:1">
+					<textarea id="rule_desc" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;min-height:60px;font-family:Arial,sans-serif"></textarea>
+					<div style="color:#777;font-size:13px;margin-top:8px">A description may be entered here for administrative reference. A maximum of 52 characters will be used in the ruleset label and displayed in the firewall log.</div>
+				</div>
+			</div>
+
+			<!-- Advanced Options -->
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;text-decoration:underline;margin-top:8px">Advanced Options</label>
+				<div style="flex:1">
+					<button type="button" style="padding:8px 12px;border-radius:4px;border:none;background:#0275d8;color:#fff;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+						⚙️ Display Advanced
+					</button>
+				</div>
+			</div>
+
+			<!-- Save Button -->
+			<div style="display:flex;justify-content:flex-start;gap:8px;padding-top:12px;border-top:1px solid #ddd">
+				<button type="button" id="ruleEditSaveBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#007bff;color:#fff">Save</button>
+				<button type="button" id="ruleEditCancelBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#6c757d;color:#fff">Cancel</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<script>
+	// Wire up Edit Rule Modal close buttons
+	const ruleEditModal = document.getElementById('ruleEditModal');
+	const ruleEditSaveBtn = document.getElementById('ruleEditSaveBtn');
+	const ruleEditCancelBtn = document.getElementById('ruleEditCancelBtn');
+
+	if(ruleEditSaveBtn) ruleEditSaveBtn.addEventListener('click', function(e){ e.preventDefault(); if(ruleEditModal) ruleEditModal.style.display='none'; });
+	if(ruleEditCancelBtn) ruleEditCancelBtn.addEventListener('click', function(e){ e.preventDefault(); if(ruleEditModal) ruleEditModal.style.display='none'; });
+	if(ruleEditModal) ruleEditModal.addEventListener('click', function(e){ if(e.target === ruleEditModal) ruleEditModal.style.display='none'; });
+</script>
+
 {% endblock %}

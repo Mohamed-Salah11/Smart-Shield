@@ -125,7 +125,15 @@ def nat():
 
 @app.route('/firewall/aliases')
 def aliases():
-    return render_template('aliases.html')
+    return render_template('aliases.html', tab='ip')
+
+
+@app.route('/firewall/aliases/<tab>')
+def aliases_tab(tab):
+    valid_tabs = ['ip', 'ports', 'urls', 'all']
+    if tab not in valid_tabs:
+        tab = 'ip'
+    return render_template('aliases.html', tab=tab)
 
 
 @app.route('/firewall/schedules')
