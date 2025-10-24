@@ -1,6 +1,1043 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to NAT</h1>
-<p>This is an empty placeholder page for Firewall &gt; NAT.</p>
+<style>
+	.nf-header{background:#f5f5f5;border-radius:6px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+	.nf-crumbs{font-size:20px;font-weight:700;color:#444}
+	.nf-crumbs a{color:#2a9bd6;text-decoration:none}
+	.nf-tabs{display:flex;gap:24px;border-bottom:2px solid #f0f0f0;padding-bottom:10px;margin-bottom:12px}
+	.nf-tab{padding:8px 6px;color:#c23a33;font-weight:700}
+	.nf-card{background:#fff;border:1px solid #ddd;border-radius:6px;overflow:hidden}
+	.nf-title{background:#4a4a4a;color:#fff;padding:10px 12px;font-weight:700}
+	.nf-table{width:100%;border-collapse:collapse}
+	.nf-table thead th{background:#f7f7f7;padding:10px 12px;text-align:left;color:#333;border-bottom:1px solid #e2e2e2}
+	.nf-table tbody td{padding:12px;border-bottom:1px solid #eee}
+	.nf-footer{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding-top:12px;margin-top:10px}
+	.btn{border:none;border-radius:4px;color:#fff;font-weight:700;padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+	.btn.add{background:#2e7d32}
+	.btn.add-green{background:#28a745}
+	.btn.delete{background:#e74c3c}
+	.btn.toggle{background:#3498db}
+	.btn.save{background:#2980b9}
+	.btn.sep{background:#f39c12}
+	.rules-empty{padding:20px;color:#666}
+</style>
+
+<div class="nf-header">
+	<div class="nf-crumbs"><a href="{{ url_for('home') }}">Firewall</a> / <a href="#">NAT</a> / <span style="color:#2a9bd6">Port Forward</span></div>
+	<div></div>
+</div>
+
+<div class="nf-tabs">
+	<div class="nf-tab active" data-tab="pf" style="border-bottom:4px solid #c62828;padding-bottom:6px;cursor:pointer">Port Forward</div>
+	<div class="nf-tab" data-tab="1to1" style="cursor:pointer">1:1</div>
+	<div class="nf-tab" data-tab="outbound" style="cursor:pointer">Outbound</div>
+	<div class="nf-tab" data-tab="npt" style="cursor:pointer">NPt</div>
+</div>
+
+<div id="card-pf" class="nf-card">
+	<div class="nf-title">Rules</div>
+	<table class="nf-table">
+		<thead>
+			<tr>
+				<th style="width:3%"><input type="checkbox"></th>
+				<th style="width:10%">Interface</th>
+				<th style="width:8%">Protocol</th>
+				<th style="width:16%">Source Address</th>
+				<th style="width:10%">Source Ports</th>
+				<th style="width:14%">Dest. Address</th>
+				<th style="width:8%">Dest. Ports</th>
+				<th style="width:8%">NAT IP</th>
+				<th style="width:8%">NAT Ports</th>
+				<th style="width:10%">Description</th>
+				<th style="width:5%">Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td colspan="11">
+					<div class="nf-savebar-in-table" style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border:1px solid #f7f3d7;border-radius:4px">
+						<input id="nf_desc_input" placeholder="Enter a description, Save, then drag to final location." style="flex:1;padding:8px;border:1px solid #d0d7de;border-radius:4px">
+						<button type="button" id="nf_save_btn" style="background:#2e7dff;color:#fff;border:none;padding:8px 10px;border-radius:4px;cursor:pointer">Save</button>
+						<button type="button" id="nf_cancel_btn" style="background:#eef6fb;color:#2b3340;border:none;padding:8px 10px;border-radius:4px;cursor:pointer">Cancel</button>
+						<div style="display:flex;gap:6px;margin-left:8px">
+							<span style="width:14px;height:14px;border-radius:50%;background:#2ecc71;display:inline-block;border:1px solid rgba(0,0,0,0.08)"></span>
+							<span style="width:14px;height:14px;border-radius:50%;background:#e74c3c;display:inline-block;border:1px solid rgba(0,0,0,0.08)"></span>
+							<span style="width:14px;height:14px;border-radius:50%;background:#f1c40f;display:inline-block;border:1px solid rgba(0,0,0,0.08)"></span>
+							<span style="width:14px;height:14px;border-radius:50%;background:#3498db;display:inline-block;border:1px solid rgba(0,0,0,0.08)"></span>
+						</div>
+					</div>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+
+<!-- 1:1 card (hidden by default) -->
+<div id="card-1to1" class="nf-card" style="display:none">
+	<div class="nf-title">NAT 1:1 Mappings</div>
+	<table class="nf-table">
+		<thead>
+			<tr>
+				<th style="width:3%"><input type="checkbox"></th>
+				<th style="width:20%">Interface</th>
+				<th style="width:20%">External IP</th>
+				<th style="width:20%">Internal IP</th>
+				<th style="width:20%">Destination IP</th>
+				<th style="width:17%">Description</th>
+				<th style="width:5%">Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+		</tbody>
+	</table>
+	<div class="nf-footer">
+		<button class="btn add-green" id="1to1Add">
+			<span style="font-size:16px">+</span>Add
+		</button>
+		<button class="btn add-green" id="1to1AddAnother">
+			<span style="font-size:16px">+</span>Add
+		</button>
+		<button class="btn delete" id="1to1Delete">
+			<span style="font-size:16px">🗑️</span>Delete
+		</button>
+		<button class="btn toggle" id="1to1Toggle">
+			<span style="font-size:16px">⚡</span>Toggle
+		</button>
+		<button class="btn save" id="1to1Save">
+			<span style="font-size:16px">💾</span>Save
+		</button>
+	</div>
+</div>
+
+<!-- Outbound cards (hidden by default) -->
+<div id="card-outbound" class="nf-card" style="display:none;margin-bottom:12px">
+	<div class="nf-title">Outbound NAT Mode</div>
+	<div style="padding:12px">
+		<div style="display:flex;gap:20px;align-items:flex-start">
+			<label style="width:140px;font-weight:700;color:#333">Mode</label>
+			<div style="flex:1;display:flex;gap:24px;align-items:flex-start">
+				<div style="text-align:center">
+					<div><input type="radio" name="out_mode" checked></div>
+					<div style="color:#777;font-size:13px;max-width:220px">Automatic outbound NAT rule generation. (IPsec passthrough included)</div>
+				</div>
+				<div style="text-align:center">
+					<div><input type="radio" name="out_mode"></div>
+					<div style="color:#777;font-size:13px;max-width:220px">Hybrid Outbound NAT rule generation. (Automatic Outbound NAT + rules below)</div>
+				</div>
+				<div style="text-align:center">
+					<div><input type="radio" name="out_mode"></div>
+					<div style="color:#777;font-size:13px;max-width:220px">Manual Outbound NAT rule generation. (AON - Advanced Outbound NAT)</div>
+				</div>
+				<div style="text-align:center">
+					<div><input type="radio" name="out_mode"></div>
+					<div style="color:#777;font-size:13px;max-width:220px">Disable Outbound NAT rule generation. (No Outbound NAT rules)</div>
+				</div>
+			</div>
+		</div>
+		<div style="margin-top:12px"><button type="button" style="background:#007bff;color:#fff;border:none;padding:8px 12px;border-radius:4px;font-weight:700">Save</button></div>
+	</div>
+</div>
+
+<div class="nf-card" id="card-outbound-mappings" style="display:none;margin-bottom:12px">
+	<div class="nf-title">Mappings</div>
+	<div style="padding:8px">
+		<table class="nf-table" style="width:100%">
+			<thead>
+				<tr>
+					<th style="width:3%"><input type="checkbox"></th>
+					<th style="width:12%">Interface</th>
+					<th style="width:18%">Source</th>
+					<th style="width:10%">Source Port</th>
+					<th style="width:18%">Destination</th>
+					<th style="width:10%">Destination Port</th>
+					<th style="width:10%">NAT Address</th>
+					<th style="width:8%">NAT Port</th>
+					<th style="width:6%">Static Port</th>
+					<th style="width:8%">Description</th>
+					<th style="width:5%">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+		<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+			<button class="btn add-green" id="outboundAdd1" style="background:#28a745">Add</button>
+			<button class="btn add" id="outboundAdd2" style="background:#2e7d32">Add</button>
+			<button class="btn delete" style="background:#e74c3c">Delete</button>
+			<button class="btn toggle" style="background:#3498db">Toggle</button>
+			<button class="btn save" style="background:#2980b9">Save</button>
+		</div>
+	</div>
+</div>
+
+<div class="nf-card" id="card-outbound-auto" style="display:none">
+	<div class="nf-title">Automatic Rules</div>
+	<table class="nf-table">
+		<thead>
+			<tr>
+				<th style="width:6%"></th>
+				<th style="width:10%">Interface</th>
+				<th style="width:30%">Source</th>
+				<th style="width:8%">Source Port</th>
+				<th style="width:10%">Destination</th>
+				<th style="width:10%">Destination Port</th>
+				<th style="width:8%">NAT Address</th>
+				<th style="width:8%">NAT Port</th>
+				<th style="width:6%">Static Port</th>
+				<th style="width:6%">Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>✓</td>
+				<td>WAN</td>
+				<td>127.0.0.0/8 ::1/128 10.0.0.0/24</td>
+				<td>*</td>
+				<td>*</td>
+				<td>500</td>
+				<td>WAN address</td>
+				<td>*</td>
+				<td>✓</td>
+				<td>Auto created rule for ISAKMP</td>
+			</tr>
+			<tr>
+				<td>✓</td>
+				<td>WAN</td>
+				<td>127.0.0.0/8 ::1/128 10.0.0.0/24</td>
+				<td>*</td>
+				<td>*</td>
+				<td>*</td>
+				<td>WAN address</td>
+				<td>*</td>
+				<td>↔</td>
+				<td>Auto created rule</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+
+<!-- NPt card (hidden by default) -->
+<div id="card-npt" class="nf-card" style="display:none;margin-top:12px">
+	<div class="nf-title">NPt Mappings</div>
+	<div style="padding:8px">
+		<table class="nf-table" style="width:100%">
+			<thead>
+				<tr>
+					<th style="width:3%"><input type="checkbox"></th>
+					<th style="width:20%">Interface</th>
+					<th style="width:30%">External Prefix</th>
+					<th style="width:30%">Internal prefix</th>
+					<th style="width:17%">Description</th>
+					<th style="width:5%">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+		<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+			<button class="btn add-green" id="nptAdd1" style="background:#28a745">Add</button>
+			<button class="btn add" id="nptAdd2" style="background:#2e7d32">Add</button>
+			<button class="btn delete" id="nptDelete" style="background:#e74c3c">Delete</button>
+			<button class="btn toggle" id="nptToggle" style="background:#3498db">Toggle</button>
+			<button class="btn save" id="nptSave" style="background:#2980b9">Save</button>
+		</div>
+	</div>
+</div>
+
+<!-- footer buttons removed as requested -->
+
+<!-- NPt Edit Modal -->
+<div id="nptModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.6);z-index:1400;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:4px;max-width:980px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:auto;max-height:92vh">
+        <div style="background:#333;color:#fff;padding:10px 14px;font-weight:700">Firewall / NAT / NPt / Edit</div>
+        <div style="background:#4a4a4a;color:#fff;padding:10px 14px;font-weight:700">Edit NAT NPt Entry</div>
+        <form id="nptForm" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                <label style="width:160px;font-weight:700">Disabled</label>
+                <div><input type="checkbox" id="npt_disabled"> <label for="npt_disabled">Disable this rule</label></div>
+            </div>
+
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+                <label style="width:160px;font-weight:700">Interface</label>
+                <select id="npt_interface" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+                    <option>WAN</option>
+                    <option>LAN</option>
+                </select>
+            </div>
+            <div style="color:#777;font-size:13px;margin-bottom:12px">Choose which interface this rule applies to. Hint: Typically the "WAN" is used here.</div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+                <label style="width:160px;font-weight:700">Source IPv6 prefix</label>
+                <div style="flex:1;display:flex;gap:8px;align-items:center">
+                    <input type="checkbox" id="npt_source_not"> <label for="npt_source_not">Not</label>
+                    <input type="text" id="npt_source_addr" placeholder="*Source prefix" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+                    <select id="npt_source_mask" style="width:80px;padding:8px;border:1px solid #ddd;border-radius:4px">
+                        <option>128</option>
+                        <option>127</option>
+                        <option>126</option>
+                        <option>125</option>
+                        <option>124</option>
+                        <option>123</option>
+                        <option>122</option>
+                        <option>121</option>
+                        <option>120</option>
+                        <option>119</option>
+                        <option>118</option>
+                        <option>117</option>
+                        <option>116</option>
+                        <option>115</option>
+                        <option>114</option>
+                        <option>113</option>
+                        <option>112</option>
+                        <option>111</option>
+                        <option>110</option>
+                        <option>109</option>
+                        <option>108</option>
+                        <option>107</option>
+                        <option>106</option>
+                        <option>105</option>
+                        <option>104</option>
+                        <option>103</option>
+                        <option>102</option>
+                        <option>101</option>
+                        <option>100</option>
+                        <option>99</option>
+                        <option>98</option>
+                        <option>97</option>
+                        <option>96</option>
+                        <option>95</option>
+                        <option>94</option>
+                        <option>93</option>
+                        <option>92</option>
+                        <option>91</option>
+                        <option>90</option>
+                        <option>89</option>
+                        <option>88</option>
+                        <option>87</option>
+                        <option>86</option>
+                        <option>85</option>
+                        <option>84</option>
+                        <option>83</option>
+                        <option>82</option>
+                        <option>81</option>
+                        <option>80</option>
+                        <option>79</option>
+                        <option>78</option>
+                        <option>77</option>
+                        <option>76</option>
+                        <option>75</option>
+                        <option>74</option>
+                        <option>73</option>
+                        <option>72</option>
+                        <option>71</option>
+                        <option>70</option>
+                        <option>69</option>
+                        <option>68</option>
+                        <option>67</option>
+                        <option>66</option>
+                        <option>65</option>
+                        <option>64</option>
+                        <option>63</option>
+                        <option>62</option>
+                        <option>61</option>
+                        <option>60</option>
+                        <option>59</option>
+                        <option>58</option>
+                        <option>57</option>
+                        <option>56</option>
+                        <option>55</option>
+                        <option>54</option>
+                        <option>53</option>
+                        <option>52</option>
+                        <option>51</option>
+                        <option>50</option>
+                        <option>49</option>
+                        <option>48</option>
+                        <option>47</option>
+                        <option>46</option>
+                        <option>45</option>
+                        <option>44</option>
+                        <option>43</option>
+                        <option>42</option>
+                        <option>41</option>
+                        <option>40</option>
+                        <option>39</option>
+                        <option>38</option>
+                        <option>37</option>
+                        <option>36</option>
+                        <option>35</option>
+                        <option>34</option>
+                        <option>33</option>
+                        <option>32</option>
+                        <option>31</option>
+                        <option>30</option>
+                        <option>29</option>
+                        <option>28</option>
+                        <option>27</option>
+                        <option>26</option>
+                        <option>25</option>
+                        <option>24</option>
+                        <option>23</option>
+                        <option>22</option>
+                        <option>21</option>
+                        <option>20</option>
+                        <option>19</option>
+                        <option>18</option>
+                        <option>17</option>
+                        <option>16</option>
+                        <option>15</option>
+                        <option>14</option>
+                        <option>13</option>
+                        <option>12</option>
+                        <option>11</option>
+                        <option>10</option>
+                        <option>9</option>
+                        <option>8</option>
+                        <option>7</option>
+                        <option>6</option>
+                        <option>5</option>
+                        <option>4</option>
+                        <option>3</option>
+                        <option>2</option>
+                        <option>1</option>
+                    </select>
+                </div>
+            </div>
+            <div style="color:#777;font-size:13px;margin-bottom:12px">Invert the sense of the match. Internal (LAN) ULA IPv6 Prefix for the Network Prefix translation. The prefix size specified for the internal IPv6 prefix will be applied to the external prefix.</div>
+
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+                <label style="width:160px;font-weight:700">Destination IPv6 prefix</label>
+                <div style="flex:1;display:flex;gap:8px;align-items:center">
+                    <input type="checkbox" id="npt_dest_not"> <label for="npt_dest_not">Not</label>
+                    <select id="npt_dest_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+                        <option>Prefix</option>
+                    </select>
+                    <input type="text" id="npt_dest_addr" placeholder="*Destination prefix" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+                    <select id="npt_dest_mask" style="width:80px;padding:8px;border:1px solid #ddd;border-radius:4px">
+                        <option>128</option>
+                        <option>127</option>
+                        <option>126</option>
+                        <option>125</option>
+                        <option>124</option>
+                        <option>123</option>
+                        <option>122</option>
+                        <option>121</option>
+                        <option>120</option>
+                        <option>119</option>
+                        <option>118</option>
+                        <option>117</option>
+                        <option>116</option>
+                        <option>115</option>
+                        <option>114</option>
+                        <option>113</option>
+                        <option>112</option>
+                        <option>111</option>
+                        <option>110</option>
+                        <option>109</option>
+                        <option>108</option>
+                        <option>107</option>
+                        <option>106</option>
+                        <option>105</option>
+                        <option>104</option>
+                        <option>103</option>
+                        <option>102</option>
+                        <option>101</option>
+                        <option>100</option>
+                        <option>99</option>
+                        <option>98</option>
+                        <option>97</option>
+                        <option>96</option>
+                        <option>95</option>
+                        <option>94</option>
+                        <option>93</option>
+                        <option>92</option>
+                        <option>91</option>
+                        <option>90</option>
+                        <option>89</option>
+                        <option>88</option>
+                        <option>87</option>
+                        <option>86</option>
+                        <option>85</option>
+                        <option>84</option>
+                        <option>83</option>
+                        <option>82</option>
+                        <option>81</option>
+                        <option>80</option>
+                        <option>79</option>
+                        <option>78</option>
+                        <option>77</option>
+                        <option>76</option>
+                        <option>75</option>
+                        <option>74</option>
+                        <option>73</option>
+                        <option>72</option>
+                        <option>71</option>
+                        <option>70</option>
+                        <option>69</option>
+                        <option>68</option>
+                        <option>67</option>
+                        <option>66</option>
+                        <option>65</option>
+                        <option>64</option>
+                        <option>63</option>
+                        <option>62</option>
+                        <option>61</option>
+                        <option>60</option>
+                        <option>59</option>
+                        <option>58</option>
+                        <option>57</option>
+                        <option>56</option>
+                        <option>55</option>
+                        <option>54</option>
+                        <option>53</option>
+                        <option>52</option>
+                        <option>51</option>
+                        <option>50</option>
+                        <option>49</option>
+                        <option>48</option>
+                        <option>47</option>
+                        <option>46</option>
+                        <option>45</option>
+                        <option>44</option>
+                        <option>43</option>
+                        <option>42</option>
+                        <option>41</option>
+                        <option>40</option>
+                        <option>39</option>
+                        <option>38</option>
+                        <option>37</option>
+                        <option>36</option>
+                        <option>35</option>
+                        <option>34</option>
+                        <option>33</option>
+                        <option>32</option>
+                        <option>31</option>
+                        <option>30</option>
+                        <option>29</option>
+                        <option>28</option>
+                        <option>27</option>
+                        <option>26</option>
+                        <option>25</option>
+                        <option>24</option>
+                        <option>23</option>
+                        <option>22</option>
+                        <option>21</option>
+                        <option>20</option>
+                        <option>19</option>
+                        <option>18</option>
+                        <option>17</option>
+                        <option>16</option>
+                        <option>15</option>
+                        <option>14</option>
+                        <option>13</option>
+                        <option>12</option>
+                        <option>11</option>
+                        <option>10</option>
+                        <option>9</option>
+                        <option>8</option>
+                        <option>7</option>
+                        <option>6</option>
+                        <option>5</option>
+                        <option>4</option>
+                        <option>3</option>
+                        <option>2</option>
+                        <option>1</option>
+                    </select>
+                </div>
+            </div>
+            <div style="color:#777;font-size:13px;margin-bottom:12px">Invert the sense of the match. Global Unicast routable IPv6 prefix</div>
+
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+                <label style="width:160px;font-weight:700">Description</label>
+                <input type="text" id="npt_desc" placeholder="A description may be entered here for administrative reference (not parsed)." style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+            </div>
+
+            <div style="display:flex;justify-content:flex-start;gap:8px;padding-top:12px">
+                <button type="button" id="nptSaveBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#007bff;color:#fff">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Outbound Advanced Edit Modal -->
+<div id="outboundModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.6);z-index:1400;align-items:center;justify-content:center;padding:20px">
+	<div style="background:#fff;border-radius:4px;max-width:980px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:auto;max-height:92vh">
+		<div style="background:#333;color:#fff;padding:10px 14px;font-weight:700">Firewall / NAT / Outbound / Edit</div>
+		<div style="background:#4a4a4a;color:#fff;padding:10px 14px;font-weight:700">Edit Advanced Outbound NAT Entry</div>
+		<form id="outboundForm" style="padding:14px">
+			<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+				<label style="width:160px;font-weight:700">Disabled</label>
+				<div><input type="checkbox" id="o_disabled_modal"> <label for="o_disabled_modal">Disable this rule</label></div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:14px">
+				<label style="width:160px;font-weight:700">Do not NAT</label>
+				<div style="flex:1">
+					<input type="checkbox" id="o_donotnat"> <label for="o_donotnat">Enabling this option will disable NAT for traffic matching this rule and stop processing Outbound NAT rules</label>
+					<div style="color:#777;font-size:13px;margin-top:6px">In most cases this option is not required.</div>
+				</div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700">Interface</label>
+				<select id="o_interface_modal" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>WAN</option>
+					<option>LAN</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">The interface on which traffic is matched as it exits the firewall. In most cases this is "WAN" or another externally-connected interface.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700">Address Family</label>
+				<select id="o_af_modal" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>IPv4+IPv6</option>
+					<option>IPv4</option>
+					<option>IPv6</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Select the Internet Protocol version this rule applies to.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700">Protocol</label>
+				<select id="o_proto_modal" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>Any</option>
+					<option>TCP</option>
+					<option>UDP</option>
+					<option>TCP/UDP</option>
+					<option>ICMP</option>
+					<option>ESP</option>
+					<option>AH</option>
+					<option>GRE</option>
+					<option>IPV6</option>
+					<option>IGMP</option>
+					<option>SCTP</option>
+					<option>CARP</option>
+					<option>PFSYNC</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Choose which protocol this rule should match. In most cases "any" is specified.</div>
+
+			<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+				<label style="width:160px;font-weight:700">Source</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<select id="o_source_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Any</option>
+						<option>This Firewall (self)</option>
+						<option>Network or Alias</option>
+						<option>WAN subnets</option>
+						<option>LAN subnets</option>
+					</select>
+					<input type="text" placeholder="Source network" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<input type="text" placeholder="Port or Range" style="width:140px;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Source network for the outbound NAT mapping.</div>
+
+			<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+				<label style="width:160px;font-weight:700">Destination</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<select id="o_dest_type_modal" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Any</option>
+						<option>Network or Alias</option>
+						<option>WAN subnets</option>
+						<option>LAN subnets</option>
+					</select>
+					<input type="text" placeholder="Destination network" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<input type="text" placeholder="Port or Range" style="width:140px;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Destination network for the outbound NAT mapping.</div>
+
+			<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+				<label style="width:160px"></label>
+				<div><input type="checkbox" id="o_dest_not_modal"> <label for="o_dest_not_modal">Not</label> <div style="color:#777;font-size:13px;margin-top:6px">Invert the sense of the destination match.</div></div>
+			</div>
+
+			<div style="background:#f7f7f7;border:1px solid #e6e6e6;padding:10px;margin-top:12px">
+				<div style="font-weight:700;margin-bottom:8px">Translation</div>
+				<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+					<label style="width:160px">Address</label>
+					<select id="o_trans_addr" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Network or Alias</option>
+						<option selected>WAN address</option>
+						<option>LAN address</option>
+					</select>
+				</div>
+				<div style="display:flex;gap:12px;align-items:center">
+					<label style="width:160px">Port or Range</label>
+					<input id="o_trans_port" type="text" placeholder="Port or Range" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<label style="margin-left:8px"><input type="checkbox" id="o_trans_static"> Static Port</label>
+				</div>
+				<div style="color:#777;font-size:13px;margin-top:8px">Enter the external source Port or Range used for remapping the original source port on connections matching the rule. Port ranges are a low port and high port number separated by ':'. Leave blank when Static Port is checked.</div>
+			</div>
+
+			<!-- Misc -->
+			<div style="margin-top:12px;border-top:1px solid #ddd;padding-top:12px">
+				<div style="background:#4a4a4a;color:#fff;padding:8px 12px;font-weight:700;margin-bottom:8px">Misc</div>
+				<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+					<label style="width:160px;font-weight:700">No XMLRPC Sync</label>
+					<div style="flex:1"><input type="checkbox" id="o_noxmlrpc_modal"> <label for="o_noxmlrpc_modal">Prevent the rule on Master from automatically syncing to other CARP members. This does NOT prevent the rule from being overwritten on Slave.</label></div>
+				</div>
+				<div style="display:flex;align-items:center;gap:12px">
+					<label style="width:160px;font-weight:700">Description</label>
+					<div style="flex:1">
+						<input type="text" id="o_desc_modal" placeholder="A description may be entered here for administrative reference (not parsed)." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+					</div>
+				</div>
+			</div>
+
+			<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:12px">
+				<button type="button" id="outboundCancel" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
+				<button type="button" id="outboundSave" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">Save</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- 1:1 Edit Modal popup -->
+<div id="oneoneModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.5);z-index:1200;align-items:center;justify-content:center;padding:20px">
+	<div style="background:#fff;border-radius:4px;max-width:900px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:auto;max-height:90vh">
+		<div style="background:#f5f5f5;padding:10px 14px;font-weight:700;color:#333">Firewall / NAT / 1:1 / Edit</div>
+		<div style="background:#303030;color:#fff;padding:10px 14px;font-weight:700">Edit NAT 1:1 Entry</div>
+		<form id="oneoneForm" style="padding:14px">
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">
+				<label style="width:160px;font-weight:700;color:#333">Disabled</label>
+				<div><input type="checkbox" id="o_disabled"> <label for="o_disabled">Disable this rule</label></div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">When disabled, the rule will not have any effect.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">
+				<label style="width:160px;font-weight:700;color:#333">No BINAT (NOT)</label>
+				<div><input type="checkbox" id="o_nobinat"> <label for="o_nobinat">Do not perform binat for the specified address</label></div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Excludes the address from a later, more general, rule.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Interface</label>
+				<select id="o_interface" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>WAN</option>
+					<option>LAN</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Choose which interface this rule applies to. In most cases "WAN" is specified.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Address Family</label>
+				<select id="o_af" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>IPv4</option>
+					<option>IPv6</option>
+				</select>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Select the Internet Protocol version this rule applies to.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">External subnet IP</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<select id="o_external_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Address</option>
+						<option>Interface address</option>
+					</select>
+					<input type="text" id="o_external" placeholder="Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Enter the external (usually on a WAN) subnet's starting address or interface for the 1:1 mapping.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">
+				<label style="width:160px;font-weight:700;color:#333">Internal IP</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<input type="checkbox" id="o_internal_not"> <label for="o_internal_not">Not</label>
+					<select id="o_internal_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Any</option>
+						<option>Address</option>
+						<option>Network</option>
+						<option>PPTP clients</option>
+						<option>PPPoE clients</option>
+						<option>L2TP clients</option>
+						<option>WAN address</option>
+						<option>LAN address</option>
+						<option>WAN subnet</option>
+						<option>LAN subnet</option>
+					</select>
+					<input type="text" id="o_internal" placeholder="Address/mask" style="width:160px;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">Enter the internal (LAN) subnet for the 1:1 mapping. The subnet size specified for the internal subnet will be applied to the external subnet.</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">
+				<label style="width:160px;font-weight:700;color:#333">Destination</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<input type="checkbox" id="o_dest_not"> <label for="o_dest_not">Not</label>
+					<select id="o_dest_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Any</option>
+						<option>Address or Alias</option>
+						<option>Network</option>
+						<option>PPTP clients</option>
+						<option>PPPoE clients</option>
+						<option>L2TP clients</option>
+						<option>WAN address</option>
+						<option>LAN address</option>
+						<option>WAN subnet</option>
+						<option>LAN subnet</option>
+					</select>
+					<input type="text" id="o_dest" placeholder="Address/mask" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+			<div style="color:#777;font-size:13px;margin-bottom:12px">The 1:1 mapping will only be used for connections to or from the specified destination. Hint: this is usually "Any".</div>
+
+			<div style="margin-bottom:12px">
+				<label style="display:block;font-weight:700;color:#333;margin-bottom:6px">Description</label>
+				<input type="text" id="o_desc" placeholder="A description may be entered here for administrative reference (not parsed)." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">NAT reflection</label>
+				<select id="o_refl" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>Use system default</option>
+					<option>Enable (NAT + Proxy)</option>
+					<option>Enable (Pure NAT)</option>
+					<option>Disable</option>
+				</select>
+			</div>
+
+			<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:6px;border-top:1px solid #eee;margin-top:8px">
+				<button type="button" id="oneoneCancel" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
+				<button type="button" id="oneoneSave" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#007bff;color:#fff">Save</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- Edit Redirect Entry Modal -->
+<div id="natModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.5);z-index:1300;align-items:center;justify-content:center;padding:20px">
+	<div style="background:#fff;border-radius:4px;max-width:900px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:auto;max-height:90vh">
+		<div style="background:#303030;color:#fff;padding:10px 14px;font-weight:700">Firewall / NAT / Port Forward / Edit</div>
+		<form id="natForm" style="padding:14px">
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Disabled</label>
+				<div><input type="checkbox" id="r_disabled"> <label for="r_disabled">Disable this rule</label></div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">No RDR (NOT)</label>
+				<div style="flex:1">
+					<input type="checkbox" id="r_nordr"> <label for="r_nordr">Disable redirection for traffic matching this rule</label>
+					<div style="color:#777;font-size:13px;margin-top:6px">This option is rarely needed. Don't use this without thorough knowledge of the implications.</div>
+				</div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Interface</label>
+				<select id="r_interface" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>WAN</option>
+					<option>LAN</option>
+				</select>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Address Family</label>
+				<select id="r_af" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>IPv4</option>
+					<option>IPv6</option>
+				</select>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Protocol</label>
+				<select id="r_proto" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>Any</option>
+					<option>TCP</option>
+					<option>UDP</option>
+					<option>TCP/UDP</option>
+					<option>ICMP</option>
+					<option>ESP</option>
+					<option>AH</option>
+					<option>GRE</option>
+					<option>IPV6</option>
+					<option>IGMP</option>
+					<option>SCTP</option>
+					<option>CARP</option>
+					<option>PFSYNC</option>
+				</select>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Source</label>
+				<div style="flex:1">
+					<button type="button" style="background:#e9eef5;border-radius:4px;padding:6px 10px;border:none;cursor:pointer;color:#2b3340">Display Advanced</button>
+				</div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Destination</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<input type="checkbox" id="r_invert"> <label for="r_invert">Invert match.</label>
+					<select id="r_dest_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Any</option>
+						<option>Address or Alias</option>
+						<option>Network</option>
+						<option>PPTP clients</option>
+						<option>PPPoE clients</option>
+						<option>L2TP clients</option>
+						<option>WAN address</option>
+						<option>LAN address</option>
+						<option>WAN subnet</option>
+						<option>LAN subnet</option>
+					</select>
+					<input type="text" id="r_dest_addr" placeholder="Address/mask" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Redirect target IP</label>
+				<div style="flex:1;display:flex;gap:8px;align-items:center">
+					<select id="r_target_type" style="padding:8px;border:1px solid #ddd;border-radius:4px">
+						<option>Address or Alias</option>
+						<option>WAN address</option>
+						<option>LAN address</option>
+					</select>
+					<input type="text" id="r_target_addr" placeholder="Address" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+				</div>
+			</div>
+
+			<div style="margin-bottom:12px">
+				<label style="display:block;font-weight:700;color:#333;margin-bottom:6px">Description</label>
+				<input type="text" id="r_desc" placeholder="A description may be entered here for administrative reference (not parsed)." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px">
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">No XMLRPC Sync</label>
+				<div><input type="checkbox" id="r_noxmlrpc"> <label for="r_noxmlrpc">Do not automatically sync to other CARP members</label></div>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">NAT reflection</label>
+				<select id="r_refl" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>Use system default</option>
+					<option>Enable (NAT + Proxy)</option>
+					<option>Enable (Pure NAT)</option>
+					<option>Disable</option>
+				</select>
+			</div>
+
+			<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+				<label style="width:160px;font-weight:700;color:#333">Filter rule association</label>
+				<select id="r_assoc" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px">
+					<option>None</option>
+					<option>Add associated filter rule</option>
+					<option>Add unassociated filter rule</option>
+					<option>Pass</option>
+				</select>
+			</div>
+
+			<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:6px;border-top:1px solid #eee;margin-top:8px">
+				<button type="button" id="natCancel" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
+				<button type="button" id="natSave" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">Save</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	const addBtn = document.querySelector('.nf-footer .btn.add-green');
+	const modal = document.getElementById('natModal');
+	const cancel = document.getElementById('natCancel');
+	const save = document.getElementById('natSave');
+
+	// quick save elements inside the table
+	const quickSave = document.getElementById('nf_save_btn');
+	const quickCancel = document.getElementById('nf_cancel_btn');
+	const quickDesc = document.getElementById('nf_desc_input');
+
+	function openModal(){ if(modal) modal.style.display = 'flex'; }
+	function closeModal(){ if(modal) modal.style.display = 'none'; }
+
+	const oneoneModal = document.getElementById('oneoneModal');
+	const oneoneSave = document.getElementById('oneoneSave');
+	const oneoneCancel = document.getElementById('oneoneCancel');
+
+	if(addBtn) addBtn.addEventListener('click', function(e){
+		e.preventDefault();
+		const active = document.querySelector('.nf-tab.active');
+		const tab = active ? active.getAttribute('data-tab') : 'pf';
+		if(tab === '1to1'){
+			if(oneoneModal) oneoneModal.style.display = 'flex';
+			return;
+		}
+		if(tab === 'outbound'){
+			if(document.getElementById('outboundModal')) document.getElementById('outboundModal').style.display = 'flex';
+			return;
+		}
+		openModal();
+	});
+	if(cancel) cancel.addEventListener('click', function(e){ e.preventDefault(); closeModal(); });
+	if(save) save.addEventListener('click', function(e){ e.preventDefault(); closeModal(); /* TODO: submit nat form via fetch/post */ });
+
+	if(quickSave) quickSave.addEventListener('click', function(e){ e.preventDefault();
+		const d = quickDesc ? quickDesc.value : '';
+		const md = document.getElementById('r_desc');
+		if(md) md.value = d;
+		openModal();
+	});
+
+	if(quickCancel) quickCancel.addEventListener('click', function(e){ e.preventDefault(); if(quickDesc) quickDesc.value = ''; });
+
+	// click outside to close
+	if(modal) modal.addEventListener('click', function(ev){ if(ev.target === modal) closeModal(); });
+	if(oneoneModal) oneoneModal.addEventListener('click', function(ev){ if(ev.target === oneoneModal) oneoneModal.style.display = 'none'; });
+
+	// outbound modal handlers
+	const obModal = document.getElementById('outboundModal');
+	const obAdd1 = document.getElementById('outboundAdd1');
+	const obAdd2 = document.getElementById('outboundAdd2');
+	const obCancel = document.getElementById('outboundCancel');
+	const obSave = document.getElementById('outboundSave');
+
+	if(obAdd1) obAdd1.addEventListener('click', function(e){ e.preventDefault(); if(obModal) obModal.style.display='flex'; });
+	if(obAdd2) obAdd2.addEventListener('click', function(e){ e.preventDefault(); if(obModal) obModal.style.display='flex'; });
+	if(obCancel) obCancel.addEventListener('click', function(e){ e.preventDefault(); if(obModal) obModal.style.display='none'; });
+	if(obSave) obSave.addEventListener('click', function(e){ e.preventDefault(); if(obModal) obModal.style.display='none'; /* TODO: persist rule */ });
+	if(obModal) obModal.addEventListener('click', function(ev){ if(ev.target === obModal) obModal.style.display='none'; });
+
+	// NPt buttons wiring
+	const nptAdd1 = document.getElementById('nptAdd1');
+	const nptAdd2 = document.getElementById('nptAdd2');
+	const nptDelete = document.getElementById('nptDelete');
+	const nptToggle = document.getElementById('nptToggle');
+	const nptSave = document.getElementById('nptSave');
+	const nptModal = document.getElementById('nptModal');
+	const nptSaveBtn = document.getElementById('nptSaveBtn');
+
+	if(nptAdd1) nptAdd1.addEventListener('click', function(e){ e.preventDefault(); if(nptModal) nptModal.style.display='flex'; });
+	if(nptAdd2) nptAdd2.addEventListener('click', function(e){ e.preventDefault(); if(nptModal) nptModal.style.display='flex'; });
+
+	if(nptDelete) nptDelete.addEventListener('click', function(e){ e.preventDefault(); const tb = document.querySelector('#card-npt tbody'); if(tb){ const sel = tb.querySelectorAll('input[type=checkbox]:checked'); sel.forEach(cb=>cb.closest('tr').remove()); }});
+	if(nptToggle) nptToggle.addEventListener('click', function(e){ e.preventDefault(); /* placeholder: toggle enable state */ });
+	if(nptSave) nptSave.addEventListener('click', function(e){ e.preventDefault(); /* placeholder: save NPt mappings */ });
+	if(nptSaveBtn) nptSaveBtn.addEventListener('click', function(e){ e.preventDefault(); if(nptModal) nptModal.style.display='none'; });
+	if(nptModal) nptModal.addEventListener('click', function(e){ if(e.target === nptModal) nptModal.style.display='none'; });
+
+	if(oneoneSave) oneoneSave.addEventListener('click', function(e){ e.preventDefault(); if(oneoneModal) oneoneModal.style.display = 'none'; });
+	if(oneoneCancel) oneoneCancel.addEventListener('click', function(e){ e.preventDefault(); if(oneoneModal) oneoneModal.style.display = 'none'; });
+
+	// tab switching
+	const tabs = document.querySelectorAll('.nf-tab');
+	tabs.forEach(t => t.addEventListener('click', function(){
+		const tab = this.getAttribute('data-tab');
+		// remove active styling
+		document.querySelectorAll('.nf-tab').forEach(x=>{ x.classList.remove('active'); x.style.borderBottom=''; });
+		this.classList.add('active');
+		this.style.borderBottom='4px solid #c62828';
+		// show/hide cards
+		document.getElementById('card-pf').style.display = tab === 'pf' ? '' : 'none';
+		document.getElementById('card-1to1').style.display = tab === '1to1' ? '' : 'none';
+		document.getElementById('card-outbound').style.display = tab === 'outbound' ? '' : 'none';
+		document.getElementById('card-outbound-mappings').style.display = tab === 'outbound' ? '' : 'none';
+		document.getElementById('card-outbound-auto').style.display = tab === 'outbound' ? '' : 'none';
+		// npt card (if present)
+		if(document.getElementById('card-npt')) document.getElementById('card-npt').style.display = tab === 'npt' ? '' : 'none';
+	}));
+});
+</script>
 {% endblock %}
