@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb bg-transparent p-0">
+            <li class="breadcrumb-item">Wizard</li>
+            <li class="breadcrumb-item"><a href="{{ url_for('setup_wizard') }}">ZGate Setup</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Wizard completed.</li>
+        </ol>
+    </nav>
+
+    <div class="mb-2">
+        <div class="progress" style="height:6px;">
+            <div class="progress-bar bg-success" role="progressbar" style="width:100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="mt-2">
+            <span class="badge bg-success">Step 9 of 9</span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">Wizard completed.</div>
+        <div class="card-body">
+            <h4>Congratulations! ZGate is now configured.</h4>
+            <p>We recommend that you check to see if there are any software updates available. Keeping your software up to date is one of the most important things you can do to maintain the security of your network.</p>
+            <a class="btn btn-outline-primary" href="{{ url_for('update_page') }}">Check for updates</a>
+
+            <h5 class="mt-4">Remember, we're here to help.</h5>
+            <p><a href="#">Click here</a> to learn about ZGate 24/7/365 support services.</p>
+
+            <h5 class="mt-4">User survey</h5>
+            <p>Please help all the people involved in improving and expanding ZGate software by taking a moment to answer this short survey (all answers are anonymous)</p>
+            <p><a href="#">Anonymous User Survey</a></p>
+
+            <h5 class="mt-4">Useful resources.</h5>
+            <ul>
+                <li>Learn more about our product line, services, and ZGate software from our <a href="#">website</a></li>
+                <li>To learn about appliances and other offers, <a href="#">visit our store</a></li>
+                <li>Become part of the community. Visit our <a href="#">forum</a></li>
+                <li>Subscribe to our <a href="#">newsletter</a> for product information and announcements.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <form method="get" action="{{ url_for('copyright_page') }}">
+            <button type="submit" class="btn btn-primary">Finish</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
