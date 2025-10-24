@@ -1,6 +1,231 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block main %}
-<h1>Welcome to Certificates</h1>
-<p>This is an empty placeholder page for Certificates.</p>
-{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <title>Certificate Authorities - pfSense Style</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .nav-link.active {
+            background: #c0392b;
+        }
+
+        .search-container {
+            background: #ecf0f1;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            margin: 10px 0;
+        }
+
+        .search-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 5px;
+        }
+
+        .search-select {
+            padding: 5px;
+        }
+
+        .btn {
+            padding: 5px 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-clear {
+            background: #95a5a6;
+        }
+
+        .btn-add {
+            background: #27ae60;
+            padding: 5px;
+        }
+
+        .table-header {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th,
+        td {
+            border: 1px solid #bdc3c7;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #ecf0f1;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-left: 10px;
+        }
+
+        .section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <span class="nav-links">
+            <a href="#" class="nav-link {{ 'active' if active_section == 'authorities' else '' }}"
+                onclick="showSection('authorities')">Authorities</a> |
+            <a href="#" class="nav-link {{ 'active' if active_section == 'certificates' else '' }}"
+                onclick="showSection('certificates')">Certificates</a> |
+            <a href="#" class="nav-link">Revocation</a>
+        </span>
+    </div>
+
+    <div class="search-container">
+        <form method="get" class="search-form">
+            <label>Search term</label>
+            <input type="text" name="search_term" class="search-input" placeholder="Enter a search string or regex">
+            <select name="search_type" class="search-select">
+                <option value="Both">Both</option>
+            </select>
+            <button type="submit" class="btn">Search</button>
+            <button type="button" class="btn btn-clear">Clear</button>
+        </form>
+        <div class="help-text">Enter a search string or regex expression to search certificate names and distinguished
+            names</div>
+    </div>
+
+    <!-- Certificate Authorities Section -->
+    <div class="section" id="authorities-section" {% if active_section=='authorities' %}class="active" {% endif %}>
+        <div class="table-header">Certificate Authorities</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Internal</th>
+                    <th>Issuer</th>
+                    <th>Certificates</th>
+                    <th>Distinguished Name</th>
+                    <th>In Use</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if cas %}
+                {% for ca in cas %}
+                <tr>
+                    <td>{{ ca.name }}</td>
+                    <td>{{ ca.internal }}</td>
+                    <td>{{ ca.issuer }}</td>
+                    <td>{{ ca.certificates }}</td>
+                    <td>{{ ca.distinguished_name }}</td>
+                    <td>{{ ca.in_use }}</td>
+                    <td><button class="btn btn-add">+</button></td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="7" class="no-data">No certificate authorities configured.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <button class="btn btn-add" style="margin-top: 10px;" onclick="window.location.href='/add_ca'">+ Add</button>
+    </div>
+
+    <!-- Certificates Section -->
+    <div class="section" id="certificates-section" {% if active_section=='certificates' %}class="active" {% endif %}>
+        <div class="table-header">Certificates</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Issuer</th>
+                    <th>Distinguished Name</th>
+                    <th>In Use</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if certs %}
+                {% for cert in certs %}
+                <tr>
+                    <td>{{ cert.name }}</td>
+                    <td>{{ cert.issuer }}</td>
+                    <td>{{ cert.distinguished_name }}</td>
+                    <td>{{ cert.in_use }}</td>
+                    <td>View, Edit, Export, Copy</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="no-data">No certificates configured.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <button class="btn btn-add" style="margin-top: 10px;" onclick="window.location.href='/add_certificate'">+ Add
+            Sign</button>
+    </div>
+
+    <script>
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(section + '-section').classList.add('active');
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
