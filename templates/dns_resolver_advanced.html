@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
+{% block main %}
+
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+    <div>
+        <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+        <span class="small-muted"> / </span>
+        <a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
+        <span class="small-muted"> / </span>
+        <span class="breadcrumb-link">Advanced Settings</span>
+    </div>
+    <div class="breadcrumb-actions">
+        <button class="btn btn-sm btn-danger" aria-label="help">?</button>
+    </div>
+</div>
+
+<!-- Tabs with Advanced active -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver') }}">General Settings</a></li>
+    <li class="nav-item"><a class="nav-link active" href="#">Advanced Settings</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver_access_lists') }}">Access Lists</a></li>
+</ul>
+
+<!-- Advanced Privacy Options -->
+<div class="card mb-3">
+    <div class="card-header">Advanced Privacy Options</div>
+    <div class="card-body">
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Hide Identity</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="hide_identity" name="hide_identity" checked>
+                    <label class="form-check-label" for="hide_identity">id.server and hostname.bind queries are refused</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Hide Version</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="hide_version" name="hide_version" checked>
+                    <label class="form-check-label" for="hide_version">version.server and version.bind queries are refused</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Query Name Minimization</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="qname_min" name="qname_min" checked>
+                    <label class="form-check-label" for="qname_min">Send minimum amount of QNAME/QTYPE information to upstream servers to enhance privacy</label>
+                </div>
+                <div class="option-desc">Only send minimum required labels of the QNAME and set QTYPE to A when possible. Refer to RFC 7816 for details.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Strict Query Name Minimization</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="qname_min_strict" name="qname_min_strict">
+                    <label class="form-check-label" for="qname_min_strict">Do not fall-back to sending full QNAME to potentially broken DNS servers</label>
+                </div>
+                <div class="option-desc">Strict mode may cause a significant number of domains to fail to resolve. Use only if you know what you are doing.</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Advanced Resolver Options (multiple rows) -->
+<div class="card mb-3">
+    <div class="card-header">Advanced Resolver Options</div>
+    <div class="card-body">
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Prefetch Support</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="prefetch" name="prefetch">
+                    <label class="form-check-label" for="prefetch">Message cache elements are prefetched before they expire</label>
+                </div>
+                <div class="option-desc">When enabled, this option can cause an increase in DNS traffic and server load but keeps the cache up to date.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Prefetch DNS Key Support</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="prefetch_dnskey" name="prefetch_dnskey">
+                    <label class="form-check-label" for="prefetch_dnskey">DNSKEYs are fetched earlier in the validation process</label>
+                </div>
+                <div class="option-desc">This helps lower latency but uses additional CPU.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Harden DNSSEC Data</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="harden_dnssec" name="harden_dnssec" checked>
+                    <label class="form-check-label" for="harden_dnssec">DNSSEC data is required for trust-anchored zones</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Serve Expired</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="serve_expired" name="serve_expired">
+                    <label class="form-check-label" for="serve_expired">Serve cache records even with TTL of 0</label>
+                </div>
+                <div class="option-desc">When enabled, allows unbound to serve one query even with TTL of 0 while refreshing in the background.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Drop Old UDP Queries</label>
+            <div class="col-sm-9">
+                <input class="form-control" name="drop_old_udp" placeholder="0">
+                <div class="option-desc">Timeout in seconds before dropping UDP queries waiting in the socket buffer. Disabled by default (0).</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Aggressive NSEC</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="aggressive_nsec" name="aggressive_nsec">
+                    <label class="form-check-label" for="aggressive_nsec">Aggressive Use of DNSSEC-Validated Cache</label>
+                </div>
+                <div class="option-desc">When enabled, unbound uses the DNSSEC NSEC chain to synthesize NXDOMAIN and reduce query rates.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Message Cache Size</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="message_cache_size">
+                    <option selected>4 MB</option>
+                    <option>10 MB</option>
+                    <option>20 MB</option>
+                    <option>50 MB</option>
+                    <option>100 MB</option>
+                    <option>250 MB</option>
+                    <option>512 MB</option>
+                </select>
+                <div class="option-desc">Size of the message cache. The default is 4 megabytes.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Outgoing TCP Buffers</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="outgoing_tcp">
+                    <option>0</option>
+                    <option selected>10</option>
+                    <option>20</option>
+                    <option>30</option>
+                    <option>50</option>
+                </select>
+                <div class="option-desc">The number of outgoing TCP buffers to allocate per thread. The default value is 10. If 0 is selected then TCP queries are not sent to authoritative servers.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Incoming TCP Buffers</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="incoming_tcp">
+                    <option>0</option>
+                    <option selected>10</option>
+                    <option>20</option>
+                    <option>30</option>
+                    <option>50</option>
+                </select>
+                <div class="option-desc">The number of incoming TCP buffers to allocate per thread. The default value is 10.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">EDNS Buffer Size</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="edns_buffer">
+                    <option selected>Automatic value based on active interface MTUs</option>
+                    <option>512: IPv4 Minimum</option>
+                    <option>1220: NSD IPv6 EDNS Minimum</option>
+                    <option>1232: IPv6 Minimum</option>
+                    <option>1432: 1500 Byte MTU</option>
+                    <option>1480: NSD IPv4 EDNS Minimum</option>
+                    <option>4096: Unbound Default</option>
+                </select>
+                <div class="option-desc">Number of bytes size to advertise as the EDNS reassembly buffer size. Auto mode sets optimal buffer size by using the smallest MTU of active interfaces.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Number of Queries per Thread</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="queries_per_thread">
+                    <option selected>512</option>
+                    <option>1024</option>
+                    <option>2048</option>
+                </select>
+                <div class="option-desc">The number of queries that every thread will service simultaneously. If more queries arrive that need to be serviced, and no queries can be jostled, then these queries are dropped.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Jostle Timeout</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="jostle_timeout">
+                    <option selected>200</option>
+                    <option>400</option>
+                    <option>800</option>
+                </select>
+                <div class="option-desc">This timeout is used for when the server is very busy. The default value is 200 milliseconds.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Maximum TTL for RRSets and Messages</label>
+            <div class="col-sm-9">
+                <input class="form-control" name="max_ttl" value="86400">
+                <div class="option-desc">Maximum Time to Live for RRsets and messages in the cache (default 86400 seconds).</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Minimum TTL for RRSets and Messages</label>
+            <div class="col-sm-9">
+                <input class="form-control" name="min_ttl" value="0">
+                <div class="option-desc">Minimum TTL to keep items in the cache (default 0 seconds).</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Keep Probing</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="keep_probing" name="keep_probing" checked>
+                    <label class="form-check-label" for="keep_probing">Keep probing servers that are down</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">TTL for Host Cache Entries</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="ttl_host_cache">
+                    <option>1 minutes</option>
+                    <option>2 minutes</option>
+                    <option>5 minutes</option>
+                    <option>10 minutes</option>
+                    <option selected>15 minutes</option>
+                </select>
+                <div class="option-desc">Time to Live duration for entries in the infrastructure host cache. The default value is 15 minutes.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Number of Hosts to Cache</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="num_hosts_cache">
+                    <option>1000</option>
+                    <option>5000</option>
+                    <option selected>10000</option>
+                    <option>20000</option>
+                    <option>50000</option>
+                    <option>100000</option>
+                    <option>200000</option>
+                </select>
+                <div class="option-desc">Number of infrastructure hosts for which information is cached. The default is 10,000.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Unwanted Reply Threshold</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="unwanted_reply">
+                    <option selected>Disabled</option>
+                    <option>5 million</option>
+                    <option>10 million</option>
+                    <option>20 million</option>
+                    <option>40 million</option>
+                    <option>50 million</option>
+                </select>
+                <div class="option-desc">If enabled, a total number of unwanted replies is kept track of; when it reaches the threshold a defensive action is taken.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Log Level</label>
+            <div class="col-sm-9">
+                <select class="form-select" name="log_level">
+                    <option>Level 0: No logging</option>
+                    <option selected>Level 1: Basic operational information</option>
+                    <option>Level 2: Detailed operational information</option>
+                    <option>Level 3: Query level information</option>
+                    <option>Level 4: Algorithm level information</option>
+                    <option>Level 5: Client identification for cache misses</option>
+                </select>
+                <div class="option-desc">Select the level of detail to be logged. Each level includes information from previous levels.</div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Disable Auto-added Access Control</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="disable_auto_acl" name="disable_auto_acl">
+                    <label class="form-check-label" for="disable_auto_acl">Disable the automatically-added access control entries</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Disable Auto-added Host Entries</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="disable_auto_host" name="disable_auto_host">
+                    <label class="form-check-label" for="disable_auto_host">Disable the automatically-added host entries</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">Experimental Bit 0x20 Support</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="exp_bit" name="exp_bit">
+                    <label class="form-check-label" for="exp_bit">Use 0x20 encoded random bits in the DNS query to foil spoofing attempts</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">DNS64 Support</label>
+            <div class="col-sm-9">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="dns64" name="dns64">
+                    <label class="form-check-label" for="dns64">Enable DNS64 (RFC 6147)</label>
+                </div>
+                <div class="option-desc">DNS64 is used with an IPv6/IPv4 translator to enable client-server communication.</div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex align-items-center">
+            <button class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+            <a href="{{ url_for('dns_resolver_access_lists') }}" class="btn btn-outline-secondary ms-3">Access Lists</a>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

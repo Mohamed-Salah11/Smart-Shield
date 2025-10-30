@@ -1,6 +1,199 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
 {% block main %}
-<h1>Welcome to DNS Forwarder</h1>
-<p>Placeholder page for DNS Forwarder service.</p>
+<!-- Breadcrumb-style header and notice to match screenshot -->
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+	<div>
+		<span class="small-muted">Services /</span>
+		<a class="breadcrumb-link" href="{{ url_for('dns_forwarder') }}">DNS Forwarder</a>
+	</div>
+	<div class="breadcrumb-actions">
+		<button class="btn btn-sm btn-secondary" aria-label="table">&#x2630;</button>
+		<button class="btn btn-sm btn-danger" aria-label="help">?</button>
+	</div>
+</div>
+
+<div class="notice-alert">
+	<strong>ISC DHCP has reached end-of-life and will be removed in a future version of pfSense.</strong>
+	Visit <a href="#">System &gt; Advanced &gt; Networking</a> to switch DHCP backend.
+</div>
+
+<div class="card mb-4">
+	<div class="card-header">General DNS Forwarder Options</div>
+	<div class="card-body">
+		<form>
+			<div class="row option-row">
+				<div class="col-md-3 option-title">Enable</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="enable_dns">
+						<label class="form-check-label" for="enable_dns">Enable DNS forwarder</label>
+					</div>
+				</div>
+			</div>
+
+			<div class="row option-row">
+				<div class="col-md-3 option-title">DHCP Registration</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="dhcp_registration">
+						<label class="form-check-label" for="dhcp_registration">Register DHCP leases in DNS forwarder</label>
+					</div>
+					<p class="option-desc">If this option is set machines that specify their hostname when requesting a DHCP lease will be registered in the DNS forwarder, so that their name can be resolved. The domain in <a href="#">System: General Setup</a> should also be set to the proper value.</p>
+				</div>
+			</div>
+
+			<div class="row option-row">
+				<div class="col-md-3 option-title">Static DHCP</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="static_dhcp">
+						<label class="form-check-label" for="static_dhcp">Register DHCP static mappings in DNS forwarder</label>
+					</div>
+					<p class="option-desc">If this option is set, IPv4 DHCP static mappings will be registered in the DNS forwarder so that their name can be resolved. The domain in <a href="#">System: General Setup</a> should also be set to the proper value.</p>
+				</div>
+			</div>
+
+			<div class="row option-row">
+				<div class="col-md-3 option-title">Prefer DHCP</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="prefer_dhcp">
+						<label class="form-check-label" for="prefer_dhcp">Resolve DHCP mappings first</label>
+					</div>
+					<p class="option-desc">If this option is set DHCP mappings will be resolved before the manual list of names below. This only affects the name given for a reverse lookup (PTR).</p>
+				</div>
+			</div>
+
+			<div class="row option-row">
+				<div class="col-md-3 option-title">Ignore System DNS</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="ignore_system_dns">
+						<label class="form-check-label" for="ignore_system_dns">Do not use system DNS servers</label>
+					</div>
+					<p class="option-desc">If this option is set the configured system DNS servers will be ignored and custom "server=" options must be used.</p>
+				</div>
+			</div>
+
+					<hr>
+
+					<div class="row mt-3">
+						<div class="col-md-12">
+							<h5 class="dns-query-title">DNS Query Forwarding</h5>
+						</div>
+					</div>
+
+					<div class="row mb-3 dns-query-row">
+						<div class="col-md-4 dns-query-col text-center">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="query_sequentially">
+							</div>
+							<label class="form-check-label d-block fw-bold" for="query_sequentially">Query DNS servers sequentially</label>
+							<p class="option-desc">If this option is set dnsmasq will query the DNS servers sequentially in the order specified rather than in parallel.</p>
+						</div>
+						<div class="col-md-4 dns-query-col text-center">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="require_domain">
+							</div>
+							<label class="form-check-label d-block fw-bold" for="require_domain">Require domain</label>
+							<p class="option-desc">If set, dnsmasq will not forward plain names (without dots) to upstream servers; a "not found" answer is returned.</p>
+						</div>
+						<div class="col-md-4 dns-query-col text-center">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="no_private_reverse">
+							</div>
+							<label class="form-check-label d-block fw-bold" for="no_private_reverse">Do not forward private reverse lookups</label>
+							<p class="option-desc">If set, reverse DNS lookups (PTR) for private addresses (RFC1918) will not be forwarded to upstream servers.</p>
+						</div>
+					</div>
+
+			<div class="row mt-3">
+				<div class="col-md-3">Listen Port</div>
+				<div class="col-md-3"><input class="form-control" type="text" value="53"></div>
+			</div>
+
+			<div class="row mt-3">
+				<div class="col-md-3">Interfaces</div>
+				<div class="col-md-6">
+					<select class="form-select" multiple>
+						<option>All</option>
+						<option>WAN</option>
+						<option>LAN</option>
+						<option>WAN IPv6 Link-Local</option>
+					</select>
+					<p class="option-desc">Interface IPs used by the DNS Forwarder for responding to queries from clients. If an interface has both IPv4 and IPv6 IPs, both are used. Queries to other interface IPs not selected above are discarded. The default behavior is to respond to queries on every available IPv4 and IPv6 address.</p>
+				</div>
+			</div>
+
+			<div class="row mt-3">
+				<div class="col-md-3">Strict binding</div>
+				<div class="col-md-9">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="strict_binding">
+						<label class="form-check-label" for="strict_binding">Strict interface binding</label>
+					</div>
+					<p class="option-desc">If this option is set, the DNS forwarder will only bind to the interfaces containing the IP addresses selected above, rather than binding to all interfaces and discarding queries to other addresses.</p>
+				</div>
+			</div>
+
+			<div class="row mt-3">
+				<div class="col-md-12">
+					<label>Custom options</label>
+					<textarea class="form-control" rows="4"></textarea>
+					<small class="text-muted">Enter any additional options to add to the dnsmasq configuration here, separated by a space or newline.</small>
+				</div>
+			</div>
+
+			<div class="mt-3">
+				<button type="button" class="btn btn-primary">Save</button>
+			</div>
+
+		</form>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-12 mb-3">
+		<div class="card mb-3">
+			<div class="card-header">Host Overrides</div>
+			<div class="card-body">
+				<table class="table table-sm">
+					<thead>
+						<tr><th>Host</th><th>Domain</th><th>IP</th><th>Description</th><th>Actions</th></tr>
+					</thead>
+					<tbody>
+						<tr><td colspan="5" class="text-muted">No entries</td></tr>
+					</tbody>
+				</table>
+				<a class="btn btn-success btn-sm" href="{{ url_for('dns_host_edit') }}">+ Add</a>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-12">
+		<div class="card mb-3">
+			<div class="card-header">Domain Overrides</div>
+			<div class="card-body">
+				<table class="table table-sm">
+					<thead>
+						<tr><th>Domain</th><th>IP</th><th>Description</th><th>Actions</th></tr>
+					</thead>
+					<tbody>
+						<tr><td colspan="4" class="text-muted">No entries</td></tr>
+					</tbody>
+				</table>
+				<a class="btn btn-success btn-sm" href="{{ url_for('dns_domain_edit') }}">+ Add</a>
+			</div>
+		</div>
+	</div>
+</div>
+</div>
+
 {% endblock %}
