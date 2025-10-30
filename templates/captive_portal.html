@@ -1,6 +1,984 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Captive Portal</h1>
-<p>Placeholder page for Captive Portal service.</p>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/captive_portal.css') }}">
+
+<div class="cp-container">
+    <!-- Breadcrumb Navigation -->
+    <div class="breadcrumb-section">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('services') }}">Services</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('captive_portal') }}">Captive Portal</a></li>
+                <li class="breadcrumb-item active" id="breadcrumb-current">Captive Portal</li>
+            </ol>
+        </nav>
+        <div class="action-buttons">
+            <button class="icon-btn add-btn" title="Add Zone" onclick="showAddZone()">
+                <span class="icon">≡</span>
+            </button>
+            <button class="icon-btn edit-btn" title="Edit">
+                <span class="icon">▦</span>
+            </button>
+            <button class="icon-btn info-btn" title="Information">?</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="cp-content">
+        <!-- Captive Portal Zones Table -->
+        <div class="table-section">
+            <div class="table-header">
+                <h2>Captive Portal Zones</h2>
+            </div>
+            <table class="zones-table">
+                <thead>
+                    <tr>
+                        <th>Zone</th>
+                        <th>Interfaces</th>
+                        <th>Number of users</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table rows will be populated here -->
+                </tbody>
+            </table>
+            <div class="table-footer">
+                <button class="btn btn-add" onclick="showAddZone()">+ Add</button>
+            </div>
+        </div>
+
+        <!-- Add Captive Portal Zone Form -->
+        <div id="add-zone-section" class="add-zone-section" style="display: none;">
+            <div class="add-zone-header">
+                <h2>Add Captive Portal Zone</h2>
+            </div>
+            
+            <form class="add-zone-form">
+                <div class="form-row">
+                    <label for="zone-name" class="form-label">Zone name</label>
+                    <input type="text" id="zone-name" class="form-control" placeholder="">
+                    <p class="help-text">Zone name. Can only contain lowercase letters, digits, and underscores (_) and may not start with a digit.</p>
+                </div>
+
+                <div class="form-row">
+                    <label for="zone-description" class="form-label">Zone description</label>
+                    <input type="text" id="zone-description" class="form-control" placeholder="">
+                    <p class="help-text">A description may be entered here for administrative reference (not parsed).</p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" onclick="saveZone()">💾 Save & Continue</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelAddZone()">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Zone Configuration Page -->
+        <div id="zone-config-section" class="zone-config-section" style="display: none;">
+            <!-- Config Tabs Navigation -->
+            <div class="config-tabs">
+                <button class="config-tab-btn active" onclick="switchConfigTab('configuration')">Configuration</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('macs')">MACs</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('allowed-ips')">Allowed IP Addresses</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('allowed-hostnames')">Allowed Hostnames</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('vouchers')">Vouchers</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('high-availability')">High Availability</button>
+                <button class="config-tab-btn" onclick="switchConfigTab('file-manager')">File Manager</button>
+            </div>
+
+            <!-- Configuration Tab -->
+            <div id="configuration" class="config-tab-content active">
+                <div class="config-header">
+                    <h2>Captive Portal Configuration</h2>
+                </div>
+                
+                <div class="config-form">
+                    <div class="form-row">
+                        <label class="form-label">Enable</label>
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="enable-portal" class="form-checkbox">
+                            <label for="enable-portal" class="checkbox-label">Enable Captive Portal</label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" id="description" class="form-control" placeholder="">
+                        <p class="help-text">A description may be entered here for administrative reference (not parsed).</p>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-primary" onclick="saveConfiguration()">💾 Save</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MACs Tab -->
+            <div id="macs" class="config-tab-content" style="display: none;">
+                <div class="config-header">
+                    <h2>MAC Addresses</h2>
+                </div>
+                
+                <div class="mac-table-section">
+                    <table class="mac-table">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>MAC address</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- MAC entries will be populated here -->
+                        </tbody>
+                    </table>
+                    <div class="table-footer">
+                        <button class="btn btn-add-small">+ Add</button>
+                    </div>
+                </div>
+
+                <!-- Info message -->
+                <div class="info-message">
+                    <span class="info-icon">ⓘ</span>
+                </div>
+
+                <!-- Add/Edit MAC Form -->
+                <div id="add-mac-form-section" class="add-mac-form-section" style="display: none;">
+                    <div class="edit-header">
+                        <h2>Edit MAC Address Rules</h2>
+                    </div>
+
+                    <form class="edit-mac-form">
+                        <div class="form-row">
+                            <label class="form-label">Action</label>
+                            <select id="mac-action" class="form-control">
+                                <option>Pass</option>
+                                <option>Block</option>
+                            </select>
+                            <p class="help-text">Choose what to do with packets coming from this MAC address.</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="mac-address" class="form-label">MAC Address</label>
+                            <div class="input-group-mac">
+                                <input type="text" id="mac-address" class="form-control" placeholder="XX:XX:XX:XX:XX:XX">
+                                <button type="button" class="btn btn-copy" onclick="copyMyMAC()">📋 Copy My MAC</button>
+                            </div>
+                            <p class="help-text">The client's MAC address, optionally with a mask length (e.g. '/24').</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="mac-description" class="form-label">Description</label>
+                            <input type="text" id="mac-description" class="form-control" placeholder="">
+                            <p class="help-text">A description may be entered here for administrative reference (not parsed)</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="bandwidth-up" class="form-label">Bandwidth up</label>
+                            <input type="text" id="bandwidth-up" class="form-control" placeholder="">
+                            <p class="help-text">Enter an upload limit to be enforced on this MAC in Kbit/s</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="bandwidth-down" class="form-label">Bandwidth down</label>
+                            <input type="text" id="bandwidth-down" class="form-control" placeholder="">
+                            <p class="help-text">Enter a download limit to be enforced on this MAC in Kbit/s</p>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveMACRule()">💾 Save</button>
+                            <button type="button" class="btn btn-secondary" onclick="cancelAddMAC()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Allowed IP Addresses Tab -->
+            <div id="allowed-ips" class="config-tab-content" style="display: none;">
+                <div class="config-header">
+                    <h2>Allowed IP Addresses</h2>
+                </div>
+                
+                <div class="ip-description-section">
+                    <p class="ip-description">
+                        <strong>→</strong> = All connections to the address are allowed, 
+                        <strong>←</strong> = All connections <strong>from</strong> the address are allowed, 
+                        <strong>↔</strong> = All connections <strong>to or from</strong> are allowed
+                    </p>
+                </div>
+
+                <div class="ip-table-section">
+                    <table class="ip-table">
+                        <thead>
+                            <tr>
+                                <th>IP Addresses</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- IP entries will be populated here -->
+                        </tbody>
+                    </table>
+                    <div class="table-footer">
+                        <button class="btn btn-add-small" onclick="showAddIPForm()">+ Add</button>
+                    </div>
+                </div>
+
+                <!-- Info message -->
+                <div class="info-message">
+                    <span class="info-icon">ⓘ</span>
+                </div>
+
+                <!-- Add/Edit IP Form -->
+                <div id="add-ip-form-section" class="add-ip-form-section" style="display: none;">
+                    <div class="edit-header">
+                        <h2>Edit Captive Portal IP Rule</h2>
+                    </div>
+
+                    <form class="edit-ip-form">
+                        <div class="form-row">
+                            <label for="ip-address" class="form-label">IP Address</label>
+                            <div class="ip-input-group">
+                                <input type="text" id="ip-address" class="form-control" placeholder="">
+                                <div class="cidr-selector">
+                                    <span class="cidr-slash">/</span>
+                                    <select id="ip-cidr" class="form-control cidr-input">
+                                        <option>32</option>
+                                        <option>31</option>
+                                        <option>30</option>
+                                        <option>29</option>
+                                        <option>28</option>
+                                        <option>27</option>
+                                        <option>26</option>
+                                        <option>25</option>
+                                        <option>24</option>
+                                        <option>23</option>
+                                        <option>22</option>
+                                        <option>21</option>
+                                        <option>20</option>
+                                        <option>19</option>
+                                        <option>18</option>
+                                        <option>17</option>
+                                        <option>16</option>
+                                        <option>15</option>
+                                        <option>14</option>
+                                        <option>13</option>
+                                        <option>12</option>
+                                        <option>11</option>
+                                        <option>10</option>
+                                        <option>9</option>
+                                        <option>8</option>
+                                        <option>7</option>
+                                        <option>6</option>
+                                        <option>5</option>
+                                        <option>4</option>
+                                        <option>3</option>
+                                        <option>2</option>
+                                        <option>1</option>
+                                        <option>0</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="ip-description" class="form-label">Description</label>
+                            <input type="text" id="ip-description" class="form-control" placeholder="">
+                            <p class="help-text">Enter a description here for reference only. (Not parsed)</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label class="form-label">Direction</label>
+                            <select id="ip-direction" class="form-control">
+                                <option value="Both">Both</option>
+                                <option value="From">From</option>
+                                <option value="To">To</option>
+                            </select>
+                            <p class="help-text">Use "From" to always allow access to an address through the captive portal (without authentication). Use "To" to allow access from all clients (even non-authenticated ones) behind the portal to this IP.</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="bandwidth-up" class="form-label">Bandwidth up</label>
+                            <input type="text" id="bandwidth-up" class="form-control" placeholder="">
+                            <p class="help-text">Enter an upload limit to be enforced on this address in Kbit/s</p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="bandwidth-down" class="form-label">Bandwidth down</label>
+                            <input type="text" id="bandwidth-down" class="form-control" placeholder="">
+                            <p class="help-text">Enter a download limit to be enforced on this address in Kbit/s</p>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveIPRule()">💾 Save</button>
+                            <button type="button" class="btn btn-secondary" onclick="cancelAddIP()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Allowed Hostnames Tab -->
+            <div id="allowed-hostnames" class="config-tab-content" style="display: none;">
+                <div class="config-header">
+                    <h2>Edit Captive Portal Hostname Rules</h2>
+                </div>
+
+                <!-- Hostname Table Section -->
+                <div class="hostname-table-section">
+                    <table class="hostname-table">
+                        <thead>
+                            <tr>
+                                <th>Hostname</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Hostname rules will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Description Legend -->
+                <div class="description-legend">
+                    <p><strong>Legend:</strong></p>
+                    <p>→ = All connections to the hostname are allowed, ← = All connections from the hostname are allowed, ↔ = All connections to or from are allowed</p>
+                </div>
+
+                <!-- Add Hostname Form Section -->
+                <div id="add-hostname-form-section" class="add-hostname-form-section" style="display: none;">
+                    <div class="edit-header">
+                        <h2>Captive Portal Hostname Settings</h2>
+                    </div>
+
+                    <form class="edit-hostname-form">
+                        <div class="form-row">
+                            <label for="hostname-direction" class="form-label">Direction</label>
+                            <div class="form-column">
+                                <select id="hostname-direction" class="form-control">
+                                    <option value="Both">Both</option>
+                                    <option value="From">From</option>
+                                    <option value="To">To</option>
+                                </select>
+                                <p class="help-text">Use "From" to always allow a Hostname through the captive portal (without authentication). Use "To" to allow access from all clients (even non-authenticated ones) behind the portal to this Hostname.</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="hostname-value" class="form-label">Hostname</label>
+                            <div class="form-column">
+                                <input type="text" id="hostname-value" class="form-control" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="hostname-description" class="form-label">Description</label>
+                            <div class="form-column">
+                                <input type="text" id="hostname-description" class="form-control" placeholder="">
+                                <p class="help-text">A description may be entered here for administrative reference (not parsed).</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="hostname-bandwidth-up" class="form-label">Bandwidth up</label>
+                            <div class="form-column">
+                                <input type="text" id="hostname-bandwidth-up" class="form-control" placeholder="">
+                                <p class="help-text">Enter a upload limit to be enforced on this Hostname in Kbit/s</p>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="hostname-bandwidth-down" class="form-label">Bandwidth down</label>
+                            <div class="form-column">
+                                <input type="text" id="hostname-bandwidth-down" class="form-control" placeholder="">
+                                <p class="help-text">Enter a download limit to be enforced on this Hostname in Kbit/s</p>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveHostnameRule()">💾 Save</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Add Hostname Button -->
+                <div class="add-hostname-button-section" id="add-hostname-button-section">
+                    <button class="btn btn-add-small" onclick="showAddHostnameForm()">+ Add</button>
+                </div>
+
+                <!-- Info Icon -->
+                <div class="info-section">
+                    <button class="info-btn" title="Information">ℹ</button>
+                </div>
+            </div>
+
+            <!-- Vouchers Tab -->
+            <div id="vouchers" class="config-tab-content" style="display: none;">
+                <!-- Voucher Rolls Table -->
+                <div class="voucher-section">
+                    <div class="section-header">
+                        <h3>Voucher Rolls</h3>
+                    </div>
+                    <table class="voucher-table">
+                        <thead>
+                            <tr>
+                                <th>Roll #</th>
+                                <th>Minutes/Ticket</th>
+                                <th># of Tickets</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Voucher rolls will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Create, Generate and Activate Rolls with Vouchers -->
+                <div class="voucher-section">
+                    <div class="section-header">
+                        <h3>Create, Generate and Activate Rolls with Vouchers</h3>
+                    </div>
+
+                    <form class="voucher-form">
+                        <div class="form-row">
+                            <label class="form-label">Enable</label>
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" id="enable-vouchers" class="form-checkbox">
+                                <label for="enable-vouchers" class="checkbox-label">Enable the creation, generation and activation of rolls with vouchers</label>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveVoucherSettings()">💾 Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- High Availability Tab -->
+            <div id="high-availability" class="config-tab-content" style="display: none;">
+                <!-- Secondary to Primary Node Synchronization -->
+                <div class="ha-section">
+                    <div class="section-header">
+                        <h3>Secondary to Primary node Synchronization</h3>
+                    </div>
+
+                    <form class="ha-form">
+                        <div class="form-row">
+                            <label class="form-label">Enable</label>
+                            <div class="form-column">
+                                <div class="checkbox-wrapper">
+                                    <input type="checkbox" id="enable-ha-sync" class="form-checkbox">
+                                    <label for="enable-ha-sync" class="checkbox-label">Enable backward High Availability Sync for connected users and used vouchers</label>
+                                </div>
+                                <p class="help-text">The XMLRPC sync provided by pfSense in <a href="#" class="link">High Availability settings</a> only synchronize a secondary node to its primary node. This checkbox enable a backward sync from the secondary to the primary, in order to have a bi-directional synchronization.pfSenseThe purpose of this feature is to keep connected users synchronized between servers even if a node does down, thus providing redundancy for the captive portal zone.</p>
+                                <p class="important-notice">Important: these settings should be set on the secondary node only ! Do not update these settings if this pfSense is the primary node !</p>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveHASettings()">💾 Save</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Info Alert -->
+                <div class="info-alert">
+                    <span class="alert-icon">ℹ</span>
+                    <p>It is recommended to configure XMLRPC sync on the primary node before configuring backward synchronization for captive portal.</p>
+                    <button class="alert-close" onclick="this.parentElement.style.display='none';">×</button>
+                </div>
+            </div>
+
+            <!-- File Manager Tab -->
+            <div id="file-manager" class="config-tab-content" style="display: none;">
+                <!-- File Upload Form Section -->
+                <div class="file-upload-section">
+                    <div class="section-header">
+                        <h3>Upload a New File</h3>
+                    </div>
+
+                    <form class="file-upload-form">
+                        <div class="form-row">
+                            <label for="file-input" class="form-label">File</label>
+                            <div class="form-column">
+                                <div class="file-input-wrapper">
+                                    <button type="button" class="btn btn-browse" onclick="document.getElementById('file-input').click()">Browse...</button>
+                                    <span id="file-name-display" class="file-name-display">No file selected.</span>
+                                    <input type="file" id="file-input" class="form-control" style="display: none;" onchange="updateFileName()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="uploadFile()">⬆ Upload</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Installed Files Section -->
+                <div class="file-manager-section">
+                    <div class="section-header">
+                        <h3>Installed Files</h3>
+                    </div>
+
+                    <div class="file-table-container">
+                        <table class="file-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- File entries will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Info Icon -->
+                <div class="info-section">
+                    <button class="info-btn" title="Information">ℹ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showAddZone() {
+    document.getElementById('add-zone-section').style.display = 'block';
+    document.getElementById('breadcrumb-current').textContent = 'Add Zone';
+    document.querySelector('.table-section').style.display = 'none';
+}
+
+function cancelAddZone() {
+    document.getElementById('add-zone-section').style.display = 'none';
+    document.getElementById('breadcrumb-current').textContent = 'Captive Portal';
+    document.querySelector('.table-section').style.display = 'block';
+}
+
+function saveZone() {
+    const zoneName = document.getElementById('zone-name').value;
+    const zoneDescription = document.getElementById('zone-description').value;
+    
+    if (!zoneName) {
+        alert('Please enter a zone name');
+        return;
+    }
+    
+    // Store zone info for configuration page
+    localStorage.setItem('currentZoneName', zoneName);
+    localStorage.setItem('currentZoneDescription', zoneDescription);
+    
+    // Show configuration page
+    document.getElementById('add-zone-section').style.display = 'none';
+    document.getElementById('zone-config-section').style.display = 'block';
+    document.getElementById('breadcrumb-current').textContent = zoneName + ' / Configuration';
+    
+    // Set description in configuration tab
+    document.getElementById('description').value = zoneDescription;
+}
+
+function switchConfigTab(tabName) {
+    // Hide all tabs
+    const tabs = document.querySelectorAll('.config-tab-content');
+    tabs.forEach(tab => tab.style.display = 'none');
+    
+    // Show selected tab
+    document.getElementById(tabName).style.display = 'block';
+    
+    // Update button styles
+    const buttons = document.querySelectorAll('.config-tab-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function saveConfiguration() {
+    alert('Configuration saved successfully!');
+}
+
+function showAddMACForm() {
+    document.getElementById('add-mac-form-section').style.display = 'block';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / MACs / Edit';
+    document.querySelector('.mac-table-section').style.display = 'none';
+    document.querySelector('.info-message').style.display = 'none';
+}
+
+function cancelAddMAC() {
+    document.getElementById('add-mac-form-section').style.display = 'none';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / MACs';
+    document.querySelector('.mac-table-section').style.display = 'block';
+    document.querySelector('.info-message').style.display = 'flex';
+}
+
+function saveMACRule() {
+    const macAddress = document.getElementById('mac-address').value;
+    const macAction = document.getElementById('mac-action').value;
+    const macDescription = document.getElementById('mac-description').value;
+    
+    if (!macAddress) {
+        alert('Please enter a MAC address');
+        return;
+    }
+    
+    // Get the MAC table tbody
+    const tableBody = document.querySelector('#macs .mac-table tbody');
+    
+    // Create new row
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td>${macAction}</td>
+        <td>${macAddress}</td>
+        <td>${macDescription}</td>
+        <td>
+            <button class="btn btn-sm btn-edit" onclick="editMACRule(this)">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteMACRule(this)">Delete</button>
+        </td>
+    `;
+    
+    // Add row to table
+    tableBody.appendChild(newRow);
+    
+    // Clear form and close
+    document.getElementById('mac-action').value = 'Pass';
+    document.getElementById('mac-address').value = '';
+    document.getElementById('mac-description').value = '';
+    document.getElementById('bandwidth-up').value = '';
+    document.getElementById('bandwidth-down').value = '';
+    
+    alert('MAC rule added successfully!');
+    cancelAddMAC();
+}
+
+function editMACRule(button) {
+    const row = button.closest('tr');
+    const cells = row.querySelectorAll('td');
+    
+    // Populate form with existing data
+    document.getElementById('mac-action').value = cells[0].textContent;
+    document.getElementById('mac-address').value = cells[1].textContent;
+    document.getElementById('mac-description').value = cells[2].textContent;
+    
+    // Remove the old row
+    row.remove();
+    
+    // Show the form
+    showAddMACForm();
+}
+
+function deleteMACRule(button) {
+    if (confirm('Are you sure you want to delete this MAC rule?')) {
+        button.closest('tr').remove();
+        alert('MAC rule deleted successfully!');
+    }
+}
+
+// IP Address Functions
+function showAddIPForm() {
+    document.getElementById('add-ip-form-section').style.display = 'block';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / Allowed IP Addresses / Edit';
+    document.querySelector('#allowed-ips .ip-table-section').style.display = 'none';
+    document.querySelector('#allowed-ips .info-message').style.display = 'none';
+}
+
+function cancelAddIP() {
+    document.getElementById('add-ip-form-section').style.display = 'none';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / Allowed IP Addresses';
+    document.querySelector('#allowed-ips .ip-table-section').style.display = 'block';
+    document.querySelector('#allowed-ips .info-message').style.display = 'flex';
+}
+
+function saveIPRule() {
+    const ipAddress = document.getElementById('ip-address').value;
+    const ipCIDR = document.getElementById('ip-cidr').value;
+    const ipDirection = document.getElementById('ip-direction').value;
+    const ipDescription = document.getElementById('ip-description').value;
+    const bandwidthUp = document.getElementById('bandwidth-up').value;
+    const bandwidthDown = document.getElementById('bandwidth-down').value;
+    
+    if (!ipAddress) {
+        alert('Please enter an IP address');
+        return;
+    }
+    
+    // Get the IP table tbody
+    const tableBody = document.querySelector('#allowed-ips .ip-table tbody');
+    
+    // Create display text with CIDR if not /32
+    const displayIP = ipCIDR !== '32' ? `${ipAddress}/${ipCIDR}` : ipAddress;
+    
+    // Create new row
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td>${displayIP}</td>
+        <td>${ipDescription}</td>
+        <td>
+            <button class="btn btn-sm btn-edit" onclick="editIPRule(this)">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteIPRule(this)">Delete</button>
+        </td>
+    `;
+    
+    // Add row to table
+    tableBody.appendChild(newRow);
+    
+    // Clear form and close
+    document.getElementById('ip-address').value = '';
+    document.getElementById('ip-cidr').value = '32';
+    document.getElementById('ip-direction').value = 'Both';
+    document.getElementById('ip-description').value = '';
+    document.getElementById('bandwidth-up').value = '';
+    document.getElementById('bandwidth-down').value = '';
+    
+    alert('IP rule added successfully!');
+    cancelAddIP();
+}
+
+function editIPRule(button) {
+    const row = button.closest('tr');
+    const cells = row.querySelectorAll('td');
+    
+    // Parse the direction and IP from the first cell
+    const ipText = cells[0].textContent;
+    const direction = ipText.split(' ')[0];
+    const ipAddress = ipText.substring(direction.length).trim();
+    
+    // Populate form with existing data
+    document.getElementById('ip-direction').value = direction;
+    document.getElementById('ip-address').value = ipAddress;
+    document.getElementById('ip-description').value = cells[1].textContent;
+    
+    // Remove the old row
+    row.remove();
+    
+    // Show the form
+    showAddIPForm();
+}
+
+function deleteIPRule(button) {
+    if (confirm('Are you sure you want to delete this IP rule?')) {
+        button.closest('tr').remove();
+        alert('IP rule deleted successfully!');
+    }
+}
+
+// Hostname Functions
+function showAddHostnameForm() {
+    document.getElementById('add-hostname-form-section').style.display = 'block';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / Allowed Hostnames / Edit';
+    document.querySelector('#allowed-hostnames .hostname-table-section').style.display = 'none';
+    document.querySelector('#allowed-hostnames .description-legend').style.display = 'none';
+    document.querySelector('#allowed-hostnames .add-hostname-button-section').style.display = 'none';
+    document.querySelector('#allowed-hostnames .info-section').style.display = 'none';
+}
+
+function cancelAddHostname() {
+    document.getElementById('add-hostname-form-section').style.display = 'none';
+    document.getElementById('breadcrumb-current').textContent = localStorage.getItem('currentZoneName') + ' / Allowed Hostnames';
+    document.querySelector('#allowed-hostnames .hostname-table-section').style.display = 'block';
+    document.querySelector('#allowed-hostnames .description-legend').style.display = 'block';
+    document.querySelector('#allowed-hostnames .add-hostname-button-section').style.display = 'block';
+    document.querySelector('#allowed-hostnames .info-section').style.display = 'block';
+    
+    // Reset form
+    document.getElementById('hostname-value').value = '';
+    document.getElementById('hostname-description').value = '';
+    document.getElementById('hostname-direction').value = 'Both';
+    document.getElementById('hostname-bandwidth-up').value = '';
+    document.getElementById('hostname-bandwidth-down').value = '';
+}
+
+function saveHostnameRule() {
+    const hostname = document.getElementById('hostname-value').value;
+    const description = document.getElementById('hostname-description').value;
+    const direction = document.getElementById('hostname-direction').value;
+    const bandwidthUp = document.getElementById('hostname-bandwidth-up').value;
+    const bandwidthDown = document.getElementById('hostname-bandwidth-down').value;
+    
+    if (!hostname) {
+        alert('Please enter a hostname');
+        return;
+    }
+    
+    // Get the hostname table tbody
+    const tableBody = document.querySelector('#allowed-hostnames .hostname-table tbody');
+    
+    // Map direction text to symbol
+    const directionSymbol = direction === 'Both' ? '↔' : (direction === 'From' ? '←' : '→');
+    
+    // Create new row
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td>${directionSymbol} ${hostname}</td>
+        <td>${description}</td>
+        <td>
+            <button class="btn btn-sm btn-edit" onclick="editHostnameRule(this)">Edit</button>
+            <button class="btn btn-sm btn-delete" onclick="deleteHostnameRule(this)">Delete</button>
+        </td>
+    `;
+    
+    // Add row to table
+    tableBody.appendChild(newRow);
+    
+    // Clear form and close
+    document.getElementById('hostname-value').value = '';
+    document.getElementById('hostname-description').value = '';
+    document.getElementById('hostname-direction').value = 'Both';
+    document.getElementById('hostname-bandwidth-up').value = '';
+    document.getElementById('hostname-bandwidth-down').value = '';
+    
+    cancelAddHostname();
+}
+
+function editHostnameRule(button) {
+    // Get the row data
+    const row = button.closest('tr');
+    const cells = row.querySelectorAll('td');
+    
+    // Parse the hostname and direction
+    const hostnameText = cells[0].textContent.trim();
+    const directionMatch = hostnameText.match(/^(→|←|↔)\s(.+)$/);
+    const directionSymbol = directionMatch ? directionMatch[1] : '↔';
+    const hostname = directionMatch ? directionMatch[2] : hostnameText;
+    
+    // Map symbol back to direction text
+    let directionValue = 'Both';
+    if (directionSymbol === '←') directionValue = 'From';
+    else if (directionSymbol === '→') directionValue = 'To';
+    
+    // Populate form
+    document.getElementById('hostname-direction').value = directionValue;
+    document.getElementById('hostname-value').value = hostname;
+    document.getElementById('hostname-description').value = cells[1].textContent;
+    
+    // Remove the old row
+    row.remove();
+    
+    // Show the form
+    showAddHostnameForm();
+}
+
+function deleteHostnameRule(button) {
+    if (confirm('Are you sure you want to delete this hostname rule?')) {
+        button.closest('tr').remove();
+        alert('Hostname rule deleted successfully!');
+    }
+}
+
+function copyMyMAC() {
+    // Get client's IP and fetch MAC from server
+    fetch('/api/get-client-mac')
+        .then(response => response.json())
+        .then(data => {
+            if (data.mac) {
+                // Copy to clipboard
+                navigator.clipboard.writeText(data.mac).then(function() {
+                    // Set the MAC address in the input field
+                    document.getElementById('mac-address').value = data.mac;
+                    
+                    // Show success feedback
+                    const button = event.target.closest('.btn-copy');
+                    const originalText = button.textContent;
+                    button.textContent = '✓ Copied!';
+                    button.style.backgroundColor = '#28a745';
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.style.backgroundColor = '';
+                    }, 2000);
+                }).catch(err => {
+                    alert('Failed to copy to clipboard: ' + err);
+                });
+            } else {
+                alert('Could not retrieve MAC address');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error fetching MAC address. Please enter it manually.');
+        });
+}
+
+// Voucher Settings Function
+function saveVoucherSettings() {
+    const enableVouchers = document.getElementById('enable-vouchers').checked;
+    alert('Voucher settings saved! Enable Vouchers: ' + (enableVouchers ? 'Yes' : 'No'));
+}
+
+// High Availability Settings Function
+function saveHASettings() {
+    const enableHASync = document.getElementById('enable-ha-sync').checked;
+    alert('High Availability settings saved! Enable HA Sync: ' + (enableHASync ? 'Yes' : 'No'));
+}
+
+// File Manager Functions
+function updateFileName() {
+    const fileInput = document.getElementById('file-input');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    
+    if (fileInput.files.length > 0) {
+        fileNameDisplay.textContent = fileInput.files[0].name;
+    } else {
+        fileNameDisplay.textContent = 'No file selected.';
+    }
+}
+
+function uploadFile() {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file to upload');
+        return;
+    }
+    
+    // Get the file table tbody
+    const tableBody = document.querySelector('#file-manager .file-table tbody');
+    
+    // Calculate file size in KB
+    const fileSizeKB = (file.size / 1024).toFixed(2);
+    
+    // Create new row
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td>${file.name}</td>
+        <td>${fileSizeKB} KB</td>
+        <td>
+            <button class="btn btn-sm btn-delete" onclick="deleteFile(this)">Delete</button>
+        </td>
+    `;
+    
+    // Add row to table
+    tableBody.appendChild(newRow);
+    
+    // Clear form and reset display
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-name-display').textContent = 'No file selected.';
+    alert('File "' + file.name + '" uploaded successfully!');
+}
+
+function deleteFile(button) {
+    if (confirm('Are you sure you want to delete this file?')) {
+        button.closest('tr').remove();
+        alert('File deleted successfully!');
+    }
+}
+
+// Add event listener to MAC Add button
+document.addEventListener('DOMContentLoaded', function() {
+    const macAddButton = document.querySelector('#macs .btn-add-small');
+    if (macAddButton) {
+        macAddButton.addEventListener('click', showAddMACForm);
+    }
+});
+</script>
+
 {% endblock %}
