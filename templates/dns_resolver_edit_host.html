@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
+{% block main %}
+
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+    <div>
+        <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+        <span class="small-muted"> / </span>
+        <a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
+        <span class="small-muted"> / </span>
+        <a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">General Settings</a>
+        <span class="small-muted"> / </span>
+        <span class="breadcrumb-link">Edit Host Override</span>
+    </div>
+    <div class="breadcrumb-actions">
+        <button class="btn btn-sm btn-danger" aria-label="help">?</button>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Host Override Options</div>
+    <div class="card-body">
+        <form method="post">
+
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">Host</label>
+                <div class="col-sm-10">
+                    <input class="form-control" name="host" placeholder="">
+                    <div class="option-desc">Name of the host, without the domain part e.g. enter "myhost" if the full domain name is "myhost.example.com"</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">Domain</label>
+                <div class="col-sm-10">
+                    <input class="form-control" name="domain" placeholder="">
+                    <div class="option-desc">Parent domain of the host e.g. enter "example.com" for "myhost.example.com"</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">IP Address</label>
+                <div class="col-sm-10">
+                    <input class="form-control" name="ip" placeholder="">
+                    <div class="option-desc">IPv4 or IPv6 comma-separated addresses to be returned for the host e.g., 192.168.100.100 or fd00:abcd::</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">Description</label>
+                <div class="col-sm-10">
+                    <input class="form-control" name="description" placeholder="">
+                    <div class="option-desc">A description may be entered here for administrative reference (not parsed).</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-sm-12">
+                    <p class="option-desc">This page is used to override the usual lookup process for a specific host. A host is defined by its name and parent domain (e.g., 'somesite.google.com'). Any attempt to lookup that host will automatically return the given IP address, and any usual external lookup server for the domain will not be queried.</p>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="card mb-3">
+                <div class="card-header">Additional Names for this Host</div>
+                <div class="card-body p-3">
+                    <div class="table-responsive">
+                        <table class="table mb-2">
+                            <thead>
+                                <tr>
+                                    <th style="width:30%">Host name</th>
+                                    <th style="width:30%">Domain</th>
+                                    <th style="width:30%">Description</th>
+                                    <th style="width:10%"> &nbsp; </th>
+                                </tr>
+                            </thead>
+                            <tbody id="additional-names">
+                                <tr>
+                                    <td><input class="form-control" name="add_name_host[]"></td>
+                                    <td><input class="form-control" name="add_name_domain[]"></td>
+                                    <td><input class="form-control" name="add_name_desc[]"></td>
+                                    <td><button type="button" class="btn btn-warning btn-sm">Delete</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-success me-2">+ Add Host Name</button>
+                            <button type="button" class="btn btn-warning">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+                <a class="btn btn-success ms-2" href="{{ url_for('dns_resolver') }}">Cancel</a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+{% endblock %}
