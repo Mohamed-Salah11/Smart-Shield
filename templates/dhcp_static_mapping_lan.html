@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<style>
+    .nav-breadcrumb { margin-bottom: 20px; font-size: 0.9em; }
+    .nav-breadcrumb a { color: #0275d8; text-decoration: none; margin: 0 5px; }
+    .section-header { background-color: #333; color: white; padding: 12px 15px; margin-top: 20px; margin-bottom: 15px; font-weight: bold; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #0275d8; }
+    .help-text { color: #666; font-size: 0.9em; margin-top: 5px; }
+    .btn-save { background-color: #0275d8; color: white; padding: 10px 30px; border: none; border-radius: 3px; cursor: pointer; margin-top: 20px; }
+    .btn-save:hover { background-color: #0250a8; }
+    .copy-btn { background-color: #5cb85c; color: white; padding: 6px 12px; border: none; border-radius: 3px; cursor: pointer; margin-left: 10px; float: right; }
+    .copy-btn:hover { background-color: #4cae4c; }
+    .btn-advanced { background-color: #0275d8; color: white; padding: 6px 15px; border: none; border-radius: 3px; cursor: pointer; }
+    .btn-advanced:hover { background-color: #0250a8; }
+    .checkbox-group { display: flex; align-items: center; }
+    .checkbox-group input { width: auto; margin-right: 8px; }
+    .inline-field { display: inline-block; width: calc(100% - 120px); }
+</style>
+
+<div class="container">
+    <!-- Breadcrumb Navigation -->
+    <div class="nav-breadcrumb">
+        Services / <a href="{{ url_for('dhcp_server_lan') }}">DHCP Server</a> / <a href="{{ url_for('dhcp_server_lan') }}">LAN</a> / Static Mapping / <strong>Edit</strong>
+    </div>
+
+    <!-- Static DHCP Mapping Section -->
+    <div class="section-header">Static DHCP Mapping</div>
+    
+    <div style="background: white; padding: 20px; border: 1px solid #ddd;">
+        <div style="display: flex; margin-bottom: 15px; align-items: center;">
+            <div style="flex: 1; font-weight: bold;">DHCP Backend:</div>
+            <div style="flex: 2;">ISC DHCP</div>
+        </div>
+
+        <div class="form-group">
+            <label for="mac_address">MAC Address</label>
+            <div style="position: relative;">
+                <input type="text" id="mac_address" placeholder="xx:xx:xx:xx:xx" style="padding-right: 110px;">
+                <button class="copy-btn" style="position: absolute; right: 5px; top: 5px;">📋 Copy My MAC</button>
+            </div>
+            <div class="help-text">MAC address of the client to match (6 hex octets separated by colons)</div>
+        </div>
+
+        <div class="form-group">
+            <label for="client_identifier">Client Identifier</label>
+            <input type="text" id="client_identifier" placeholder="">
+            <div class="help-text">An optional identifier to match based on the value sent by the client (RFC 2132)</div>
+        </div>
+
+        <div class="form-group">
+            <label for="ip_address">IP Address</label>
+            <input type="text" id="ip_address" placeholder="">
+            <div class="help-text">IPv4 address to assign this client</div>
+            <div class="help-text">Address must be outside of any defined pools. If no IPv4 address is given, one will be dynamically allocated from a pool. The same IP address may be assigned to multiple mappings.</div>
+        </div>
+
+        <div class="form-group">
+            <label><strong>Static ARP Entry</strong></label>
+            <label>
+                <input type="checkbox"> Create a static ARP table entry for this MAC & IP Address pair
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label for="hostname">Hostname</label>
+            <input type="text" id="hostname" placeholder="">
+            <div class="help-text">Name of the client host without the domain part</div>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" id="description" placeholder="">
+            <div class="help-text">A description for administrative reference (not parsed)</div>
+        </div>
+    </div>
+
+    <!-- Server Options Section -->
+    <div class="section-header">Server Options</div>
+    
+    <div style="background: white; padding: 20px; border: 1px solid #ddd;">
+        <div class="form-group">
+            <label for="wins_1">WINS Servers</label>
+            <input type="text" id="wins_1" placeholder="WINS Server 1" style="margin-bottom: 10px;">
+            <input type="text" placeholder="WINS Server 2">
+        </div>
+
+        <div class="form-group">
+            <label for="dns_1">DNS Servers</label>
+            <input type="text" id="dns_1" value="10.0.0.1" style="margin-bottom: 10px;">
+            <input type="text" placeholder="DNS Server 2" style="margin-bottom: 10px;">
+            <input type="text" placeholder="DNS Server 3" style="margin-bottom: 10px;">
+            <input type="text" placeholder="DNS Server 4">
+            <div class="help-text">Leave blank to use the system default DNS servers. The IP address of this firewall interface if DNS Resolver or Forwarder is enabled, otherwise the servers configured in General settings or those obtained dynamically.</div>
+        </div>
+    </div>
+
+    <!-- Other DHCP Options Section -->
+    <div class="section-header">Other DHCP Options</div>
+    
+    <div style="background: white; padding: 20px; border: 1px solid #ddd;">
+        <div class="form-group">
+            <label for="gateway">Gateway</label>
+            <input type="text" id="gateway" value="10.0.0.1">
+            <div class="help-text">The default is to use the IP address of this firewall interface as the gateway. Specify an alternate gateway here if this is not the correct gateway for the network.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="domain_name">Domain Name</label>
+            <input type="text" id="domain_name" placeholder="home.arpa">
+            <div class="help-text">The default is to use the domain name of this firewall as the default domain name provided by DHCP. An alternate domain name may be specified here.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="domain_search_list">Domain Search List</label>
+            <input type="text" id="domain_search_list" placeholder="example.com;sub.example.com">
+            <div class="help-text">The DHCP server can optionally provide a domain search list. Use the semicolon character as separator.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="default_lease_time">Default Lease Time</label>
+            <input type="number" id="default_lease_time" placeholder="">
+            <div class="help-text">Used for clients that do not ask for a specific expiration time. The default is 7200 seconds.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="maximum_lease_time">Maximum Lease Time</label>
+            <input type="text" id="maximum_lease_time" placeholder="">
+            <div class="help-text">This is the maximum lease time for clients that ask for a specific expiration time. The default is 86400 seconds.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="dynamic_dns">Dynamic DNS</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+
+        <div class="form-group">
+            <label for="ntp">NTP</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+
+        <div class="form-group">
+            <label for="tftp">TFTP</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+
+        <div class="form-group">
+            <label for="ldap">LDAP</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+
+        <div class="form-group">
+            <label for="network_booting">Network Booting</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+
+        <div class="form-group">
+            <label for="custom_dhcp">Custom DHCP Options</label>
+            <button class="btn-advanced">⚙️ Display Advanced</button>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <button class="btn-save" onclick="saveMapping()">💾 Save</button>
+</div>
+
+<script>
+    function saveMapping() {
+        // Get form values
+        const mapping = {
+            mac_address: document.getElementById('mac_address').value,
+            client_identifier: document.getElementById('client_identifier').value,
+            ip_address: document.getElementById('ip_address').value,
+            static_arp: document.querySelector('input[type="checkbox"]').checked,
+            hostname: document.getElementById('hostname').value,
+            description: document.getElementById('description').value,
+            wins_servers: [
+                document.getElementById('wins_1').value,
+                document.querySelectorAll('input[placeholder="WINS Server 2"]')[0]?.value || ''
+            ].filter(v => v),
+            dns_servers: [
+                document.getElementById('dns_1').value,
+                ...Array.from(document.querySelectorAll('input[placeholder^="DNS Server"]')).map(el => el.value)
+            ].filter(v => v),
+            gateway: document.getElementById('gateway').value,
+            domain_name: document.getElementById('domain_name').value,
+            domain_search_list: document.getElementById('domain_search_list').value,
+            default_lease_time: document.getElementById('default_lease_time').value,
+            maximum_lease_time: document.getElementById('maximum_lease_time').value
+        };
+        
+        // Validate required fields
+        if (!mapping.mac_address && !mapping.client_identifier) {
+            alert('Please enter either MAC Address or Client Identifier');
+            return;
+        }
+        
+        if (!mapping.ip_address) {
+            alert('Please enter an IP Address');
+            return;
+        }
+        
+        // Get existing mappings
+        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
+        const editIndex = localStorage.getItem('edit_mapping_index_lan');
+        
+        if (editIndex !== null) {
+            // Update existing mapping
+            mappings[parseInt(editIndex)] = mapping;
+            localStorage.removeItem('edit_mapping_index_lan');
+        } else {
+            // Add new mapping
+            mappings.push(mapping);
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('dhcp_static_mappings_lan', JSON.stringify(mappings));
+        
+        // Redirect back to DHCP Server LAN page
+        alert('Static mapping saved successfully!');
+        window.location.href = '{{ url_for("dhcp_server_lan") }}';
+    }
+    
+    // Load existing mapping if editing
+    document.addEventListener('DOMContentLoaded', function() {
+        const editIndex = localStorage.getItem('edit_mapping_index_lan');
+        if (editIndex !== null) {
+            const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
+            const mapping = mappings[parseInt(editIndex)];
+            
+            if (mapping) {
+                document.getElementById('mac_address').value = mapping.mac_address || '';
+                document.getElementById('client_identifier').value = mapping.client_identifier || '';
+                document.getElementById('ip_address').value = mapping.ip_address || '';
+                document.querySelector('input[type="checkbox"]').checked = mapping.static_arp || false;
+                document.getElementById('hostname').value = mapping.hostname || '';
+                document.getElementById('description').value = mapping.description || '';
+                document.getElementById('gateway').value = mapping.gateway || '';
+                document.getElementById('domain_name').value = mapping.domain_name || '';
+                document.getElementById('domain_search_list').value = mapping.domain_search_list || '';
+                document.getElementById('default_lease_time').value = mapping.default_lease_time || '';
+                document.getElementById('maximum_lease_time').value = mapping.maximum_lease_time || '';
+            }
+        }
+    });
+</script>
+{% endblock %}
