@@ -1,6 +1,290 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Welcome to UPnP IGD & PCP</h1>
-<p>Placeholder page for UPnP IGD & PCP service.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPnP Settings</title>
+<style>
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background-color: #f5f5f5;
+  color: #222;
+  margin: 0;
+  padding: 20px;
+}
+
+.page {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-size: 1.5em;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 1.1em;
+  margin-bottom: 10px;
+  color: #333;
+  font-weight: 600;
+}
+
+.card-content label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+input[type="text"], select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95em;
+  background-color: #fafafa;
+  transition: border 0.2s;
+}
+
+input[type="text"]:focus, select:focus {
+  border-color: #0078d7;
+  outline: none;
+  background-color: #fff;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.btn {
+  background: #0078d7;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.btn:hover {
+  background: #005ea6;
+}
+
+.field-inline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.acl-list {
+  margin-top: 10px;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 40px;
+}
+
+.acl-item {
+  padding: 6px 10px;
+  background: #e8f0fe;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.acl-item button {
+  background: none;
+  border: none;
+  color: #d00;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1em;
+}
+</style>
+</head>
+<body>
+
+<div class="page upnp-settings">
+
+  <h2 class="section-title">UPnP Settings</h2>
+
+  <!-- Service Settings -->
+  <div class="card">
+    <h3 class="card-title">Service Settings</h3>
+    <div class="card-content">
+      <label class="checkbox">
+        <input type="checkbox" id="enable_port_mapping">
+        Enable port mapping service
+      </label>
+
+      <label class="checkbox">
+        <input type="checkbox" id="allow_upnp_igd">
+        Allow UPnP IGD port mapping
+      </label>
+
+      <label class="checkbox">
+        <input type="checkbox" id="allow_pcp_natpmp">
+        Allow PCP/NAT-PMP port mapping
+      </label>
+
+      <div class="field">
+        <label for="external_interface">External interface</label>
+        <select id="external_interface">
+          <option>wan</option>
+          <option>lan</option>
+          <option>localhost</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="internal_interfaces">Internal interfaces</label>
+        <select id="internal_interfaces">
+          <option>wan</option>
+          <option>lan</option>
+          <option>loopback</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- External Address Settings -->
+  <div class="card">
+    <h3 class="card-title">External Address Settings</h3>
+    <div class="card-content">
+      <label class="checkbox">
+        <input type="checkbox" id="enable_stun">
+        Enable STUN
+      </label>
+
+      <div class="field">
+        <label for="stun_server">STUN server</label>
+        <input type="text" id="stun_server" placeholder="stun.example.com">
+      </div>
+
+      <div class="field">
+        <label for="stun_port">STUN port</label>
+        <input type="text" id="stun_port" placeholder="3478">
+      </div>
+
+      <div class="field">
+        <label for="override_wan_address">Override WAN address</label>
+        <input type="text" id="override_wan_address" placeholder="e.g. 203.0.113.5">
+      </div>
+    </div>
+  </div>
+
+  <!-- Advanced Settings -->
+  <div class="card">
+    <h3 class="card-title">Advanced Settings</h3>
+    <div class="card-content">
+      <div class="field">
+        <label for="download_speed">Download speed</label>
+        <input type="text" id="download_speed" placeholder="Mbps">
+      </div>
+
+      <div class="field">
+        <label for="upload_speed">Upload speed</label>
+        <input type="text" id="upload_speed" placeholder="Mbps">
+      </div>
+
+      <div class="field">
+        <label for="traffic_shaping">Traffic shaping</label>
+        <input type="text" id="traffic_shaping">
+      </div>
+
+      <div class="field">
+        <label for="custom_presentation_url">Custom presentation URL</label>
+        <input type="text" id="custom_presentation_url">
+      </div>
+
+      <div class="field">
+        <label for="custom_model_number">Custom model number</label>
+        <input type="text" id="custom_model_number">
+      </div>
+
+      <label class="checkbox">
+        <input type="checkbox" id="firewall_logs">
+        Log mapped connections
+      </label>
+
+      <label class="checkbox">
+        <input type="checkbox" id="report_uptime">
+        Report system uptime
+      </label>
+    </div>
+  </div>
+
+  <!-- Service Access Control List -->
+  <div class="card">
+    <h3 class="card-title">Service Access Control List</h3>
+    <div class="card-content">
+      <label class="checkbox">
+        <input type="checkbox" id="default_deny">
+        Deny access to port mapping service by default
+      </label>
+
+      <div class="acl-section">
+        <div class="field-inline">
+          <input type="text" id="acl_entry" placeholder="e.g. 192.168.1.100">
+          <button class="btn" id="add_acl">Add</button>
+        </div>
+
+        <div id="acl_entries" class="acl-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.getElementById("add_acl").addEventListener("click", function() {
+  const input = document.getElementById("acl_entry");
+  const value = input.value.trim();
+  if (value === "") return;
+
+  const list = document.getElementById("acl_entries");
+  const item = document.createElement("div");
+  item.className = "acl-item";
+  item.innerHTML = `<span>${value}</span><button>&times;</button>`;
+  item.querySelector("button").addEventListener("click", () => item.remove());
+  list.appendChild(item);
+  input.value = "";
+});
+</script>
+
+</body>
+</html>
+
 {% endblock %}
