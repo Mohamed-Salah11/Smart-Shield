@@ -336,9 +336,9 @@ def upnp_igd_pcp():
 
 @app.route('/services/wake-on-lan')
 def wake_on_lan():
-    interfaces = ['WAN', 'LAN']  
-    devices = []  
-    return render_template('wake_on_lan.html', interfaces=interfaces, devices=devices)
+    interfaces = ['WAN', 'LAN']
+    devices = []
+    return render_template('wake_on_lan.html', interfaces=interfaces, devices=devices, request=request)
 @app.route('/vpn')
 def vpn():
     return render_template('vpn.html')
