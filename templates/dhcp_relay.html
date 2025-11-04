@@ -1,6 +1,151 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to DHCP Relay</h1>
-<p>Placeholder page for DHCP Relay service.</p>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dhcp_relay.css') }}">
+
+<div class="dhcp-relay-container">
+    <!-- Breadcrumb Navigation -->
+    <div class="breadcrumb-section">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('services') }}">Services</a></li>
+                <li class="breadcrumb-item active">DHCP Relay</li>
+            </ol>
+        </nav>
+        <div class="action-buttons">
+            <button class="info-btn" title="Information">?</button>
+        </div>
+    </div>
+
+    <!-- DHCP Relay Configuration -->
+    <div class="config-section">
+        <div class="section-header">
+            <h2>DHCP Relay Configuration</h2>
+        </div>
+
+        <form class="dhcp-relay-form">
+            <!-- Enable DHCP Relay -->
+            <div class="form-row">
+                <label class="form-label">Enable</label>
+                <div class="form-column">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="enable-dhcp-relay" class="form-checkbox">
+                        <label for="enable-dhcp-relay" class="checkbox-label">Enable DHCP Relay</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Downstream Interfaces -->
+            <div class="form-row">
+                <label for="downstream-interfaces" class="form-label">Downstream Interfaces</label>
+                <div class="form-column">
+                    <textarea id="downstream-interfaces" class="form-control textarea-control" rows="3">WAN
+LAN</textarea>
+                    <p class="help-text">Interfaces without an IPv4 address will not be shown.</p>
+                </div>
+            </div>
+
+            <!-- CARP Status VIP -->
+            <div class="form-row">
+                <label for="carp-status-vip" class="form-label">CARP Status VIP</label>
+                <div class="form-column">
+                    <select id="carp-status-vip" class="form-control">
+                        <option>none</option>
+                        <option>VIP 1</option>
+                        <option>VIP 2</option>
+                    </select>
+                    <p class="help-text">DHCP Relay will be stopped when the chosen VIP is in BACKUP status, and started in MASTER status.</p>
+                </div>
+            </div>
+
+            <!-- Append circuit ID and agent ID -->
+            <div class="form-row">
+                <label class="form-label">Append circuit ID and agent ID</label>
+                <div class="form-column">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="append-circuit-id" class="form-checkbox">
+                        <label for="append-circuit-id" class="checkbox-label">Append circuit ID and agent ID to requests</label>
+                    </div>
+                    <p class="help-text">Append the circuit ID (interface number) and the agent ID to the DHCP request.</p>
+                </div>
+            </div>
+
+            <!-- Upstream Servers -->
+            <div class="form-row upstream-servers-row">
+                <label class="form-label">Upstream Servers</label>
+                <div class="form-column">
+                    <!-- Upstream Servers List -->
+                    <div id="upstream-servers-list" class="upstream-servers-list">
+                        <!-- Server entries will be added here -->
+                    </div>
+
+                    <!-- Add New Server Input -->
+                    <div class="upstream-server-input-group">
+                        <input type="text" id="upstream-server" class="form-control" placeholder="Upstream Server">
+                        <button type="button" class="btn btn-add-server" onclick="addUpstreamServer()">+ Add Upstream Server</button>
+                    </div>
+
+                    <p class="help-text">The IPv4 addresses of the servers to which DHCP requests are relayed.</p>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="saveDHCPRelaySettings()">💾 Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function addUpstreamServer() {
+    const input = document.getElementById('upstream-server');
+    const server = input.value.trim();
+    
+    if (!server) {
+        alert('Please enter an upstream server address');
+        return;
+    }
+    
+    // Get the upstream servers list
+    const list = document.getElementById('upstream-servers-list');
+    
+    // Create new server entry
+    const serverEntry = document.createElement('div');
+    serverEntry.className = 'upstream-server-entry';
+    serverEntry.innerHTML = `
+        <input type="text" class="form-control" value="${server}" readonly>
+        <button type="button" class="btn btn-delete" onclick="deleteUpstreamServer(this)">🗑 Delete</button>
+    `;
+    
+    // Add to list
+    list.appendChild(serverEntry);
+    
+    // Clear input
+    input.value = '';
+}
+
+function deleteUpstreamServer(button) {
+    if (confirm('Are you sure you want to delete this upstream server?')) {
+        button.closest('.upstream-server-entry').remove();
+        alert('Upstream server deleted successfully!');
+    }
+}
+
+function saveDHCPRelaySettings() {
+    const enableRelay = document.getElementById('enable-dhcp-relay').checked;
+    const downstreamInterfaces = document.getElementById('downstream-interfaces').value;
+    const carpVIP = document.getElementById('carp-status-vip').value;
+    const appendCircuitID = document.getElementById('append-circuit-id').checked;
+    
+    // Get all upstream servers
+    const upstreamServers = [];
+    document.querySelectorAll('.upstream-server-entry input').forEach(input => {
+        upstreamServers.push(input.value);
+    });
+    
+    alert('DHCP Relay settings saved!\n\nEnabled: ' + (enableRelay ? 'Yes' : 'No') + '\nDownstream Interfaces: ' + downstreamInterfaces.replace(/\n/g, ', ') + '\nUpstream Servers: ' + (upstreamServers.length > 0 ? upstreamServers.join(', ') : 'None') + '\nCARP VIP: ' + carpVIP);
+}
+</script>
+
 {% endblock %}
