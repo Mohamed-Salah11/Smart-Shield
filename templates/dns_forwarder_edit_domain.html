@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
+{% block main %}
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+  <div>
+    <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+    <span class="small-muted"> / </span>
+    <a href="{{ url_for('dns_forwarder') }}" class="breadcrumb-link">DNS Forwarder</a>
+    <span class="small-muted"> / </span>
+    <span class="breadcrumb-link">Edit Domain Override</span>
+  </div>
+  <div class="breadcrumb-actions">
+    <button class="btn btn-sm btn-secondary" aria-label="settings">⚙</button>
+    <button class="btn btn-sm btn-secondary" aria-label="table">≡</button>
+    <button class="btn btn-sm btn-danger" aria-label="help">?</button>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Domain Override Options</div>
+  <div class="card-body">
+    <form method="post">
+      <div class="row mb-3">
+        <div class="col-md-2"><label class="form-label">Domain</label></div>
+        <div class="col-md-10">
+          <input class="form-control" name="domain" placeholder="">
+          <small class="text-muted">Domain to override (NOTE: this does not have to be a valid TLD!) e.g.: test or nas.home.arpa or mycompany.localdomain or 1.168.192.in-addr.arpa</small>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-2"><label class="form-label">IP Address</label></div>
+        <div class="col-md-10">
+          <input class="form-control" name="ipaddr" placeholder="">
+          <small class="text-muted">IP address of the authoritative DNS server for this domain e.g.: 192.168.100.100
+Or enter # for an exclusion to pass through this host/subdomain to standard nameservers instead of a previous override. Or enter ! for lookups for this host/subdomain to NOT be forwarded anywhere.</small>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-2"><label class="form-label">Source IP</label></div>
+        <div class="col-md-10">
+          <input class="form-control" name="source_ip" placeholder="">
+          <small class="text-muted">Source IP address for queries to the DNS server for the override domain. Leave blank unless the DNS server is accessed through a VPN tunnel.</small>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-2"><label class="form-label">Description</label></div>
+        <div class="col-md-10">
+          <input class="form-control" name="description" placeholder="">
+          <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+        </div>
+      </div>
+
+      <div class="mt-2">
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

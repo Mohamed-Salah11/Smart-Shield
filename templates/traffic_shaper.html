@@ -1,6 +1,491 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Traffic Shaper</h1>
-<p>This is an empty placeholder page for Firewall &gt; Traffic Shaper.</p>
+{% block main %}
+<style>
+	.ts-header { background:#f8f9fa;border-bottom:1px solid #ddd;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin:-12px -12px 12px -12px }
+	.ts-tabs { display:flex;gap:0;border-bottom:2px solid #ddd;margin-bottom:16px }
+	.ts-tab { padding:12px 16px;cursor:pointer;color:#e74c3c;font-weight:700;border-bottom:3px solid transparent;margin-bottom:-2px }
+	.ts-tab.active { border-bottom-color:#e74c3c;color:#e74c3c }
+	.ts-tab:not(.active) { color:#999 }
+	.ts-section-header { background:#555;color:#fff;padding:10px 14px;font-weight:700;margin-bottom:16px;margin-top:16px }
+	.ts-form-row { display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:start;padding:16px;background:#fff;border:1px solid #ddd;margin-bottom:12px;border-radius:4px }
+	.ts-form-label { font-weight:700;text-align:right;text-decoration:underline }
+	.ts-form-input { display:flex;flex-direction:column;gap:8px }
+	.ts-checkbox { display:flex;align-items:center;gap:8px }
+	.ts-helper-text { color:#777;font-size:12px;margin-top:4px }
+	.ts-buttons { display:flex;gap:8px;margin-top:16px }
+	.btn { padding:8px 12px;border-radius:4px;border:none;cursor:pointer;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px }
+	.btn-blue { background:#0275d8;color:#fff }
+	.btn-green { background:#28a745;color:#fff }
+	.btn-red { background:#d32f2f;color:#fff }
+	.ts-interface-list { display:flex;flex-direction:column;gap:8px;margin-bottom:16px }
+	.ts-interface-item { display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border-radius:4px }
+	.ts-interface-item:hover { background:#f5f5f5 }
+	.ts-interface-item input[type="checkbox"] { cursor:pointer }
+</style>
+
+<div class="ts-header">
+	<div style="display:flex;align-items:center;gap:6px;font-size:14px;color:#666">
+		<span>Firewall</span>
+		<span style="color:#999">/</span>
+		<span style="color:#0275d8">Traffic Shaper</span>
+		<span style="color:#999">/</span>
+		<span style="color:#0275d8">By Interface</span>
+	</div>
+	<div style="display:flex;gap:8px">
+		<button style="background:none;border:none;cursor:pointer;color:#666;font-size:16px" title="Info">ℹ️</button>
+		<button style="background:none;border:none;cursor:pointer;color:#d32f2f;font-size:16px" title="Delete">🗑️</button>
+	</div>
+</div>
+
+<!-- Tabs -->
+<div class="ts-tabs">
+	<div class="ts-tab active" onclick="switchTab(this, 'byInterface')">By Interface</div>
+	<div class="ts-tab" onclick="switchTab(this, 'byQueue')">By Queue</div>
+	<div class="ts-tab" onclick="switchTab(this, 'limiters')">Limiters</div>
+	<div class="ts-tab" onclick="switchTab(this, 'wizards')">Wizards</div>
+</div>
+
+<!-- By Interface Tab Content -->
+<div id="byInterface" style="display:block">
+	<!-- Interface Selection with Configuration -->
+	<div style="display:grid;grid-template-columns:160px 1fr;gap:20px">
+		<!-- Left Sidebar - Interface List -->
+		<div>
+			<div class="ts-interface-list">
+				<div class="ts-interface-item">
+					<input type="checkbox" id="wanCheck" onchange="showInterface('wan')" style="width:16px;height:16px">
+					<label for="wanCheck" style="cursor:pointer;font-weight:700;color:#0275d8">WAN</label>
+				</div>
+				<div class="ts-interface-item">
+					<input type="checkbox" id="lanCheck" onchange="showInterface('lan')" style="width:16px;height:16px">
+					<label for="lanCheck" style="cursor:pointer;font-weight:700;color:#0275d8">LAN</label>
+				</div>
+			</div>
+		</div>
+
+		<!-- Right Content - Configuration -->
+		<div>
+			<!-- WAN Configuration -->
+			<div id="wanConfig" style="display:none;background:#fff;border:1px solid #ddd;border-radius:4px;padding:0;overflow:hidden">
+				<div class="ts-section-header">WAN Configuration</div>
+
+				<!-- Enable/Disable -->
+				<div class="ts-form-row" style="grid-template-columns:auto 1fr">
+					<div class="ts-checkbox">
+						<input type="checkbox" id="wanEnable" style="width:16px;height:16px">
+						<label for="wanEnable" style="cursor:pointer;font-weight:700">Enable/Disable</label>
+					</div>
+					<div style="color:#777;font-size:12px">Enable/disable discipline and its children</div>
+				</div>
+
+				<!-- Name -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Name</div>
+					<div class="ts-form-input">
+						<input type="text" value="wan" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px" readonly>
+					</div>
+				</div>
+
+				<!-- Scheduler Type -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Scheduler Type</div>
+					<div class="ts-form-input">
+						<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+							<option>HFSC</option>
+							<option>CBQ</option>
+							<option>PRIQ</option>
+						</select>
+						<div class="ts-helper-text">Changing this changes all child queues! Beware information can be lost.</div>
+					</div>
+				</div>
+
+				<!-- Bandwidth -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Bandwidth</div>
+					<div class="ts-form-input">
+						<div style="display:flex;gap:8px;align-items:center">
+							<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:200px;flex:1">
+							<select style="padding:8px;border:1px solid #ddd;border-radius:4px">
+								<option>Mbit/s</option>
+								<option>Kbit/s</option>
+								<option>bit/s</option>
+							</select>
+						</div>
+					</div>
+				</div>
+
+				<!-- Queue Limit -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Queue Limit</div>
+					<div class="ts-form-input">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+					</div>
+				</div>
+
+				<!-- TBR Size -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">TBR Size</div>
+					<div class="ts-form-input">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+						<div class="ts-helper-text">Adjusts the size, in bytes, of the token bucket regulator. If not specified, heuristics based on the interface bandwidth are used to determine the size.</div>
+					</div>
+				</div>
+
+				<!-- Action Buttons -->
+				<div style="padding:16px;background:#f9f9f9;border-top:1px solid #ddd;display:flex;gap:8px">
+					<button class="btn btn-blue">💾 Save</button>
+					<button class="btn btn-green">+ Add new Queue</button>
+					<button class="btn btn-red">🗑️ Disable shaper on interface</button>
+				</div>
+			</div>
+
+			<!-- LAN Configuration -->
+			<div id="lanConfig" style="display:none;background:#fff;border:1px solid #ddd;border-radius:4px;padding:0;overflow:hidden">
+				<div class="ts-section-header">LAN Configuration</div>
+
+				<!-- Enable/Disable -->
+				<div class="ts-form-row" style="grid-template-columns:auto 1fr">
+					<div class="ts-checkbox">
+						<input type="checkbox" id="lanEnable" style="width:16px;height:16px">
+						<label for="lanEnable" style="cursor:pointer;font-weight:700">Enable/Disable</label>
+					</div>
+					<div style="color:#777;font-size:12px">Enable/disable discipline and its children</div>
+				</div>
+
+				<!-- Name -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Name</div>
+					<div class="ts-form-input">
+						<input type="text" value="lan" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px" readonly>
+					</div>
+				</div>
+
+				<!-- Scheduler Type -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Scheduler Type</div>
+					<div class="ts-form-input">
+						<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+							<option>HFSC</option>
+							<option>CBQ</option>
+							<option>PRIQ</option>
+						</select>
+						<div class="ts-helper-text">Changing this changes all child queues! Beware information can be lost.</div>
+					</div>
+				</div>
+
+				<!-- Bandwidth -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Bandwidth</div>
+					<div class="ts-form-input">
+						<div style="display:flex;gap:8px;align-items:center">
+							<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:200px;flex:1">
+							<select style="padding:8px;border:1px solid #ddd;border-radius:4px">
+								<option>Mbit/s</option>
+								<option>Kbit/s</option>
+								<option>bit/s</option>
+							</select>
+						</div>
+					</div>
+				</div>
+
+				<!-- Queue Limit -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">Queue Limit</div>
+					<div class="ts-form-input">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+					</div>
+				</div>
+
+				<!-- TBR Size -->
+				<div class="ts-form-row">
+					<div class="ts-form-label">TBR Size</div>
+					<div class="ts-form-input">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:300px">
+						<div class="ts-helper-text">Adjusts the size, in bytes, of the token bucket regulator. If not specified, heuristics based on the interface bandwidth are used to determine the size.</div>
+					</div>
+				</div>
+
+				<!-- Action Buttons -->
+				<div style="padding:16px;background:#f9f9f9;border-top:1px solid #ddd;display:flex;gap:8px">
+					<button class="btn btn-blue">💾 Save</button>
+					<button class="btn btn-green">+ Add new Queue</button>
+					<button class="btn btn-red">🗑️ Disable shaper on interface</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- By Queue Tab Content -->
+<div id="byQueue" style="display:none;background:#fff;border:1px solid #ddd;border-radius:4px;padding:16px;text-align:center;color:#777">
+	<p>No data available for By Queue view</p>
+</div>
+
+<!-- Limiters Tab Content -->
+<div id="limiters" style="display:none">
+	<div style="display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start">
+		<!-- Left: Buttons -->
+		<div style="display:flex;flex-direction:column;gap:8px">
+			<button class="btn btn-green" onclick="toggleLimiterForm()">+ New Limiter</button>
+			<button style="width:32px;height:32px;border-radius:50%;background:#0275d8;color:#fff;border:none;cursor:pointer;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center" title="Info">ℹ️</button>
+		</div>
+
+		<!-- Right: Form (appears when button clicked) -->
+		<div id="limiterForm" style="display:none;background:#fff;border:1px solid #ddd;border-radius:4px;padding:0;overflow:hidden">
+			<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700">Limiters</div>
+
+			<!-- Form Table -->
+			<table style="width:100%;border-collapse:collapse;background:#fff">
+				<!-- Enable/Disable Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top">Enable</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<div style="display:flex;align-items:center;gap:8px">
+							<input type="checkbox" style="width:16px;height:16px">
+							<span style="font-size:13px;color:#666">Enable limiter and its children</span>
+						</div>
+					</td>
+				</tr>
+
+				<!-- Name Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Name</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+					</td>
+				</tr>
+
+				<!-- Bandwidth Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Bandwidth</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<table style="width:100%;border-collapse:collapse">
+							<tr>
+								<td style="padding-bottom:12px;width:30%">
+									<div style="font-weight:700;font-size:12px;margin-bottom:6px">Bandwidth</div>
+									<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%">
+								</td>
+								<td style="padding-bottom:12px;padding-left:12px;width:30%">
+									<div style="font-weight:700;font-size:12px;margin-bottom:6px">Bw type</div>
+									<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%">
+										<option>Mbit/s</option>
+										<option>Kbit/s</option>
+										<option>bit/s</option>
+									</select>
+								</td>
+								<td style="padding-bottom:12px;padding-left:12px;width:30%">
+									<div style="font-weight:700;font-size:12px;margin-bottom:6px">Schedule</div>
+									<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%">
+										<option>none</option>
+									</select>
+								</td>
+								<td style="padding-bottom:12px;padding-left:12px;width:auto">
+									<button style="padding:8px 12px;border-radius:4px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:#d89037;color:#fff;display:flex;align-items:center;gap:6px;margin-top:20px">🗑️ Delete</button>
+								</td>
+							</tr>
+						</table>
+						<div style="margin-top:12px">
+							<button style="padding:8px 12px;border-radius:4px;border:none;cursor:pointer;font-weight:700;font-size:13px;background:#28a745;color:#fff;display:flex;align-items:center;gap:6px">+ Add Schedule</button>
+						</div>
+					</td>
+				</tr>
+
+				<!-- Mask Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Mask</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:12px">
+							<option>None</option>
+							<option>Source addresses</option>
+							<option>Destination addresses</option>
+						</select>
+						<div style="color:#666;font-size:12px;line-height:1.5;margin-bottom:12px">If "source" or "destination" slots is chosen a dynamic pipe with the bandwidth, delay, packet loss and queue size given above will be created for each source/destination IP address encountered, respectively. This makes it possible to easily specify bandwidth limits per host or subnet.</div>
+						
+						<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+							<div>
+								<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:4px">
+									<option>32</option>
+								</select>
+								<div style="font-size:11px;color:#666">IPv4 mask bits<br>255.255.255.255/?</div>
+							</div>
+							<div>
+								<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:4px">
+									<option>128</option>
+								</select>
+								<div style="font-size:11px;color:#666">IPv6 mask bits<br>ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/?</div>
+							</div>
+						</div>
+					</td>
+				</tr>
+
+				<!-- Description Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Description</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+						<div style="color:#666;font-size:12px;margin-top:6px">A description may be entered here for administrative reference (not parsed).</div>
+					</td>
+				</tr>
+
+				<!-- Queue Section Header -->
+				<tr>
+					<td colspan="2" style="background:#555;color:#fff;padding:10px 14px;font-weight:700">Queue</td>
+				</tr>
+
+				<!-- Queue Management Algorithm Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Queue Management Algorithm</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:12px">
+							<option>Tail Drop</option>
+							<option>CoDel</option>
+							<option>PIE</option>
+							<option>Random Early Detection (RED)</option>
+							<option>Gentle Random Early Detection (GRED)</option>
+						</select>
+						<div style="color:#666;font-size:12px;line-height:1.5;margin-bottom:12px">Active queue management (AQM) is the intelligent drop of network packets inside the limiter, when it becomes full or gets close to becoming full, with the goal of reducing network congestion.</div>
+						<div style="color:#666;font-size:12px;margin-bottom:12px">No parameters for selected algorithm.</div>
+						<div style="color:#999;font-size:12px">Specifies the queue management algorithm parameters.</div>
+					</td>
+				</tr>
+
+				<!-- Scheduler Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Scheduler</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<select style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:12px">
+							<option>Worst-case Weighted fair Queuing (default)</option>
+							<option>FIFO</option>
+							<option>Quick Fair Queuing</option>
+							<option>Round Robin</option>
+							<option>PRIO</option>
+							<option>FQ_CODEL</option>
+							<option>FQ_PIE</option>
+						</select>
+						<div style="color:#666;font-size:12px;line-height:1.5;margin-bottom:12px">The scheduler manages the sequence of network packets in the limiter's queue.</div>
+						<div style="color:#666;font-size:12px;margin-bottom:12px">No parameters for selected algorithm.</div>
+						<div style="color:#999;font-size:12px">Specifies the scheduler parameters.</div>
+					</td>
+				</tr>
+
+				<!-- Queue length Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Queue length</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+						<div style="color:#666;font-size:12px;margin-top:6px">Specifies the length of the limiter's queue, which the scheduler and AQM are responsible for. This field may be left empty.</div>
+					</td>
+				</tr>
+
+				<!-- Advanced Options Section Header -->
+				<tr>
+					<td colspan="2" style="background:#555;color:#fff;padding:10px 14px;font-weight:700">Advanced Options</td>
+				</tr>
+
+				<!-- Delay Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Delay (ms)</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+						<div style="color:#666;font-size:12px;margin-top:6px">In most cases, zero (0) should specified here (or leave the field empty).</div>
+					</td>
+				</tr>
+
+				<!-- Packet Loss Rate Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Packet Loss Rate</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+						<div style="color:#666;font-size:12px;margin-top:6px">In most cases, zero (0) should be specified here (or leave the field empty). A value of 0.001 means one packet in 1000 gets dropped.</div>
+					</td>
+				</tr>
+
+				<!-- Bucket size Row -->
+				<tr>
+					<td style="width:130px;padding:14px 16px;font-weight:700;text-align:right;border-bottom:1px solid #ddd;border-right:1px solid #ddd;background:#f9f9f9;vertical-align:top;text-decoration:underline">Bucket size (slots)</td>
+					<td style="padding:14px 16px;border-bottom:1px solid #ddd;background:#fff">
+						<input type="text" style="padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;max-width:400px">
+						<div style="color:#666;font-size:12px;margin-top:6px">In most cases, this field should be left empty. It increases the hash size set.</div>
+					</td>
+				</tr>
+
+				<!-- Save Button Row -->
+				<tr>
+					<td colspan="2" style="padding:14px 16px;background:#f9f9f9;border-top:1px solid #ddd">
+						<button class="btn btn-blue">💾 Save</button>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</div>
+
+<!-- Wizards Tab Content -->
+<div id="wizards" style="display:none;background:#fff;border:1px solid #ddd;border-radius:4px;padding:0;overflow:hidden">
+	<div style="background:#555;color:#fff;padding:10px 14px;font-weight:700">Traffic Shaper Wizards</div>
+	<table style="width:100%;border-collapse:collapse;background:#fff">
+		<tr>
+			<td style="padding:14px 16px;border-bottom:1px solid #ddd;font-weight:700;text-align:right;width:180px;background:#f9f9f9">Multiple Lan/Wan</td>
+			<td style="padding:14px 16px;border-bottom:1px solid #ddd">
+				<a href="#" style="color:#0275d8;text-decoration:none;cursor:pointer">traffic_shaper_wizard_multi_all.xml</a>
+			</td>
+		</tr>
+		<tr>
+			<td style="padding:14px 16px;border-bottom:1px solid #ddd;font-weight:700;text-align:right;width:180px;background:#f9f9f9">Dedicated Links</td>
+			<td style="padding:14px 16px;border-bottom:1px solid #ddd">
+				<a href="#" style="color:#0275d8;text-decoration:none;cursor:pointer">traffic_shaper_wizard_dedicated.xml</a>
+			</td>
+		</tr>
+	</table>
+</div>
+
+<script>
+	function switchTab(tabElement, tabId) {
+		// Hide all tabs
+		document.getElementById('byInterface').style.display = 'none';
+		document.getElementById('byQueue').style.display = 'none';
+		document.getElementById('limiters').style.display = 'none';
+		document.getElementById('wizards').style.display = 'none';
+
+		// Remove active class from all tabs
+		document.querySelectorAll('.ts-tab').forEach(tab => tab.classList.remove('active'));
+
+		// Show selected tab
+		document.getElementById(tabId).style.display = 'block';
+		tabElement.classList.add('active');
+	}
+
+	function showInterface(interfaceName) {
+		if (interfaceName === 'wan') {
+			const wanCheck = document.getElementById('wanCheck');
+			const wanConfig = document.getElementById('wanConfig');
+			if (wanCheck.checked) {
+				wanConfig.style.display = 'block';
+			} else {
+				wanConfig.style.display = 'none';
+			}
+		} else if (interfaceName === 'lan') {
+			const lanCheck = document.getElementById('lanCheck');
+			const lanConfig = document.getElementById('lanConfig');
+			if (lanCheck.checked) {
+				lanConfig.style.display = 'block';
+			} else {
+				lanConfig.style.display = 'none';
+			}
+		}
+	}
+
+	function toggleLimiterForm() {
+		const limiterForm = document.getElementById('limiterForm');
+		if (limiterForm) {
+			if (limiterForm.style.display === 'none' || limiterForm.style.display === '') {
+				limiterForm.style.display = 'block';
+			} else {
+				limiterForm.style.display = 'none';
+			}
+		}
+	}
+</script>
+
 {% endblock %}

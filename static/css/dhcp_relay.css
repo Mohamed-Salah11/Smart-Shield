@@ -1,0 +1,417 @@
+/* DHCP Relay Page Styles */
+
+.dhcp-relay-container {
+    background-color: #ffffff;
+    margin: 20px;
+    padding: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb Section */
+.breadcrumb-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.breadcrumb {
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-item {
+    font-size: 14px;
+    color: #333;
+}
+
+.breadcrumb-item.active {
+    color: #0066cc;
+    font-weight: 500;
+}
+
+.breadcrumb-item a {
+    color: #333;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #0066cc;
+}
+
+.breadcrumb-item + .breadcrumb-item:before {
+    content: " / ";
+    color: #999;
+    margin: 0 5px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.info-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #cc0000;
+    color: white;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.info-btn:hover {
+    background-color: #990000;
+}
+
+/* Configuration Section */
+.config-section {
+    margin: 0;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+}
+
+.section-header {
+    background-color: #4a4a4a;
+    color: white;
+    padding: 12px 20px;
+    margin: 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Form Styles */
+.dhcp-relay-form {
+    padding: 0;
+    background-color: #ffffff;
+}
+
+.dhcp-relay-form .form-row {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 15px;
+    padding: 15px 20px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    margin: 0;
+    align-items: flex-start;
+}
+
+.dhcp-relay-form .form-row:last-of-type {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.dhcp-relay-form .form-label {
+    text-align: right;
+    margin-bottom: 0;
+    font-size: 13px;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.dhcp-relay-form .form-column {
+    display: block;
+    grid-column: 2;
+}
+
+.dhcp-relay-form .form-control {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dhcp-relay-form .form-control:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+/* Textarea Control */
+.textarea-control {
+    resize: vertical;
+    min-height: 80px;
+    font-family: monospace;
+    white-space: pre;
+}
+
+/* Select dropdown styling with arrow */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23333' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-color: #ffffff;
+    padding-right: 30px;
+}
+
+select.form-control:hover {
+    cursor: pointer;
+}
+
+/* Checkbox Wrapper */
+.checkbox-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #0066cc;
+}
+
+.checkbox-label {
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+}
+
+/* Help Text */
+.help-text {
+    font-size: 12px;
+    color: #666;
+    margin: 8px 0 0 0;
+    line-height: 1.5;
+}
+
+/* Upstream Servers Styling */
+.upstream-servers-row {
+    align-items: stretch !important;
+}
+
+.upstream-servers-list {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.upstream-server-entry {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.upstream-server-entry .form-control {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+.upstream-server-entry .btn-delete {
+    padding: 8px 12px;
+    background-color: #ffa500;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.upstream-server-entry .btn-delete:hover {
+    background-color: #ff8c00;
+}
+
+.upstream-server-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.upstream-server-input-group .form-control {
+    flex: 1;
+}
+
+/* Add Upstream Server Button */
+.btn-add-server {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 15px;
+    margin-top: 10px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-add-server:hover {
+    background-color: #218838;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #f9f9f9;
+}
+
+.btn {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-primary {
+    background-color: #0066cc;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0052a3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .dhcp-relay-form .form-row {
+        grid-template-columns: 120px 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .dhcp-relay-container {
+        margin: 10px;
+    }
+
+    .breadcrumb-section {
+        padding: 10px 15px;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .breadcrumb {
+        font-size: 12px;
+    }
+
+    .action-buttons {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .dhcp-relay-form .form-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px 15px;
+    }
+
+    .dhcp-relay-form .form-label {
+        text-align: left;
+        margin-bottom: 5px;
+    }
+
+    .dhcp-relay-form .form-column {
+        grid-column: 1;
+    }
+
+    .section-header h2 {
+        font-size: 13px;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .breadcrumb-section {
+        padding: 8px 10px;
+    }
+
+    .breadcrumb {
+        font-size: 11px;
+    }
+
+    .action-buttons {
+        gap: 5px;
+    }
+
+    .info-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+
+    .dhcp-relay-form .form-row {
+        padding: 10px;
+    }
+
+    .section-header {
+        padding: 10px 15px;
+    }
+
+    .form-actions {
+        padding: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        flex: 1;
+        min-width: 80px;
+        padding: 8px 10px;
+    }
+
+    .textarea-control {
+        min-height: 60px;
+        font-size: 12px;
+    }
+}
