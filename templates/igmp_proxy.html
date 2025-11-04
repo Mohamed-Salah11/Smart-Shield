@@ -1,6 +1,412 @@
 {% extends 'base.html' %}
 
 {% block main %}
-	<h1>Welcome to IGMP Proxy</h1>
-	<p>Placeholder page for IGMP Proxy service.</p>
+<style>
+	/* General Styles for a clean, system-like interface */
+	.igmp-container {
+		max-width: 900px;
+		margin: 0 auto;
+		background-color: #fff;
+		padding: 30px;
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	}
+
+	/* Header Navigation (Breadcrumb) */
+	.igmp-header {
+		background-color: #e9ecef;
+		padding: 10px 15px;
+		border-radius: 4px;
+		margin-bottom: 25px;
+		font-size: 0.9em;
+		color: #6c757d;
+		border: 1px solid #dee2e6;
+		font-weight: 600;
+	}
+
+	/* Warning Banner */
+	.igmp-warning {
+		background-color: #fef2f2;
+		/* Light red background */
+		color: #b91c1c;
+		/* Darker red text */
+		padding: 15px;
+		border: 1px solid #fca5a5;
+		border-radius: 4px;
+		margin-bottom: 25px;
+		font-weight: 500;
+	}
+
+	/* Section Headings */
+	.igmp-container h1 {
+		color: #1e3a8a;
+		font-size: 1.8em;
+		font-weight: 700;
+		margin-bottom: 25px;
+		border-bottom: 2px solid #e0f2fe;
+		padding-bottom: 5px;
+	}
+
+	.igmp-container h2 {
+		color: #007bff;
+		font-size: 1.3em;
+		font-weight: 600;
+		margin-top: 30px;
+		margin-bottom: 15px;
+	}
+
+	/* Form Grouping and Layout */
+	.igmp-form-group {
+		padding: 10px 0;
+		border-bottom: 1px dashed #e9ecef;
+	}
+
+	.igmp-form-row {
+		display: flex;
+		align-items: flex-start;
+		margin-bottom: 15px;
+	}
+
+	.igmp-label-cell {
+		width: 250px;
+		min-width: 150px;
+		font-weight: bold;
+		color: #343a40;
+		padding-right: 20px;
+		padding-top: 5px;
+	}
+
+	.igmp-input-cell {
+		flex-grow: 1;
+	}
+
+	.igmp-container input[type="text"],
+	.igmp-container input[type="number"],
+	.igmp-container select {
+		width: 100%;
+		max-width: 350px;
+		padding: 8px;
+		border: 1px solid #ced4da;
+		border-radius: 4px;
+		box-sizing: border-box;
+		font-size: 1em;
+	}
+
+	/* Description Box Styling */
+	.igmp-description-box {
+		background-color: #e0f7fa;
+		/* Light cyan background */
+		border: 1px solid #b2ebf2;
+		padding: 10px;
+		border-radius: 4px;
+		color: #006064;
+		font-size: 0.85em;
+		line-height: 1.4;
+		margin-top: 5px;
+	}
+
+	/* IGMP Proxy Table */
+	.igmp-table-container {
+		margin-top: 15px;
+		border: 1px solid #dee2e6;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.igmp-table-container table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.95em;
+	}
+
+	.igmp-table-container th {
+		background-color: #e9ecef;
+		color: #343a40;
+		padding: 12px 15px;
+		text-align: left;
+		border-bottom: 2px solid #dee2e6;
+	}
+
+	.igmp-table-container td {
+		padding: 10px 15px;
+		border-bottom: 1px solid #f8f9fa;
+	}
+
+	/* Add Button in Table (Green) */
+	.igmp-add-button {
+		background-color: #28a745;
+		color: white;
+		padding: 8px 15px;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-weight: bold;
+		display: inline-flex;
+		align-items: center;
+		transition: background-color 0.2s;
+	}
+
+	.igmp-add-button:hover {
+		background-color: #218838;
+	}
+
+	.igmp-add-button:before {
+		content: '+';
+		font-size: 1.2em;
+		margin-right: 5px;
+	}
+
+	/* Action Button in Edit form (Blue, from image 101.jpg) */
+	.igmp-action-button {
+		background-color: #007bff;
+		/* Blue to match the Save button */
+		color: white;
+		padding: 10px 20px;
+		border: none;
+		border-radius: 5px;
+		font-size: 1em;
+		cursor: pointer;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		transition: background-color 0.3s;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.igmp-action-button:hover {
+		background-color: #0056b3;
+	}
+
+	.igmp-action-button:before {
+		content: '💾';
+		margin-right: 8px;
+	}
+
+	/* Hide elements by default */
+	.igmp-hidden {
+		display: none !important;
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 768px) {
+		.igmp-form-row {
+			flex-direction: column;
+		}
+
+		.igmp-label-cell {
+			width: 100%;
+			margin-bottom: 5px;
+		}
+
+		.igmp-input-cell {
+			min-width: 100%;
+		}
+
+		.igmp-container input[type="text"],
+		.igmp-container input[type="number"],
+		.igmp-container select {
+			max-width: 100%;
+		}
+
+		.igmp-table-container th,
+		.igmp-table-container td {
+			padding: 8px 10px;
+		}
+	}
+</style>
+
+<div class="igmp-container">
+
+	<div class="igmp-header">
+		Services / <span id="page-title">IGMP Proxy</span>
+	</div>
+
+	<div class="igmp-warning">
+		WARNING: The password for the account is insecure. Password is currently set to the default value (pfsense).
+		Change the password as soonately as possible.
+	</div>
+
+	<!-- ---------------------------------------------------------------------- -->
+	<!-- PRIMARY VIEW (Screenshot 100.jpg) -->
+	<!-- ---------------------------------------------------------------------- -->
+	<div id="main-view">
+		<h1>IGMP Proxy Settings</h1>
+
+		<h2>General IGMP Options</h2>
+
+		<form action="/api/save_general_settings" method="POST">
+			<div class="igmp-form-group">
+				<div class="igmp-input-cell checkbox-item">
+					<input type="checkbox" id="enable_igmp" name="enable_igmp">
+					<label for="enable_igmp">Enable IGMP</label>
+				</div>
+			</div>
+
+			<div class="igmp-form-group">
+				<div class="igmp-input-cell checkbox-item">
+					<input type="checkbox" id="verbose_logging" name="verbose_logging">
+					<label for="verbose_logging">Enable verbose logging (Default is less logged)</label>
+				</div>
+			</div>
+
+			<div style="padding-top: 15px; border-top: 1px solid #ccc;">
+				<button type="submit" class="igmp-action-button">
+					Save
+				</button>
+			</div>
+		</form>
+
+		<h2>IGMP Proxy</h2>
+
+		<div class="igmp-table-container">
+			<table>
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Type</th>
+						<th>Values</th>
+						<th>Description</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					<!-- Placeholder for existing proxy entries -->
+					<tr>
+						<td colspan="5" style="text-align: center; color: #6c757d; padding: 20px;">
+							No IGMP Proxy entries configured.
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div style="text-align: right; margin-top: 15px;">
+			<button class="igmp-add-button" onclick="showEditForm()">
+				Add
+			</button>
+		</div>
+	</div>
+
+
+
+	<!-- ---------------------------------------------------------------------- -->
+	<!-- EDIT VIEW (Screenshot 101.jpg) -->
+	<!-- ---------------------------------------------------------------------- -->
+	<div id="edit-view" class="igmp-hidden">
+		<h1>IGMP Proxy Edit / Add</h1>
+
+		<form id="proxy-edit-form" action="/api/save_proxy_entry" method="POST">
+
+			<div class="igmp-form-group igmp-form-row">
+				<div class="igmp-label-cell">Interface</div>
+				<div class="igmp-input-cell">
+					<select name="proxy_interface">
+						<option value="WAN" selected>WAN</option>
+						<option value="LAN">LAN</option>
+						<option value="OPT1">OPT1</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="igmp-form-group igmp-form-row">
+				<div class="igmp-label-cell">Description</div>
+				<div class="igmp-input-cell">
+					<input type="text" name="proxy_description"
+						placeholder="A description may be entered here for administrative reference (not parsed)">
+				</div>
+			</div>
+
+			<div class="igmp-form-group igmp-form-row">
+				<div class="igmp-label-cell">Type</div>
+				<div class="igmp-input-cell">
+					<select name="proxy_type">
+						<option value="upstream" selected>Upstream Interface</option>
+						<option value="downstream">Downstream Interface</option>
+					</select>
+					<div class="igmp-description-box">
+						The upstream network interface is the outgoing interface which is responsible for
+						communicating to available multicast data sources. There can only be one **upstream**
+						interface. Downstream interfaces are the distribution interfaces to the destination
+						networks, where multicast hosts can join groups and receive multicast data. One or more
+						**downstream** interfaces must be configured.
+					</div>
+				</div>
+			</div>
+
+			<div class="igmp-form-group igmp-form-row">
+				<div class="igmp-label-cell">Threshold</div>
+				<div class="igmp-input-cell">
+					<input type="number" name="threshold" value="1" min="1" max="32" style="max-width: 100px;">
+					<div class="igmp-description-box">
+						Defines the **TTL threshold** for the network interface. Packets with a lower TTL than the
+						threshold value will be ignored. This setting is optional, and by default the threshold is
+						**1**.
+					</div>
+				</div>
+			</div>
+
+			<div class="igmp-form-group igmp-form-row">
+				<div class="igmp-label-cell">Networks</div>
+				<div class="igmp-input-cell">
+					<div style="display: flex; gap: 10px; margin-bottom: 5px;">
+						<input type="text" name="network_cidr" placeholder="Network/CIDR" style="max-width: 250px;">
+						<button type="button" class="igmp-add-button"
+							style="background-color: #5bc0de; font-size: 0.9em; padding: 6px 10px;"
+							onclick="addNetworkField()">
+							Add Network
+						</button>
+					</div>
+					<div id="networks-container">
+						<!-- New network fields will be added here -->
+					</div>
+				</div>
+			</div>
+
+			<div style="padding-top: 15px; border-top: 1px solid #ccc; margin-top: 30px;">
+				<!-- This is the Save button from the Edit view in Screenshot 101.jpg -->
+				<button type="submit" class="igmp-action-button">
+					Save
+				</button>
+				<button type="button" class="igmp-action-button" onclick="showMainView()"
+					style="background-color: #6c757d; margin-left: 10px;">
+					Cancel
+				</button>
+			</div>
+		</form>
+	</div>
+
+</div>
+
+<script>
+	const mainView = document.getElementById('main-view');
+	const editView = document.getElementById('edit-view');
+	const networksContainer = document.getElementById('networks-container');
+	const pageTitle = document.getElementById('page-title');
+
+	function showEditForm() {
+		mainView.classList.add('igmp-hidden');
+		editView.classList.remove('igmp-hidden');
+		pageTitle.textContent = 'IGMP Proxy Edit / Add';
+		// Clear any previous inputs for a new 'Add' operation
+		document.getElementById('proxy-edit-form').reset();
+		networksContainer.innerHTML = '';
+		addNetworkField(); // Add one initial network field
+	}
+
+	function showMainView() {
+		editView.classList.add('igmp-hidden');
+		mainView.classList.remove('igmp-hidden');
+		pageTitle.textContent = 'IGMP Proxy';
+	}
+
+	function addNetworkField() {
+		const input = document.createElement('input');
+		input.type = 'text';
+		input.name = 'networks[]';
+		input.placeholder = 'Network/CIDR';
+		input.style.maxWidth = '250px';
+		input.style.marginBottom = '5px';
+		networksContainer.appendChild(input);
+	}
+</script>
+
 {% endblock %}

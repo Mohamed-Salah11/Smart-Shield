@@ -1,6 +1,201 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block main %}
-<h1>Welcome to Package Manager</h1>
-<p>This is an empty placeholder page for Package Manager.</p>
-{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <title>System / Package Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f8f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .breadcrumb {
+            background: #e5e5e5;
+            padding: 15px 30px;
+            font-size: 18px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .breadcrumb span {
+            color: #888;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 30px;
+            padding: 15px 40px 0;
+        }
+
+        .tab {
+            font-weight: bold;
+            color: #c00;
+            cursor: pointer;
+            padding-bottom: 8px;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab.active {
+            border-bottom: 2px solid #c00;
+        }
+
+        .section {
+            background: #fff;
+            margin: 20px 30px;
+            border: 1px solid #ccc;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            background: #444;
+            color: #fff;
+            padding: 10px 15px;
+            font-weight: bold;
+        }
+
+        .warning {
+            background: #fff8dc;
+            color: #444;
+            padding: 15px;
+            border-top: 2px solid #ffcc00;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th,
+        table td {
+            padding: 12px 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        table th {
+            background: #eee;
+            text-align: left;
+        }
+
+        .install-btn {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .install-btn:hover {
+            background-color: #45a049;
+        }
+
+        .search-bar {
+            background: #333;
+            color: white;
+            padding: 15px;
+        }
+
+        .search-bar input,
+        .search-bar select {
+            padding: 6px;
+            border-radius: 3px;
+            border: none;
+            margin-right: 10px;
+        }
+
+        .search-bar button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .search-bar button:hover {
+            background-color: #005bb5;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="breadcrumb">
+        <strong>System /</strong> <span>Package Manager</span>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active">Installed Packages</div>
+        <div class="tab">Available Packages</div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">Installed Packages</div>
+        <div class="warning">There are no packages currently installed.</div>
+    </div>
+
+    <div class="section" style="display:none;">
+        <div class="section-header">Search</div>
+        <div class="search-bar">
+            <label>Search term</label>
+            <input type="text" placeholder="Enter search string">
+            <select>
+                <option>Both</option>
+                <option>Name only</option>
+            </select>
+            <button>Search</button>
+            <button style="background:#009688;">Clear</button>
+        </div>
+
+        <div class="section-header">Packages</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Version</th>
+                    <th>Description</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>acme</td>
+                    <td>1.0</td>
+                    <td>Automated Certificate Management Environment for LetsEncrypt.</td>
+                    <td><button class="install-btn">Install</button></td>
+                </tr>
+                <tr>
+                    <td>apcupsd</td>
+                    <td>0.3.92_9</td>
+                    <td>Control and log APC UPS models and perform network-based shutdowns.</td>
+                    <td><button class="install-btn">Install</button></td>
+                </tr>
+                <tr>
+                    <td>arping</td>
+                    <td>1.2.2_6</td>
+                    <td>Broadcasts who-has ARP packets and prints answers.</td>
+                    <td><button class="install-btn">Install</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Simple tab toggle between Installed and Available Packages
+        const tabs = document.querySelectorAll('.tab');
+        const sections = document.querySelectorAll('.section');
+
+        tabs.forEach((tab, i) => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                sections.forEach((s, j) => s.style.display = (i === j ? 'block' : 'none'));
+            });
+        });
+    </script>
+
+</body>
+
+</html>

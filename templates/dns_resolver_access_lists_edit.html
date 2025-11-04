@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
+{% block main %}
+
+<!-- Breadcrumb -->
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+  <div>
+    <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+    <span class="small-muted"> / </span>
+    <a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
+    <span class="small-muted"> / </span>
+    <a href="{{ url_for('dns_resolver_access_lists') }}" class="breadcrumb-link">Access Lists</a>
+    <span class="small-muted"> / </span>
+    <span class="breadcrumb-link">Edit</span>
+  </div>
+  <div class="breadcrumb-actions">
+    <button class="btn btn-sm btn-danger" aria-label="help">?</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver') }}">General Settings</a></li>
+  <li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver_advanced') }}">Advanced Settings</a></li>
+  <li class="nav-item"><a class="nav-link active" href="#">Access Lists</a></li>
+</ul>
+
+<div class="card">
+  <div class="card-header bg-dark text-white">New Access List</div>
+  <div class="card-body">
+    <form method="post">
+
+      <div class="row mb-3">
+        <label class="col-sm-3 col-form-label">Access List name</label>
+        <div class="col-sm-9">
+          <input name="name" class="form-control" placeholder="">
+          <div class="option-desc">Provide an Access List name.</div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <label class="col-sm-3 col-form-label">Action</label>
+        <div class="col-sm-9">
+          <select name="action" class="form-select" style="max-width:320px;">
+            <option>Allow</option>
+            <option>Deny</option>
+            <option>Refuse</option>
+            <option>Allow Snoop</option>
+            <option>Deny Nonlocal</option>
+            <option>Refuse Nonlocal</option>
+          </select>
+          <div class="mt-2">
+            <p><strong style="color:green;">Deny:</strong> Stops queries from hosts within the netblock defined below.</p>
+            <p><strong style="color:green;">Refuse:</strong> Stops queries from hosts within the netblock defined below, but sends a DNS rcode REFUSED error message back to the client.</p>
+            <p><strong style="color:green;">Allow:</strong> Allow queries from hosts within the netblock defined below.</p>
+            <p><strong style="color:green;">Allow Snoop:</strong> Allow recursive and nonrecursive access from hosts within the netblock defined below. Used for cache snooping and ideally should only be configured for the administrative host.</p>
+            <p><strong style="color:green;">Deny Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Messages that are disallowed are dropped.</p>
+            <p><strong style="color:green;">Refuse Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Sends a DNS rcode REFUSED error message back to the client for messages that are disallowed.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <label class="col-sm-3 col-form-label">Description</label>
+        <div class="col-sm-9">
+          <input name="description" class="form-control" placeholder="">
+          <div class="option-desc">A description may be entered here for administrative reference.</div>
+        </div>
+      </div>
+
+      <div class="row align-items-center mb-3">
+        <label class="col-sm-3 col-form-label">Networks</label>
+        <div class="col-sm-3">
+          <input name="net_address" class="form-control" placeholder="Network/mask">
+        </div>
+        <div class="col-sm-1">
+          <select name="net_mask" class="form-select">
+            {% for i in range(0,129) %}
+              <option value="/{{ i }}" {% if i == 32 %}selected{% endif %}>/{{ i }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-4">
+          <input name="net_description" class="form-control" placeholder="Description">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-sm-9 offset-sm-3">
+          <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+          <button type="button" class="btn btn-success ms-2"><i class="fa fa-plus"></i> Add Network</button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+{% endblock %}

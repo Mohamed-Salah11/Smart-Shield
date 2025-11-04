@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb bg-transparent p-0">
+            <li class="breadcrumb-item">Wizard</li>
+            <li class="breadcrumb-item"><a href="{{ url_for('setup_wizard') }}">ZGate Setup</a></li>
+            <li class="breadcrumb-item active" aria-current="page">General Information</li>
+        </ol>
+    </nav>
+
+    <div class="mb-2">
+        <div class="progress" style="height:6px;">
+            <div class="progress-bar bg-danger" role="progressbar" style="width:22%;" aria-valuenow="22" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="mt-2">
+            <span class="badge bg-danger">Step 2 of 9</span>
+        </div>
+    </div>
+
+    <form method="post" action="#">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                General Information
+            </div>
+            <div class="card-body">
+                <p>On this screen the general ZGate parameters will be set.</p>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Hostname</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" name="hostname" value="ZGate">
+                        <div class="form-text">Name of the firewall host, without domain part.</div>
+                        <div class="form-text">Examples: zgateway, firewall, edgefw</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Domain</label>
+                    <div class="col-sm-8">
+                        <input type="text" class="form-control" name="domain" value="home.arpa">
+                        <div class="form-text">Domain name for the firewall.</div>
+                        <div class="form-text">Examples: home.arpa, example.com</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Primary DNS Server</label>
+                    <div class="col-sm-4">
+                        <input type="text" class="form-control" name="primary_dns" value="">
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <label class="col-sm-2 col-form-label">Secondary DNS Server</label>
+                    <div class="col-sm-4">
+                        <input type="text" class="form-control" name="secondary_dns" value="">
+                    </div>
+                </div>
+
+                <div class="row mb-3 align-items-center">
+                    <label class="col-sm-2 col-form-label">Override DNS</label>
+                    <div class="col-sm-8">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="override_dns" name="override_dns" checked>
+                            <label class="form-check-label" for="override_dns">Allow DNS servers to be overridden by DHCP/PPP on WAN</label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{{ url_for('setup_wizard_step', step=4) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

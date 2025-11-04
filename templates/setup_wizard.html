@@ -1,6 +1,34 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Setup Wizard</h1>
-<p>This is an empty placeholder page for the Setup Wizard.</p>
+<div class="container mt-4">
+	<nav aria-label="breadcrumb">
+		<ol class="breadcrumb bg-transparent p-0">
+			<li class="breadcrumb-item">Wizard</li>
+			<li class="breadcrumb-item"><a href="#">pfSense Setup</a></li>
+			<li class="breadcrumb-item active" aria-current="page"></li>
+		</ol>
+	</nav>
+
+	<div class="card shadow-sm">
+		<div class="card-header bg-dark text-white">
+			pfSense Setup
+		</div>
+		<div class="card-body">
+			<h4 class="card-title">Welcome to pfSense&reg; software!</h4>
+			<p class="card-text">This wizard will provide guidance through the initial configuration of pfSense.</p>
+			<p class="card-text">The wizard may be stopped at any time by clicking the logo image at the top of the screen.</p>
+			<p class="card-text"><strong>pfSense&reg; software is developed and maintained by Netgate&reg;</strong></p>
+
+			<a href="#" class="btn btn-info">Learn more</a>
+		</div>
+	</div>
+
+	<div class="mt-3">
+		<a href="{{ url_for('setup_wizard_step', step=2) }}" class="btn btn-primary">
+			&raquo;&raquo; Next
+		</a>
+	</div>
+</div>
+
 {% endblock %}
