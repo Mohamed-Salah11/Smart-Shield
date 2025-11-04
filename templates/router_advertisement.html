@@ -1,6 +1,266 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Router Advertisement</h1>
-<p>Placeholder for router advertisement settings.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Router Advertisement</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f6f7;
+  margin: 0;
+  padding: 0;
+}
+.tabs {
+  display: flex;
+  background: #b01f24;
+  color: white;
+  font-weight: bold;
+}
+.tabs div {
+  padding: 10px 30px;
+  cursor: pointer;
+  user-select: none;
+}
+.tabs div.active {
+  background: #fff;
+  color: #b01f24;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+.container {
+  background: #fff;
+  margin: 20px;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+h2 {
+  margin-top: 0;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 10px;
+}
+.section {
+  margin-bottom: 25px;
+}
+label {
+  display: block;
+  margin: 8px 0 4px;
+  font-weight: bold;
+}
+select, input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+button, .add-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+button:hover, .add-btn:hover {
+  background: #0056b3;
+}
+.delete-btn {
+  background: #c9302c;
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.delete-btn:hover {
+  background: #a52622;
+}
+.ra-subnet {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ra-subnet input {
+  flex: 1;
+}
+.save-btn {
+  background: #28a745;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+}
+.save-btn:hover {
+  background: #1e7e34;
+}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" data-tab="WAN">WAN</div>
+  <div class="tab" data-tab="LAN">LAN</div>
+</div>
+
+<!-- WAN TAB -->
+<div id="WAN" class="container tab-content">
+  <h2>Router Advertisement</h2>
+  <div class="section">
+    <label>Router Mode</label>
+    <select>
+      <option>Disabled</option>
+      <option>Enabled</option>
+    </select>
+
+    <label>Router Priority</label>
+    <select>
+      <option>Low</option>
+      <option>Medium</option>
+      <option>High</option>
+    </select>
+
+    <label>Valid Lifetime (seconds)</label>
+    <input type="number" value="86400">
+
+    <label>Preferred Lifetime (seconds)</label>
+    <input type="number" value="14400">
+
+    <label>Minimum RA Interval (seconds)</label>
+    <input type="number" value="200">
+
+    <label>Maximum RA Interval (seconds)</label>
+    <input type="number" value="600">
+
+    <label>Router Lifetime (seconds)</label>
+    <input type="number" value="1800">
+
+    <label>NAT64 Prefix</label>
+    <input type="text" value="64:ff9b::/96">
+
+    <label>NAT64 Prefix Lifetime (seconds)</label>
+    <input type="number" value="1800">
+
+    <div id="raSubnetsWAN">
+      <label>RA Subnet(s)</label>
+    </div>
+    <button class="add-btn" onclick="addRASubnet('WAN')">+ Add RA Subnet</button>
+  </div>
+
+  <div class="section">
+    <h2>DNS Configuration</h2>
+    <label><input type="checkbox" id="dnsEnableWAN"> Enable DNS via RA Daemon</label>
+    <label><input type="checkbox" id="mirrorDHCPWAN"> Mirror DHCPv6 DNS Configuration</label>
+
+    <label>DNS Server 1</label>
+    <input type="text" placeholder="DNS Server 1">
+    <label>DNS Server 2</label>
+    <input type="text" placeholder="DNS Server 2">
+    <label>DNS Server 3</label>
+    <input type="text" placeholder="DNS Server 3">
+    <label>DNS Server 4</label>
+    <input type="text" placeholder="DNS Server 4">
+    <label>Domain Search List</label>
+    <input type="text" placeholder="example.com;sub.example.com">
+
+    <button class="save-btn">Save</button>
+  </div>
+</div>
+
+<!-- LAN TAB -->
+<div id="LAN" class="container tab-content" style="display:none;">
+  <h2>Router Advertisement</h2>
+  <div class="section">
+    <label>Router Mode</label>
+    <select>
+      <option>Disabled</option>
+      <option>Enabled</option>
+    </select>
+
+    <label>Router Priority</label>
+    <select>
+      <option>Low</option>
+      <option>Medium</option>
+      <option>High</option>
+    </select>
+
+    <label>Valid Lifetime (seconds)</label>
+    <input type="number" value="86400">
+
+    <label>Preferred Lifetime (seconds)</label>
+    <input type="number" value="14400">
+
+    <label>Minimum RA Interval (seconds)</label>
+    <input type="number" value="200">
+
+    <label>Maximum RA Interval (seconds)</label>
+    <input type="number" value="600">
+
+    <label>Router Lifetime (seconds)</label>
+    <input type="number" value="1800">
+
+    <label>NAT64 Prefix</label>
+    <input type="text" value="64:ff9b::/96">
+
+    <label>NAT64 Prefix Lifetime (seconds)</label>
+    <input type="number" value="1800">
+
+    <div id="raSubnetsLAN">
+      <label>RA Subnet(s)</label>
+    </div>
+    <button class="add-btn" onclick="addRASubnet('LAN')">+ Add RA Subnet</button>
+  </div>
+
+  <div class="section">
+    <h2>DNS Configuration</h2>
+    <label><input type="checkbox" id="dnsEnableLAN"> Enable DNS via RA Daemon</label>
+    <label><input type="checkbox" id="mirrorDHCPv6LAN"> Mirror DHCPv6 DNS Configuration</label>
+
+    <label>DNS Server 1</label>
+    <input type="text" placeholder="DNS Server 1">
+    <label>DNS Server 2</label>
+    <input type="text" placeholder="DNS Server 2">
+    <label>DNS Server 3</label>
+    <input type="text" placeholder="DNS Server 3">
+    <label>DNS Server 4</label>
+    <input type="text" placeholder="DNS Server 4">
+    <label>Domain Search List</label>
+    <input type="text" placeholder="example.com;sub.example.com">
+
+    <button class="save-btn">Save</button>
+  </div>
+</div>
+
+<script>
+function switchTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+  document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+  document.getElementById(tabName).style.display = 'block';
+}
+
+function addRASubnet(tab) {
+  const container = document.getElementById('raSubnets' + tab);
+  const div = document.createElement('div');
+  div.className = 'ra-subnet';
+  div.innerHTML = `
+    <input type="text" placeholder="RA Subnet (CIDR)">
+    <input type="number" placeholder="/128" value="128" style="width:80px">
+    <button class="delete-btn" onclick="this.parentElement.remove()">Delete</button>
+  `;
+  container.appendChild(div);
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
+});
+</script>
+
+</body>
+</html>
+
 {% endblock %}
