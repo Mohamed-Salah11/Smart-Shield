@@ -1,6 +1,75 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
+{% endblock %}
+
 {% block main %}
-<h1>Welcome to Dynamic DNS</h1>
-<p>Placeholder page for Dynamic DNS service.</p>
+<!-- Breadcrumb and page header -->
+<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
+	<div>
+		<a href="{{ url_for('services') }}" class="small-muted">Services</a>
+		<span class="small-muted"> / </span>
+		<a href="{{ url_for('dynamic_dns') }}" class="breadcrumb-link">Dynamic DNS</a>
+		<span class="small-muted"> / </span>
+		<span class="breadcrumb-link">Dynamic DNS Clients</span>
+	</div>
+	<div class="breadcrumb-actions">
+		<button class="btn btn-sm btn-danger" aria-label="help">?</button>
+	</div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+	<li class="nav-item"><a class="nav-link active" href="{{ url_for('dynamic_dns') }}">Dynamic DNS Clients</a></li>
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns_checkip') }}">Check IP Services</a></li>
+</ul>
+
+<div class="card mb-3">
+	<div class="card-header d-flex align-items-center justify-content-between">
+		<div>Dynamic DNS Clients</div>
+		<div><a class="btn btn-success btn-sm add-btn" href="{{ url_for('dynamic_dns_edit') }}"><span class="me-1">+</span> Add</a></div>
+	</div>
+	<div class="card-body p-0">
+		<table class="table mb-0">
+			<thead>
+				<tr>
+					<th>Status</th>
+					<th>Interface</th>
+					<th>Service</th>
+					<th>Hostname</th>
+					<th>Cached IP</th>
+					<th>Description</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% set clients = session.get('dynamic_dns_clients', []) %}
+				{% if clients %}
+					{% for c in clients %}
+					<tr>
+						<td>{% if not c.disabled %}<span class="status-green">●</span>{% else %}&nbsp;{% endif %}</td>
+						<td>{{ c.interface }}</td>
+						<td>{{ c.service_type }}</td>
+						<td>{{ c.hostname }}</td>
+						<td>&nbsp;</td>
+						<td>{{ c.description }}</td>
+						<td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
+					</tr>
+					{% endfor %}
+				{% else %}
+				<tr>
+					<td colspan="7">No Dynamic DNS clients configured.</td>
+				</tr>
+				{% endif %}
+			</tbody>
+		</table>
+	</div>
+</div>
+
+<!-- Add button moved to card header -->
+
+<p class="text-muted">Entries with a <span class="status-green">●</span> status column icon and IP address appearing in <span class="status-green">green</span> are up to date with Dynamic DNS provider. An update can be forced on the edit page for an entry.</p>
+
 {% endblock %}
