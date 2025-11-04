@@ -24,7 +24,7 @@
 
 <div class="container">
     <!-- Page Title -->
-    <h2>Services / DHCP Server / WAN</h2>
+    <h2>Services / DHCP Server / LAN</h2>
     
     <!-- Info Banner -->
     <div class="info-banner">
@@ -33,8 +33,8 @@
 
     <!-- Tabs -->
     <ul class="nav nav-tabs">
-        <li><a href="{{ url_for('dhcp_server') }}" class="nav-link active">WAN</a></li>
-        <li><a href="{{ url_for('dhcp_server_lan') }}" class="nav-link">LAN</a></li>
+        <li><a href="{{ url_for('dhcp_server') }}" class="nav-link">WAN</a></li>
+        <li><a href="#" class="nav-link active">LAN</a></li>
     </ul>
 
     <!-- General Settings Section -->
@@ -95,12 +95,12 @@
     <div style="background: white; padding: 20px; border: 1px solid #ddd;">
         <div class="form-group">
             <label>Subnet:</label>
-            <input type="text" value="192.168.1.0/24" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <input type="text" value="10.0.0.0/24" style="width: 100%; padding: 8px; margin-top: 5px;">
         </div>
 
         <div class="form-group">
             <label>Subnet Range:</label>
-            <input type="text" value="192.168.1.1 - 192.168.1.254" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <input type="text" value="10.0.0.1 - 10.0.0.254" style="width: 100%; padding: 8px; margin-top: 5px;">
         </div>
 
         <div class="form-group">
@@ -137,7 +137,7 @@
 
         <div class="form-group">
             <label>DNS Servers</label>
-            <input type="text" value="192.168.1.200" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            <input type="text" value="10.0.0.1" style="width: 100%; padding: 8px; margin-bottom: 10px;">
             <input type="text" placeholder="DNS Server 2" style="width: 100%; padding: 8px; margin-bottom: 10px;">
             <input type="text" placeholder="DNS Server 3" style="width: 100%; padding: 8px; margin-bottom: 10px;">
             <input type="text" placeholder="DNS Server 4" style="width: 100%; padding: 8px;">
@@ -178,8 +178,8 @@
     
     <div style="background: white; padding: 20px; border: 1px solid #ddd;">
         <div class="form-group">
-            <label>Gateway:</label>
-            <input type="text" value="192.168.1.200" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <label for="gateway">Gateway</label>
+            <input type="text" value="10.0.0.1" style="width: 100%; padding: 8px; margin-top: 5px;">
             <div class="help-text">The default is to use the IP address of this firewall interface as the gateway. Specify an alternate gateway here if this is not the correct gateway for the network. Enter "none" for no gateway assignment.</div>
         </div>
 
@@ -300,7 +300,7 @@
         <tbody id="static_mappings_body">
             <tr id="empty_row">
                 <td colspan="5" style="text-align: center; padding: 30px;">
-                    <a href="{{ url_for('dhcp_static_mapping') }}" style="text-decoration: none;">
+                    <a href="{{ url_for('dhcp_static_mapping_lan') }}" style="text-decoration: none;">
                         <button class="btn-add">+ Add Static Mapping</button>
                     </a>
                 </td>
@@ -312,7 +312,7 @@
 <script>
     // Load static mappings from localStorage
     function loadStaticMappings() {
-        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
+        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
         const tbody = document.getElementById('static_mappings_body');
         const emptyRow = document.getElementById('empty_row');
         
@@ -336,16 +336,16 @@
     }
     
     function editMapping(index) {
-        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-        localStorage.setItem('edit_mapping_index', index);
-        window.location.href = '{{ url_for("dhcp_static_mapping") }}';
+        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
+        localStorage.setItem('edit_mapping_index_lan', index);
+        window.location.href = '{{ url_for("dhcp_static_mapping_lan") }}';
     }
     
     function deleteMapping(index) {
         if (confirm('Are you sure you want to delete this mapping?')) {
-            const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
+            const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
             mappings.splice(index, 1);
-            localStorage.setItem('dhcp_static_mappings', JSON.stringify(mappings));
+            localStorage.setItem('dhcp_static_mappings_lan', JSON.stringify(mappings));
             loadStaticMappings();
         }
     }

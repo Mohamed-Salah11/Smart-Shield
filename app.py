@@ -532,6 +532,18 @@ def dhcp_relay():
 def dhcp_server():
     return render_template('dhcp_server.html')
 
+@app.route('/services/dhcp-server-lan')
+def dhcp_server_lan():
+    return render_template('dhcp_server_lan.html')
+
+@app.route('/services/dhcp-server/static-mapping')
+def dhcp_static_mapping():
+    return render_template('dhcp_static_mapping.html')
+
+@app.route('/services/dhcp-server-lan/static-mapping')
+def dhcp_static_mapping_lan():
+    return render_template('dhcp_static_mapping_lan.html')
+
 @app.route('/services/dhcpv6-relay')
 def dhcpv6_relay():
     return render_template('dhcpv6_relay.html')

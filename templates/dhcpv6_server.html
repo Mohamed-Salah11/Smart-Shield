@@ -1,6 +1,24 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to DHCPv6 Server</h1>
-<p>Placeholder page for DHCPv6 Server service.</p>
+<style>
+    .info-banner { background-color: #ffffcc; border: 1px solid #ffeb3b; padding: 10px 15px; margin-bottom: 15px; border-radius: 3px; }
+    .warning-banner { background-color: #f2dede; border: 1px solid #ebccd1; color: #a94442; padding: 12px 15px; margin-bottom: 15px; border-radius: 3px; }
+    .section-header { background-color: #333; color: white; padding: 12px 15px; margin-top: 20px; margin-bottom: 15px; font-weight: bold; }
+</style>
+
+<div class="container">
+    <!-- Page Title -->
+    <h2>Services / DHCPv6 Server</h2>
+
+    <!-- Info Banner -->
+    <div class="info-banner">
+        ⚠️ ISC DHCP has reached end-of-life and will be removed in a future version of ZGate. Visit System • Advanced • Networking to switch DHCP backend
+    </div>
+
+    <!-- Warning Banner -->
+    <div class="warning-banner">
+        ⚠️ The DHCPv6 Server can only be enabled on interfaces configured with a static IPv6 address. This system has none
+    </div>
+</div>
 {% endblock %}
