@@ -544,13 +544,190 @@ def dhcpv6_server():
 def dns_forwarder():
     return render_template('dns_forwarder.html')
 
+
+@app.route('/services/dns-forwarder/edit-host-override', methods=['GET', 'POST'])
+def dns_host_edit():
+    # A simple edit page for host override. On POST we just redirect back to the DNS Forwarder page
+    # (saving is not yet implemented).
+    if request.method == 'POST':
+        # In future: validate and save host override into session or config
+        return redirect(url_for('dns_forwarder'))
+    return render_template('dns_forwarder_edit_host.html')
+
+
+@app.route('/services/dns-forwarder/edit-domain-override', methods=['GET', 'POST'])
+def dns_domain_edit():
+    # Simple edit page for domain override. On POST we just redirect back to the DNS Forwarder page
+    if request.method == 'POST':
+        # In future: validate and save domain override into session or config
+        return redirect(url_for('dns_forwarder'))
+    return render_template('dns_forwarder_edit_domain.html')
+
 @app.route('/services/dns-resolver')
 def dns_resolver():
     return render_template('dns_resolver.html')
 
+
+@app.route('/services/dns-resolver/edit-host', methods=['GET', 'POST'])
+def dns_resolver_edit_host():
+    # Edit/Add a Host Override for DNS Resolver
+    if request.method == 'POST':
+        hosts = session.get('resolver_host_overrides', [])
+        host = request.form.get('host', '').strip()
+        domain = request.form.get('domain', '').strip()
+        ip = request.form.get('ip', '').strip()
+        description = request.form.get('description', '').strip()
+        # Simple validation: require host or domain and ip
+        if host or domain:
+            hosts.append({'host': host, 'domain': domain, 'ip': ip, 'description': description})
+            session['resolver_host_overrides'] = hosts
+        return redirect(url_for('dns_resolver'))
+
+    return render_template('dns_resolver_edit_host.html')
+
+
+@app.route('/services/dns-resolver/edit-domain', methods=['GET', 'POST'])
+def dns_resolver_edit_domain():
+    # Edit/Add a Domain Override for DNS Resolver
+    if request.method == 'POST':
+        doms = session.get('resolver_domain_overrides', [])
+        domain = request.form.get('domain', '').strip()
+        server = request.form.get('server', '').strip()
+        tls_queries = bool(request.form.get('tls_queries'))
+        tls_hostname = request.form.get('tls_hostname', '').strip()
+        description = request.form.get('description', '').strip()
+        if domain:
+            doms.append({'domain': domain, 'server': server, 'tls_queries': tls_queries, 'tls_hostname': tls_hostname, 'description': description})
+            session['resolver_domain_overrides'] = doms
+        return redirect(url_for('dns_resolver'))
+
+    return render_template('dns_resolver_edit_domain.html')
+
+
+@app.route('/services/dns-resolver/advanced', methods=['GET', 'POST'])
+def dns_resolver_advanced():
+    # Advanced settings view for DNS Resolver
+    if request.method == 'POST':
+        # For demo: we do not persist advanced settings. In a full implementation we'd save them.
+        return redirect(url_for('dns_resolver_advanced'))
+    return render_template('dns_resolver_advanced.html')
+
+
+@app.route('/services/dns-resolver/access-lists')
+def dns_resolver_access_lists():
+    # Show Access Lists for DNS Resolver (session-backed demo storage)
+    lists = session.get('resolver_access_lists', [])
+    return render_template('dns_resolver_access_lists.html', lists=lists)
+
+
+@app.route('/services/dns-resolver/access-lists/edit', methods=['GET', 'POST'])
+def dns_resolver_access_lists_edit():
+    # Simple Add/Edit form for Access Lists (POST appends to session list)
+    if request.method == 'POST':
+        lists = session.get('resolver_access_lists', [])
+        name = request.form.get('name', '').strip()
+        action = request.form.get('action', 'Allow')
+        description = request.form.get('description', '').strip()
+        if name:
+            lists.append({'name': name, 'action': action, 'description': description})
+            session['resolver_access_lists'] = lists
+        return redirect(url_for('dns_resolver_access_lists'))
+    return render_template('dns_resolver_access_lists_edit.html')
+
 @app.route('/services/dynamic-dns')
 def dynamic_dns():
     return render_template('dynamic_dns.html')
+
+
+@app.route('/services/dynamic-dns/rfc2136')
+def dynamic_dns_rfc2136():
+    # RFC2136 clients listing page
+    return render_template('dynamic_dns_rfc2136.html')
+
+
+@app.route('/services/dynamic-dns/rfc2136/edit', methods=['GET', 'POST'])
+def dynamic_dns_rfc2136_edit():
+    # RFC2136 edit form: save minimal representation to session for demo
+    if request.method == 'POST':
+        clients = session.get('rfc2136_clients', [])
+        client = {
+            'enabled': bool(request.form.get('enable')),
+            'interface': request.form.get('interface'),
+            'hostname': request.form.get('hostname'),
+            'zone': request.form.get('zone'),
+            'ttl': request.form.get('ttl'),
+            'key_name': request.form.get('key_name'),
+            'key_algorithm': request.form.get('key_algorithm'),
+            'key': request.form.get('key'),
+            'server': request.form.get('server'),
+            'protocol_tcp': bool(request.form.get('protocol_tcp')),
+            'use_public_ip': bool(request.form.get('use_public_ip')),
+            'update_source': request.form.get('update_source'),
+            'update_source_family': request.form.get('update_source_family'),
+            'record_type': request.form.get('record_type'),
+            'description': request.form.get('description', ''),
+        }
+        clients.append(client)
+        session['rfc2136_clients'] = clients
+        return redirect(url_for('dynamic_dns_rfc2136'))
+
+    return render_template('dynamic_dns_rfc2136_edit.html')
+
+
+@app.route('/services/dynamic-dns/checkip')
+def dynamic_dns_checkip():
+    # Check IP Services listing page
+    # Initialize default service in session if not present for demo (keeps UI populated)
+    if 'checkip_services' not in session:
+        session['checkip_services'] = [
+            {'name': 'Default', 'url': 'http://checkip.dyndns.org', 'verify_ssl': False, 'description': 'Default Check IP Service'}
+        ]
+    return render_template('dynamic_dns_checkip.html')
+
+
+@app.route('/services/dynamic-dns/checkip/edit', methods=['GET', 'POST'])
+def dynamic_dns_checkip_edit():
+    if request.method == 'POST':
+        services = session.get('checkip_services', [])
+        svc = {
+            'enabled': bool(request.form.get('enable')),
+            'name': request.form.get('name'),
+            'url': request.form.get('url'),
+            'username': request.form.get('username'),
+            # do NOT store raw passwords in real code; demo only
+            'password': request.form.get('password'),
+            'verify_ssl': bool(request.form.get('verify_ssl')),
+            'description': request.form.get('description', '')
+        }
+        services.append(svc)
+        session['checkip_services'] = services
+        return redirect(url_for('dynamic_dns_checkip'))
+
+    return render_template('dynamic_dns_checkip_edit.html')
+
+
+@app.route('/services/dynamic-dns/edit', methods=['GET', 'POST'])
+def dynamic_dns_edit():
+    # simple edit page for Dynamic DNS client; save minimal fields to session for demo
+    if request.method == 'POST':
+        clients = session.get('dynamic_dns_clients', [])
+        client = {
+            'disabled': bool(request.form.get('disabled')),
+            'service_type': request.form.get('service_type'),
+            'interface': request.form.get('interface'),
+            'check_ip_mode': request.form.get('check_ip_mode'),
+            'hostname': request.form.get('hostname'),
+            'mx': request.form.get('mx'),
+            'wildcards': bool(request.form.get('wildcards')),
+            'verbose': bool(request.form.get('verbose')),
+            'username': request.form.get('username'),
+            'description': request.form.get('description', ''),
+        }
+        clients.append(client)
+        session['dynamic_dns_clients'] = clients
+        return redirect(url_for('dynamic_dns'))
+
+    return render_template('dynamic_dns_edit.html')
 
 @app.route('/services/igmp-proxy')
 def igmp_proxy():
