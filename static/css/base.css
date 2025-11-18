@@ -3,25 +3,38 @@ body {
     background-color: #f5f5f5;
     margin: 0;
     padding: 0;
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	background:var(--bg);
+	color:#000000;
+
 }
 
-/* Navigation Styles */
-nav.navbar {
-    background-color: #1a1a1a;
+/* Top navbar style to match design: full-width rounded light bar */
+.navbar{
+	background:var(--panel) !important;
+	border-radius:10px;
+	/* margin:12px 12px 0 12px; small gap to the viewport edges */
+    padding:8px 14px; 
+	box-shadow: 0 6px 0 rgba(0,0,0,0.12), inset 0 -2px 0 rgba(0,0,0,0.04);
+	align-items:center;
 }
 
-nav a.nav-link,
-.navbar-brand {
-    color: white !important;
+.navbar .container-fluid{padding-left:8px;padding-right:8px}
+
+.navbar-brand{display:flex;align-items:center;gap:10px;font-weight:600;color:rgba(11,18,24,0.55) !important}
+.navbar-brand img{width:36px;height:36px;object-fit:cover;border-radius:6px}
+
+.navbar .nav-link{color:rgba(11,18,24,0.55) !important;padding:8px 12px;border-radius:6px}
+.navbar .nav-link:hover{background:rgba(0,0,0,0.04)}
+
+.navbar-toggler{border:0}
+.navbar-toggler-icon{background-image:none}
+
+/* Dropdown menus keep default bootstrap appearance but slightly darker text */
+.dropdown-menu{color:#17232b}
+
+@media (max-width:575px){
+	.navbar{margin:8px;border-radius:8px;padding:6px}
+	.navbar-brand img{width:32px;height:32px}
 }
 
-.navbar-brand img {
-    height: 32px;
-    margin-right: 10px;
-}
-
-/* Content Area */
-.content {
-    padding: 20px;
-}
