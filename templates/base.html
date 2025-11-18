@@ -26,14 +26,14 @@
                         <li><a class="dropdown-item" href="{{ url_for('certificates') }}">Certificates</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('general_setup') }}">General Setup</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('high_availability') }}">High Availability</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+                        <!-- <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li> -->
                         <li><a class="dropdown-item" href="{{ url_for('package_manager') }}">Package Manager</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('register') }}">Register</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('routing') }}">Routing</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('setup_wizard') }}">Setup Wizard</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('update_page') }}">Update</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('user_manager') }}">User Manager</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('user_password_manager') }}">User Password Manager</a></li>
+                        <!-- <li><a class="dropdown-item" href="{{ url_for('user_password_manager') }}">User Password Manager</a></li> -->
                     </ul>
                 </li>
 
@@ -41,7 +41,6 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="interfacesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Interfaces</a>
                     <ul class="dropdown-menu" aria-labelledby="interfacesDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('interfaces') }}">Overview</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('interfaces_wan') }}">WAN</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('interfaces_lan') }}">LAN</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('interfaces_assignments') }}">Assignments</a></li>
@@ -65,7 +64,6 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="servicesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Services</a>
                     <ul class="dropdown-menu" aria-labelledby="servicesDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('services') }}">Overview</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('auto_config_backup') }}">Auto Config Backup</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('captive_portal') }}">Captive Portal</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('dhcp_relay') }}">DHCP Relay</a></li>
@@ -101,7 +99,7 @@
                     <ul class="dropdown-menu" aria-labelledby="statusDropdown">
                         <li><a class="dropdown-item" href="{{ url_for('captive_portal') }}">Captive Portal</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('carp_failover') }}">CARP (failover)</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <!-- <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Dashboard</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('dhcp_leases') }}">DHCP Leases</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('dhcpv6_leases') }}">DHCPv6 Leases</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('dns_resolver') }}">DNS Resolver</a></li>
@@ -116,12 +114,12 @@
                         <li><a class="dropdown-item" href="{{ url_for('services') }}">Services</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('system_logs') }}">System Logs</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('traffic_graph') }}">Traffic Graph</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li> -->
                     </ul>
                 </li>
 
                 <!-- Diagnostics dropdown -->
-                <li class="nav-item dropdown">
+                <!-- <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="diagnosticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Diagnostics</a>
                     <ul class="dropdown-menu" aria-labelledby="diagnosticsDropdown">
                         <li><a class="dropdown-item" href="{{ url_for('diagnostics') }}">Overview</a></li>
@@ -151,10 +149,10 @@
                         <li><a class="dropdown-item" href="{{ url_for('test_port') }}">Test Port</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('tunnels') }}">Tunnels</a></li>
                     </ul>
-                </li>
+                </li> -->
 
                 <!-- Help dropdown -->
-                <li class="nav-item dropdown">
+                <!-- <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="helpDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Help</a>
                     <ul class="dropdown-menu" aria-labelledby="helpDropdown">
                         <li><a class="dropdown-item" href="{{ url_for('docs') }}">Docs</a></li>
@@ -168,7 +166,7 @@
                         <li><a class="dropdown-item" href="{{ url_for('upgrade') }}">Upgrade</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('docs') }}">Documentation</a></li>
                     </ul>
-                </li>
+                </li> -->
             </ul>
         </div>
     </div>
