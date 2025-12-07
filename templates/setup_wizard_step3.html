@@ -1,30 +1,26 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">General Information</li>
-        </ol>
-    </nav>
 
-    <div class="mb-2">
-        <div class="progress" style="height:6px;">
-            <div class="progress-bar bg-danger" role="progressbar" style="width:22%;" aria-valuenow="22" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-2">
-            <span class="badge bg-danger">Step 2 of 9</span>
-        </div>
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+    Wizard / ZGate Setup / General Information
+</div>
+
+<div class="mb-3">
+    <div class="progress" style="height:6px;">
+        <div class="progress-bar bg-danger" role="progressbar" style="width:22%;" aria-valuenow="22" aria-valuemin="0" aria-valuemax="100"></div>
     </div>
+    <div class="mt-2">
+        <span class="badge bg-danger">Step 2 of 9</span>
+    </div>
+</div>
 
-    <form method="post" action="#">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                General Information
-            </div>
-            <div class="card-body">
+<form method="post" action="#">
+    <div class="settings-section">
+        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">
+            General Information
+        </div>
                 <p>On this screen the general ZGate parameters will be set.</p>
 
                 <div class="row mb-3">
@@ -32,7 +28,7 @@
                     <div class="col-sm-8">
                         <input type="text" class="form-control" name="hostname" value="ZGate">
                         <div class="form-text">Name of the firewall host, without domain part.</div>
-                        <div class="form-text">Examples: zgateway, firewall, edgefw</div>
+                        <div class="form-text">Examples: firewall, gateway, edgefw</div>
                     </div>
                 </div>
 
@@ -67,14 +63,13 @@
                             <label class="form-check-label" for="override_dns">Allow DNS servers to be overridden by DHCP/PPP on WAN</label>
                         </div>
                     </div>
-                </div>
-
             </div>
-        </div>
 
-        <div class="mt-3">
-            <a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
-        </div>
-    </form>
-</div>
+    </div>
+
+    <div class="d-flex justify-content-start mt-3">
+        <a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
+    </div>
+</form>
+
 {% endblock %}

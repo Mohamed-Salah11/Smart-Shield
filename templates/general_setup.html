@@ -2,172 +2,295 @@
 
 {% block main %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>System / General Setup</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+<div class="breadcrumb">
+    System / General Setup
+</div>
 
-<body>
-    <div class="page">
-        <h2>System / <span>General Setup</span></h2>
+<form method="POST">
 
-        <form method="POST" class="config-form">
-            <div class="section">
-                <h3>System</h3>
-                <label>Hostname:
-                    <input type="text" name="hostname" value="{{ config.hostname }}">
-                </label>
-                <label>Domain:
-                    <input type="text" name="domain" value="{{ config.domain }}">
-                </label>
-            </div>
-
-            <div class="section">
-                <h3>DNS Server Settings</h3>
-                {% for server in config.dns_servers %}
-                <input type="text" name="dns_server" value="{{ server }}" placeholder="DNS Server">
-                {% endfor %}
-                <input type="text" name="dns_server" placeholder="Add new DNS Server">
-                <label><input type="checkbox" name="dns_override" {% if config.dns_override %}checked{% endif %}> Allow
-                    DNS server list to be overridden by DHCP/PPP</label>
-                <label>DNS Resolution Behavior:
-                    <select name="dns_behavior">
-                        <option {% if "local" in config.dns_behavior %}selected{% endif %}>Use local DNS (127.0.0.1),
-                            fall back to remote DNS Servers (Default)</option>
-                        <option>Only use remote DNS servers</option>
-                    </select>
-                </label>
-            </div>
-
-            <div class="section">
-                <h3>Localization</h3>
-                <label>Timezone:
-                    <input type="text" name="timezone" value="{{ config.timezone }}">
-                </label>
-                <label>Timeservers:
-                    <input type="text" name="timeservers" value="{{ config.timeservers }}">
-                </label>
-                <label>Language:
-                    <select name="language">
-                        <option {% if config.language=='English' %}selected{% endif %}>English</option>
-                        <option>Arabic</option>
-                        <option>French</option>
-                    </select>
-                </label>
-            </div>
-
-            <!-- webConfigurator Section -->
-            <div class="section">
-                <h3>webConfigurator</h3>
-
-                <div class="field-row">
-                    <label>Theme:</label>
-                    <select name="theme">
-                        <option value="pfSense" {% if config.theme=="pfSense" %}selected{% endif %}>pfSense</option>
-                        <option value="Light">Light</option>
-                        <option value="Dark">Dark</option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label>Top Navigation:</label>
-                    <select name="top_navigation">
-                        <option value="scroll" {% if config.top_navigation=="scroll" %}selected{% endif %}>Scrolls with
-                            page</option>
-                        <option value="fixed" {% if config.top_navigation=="fixed" %}selected{% endif %}>Fixed at top
-                        </option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label>Hostname in Menu:</label>
-                    <select name="hostname_menu">
-                        <option value="none" {% if config.hostname_menu=="none" %}selected{% endif %}>Default (No
-                            hostname)</option>
-                        <option value="hostname" {% if config.hostname_menu=="hostname" %}selected{% endif %}>Show
-                            hostname</option>
-                        <option value="fqdn" {% if config.hostname_menu=="fqdn" %}selected{% endif %}>Show FQDN</option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label>Dashboard Columns:</label>
-                    <input type="number" name="dashboard_columns" min="1" max="4"
-                        value="{{ config.dashboard_columns or 2 }}">
-                </div>
-
-                <div class="field-row">
-                    <label>Interfaces Sort:</label>
-                    <input type="checkbox" name="interfaces_sort" {% if config.interfaces_sort %}checked{% endif %}>
-                    Sort Alphabetically
-                </div>
-
-                <div class="field-row">
-                    <label>Associated Panels:</label>
-                    <div class="inline">
-                        <input type="checkbox" name="widgets" {% if config.widgets %}checked{% endif %}> Available
-                        Widgets
-                        <input type="checkbox" name="log_filter" {% if config.log_filter %}checked{% endif %}> Log
-                        Filter
-                        <input type="checkbox" name="manage_log" {% if config.manage_log %}checked{% endif %}> Manage
-                        Log
-                        <input type="checkbox" name="monitoring" {% if config.monitoring %}checked{% endif %}>
-                        Monitoring Settings
-                    </div>
-                </div>
-
-                <div class="field-row">
-                    <label>Require State Filter:</label>
-                    <input type="checkbox" name="require_state_filter" {% if config.require_state_filter %}checked{%
-                        endif %}> Do not display state table without a filter
-                </div>
-
-                <div class="field-row">
-                    <label>Require Firewall Interface:</label>
-                    <input type="checkbox" name="require_firewall_interface" {% if config.require_firewall_interface
-                        %}checked{% endif %}> Do not display firewall rules list without selecting interface
-                </div>
-
-                <div class="field-row">
-                    <label>Left Column Labels:</label>
-                    <input type="checkbox" name="left_labels" {% if config.left_labels %}checked{% endif %}> Active
-                </div>
-
-                <div class="field-row">
-                    <label>Alias Popups:</label>
-                    <input type="checkbox" name="alias_popups" {% if config.alias_popups %}checked{% endif %}> Disable
-                    details in alias popups
-                </div>
-
-                <div class="field-row">
-                    <label>Disable Dragging:</label>
-                    <input type="checkbox" name="disable_drag" {% if config.disable_drag %}checked{% endif %}> Disable
-                    dragging of firewall/NAT rules
-                </div>
-
-                <div class="field-row">
-                    <label>Login page color:</label>
-                    <select name="login_color">
-                        <option value="Dark Blue" {% if config.login_color=="Dark Blue" %}selected{% endif %}>Dark Blue
-                        </option>
-                        <option value="Gray" {% if config.login_color=="Gray" %}selected{% endif %}>Gray</option>
-                    </select>
-                </div>
-
-                <div class="field-row">
-                    <label>Login hostname</label>
-                    <input type="checkbox" name="show_hostname" {% if config.show_hostname %}checked{% endif %}> Show
-                    hostname on login banner
-                </div>
-
-                <div class="field-row">
-                    <label>Login message:</label>
-                    <textarea name="login_message">{{ config.login_message }}</textarea>
+<div class="settings-section">
+    <h5>System</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="hostname">Hostname</label>
+            <div class="form-group-content">
+                <input type="text" id="hostname" name="hostname" class="form-control" style="max-width: 400px;" value="{{ config.hostname }}">
+                <div class="help-text">
+                    Name of the firewall host, without domain part
                 </div>
             </div>
+        </div>
 
-</body>
+        <div class="form-group">
+            <label for="domain">Domain</label>
+            <div class="form-group-content">
+                <input type="text" id="domain" name="domain" class="form-control" style="max-width: 400px;" value="{{ config.domain }}">
+                <div class="help-text">
+                    Domain name (e.g. mycorp.com)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-</html>
+<div class="settings-section">
+    <h5>DNS Server Settings</h5>
+    
+    <div style="padding: 20px;">
+        {% for server in config.dns_servers %}
+        <div class="form-group">
+            <label>DNS Server {{ loop.index }}</label>
+            <div class="form-group-content">
+                <input type="text" name="dns_server" class="form-control" style="max-width: 400px;" value="{{ server }}" placeholder="DNS Server">
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="form-group">
+            <label>DNS Server</label>
+            <div class="form-group-content">
+                <input type="text" name="dns_server" class="form-control" style="max-width: 400px;" placeholder="Add new DNS Server">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dns_override">DNS Server Override</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="dns_override" name="dns_override" {% if config.dns_override %}checked{% endif %}>
+                    <label class="form-check-label" for="dns_override">
+                        Allow DNS server list to be overridden by DHCP/PPP
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dns_behavior">DNS Resolution Behavior</label>
+            <div class="form-group-content">
+                <select id="dns_behavior" name="dns_behavior" class="form-control" style="max-width: 600px;">
+                    <option {% if "local" in config.dns_behavior %}selected{% endif %}>Use local DNS (127.0.0.1), fall back to remote DNS Servers (Default)</option>
+                    <option>Only use remote DNS servers</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Localization</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="timezone">Timezone</label>
+            <div class="form-group-content">
+                <input type="text" id="timezone" name="timezone" class="form-control" style="max-width: 400px;" value="{{ config.timezone }}">
+                <div class="help-text">
+                    Select the location closest to this firewall
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="timeservers">Timeservers</label>
+            <div class="form-group-content">
+                <input type="text" id="timeservers" name="timeservers" class="form-control" style="max-width: 400px;" value="{{ config.timeservers }}">
+                <div class="help-text">
+                    Use a space to separate multiple timeservers. Example: 0.ZGate.pool.ntp.org 1.ZGate.pool.ntp.org
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="language">Language</label>
+            <div class="form-group-content">
+                <select id="language" name="language" class="form-control" style="max-width: 400px;">
+                    <option {% if config.language=='English' %}selected{% endif %}>English</option>
+                    <option>Arabic</option>
+                    <option>French</option>
+                </select>
+                <div class="help-text">
+                    Choose a language for the webConfigurator
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>webConfigurator</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="theme">Theme</label>
+            <div class="form-group-content">
+                <select id="theme" name="theme" class="form-control" style="max-width: 400px;">
+                    <option value="ZGate" {% if config.theme=="ZGate" %}selected{% endif %}>ZGate</option>
+                    <option value="Light">Light</option>
+                    <option value="Dark">Dark</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="top_navigation">Top Navigation</label>
+            <div class="form-group-content">
+                <select id="top_navigation" name="top_navigation" class="form-control" style="max-width: 400px;">
+                    <option value="scroll" {% if config.top_navigation=="scroll" %}selected{% endif %}>Scrolls with page</option>
+                    <option value="fixed" {% if config.top_navigation=="fixed" %}selected{% endif %}>Fixed at top</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="hostname_menu">Hostname in Menu</label>
+            <div class="form-group-content">
+                <select id="hostname_menu" name="hostname_menu" class="form-control" style="max-width: 400px;">
+                    <option value="none" {% if config.hostname_menu=="none" %}selected{% endif %}>Default (No hostname)</option>
+                    <option value="hostname" {% if config.hostname_menu=="hostname" %}selected{% endif %}>Show hostname</option>
+                    <option value="fqdn" {% if config.hostname_menu=="fqdn" %}selected{% endif %}>Show FQDN</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="dashboard_columns">Dashboard Columns</label>
+            <div class="form-group-content">
+                <input type="number" id="dashboard_columns" name="dashboard_columns" class="form-control" style="max-width: 200px;" min="1" max="4" value="{{ config.dashboard_columns or 2 }}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="interfaces_sort">Interfaces Sort</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="interfaces_sort" name="interfaces_sort" {% if config.interfaces_sort %}checked{% endif %}>
+                    <label class="form-check-label" for="interfaces_sort">
+                        Sort Alphabetically
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Associated Panels</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="widgets" name="widgets" {% if config.widgets %}checked{% endif %}>
+                    <label class="form-check-label" for="widgets">Available Widgets</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="log_filter" name="log_filter" {% if config.log_filter %}checked{% endif %}>
+                    <label class="form-check-label" for="log_filter">Log Filter</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="manage_log" name="manage_log" {% if config.manage_log %}checked{% endif %}>
+                    <label class="form-check-label" for="manage_log">Manage Log</label>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="monitoring" name="monitoring" {% if config.monitoring %}checked{% endif %}>
+                    <label class="form-check-label" for="monitoring">Monitoring Settings</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="require_state_filter">Require State Filter</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="require_state_filter" name="require_state_filter" {% if config.require_state_filter %}checked{% endif %}>
+                    <label class="form-check-label" for="require_state_filter">
+                        Do not display state table without a filter
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="require_firewall_interface">Require Firewall Interface</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="require_firewall_interface" name="require_firewall_interface" {% if config.require_firewall_interface %}checked{% endif %}>
+                    <label class="form-check-label" for="require_firewall_interface">
+                        Do not display firewall rules list without selecting interface
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="left_labels">Left Column Labels</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="left_labels" name="left_labels" {% if config.left_labels %}checked{% endif %}>
+                    <label class="form-check-label" for="left_labels">Active</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="alias_popups">Alias Popups</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="alias_popups" name="alias_popups" {% if config.alias_popups %}checked{% endif %}>
+                    <label class="form-check-label" for="alias_popups">
+                        Disable details in alias popups
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="disable_drag">Disable Dragging</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="disable_drag" name="disable_drag" {% if config.disable_drag %}checked{% endif %}>
+                    <label class="form-check-label" for="disable_drag">
+                        Disable dragging of firewall/NAT rules
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="login_color">Login page color</label>
+            <div class="form-group-content">
+                <select id="login_color" name="login_color" class="form-control" style="max-width: 400px;">
+                    <option value="Dark Blue" {% if config.login_color=="Dark Blue" %}selected{% endif %}>Dark Blue</option>
+                    <option value="Gray" {% if config.login_color=="Gray" %}selected{% endif %}>Gray</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="show_hostname">Login hostname</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="show_hostname" name="show_hostname" {% if config.show_hostname %}checked{% endif %}>
+                    <label class="form-check-label" for="show_hostname">
+                        Show hostname on login banner
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="login_message">Login message</label>
+            <div class="form-group-content">
+                <textarea id="login_message" name="login_message" class="form-control" rows="4" style="max-width: 600px;">{{ config.login_message }}</textarea>
+                <div class="help-text">
+                    Custom message to display on the login page
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2" style="margin-top: 20px;">
+    <button type="submit" class="btn btn-primary">Save</button>
+</div>
+
+</form>
+
 {% endblock %}

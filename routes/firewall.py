@@ -17,7 +17,7 @@ def firewall_home():
 
 @firewall_bp.route("/rules")
 def rules():
-    return render_template("firewall.html")
+    return render_template("rules.html")
 
 
 # ----------------------------

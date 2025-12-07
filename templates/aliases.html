@@ -1,157 +1,126 @@
 {% extends "base.html" %}
 {% set tab = (tab or 'ip')|lower %}
 
-{% block content %}
-<style>
-.aliases-dialog{background:#fff;border-radius:0;box-shadow:none;padding:0;width:100%;color:#2b3340}
-.aliases-head{background:#f2f4f7;border-radius:6px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:space-between;color:#424b57}
-.aliases-crumbs{font-size:22px;font-weight:600;color:#6b7683;display:flex;gap:.6rem;align-items:center}
-.aliases-crumbs a{color:#5a9bd6;text-decoration:none}
-.aliases-crumbs .sep{color:#b7bec7}
-.aliases-icons{display:flex;gap:10px}
-.aliases-ico{width:34px;height:34px;border-radius:6px;border:none;background:#e9eef5;color:#546270;display:grid;place-items:center;cursor:pointer}
-.aliases-ico.list::before{content:"≡";font-size:18px;line-height:1}
-.aliases-ico.help{color:#c62828}
-.aliases-ico.help::before{content:"?";font-weight:700}
-.aliases-tabs{display:flex;gap:24px;padding:18px 8px 0;margin:10px 0 8px;border-bottom:1px solid #eceff3}
-.aliases-tab{padding:10px 4px;color:#a0a6ad;font-weight:600;position:relative;user-select:none}
-.aliases-tab.active{color:#c23a33}
-.aliases-tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:4px;background:#c62828;border-radius:2px}
-.table-card{margin-top:16px;border:1px solid #d6dbe3;border-radius:6px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06)}
-.table-title{background:#3e3e3e;color:#fff;padding:12px 14px;font-weight:700}
-.aliases-table{width:100%;border-collapse:collapse}
-.aliases-table thead th{background:#fafbfc;color:#596474;text-align:left;font-weight:700;padding:10px 12px;border-bottom:1px solid #dedede}
-.aliases-table tbody td{padding:14px 12px;border-bottom:1px solid #dedede;color:#3b4450}
-.footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:14px}
-.btn{border:none;border-radius:4px;color:#fff;font-weight:700;padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 0 rgba(0,0,0,.12)}
-.btn.add{background:#2e7d32}
-.btn.import{background:#1976d2}
-.info-bubble{margin-top:10px;position:relative;height:0}
-.info-bubble .bubble{position:absolute;left:0;bottom:-6px;width:28px;height:28px;border-radius:50%;background:#e9eef5;color:#3c4b5d;display:grid;place-items:center;box-shadow:inset 0 0 0 1px #d2dbe6}
-@media (max-width:720px){
-  .aliases-crumbs{font-size:18px}
-  .aliases-table thead th:nth-child(4),
-  .aliases-table tbody td:nth-child(4){display:none}
-}
-</style>
+{% block main %}
 
-<div class="aliases-dialog">
-  <div class="aliases-head">
-    <div class="aliases-crumbs">
-      <a href="{{ url_for('home') }}">Firewall</a>
-      <span class="sep">/</span>
-      <a href="{{ url_for('aliases_tab', tab='ip') }}">Aliases</a>
-      <span class="sep">/</span>
-      <span>{{ tab|upper }}</span>
-    </div>
-    <div class="aliases-icons">
-      <button class="aliases-ico list" title="List"></button>
-      <button class="aliases-ico help" title="Help"></button>
-    </div>
-  </div>
-
-  <div class="aliases-tabs">
-    <a class="aliases-tab {{ 'active' if tab=='ip' }}" href="{{ url_for('aliases_tab', tab='ip') }}">IP</a>
-    <a class="aliases-tab {{ 'active' if tab=='ports' }}" href="{{ url_for('aliases_tab', tab='ports') }}">Ports</a>
-    <a class="aliases-tab {{ 'active' if tab=='urls' }}" href="{{ url_for('aliases_tab', tab='urls') }}">URLs</a>
-    <a class="aliases-tab {{ 'active' if tab=='all' }}" href="{{ url_for('aliases_tab', tab='all') }}">All</a>
-  </div>
-
-  <div class="table-card">
-    <div class="table-title">Firewall Aliases {{ tab|upper }}</div>
-    <table class="aliases-table">
-      <thead>
-        <tr>
-          <th style="width:28%">Name</th>
-          <th style="width:14%">Type</th>
-          <th style="width:30%">Values</th>
-          <th style="width:18%">Description</th>
-          <th style="width:10%">Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div class="footer">
-    <button type="button" class="btn add"><span>＋</span><span>Add</span></button>
-    {% if tab != 'urls' %}
-    <button type="button" class="btn import"><span>⤴</span><span>Import</span></button>
-    {% endif %}
-  </div>
-
-  <div class="info-bubble"><span class="bubble" title="Information">i</span></div>
+<div class="breadcrumb">
+    Firewall / Aliases / {{ tab|upper }}
 </div>
 
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab=='all' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='all') }}">All</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab=='ip' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='ip') }}">IP</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab=='ports' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='ports') }}">Ports</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if tab=='urls' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='urls') }}">URLs</a>
+    </li>
+</ul>
 
-<!-- Bulk Import Modal -->
-<div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.5);z-index:1200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:6px;max-width:1000px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden">
-  <div style="background:#3e3e3e;color:#fff;padding:12px 16px;font-weight:700">{% if tab == 'ports' %}Port Alias Details{% else %}IP Alias Details{% endif %}</div>
-    <div style="padding:16px">
-      <div style="border-bottom:1px solid #d6dbe3;padding-bottom:12px;margin-bottom:12px">
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-          <label style="width:120px;font-weight:700;color:#4b5563">Alias Name</label>
-          <input type="text" id="impName" placeholder="" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-        </div>
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-          <label style="width:120px;font-weight:700;color:#4b5563">Description</label>
-          <input type="text" id="impDesc" placeholder="A description may be entered here for administrative reference (not parsed)." style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-        </div>
-      </div>
+<div class="settings-section">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th style="width:28%">Name</th>
+                <th style="width:14%">Type</th>
+                <th style="width:30%">Values</th>
+                <th style="width:18%">Description</th>
+                <th style="width:10%">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Aliases will be populated here -->
+        </tbody>
+    </table>
+    
+    <div class="d-flex gap-2" style="margin-top: 15px;">
+        <button type="button" class="btn btn-success">Add</button>
+        <button type="button" class="btn btn-primary" id="importBtn">Import</button>
+    </div>
+</div>
 
-      <div style="display:flex;gap:12px;align-items:flex-start">
-        <label style="width:120px;font-weight:700;color:#4b5563;padding-top:6px">Aliases to import</label>
-        <div style="flex:1">
-          <textarea id="impAliases" rows="8" style="width:100%;padding:8px;border:1px solid #d6dde6;border-radius:4px"></textarea>
-          <div style="font-size:13px;color:#6b7683;margin-top:8px">
-            {% if tab == 'ports' %}
-              Paste in the ports to import separated by a carriage return. The list may contain port numbers, port ranges, blank lines (ignored) and an optional description after each port. e.g.:
-              <ul style="margin:8px 0 0 18px;color:#6b7683">
-                <li>22</li>
-                <li>1234:1250</li>
-                <li>443 HTTPS port</li>
-                <li>4000:4099 Description of a port range</li>
-              </ul>
-            {% else %}
-              Paste in the aliases to import separated by a carriage return. Common examples are lists of IPs, networks, blocklists, etc. The list may contain addresses, with or without CIDR prefix, IP ranges, blank lines (ignored) and an optional description after each IP. e.g.:
-              <ul style="margin:8px 0 0 18px;color:#6b7683">
-                <li>172.16.1.2</li>
-                <li>172.16.0.0/24</li>
-                <li>10.11.12.100-10.11.12.200</li>
-                <li>192.168.1.254 Home router</li>
-                <li>10.20.0.0/16 Office network</li>
-                <li>10.40.1.10-10.40.1.19 Managed switches</li>
-              </ul>
-            {% endif %}
-          </div>
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{% if tab == 'ports' %}Port Alias Details{% else %}IP Alias Details{% endif %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Alias Name</label>
+                    <div class="form-group-content">
+                        <input type="text" id="impName" class="form-control" style="max-width: 400px;">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description</label>
+                    <div class="form-group-content">
+                        <input type="text" id="impDesc" class="form-control" placeholder="A description may be entered here for administrative reference (not parsed).">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Aliases to import</label>
+                    <div class="form-group-content">
+                        <textarea id="impAliases" rows="8" class="form-control"></textarea>
+                        <div class="help-text">
+                            {% if tab == 'ports' %}
+                            Paste in the ports to import separated by a carriage return. The list may contain port numbers, port ranges, blank lines (ignored) and an optional description after each port. e.g.:
+                            <ul>
+                                <li>22</li>
+                                <li>1234:1250</li>
+                                <li>443 HTTPS port</li>
+                                <li>4000:4099 Description of a port range</li>
+                            </ul>
+                            {% else %}
+                            Paste in the aliases to import separated by a carriage return. Common examples are lists of IPs, networks, blocklists, etc. The list may contain addresses, with or without CIDR prefix, IP ranges, blank lines (ignored) and an optional description after each IP. e.g.:
+                            <ul>
+                                <li>172.16.1.2</li>
+                                <li>172.16.0.0/24</li>
+                                <li>10.11.12.100-10.11.12.200</li>
+                                <li>192.168.1.254 Home router</li>
+                                <li>10.20.0.0/16 Office network</li>
+                                <li>10.40.1.10-10.40.1.19 Managed switches</li>
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="impSave">Save</button>
+            </div>
         </div>
-      </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;background:#fbfbfb">
-      <button id="impCancel" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
-      <button id="impSave" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#1976d2;color:#fff">Save</button>
-    </div>
-  </div>
 </div>
 
 <script>
-// show import modal when Import button clicked
 document.addEventListener('DOMContentLoaded', function(){
-  const importBtn = document.querySelector('.footer .btn.import');
-  const modal = document.getElementById('importModal');
-  const cancel = document.getElementById('impCancel');
-  const save = document.getElementById('impSave');
-
-  function open(){ modal.style.display = 'flex'; }
-  function close(){ modal.style.display = 'none'; }
-
-  if(importBtn) importBtn.addEventListener('click', function(e){ e.preventDefault(); open(); });
-  if(cancel) cancel.addEventListener('click', function(e){ e.preventDefault(); close(); });
-  if(save) save.addEventListener('click', function(e){ e.preventDefault(); close(); /* TODO: handle import */ });
-
-  // click outside to close
-  modal.addEventListener('click', function(ev){ if(ev.target === modal) close(); });
+    const importBtn = document.getElementById('importBtn');
+    if (importBtn) {
+        importBtn.addEventListener('click', function() {
+            const modal = new bootstrap.Modal(document.getElementById('importModal'));
+            modal.show();
+        });
+    }
+    
+    const impSave = document.getElementById('impSave');
+    if (impSave) {
+        impSave.addEventListener('click', function() {
+            // TODO: handle import
+            const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+            modal.hide();
+        });
+    }
 });
 </script>
 <!-- Modal for Add/Edit -->

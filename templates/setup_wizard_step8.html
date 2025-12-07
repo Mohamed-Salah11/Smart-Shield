@@ -1,16 +1,9 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Reload configuration</li>
-        </ol>
-    </nav>
+<div class="breadcrumb">Wizard / ZGate Setup / Reload Configuration</div>
 
-    <div class="mb-2">
+<div class="mb-3">
         <div class="progress" style="height:6px;">
             <div class="progress-bar bg-danger" role="progressbar" style="width:77%;" aria-valuenow="77" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
@@ -19,15 +12,12 @@
         </div>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">Reload configuration</div>
-        <div class="card-body">
+    <div class="settings-section">
+        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Reload configuration</div>
             <p>Click 'Reload' to reload ZGate with new changes.</p>
-        </div>
     </div>
 
-    <div class="mt-3">
+    <div class="d-flex justify-content-start mt-3">
         <a href="{{ url_for('system.setup_wizard_step', step=9) }}" class="btn btn-primary">&raquo;&raquo; Reload</a>
     </div>
-</div>
 {% endblock %}

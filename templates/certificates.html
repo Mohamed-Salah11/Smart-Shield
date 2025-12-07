@@ -1,158 +1,49 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<!-- <!DOCTYPE html> -->
-<!-- <html lang="en"> -->
 
-<head>
-    <meta charset="UTF-8">
-    <title>Certificate Authorities - pfSense Style</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-        }
+<div class="breadcrumb">
+    System / Certificates
+</div>
 
-        .header {
-            background: #e74c3c;
-            color: white;
-            padding: 10px;
-            font-weight: bold;
-        }
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}" href="#" onclick="showSection('authorities'); return false;">Authorities</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}" href="#" onclick="showSection('certificates'); return false;">Certificates</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}" href="#" onclick="showSection('revocation'); return false;">Revocation</a>
+    </li>
+</ul>
 
-        .nav-links {
-            display: flex;
-            gap: 10px;
-        }
-
-        .nav-link {
-            color: white;
-            text-decoration: none;
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-
-        .nav-link.active {
-            background: #c0392b;
-        }
-
-        .search-container {
-            background: #ecf0f1;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            margin: 10px 0;
-        }
-
-        .search-form {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .search-input {
-            flex: 1;
-            padding: 5px;
-        }
-
-        .search-select {
-            padding: 5px;
-        }
-
-        .btn {
-            padding: 5px 10px;
-            background: #3498db;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-clear {
-            background: #95a5a6;
-        }
-
-        .btn-add {
-            background: #27ae60;
-            padding: 5px;
-        }
-
-        .table-header {
-            background: #34495e;
-            color: white;
-            padding: 10px;
-            font-weight: bold;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-
-        th,
-        td {
-            border: 1px solid #bdc3c7;
-            padding: 8px;
-            text-align: left;
-        }
-
-        th {
-            background: #ecf0f1;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 20px;
-            color: #7f8c8d;
-        }
-
-        .help-text {
-            font-size: 12px;
-            color: #7f8c8d;
-            margin-left: 10px;
-        }
-
-        .section {
-            margin-top: 20px;
-            display: none;
-        }
-
-        .section.active {
-            display: block;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="header">
-        <span class="nav-links">
-            <a href="#" class="nav-link {{ 'active' if active_section == 'authorities' else '' }}"
-                onclick="showSection('authorities')">Authorities</a> |
-            <a href="#" class="nav-link {{ 'active' if active_section == 'certificates' else '' }}"
-                onclick="showSection('certificates')">Certificates</a> |
-            <a href="#" class="nav-link">Revocation</a>
-        </span>
-    </div>
-
-    <div class="search-container">
-        <form method="get" class="search-form">
-            <label>Search term</label>
-            <input type="text" name="search_term" class="search-input" placeholder="Enter a search string or regex">
-            <select name="search_type" class="search-select">
+<div class="settings-section" style="margin-top: 20px;">
+    <form method="get" class="row g-3 align-items-center">
+        <div class="col-auto">
+            <label class="col-form-label">Search term</label>
+        </div>
+        <div class="col-md-4">
+            <input type="text" name="search_term" class="form-control" placeholder="Enter a search string or regex">
+        </div>
+        <div class="col-auto">
+            <select name="search_type" class="form-select">
                 <option value="Both">Both</option>
             </select>
-            <button type="submit" class="btn">Search</button>
-            <button type="button" class="btn btn-clear">Clear</button>
-        </form>
-        <div class="help-text">Enter a search string or regex expression to search certificate names and distinguished
-            names</div>
-    </div>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <button type="button" class="btn btn-secondary">Clear</button>
+        </div>
+    </form>
+    <small class="form-text text-muted">Enter a search string or regex expression to search certificate names and distinguished names</small>
+</div>
 
-    <!-- Certificate Authorities Section -->
-    <div class="section" id="authorities-section" {% if active_section=='authorities' %}class="active" {% endif %}>
-        <div class="table-header">Certificate Authorities</div>
-        <table>
+<!-- Certificate Authorities Section -->
+<div class="section" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
+    <div class="settings-section">
+        <h5>Certificate Authorities</h5>
+        <table class="table table-bordered">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -174,23 +65,25 @@
                     <td>{{ ca.certificates }}</td>
                     <td>{{ ca.distinguished_name }}</td>
                     <td>{{ ca.in_use }}</td>
-                    <td><button class="btn btn-add">+</button></td>
+                    <td><button class="btn btn-sm btn-success">+</button></td>
                 </tr>
                 {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="7" class="no-data">No certificate authorities configured.</td>
+                    <td colspan="7" class="text-center text-muted">No certificate authorities configured.</td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
-        <button class="btn btn-add" style="margin-top: 10px;" onclick="window.location.href='/add_ca'">+ Add</button>
+        <button class="btn btn-success" onclick="window.location.href='{{ url_for('system.add_ca') }}'">+ Add</button>
     </div>
+</div>
 
-    <!-- Certificates Section -->
-    <div class="section" id="certificates-section" {% if active_section=='certificates' %}class="active" {% endif %}>
-        <div class="table-header">Certificates</div>
-        <table>
+<!-- Certificates Section -->
+<div class="section" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
+    <div class="settings-section">
+        <h5>Certificates</h5>
+        <table class="table table-bordered">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -213,23 +106,62 @@
                 {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="5" class="no-data">No certificates configured.</td>
+                    <td colspan="5" class="text-center text-muted">No certificates configured.</td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
-
-        <button class="btn btn-add" style="margin-top: 10px;" onclick="window.location.href='/add_certificate'">+ Add
-            Sign</button>
+        <button class="btn btn-success" onclick="window.location.href='{{ url_for('system.add_certificate') }}'">+ Add / Sign</button>
     </div>
+</div>
 
-    <script>
-        function showSection(section) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById(section + '-section').classList.add('active');
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            event.target.classList.add('active');
-        }
-    </script>
-</body>
+<!-- Revocation Section -->
+<div class="section" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
+    <div class="settings-section">
+        <h5>Certificate Revocation Lists</h5>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>CA</th>
+                    <th>Method</th>
+                    <th>Serial #</th>
+                    <th>Reason</th>
+                    <th>Revoked At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if crls %}
+                {% for crl in crls %}
+                <tr>
+                    <td>{{ crl.ca }}</td>
+                    <td>{{ crl.method }}</td>
+                    <td>{{ crl.serial }}</td>
+                    <td>{{ crl.reason }}</td>
+                    <td>{{ crl.revoked_at }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No certificate revocations configured.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <button class="btn btn-success">+ Add or Import CRL</button>
+    </div>
+</div>
+
+<script>
+    function showSection(section) {
+        document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+        document.getElementById(section + '-section').style.display = 'block';
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+</script>
+
 {% endblock %}
