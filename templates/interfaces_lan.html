@@ -1,194 +1,173 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LAN Interface Configuration</title>
-  <style>
-    body {
-      font-family: "Segoe UI", Tahoma, sans-serif;
-      background-color: #f2f3f7;
-      margin: 0;
-      padding: 20px 40px;
-      color: #333;
-    }
 
-    h2 {
-      font-size: 16px;
-      color: #cc0000; /* red accent */
-      border-bottom: 2px solid #cc0000;
-      padding-bottom: 6px;
-      margin-top: 0;
-      margin-bottom: 20px;
-    }
+<div class="breadcrumb">
+    Interfaces / LAN
+</div>
 
-    fieldset {
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      margin-bottom: 25px;
-      padding: 20px;
-      background-color: #fff;
-    }
+<form method="POST">
 
-    legend {
-      font-weight: bold;
-      font-size: 14px;
-      color: #cc0000;
-      padding: 0 10px;
-    }
+<div class="settings-section">
+    <h5>General Configuration</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="enable">Enable Interface</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="enable" name="enable" checked>
+                    <label class="form-check-label" for="enable">
+                        Enable Interface
+                    </label>
+                </div>
+            </div>
+        </div>
 
-    label {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 12px;
-      font-weight: 500;
-    }
+        <div class="form-group">
+            <label for="description">Description</label>
+            <div class="form-group-content">
+                <input type="text" id="description" name="description" class="form-control" style="max-width: 400px;" value="LAN">
+                <div class="help-text">
+                    Description of the interface (optional)
+                </div>
+            </div>
+        </div>
 
-    input[type="text"],
-    select {
-      width: 50%;
-      padding: 6px 8px;
-      margin-bottom: 12px;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      font-size: 12px;
-    }
+        <div class="form-group">
+            <label for="ipv4type">IPv4 Configuration Type</label>
+            <div class="form-group-content">
+                <select id="ipv4type" name="ipv4type" class="form-control" style="max-width: 400px;">
+                    <option value="static" selected>Static IPv4</option>
+                    <option value="dhcp">DHCP</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+        </div>
 
-    input[type="checkbox"] {
-      margin-right: 6px;
-      transform: scale(1.1);
-    }
+        <div class="form-group">
+            <label for="ipv6type">IPv6 Configuration Type</label>
+            <div class="form-group-content">
+                <select id="ipv6type" name="ipv6type" class="form-control" style="max-width: 400px;">
+                    <option value="none" selected>None</option>
+                    <option value="static">Static IPv6</option>
+                    <option value="dhcp6">DHCP6</option>
+                    <option value="slaac">SLAAC</option>
+                </select>
+            </div>
+        </div>
 
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      font-size: 12px;
-      margin-bottom: 10px;
-      font-weight: 500;
-    }
+        <div class="form-group">
+            <label for="mac">MAC Address</label>
+            <div class="form-group-content">
+                <input type="text" id="mac" name="mac" class="form-control" style="max-width: 400px;" placeholder="00:11:22:33:44:55">
+                <div class="help-text">
+                    This field can be used to modify (spoof) the MAC address of this interface
+                </div>
+            </div>
+        </div>
 
-    .btn-group {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
+        <div class="form-group">
+            <label for="mtu">MTU</label>
+            <div class="form-group-content">
+                <input type="text" id="mtu" name="mtu" class="form-control" style="max-width: 200px;" placeholder="1500">
+                <div class="help-text">
+                    Maximum Transmission Unit (bytes). Leave blank for default (1500)
+                </div>
+            </div>
+        </div>
 
-    button {
-      background-color: #cc0000;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      padding: 8px 16px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
+        <div class="form-group">
+            <label for="mss">MSS</label>
+            <div class="form-group-content">
+                <input type="text" id="mss" name="mss" class="form-control" style="max-width: 200px;" placeholder="">
+                <div class="help-text">
+                    Maximum Segment Size (bytes). Leave blank for default
+                </div>
+            </div>
+        </div>
 
-    button:hover {
-      background-color: #e60000;
-    }
-
-    .secondary {
-      background-color: #888;
-    }
-
-    .secondary:hover {
-      background-color: #555;
-    }
-
-    /* Layout styling: broad and left-aligned */
-    .container {
-      width: 100%;
-      max-width: 1200px;
-      margin: 0;
-      padding: 0;
-    }
-  </style>
-</head>
-<body>
-
-  <div class="container">
-    <h2>LAN Interface Configuration</h2>
-
-    <!-- General Configuration -->
-    <fieldset>
-      <legend>General Configuration</legend>
-      
-      <div class="checkbox-label">
-        <input type="checkbox" id="enable">
-        <label for="enable">Enable Interface</label>
-      </div>
-
-      <label for="description">Description</label>
-      <input type="text" id="description" placeholder="LAN">
-
-      <label for="ipv4type">IPv4 Configuration Type</label>
-      <select id="ipv4type">
-        <option>Static IPv4</option>
-        <option>DHCP</option>
-        <option>None</option>
-      </select>
-
-      <label for="ipv6type">IPv6 Configuration Type</label>
-      <select id="ipv6type">
-        <option>None</option>
-        <option>Static IPv6</option>
-        <option>DHCP6</option>
-        <option>SLAAC</option>
-      </select>
-
-      <label for="mac">MAC Address</label>
-      <input type="text" id="mac" placeholder="00:11:22:33:44:55">
-
-      <label for="mtu">MTU</label>
-      <input type="text" id="mtu" placeholder="1500">
-
-      <label for="mss">MSS</label>
-      <input type="text" id="mss" placeholder="">
-
-      <label for="speed">Speed and Duplex</label>
-      <select id="speed">
-        <option>Default (negotiated)</option>
-        <option>10baseT full-duplex</option>
-        <option>100baseTX full-duplex</option>
-        <option>1000baseT full-duplex</option>
-      </select>
-    </fieldset>
-
-    <!-- Static IPv4 Configuration -->
-    <fieldset>
-      <legend>Static IPv4 Configuration</legend>
-
-      <label for="ipv4addr">IPv4 Address</label>
-      <input type="text" id="ipv4addr" placeholder="192.168.1.1/24">
-
-      <label for="ipv4gw">IPv4 Upstream Gateway</label>
-      <input type="text" id="ipv4gw" placeholder="192.168.1.254">
-    </fieldset>
-
-    <!-- Reserved Networks -->
-    <fieldset>
-      <legend>Reserved Networks</legend>
-
-      <div class="checkbox-label">
-        <input type="checkbox" id="blockprivate">
-        <label for="blockprivate">Block private networks and loopback addresses</label>
-      </div>
-
-      <div class="checkbox-label">
-        <input type="checkbox" id="blockbogons">
-        <label for="blockbogons">Block bogon networks</label>
-      </div>
-    </fieldset>
-
-    <div class="btn-group">
-      <button class="secondary">Cancel</button>
-      <button>Save</button>
+        <div class="form-group">
+            <label for="speed">Speed and Duplex</label>
+            <div class="form-group-content">
+                <select id="speed" name="speed" class="form-control" style="max-width: 400px;">
+                    <option value="default" selected>Default (negotiated)</option>
+                    <option value="10baseTFD">10baseT full-duplex</option>
+                    <option value="100baseTXFD">100baseTX full-duplex</option>
+                    <option value="1000baseTFD">1000baseT full-duplex</option>
+                </select>
+            </div>
+        </div>
     </div>
-  </div>
+</div>
 
-</body>
+<div class="settings-section">
+    <h5>Static IPv4 Configuration</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="ipv4addr">IPv4 Address</label>
+            <div class="form-group-content">
+                <input type="text" id="ipv4addr" name="ipv4addr" class="form-control" style="max-width: 400px;" placeholder="192.168.1.1/24">
+                <div class="help-text">
+                    IPv4 address in CIDR format (e.g., 192.168.1.1/24)
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="ipv4gw">IPv4 Upstream Gateway</label>
+            <div class="form-group-content">
+                <input type="text" id="ipv4gw" name="ipv4gw" class="form-control" style="max-width: 400px;" placeholder="192.168.1.254">
+                <div class="help-text">
+                    Enter the upstream gateway IPv4 address (usually not required for LAN)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="settings-section">
+    <h5>Reserved Networks</h5>
+    
+    <div style="padding: 20px;">
+        <div class="form-group">
+            <label for="blockprivate">Block private networks</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="blockprivate" name="blockprivate">
+                    <label class="form-check-label" for="blockprivate">
+                        Block private networks and loopback addresses
+                    </label>
+                </div>
+                <div class="help-text">
+                    Blocks traffic from IP addresses that are reserved for private networks per RFC 1918 and loopback addresses
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="blockbogons">Block bogon networks</label>
+            <div class="form-group-content">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="blockbogons" name="blockbogons">
+                    <label class="form-check-label" for="blockbogons">
+                        Block bogon networks
+                    </label>
+                </div>
+                <div class="help-text">
+                    Blocks traffic from reserved IP addresses (but not RFC 1918) or not yet assigned by IANA
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2" style="margin-top: 20px;">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <button type="button" class="btn btn-secondary">Cancel</button>
+</div>
+
+</form>
 
 {% endblock %}

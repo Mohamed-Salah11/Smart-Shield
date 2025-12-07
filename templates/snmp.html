@@ -1,187 +1,169 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SNMP Configuration</title>
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f5f6f7;
-  margin: 0;
-  padding: 0;
-}
-.tabs {
-  display: flex;
-  background: #b01f24;
-  color: white;
-  font-weight: bold;
-}
-.tabs div {
-  padding: 10px 30px;
-  cursor: pointer;
-  user-select: none;
-}
-.tabs div.active {
-  background: #fff;
-  color: #b01f24;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px;
-}
-.container {
-  background: #fff;
-  margin: 20px;
-  border-radius: 6px;
-  padding: 20px;
-  box-shadow: 0 0 5px rgba(0,0,0,0.1);
-}
-h2 {
-  margin-top: 0;
-  border-bottom: 2px solid #ddd;
-  padding-bottom: 10px;
-}
-.section {
-  margin-bottom: 25px;
-}
-label {
-  display: block;
-  margin: 8px 0 4px;
-  font-weight: bold;
-}
-select, input[type="text"], input[type="number"] {
-  width: 100%;
-  padding: 6px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-.checkbox-group {
-  margin-top: 10px;
-}
-.checkbox-group label {
-  font-weight: normal;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 4px 0;
-}
-.save-btn {
-  background: #28a745;
-  color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.save-btn:hover {
-  background: #1e7e34;
-}
-</style>
-</head>
-<body>
-
-<div class="tabs">
-  <div class="tab active" data-tab="SNMP">SNMP</div>
+{% block main %}
+<div class="breadcrumb">
+	<span>Services / SNMP</span>
 </div>
 
-<div id="SNMP" class="container tab-content">
-  <h2>SNMP Daemon</h2>
-  <div class="section">
-    <label><input type="checkbox" id="snmpEnable"> Enable SNMP Daemon and its controls</label>
-  </div>
+<div class="settings-section">
+	<h5>SNMP Daemon</h5>
+	
+	<div class="form-group">
+		<label>Enable SNMP</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="snmpEnable">
+				<label class="form-check-label" for="snmpEnable">Enable SNMP Daemon and its controls</label>
+			</div>
+		</div>
+	</div>
+</div>
 
-  <div id="snmpSettings" class="section">
-    <h2>SNMP Daemon Settings</h2>
-    <label>Polling Port</label>
-    <input type="number" id="snmpPort" placeholder="161">
+<div class="settings-section" id="snmpSettings">
+	<h5>SNMP Daemon Settings</h5>
 
-    <label>System Location</label>
-    <input type="text" id="systemLocation" placeholder="Server Room">
+	<div class="form-group">
+		<label>Polling Port</label>
+		<div class="form-group-content">
+			<input type="number" class="form-control" id="snmpPort" placeholder="161" style="max-width: 150px;">
+		</div>
+	</div>
 
-    <label>System Contact</label>
-    <input type="text" id="systemContact" placeholder="admin@example.com">
+	<div class="form-group">
+		<label>System Location</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="systemLocation" placeholder="Server Room" style="max-width: 300px;">
+		</div>
+	</div>
 
-    <label>Read Community String</label>
-    <input type="text" id="readCommunity" placeholder="public">
-  </div>
+	<div class="form-group">
+		<label>System Contact</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="systemContact" placeholder="admin@example.com" style="max-width: 300px;">
+		</div>
+	</div>
 
-  <div class="section">
-    <h2>SNMP Traps</h2>
-    <label><input type="checkbox" id="snmpTrapEnable"> Enable SNMP Trap and its controls</label>
-  </div>
+	<div class="form-group">
+		<label>Read Community String</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="readCommunity" placeholder="public" style="max-width: 300px;">
+		</div>
+	</div>
+</div>
 
-  <div class="section">
-    <h2>SNMP Modules</h2>
-    <div class="checkbox-group">
-      <label><input type="checkbox" id="moduleMBIL"> MBIL</label>
-      <label><input type="checkbox" id="moduleNetgraph"> Netgraph</label>
-      <label><input type="checkbox" id="modulePF"> PF</label>
-      <label><input type="checkbox" id="moduleHostRes"> Host Resources</label>
-      <label><input type="checkbox" id="moduleUCD"> UCD</label>
-      <label><input type="checkbox" id="moduleRegex"> Regex</label>
-    </div>
-  </div>
+<div class="settings-section">
+	<h5>SNMP Traps</h5>
+	
+	<div class="form-group">
+		<label>Enable SNMP Traps</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="snmpTrapEnable">
+				<label class="form-check-label" for="snmpTrapEnable">Enable SNMP Trap and its controls</label>
+			</div>
+		</div>
+	</div>
+</div>
 
-  <div class="section">
-    <h2>Interface Binding</h2>
-    <label>Internet Protocol</label>
-    <select id="ipProtocol">
-      <option>IPv4</option>
-      <option>IPv6</option>
-    </select>
+<div class="settings-section">
+	<h5>SNMP Modules</h5>
+	
+	<div class="form-group">
+		<label>Modules</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="moduleMBIL">
+				<label class="form-check-label" for="moduleMBIL">MBIL</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="moduleNetgraph">
+				<label class="form-check-label" for="moduleNetgraph">Netgraph</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="modulePF">
+				<label class="form-check-label" for="modulePF">PF</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="moduleHostRes">
+				<label class="form-check-label" for="moduleHostRes">Host Resources</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="moduleUCD">
+				<label class="form-check-label" for="moduleUCD">UCD</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="moduleRegex">
+				<label class="form-check-label" for="moduleRegex">Regex</label>
+			</div>
+		</div>
+	</div>
+</div>
 
-    <label>Bind Interfaces</label>
-    <select id="bindInterface">
-      <option>All</option>
-      <option>WAN</option>
-      <option>LAN</option>
-      <option>Localhost</option>
-    </select>
-  </div>
+<div class="settings-section">
+	<h5>Interface Binding</h5>
 
-  <button class="save-btn" onclick="saveSNMP()">Save</button>
+	<div class="form-group">
+		<label>Internet Protocol</label>
+		<div class="form-group-content">
+			<select class="form-control" id="ipProtocol" style="max-width: 200px;">
+				<option>IPv4</option>
+				<option>IPv6</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label>Bind Interfaces</label>
+		<div class="form-group-content">
+			<select class="form-control" id="bindInterface" style="max-width: 200px;">
+				<option>All</option>
+				<option>WAN</option>
+				<option>LAN</option>
+				<option>Localhost</option>
+			</select>
+		</div>
+	</div>
+</div>
+
+<div class="d-flex gap-2 mt-3">
+	<button type="button" class="btn btn-primary" onclick="saveSNMP()">Save</button>
 </div>
 
 <script>
 document.getElementById('snmpEnable').addEventListener('change', function() {
-  const enabled = this.checked;
-  document.querySelectorAll('#snmpSettings input').forEach(inp => inp.disabled = !enabled);
+	const enabled = this.checked;
+	document.querySelectorAll('#snmpSettings input').forEach(inp => inp.disabled = !enabled);
 });
 
 document.getElementById('snmpTrapEnable').addEventListener('change', function() {
-  const trapEnabled = this.checked;
-  document.querySelectorAll('.checkbox-group input').forEach(inp => inp.disabled = !trapEnabled);
+	const trapEnabled = this.checked;
+	document.querySelectorAll('.checkbox-group input').forEach(inp => inp.disabled = !trapEnabled);
 });
 
 function saveSNMP() {
-  const config = {
-    snmpEnabled: document.getElementById('snmpEnable').checked,
-    port: document.getElementById('snmpPort').value,
-    location: document.getElementById('systemLocation').value,
-    contact: document.getElementById('systemContact').value,
-    community: document.getElementById('readCommunity').value,
-    trapsEnabled: document.getElementById('snmpTrapEnable').checked,
-    modules: {
-      mbil: document.getElementById('moduleMBIL').checked,
-      netgraph: document.getElementById('moduleNetgraph').checked,
-      pf: document.getElementById('modulePF').checked,
-      hostResources: document.getElementById('moduleHostRes').checked,
-      ucd: document.getElementById('moduleUCD').checked,
-      regex: document.getElementById('moduleRegex').checked
-    },
-    interfaceBinding: {
-      ipProtocol: document.getElementById('ipProtocol').value,
-      bindInterface: document.getElementById('bindInterface').value
-    }
-  };
-  console.log('SNMP Configuration:', config);
-  alert('SNMP settings saved (check console for details).');
+	const config = {
+		snmpEnabled: document.getElementById('snmpEnable').checked,
+		port: document.getElementById('snmpPort').value,
+		location: document.getElementById('systemLocation').value,
+		contact: document.getElementById('systemContact').value,
+		community: document.getElementById('readCommunity').value,
+		trapsEnabled: document.getElementById('snmpTrapEnable').checked,
+		modules: {
+			mbil: document.getElementById('moduleMBIL').checked,
+			netgraph: document.getElementById('moduleNetgraph').checked,
+			pf: document.getElementById('modulePF').checked,
+			hostResources: document.getElementById('moduleHostRes').checked,
+			ucd: document.getElementById('moduleUCD').checked,
+			regex: document.getElementById('moduleRegex').checked
+		},
+		interfaceBinding: {
+			ipProtocol: document.getElementById('ipProtocol').value,
+			bindInterface: document.getElementById('bindInterface').value
+		}
+	};
+	console.log('SNMP Configuration:', config);
+	alert('SNMP settings saved (check console for details).');
 }
 </script>
-
-</body>
-</html>
 
 {% endblock %}

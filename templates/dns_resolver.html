@@ -1,9 +1,5 @@
 {% extends 'base.html' %}
 
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
-{% endblock %}
-
 {% block main %}
 
 <!-- Breadcrumb and notice -->
@@ -21,7 +17,7 @@
 </div>
 
 <!-- <div class="notice-alert">
-	ISC DHCP has reached end-of-life and will be removed in a future version of pfSense. Visit <a href="#">System &gt; Advanced &gt; Networking</a> to switch DHCP backend.
+	ISC DHCP has reached end-of-life and will be removed in a future version of ZGate. Visit <a href="#">System &gt; Advanced &gt; Networking</a> to switch DHCP backend.
 </div> -->
 
 <!-- Tabs -->
@@ -124,7 +120,7 @@
 					<select class="form-select" name="local_zone_type">
 						<option>Transparent</option>
 					</select>
-					<div class="option-desc">The local-zone type used for the pfSense system domain (System &gt; General Setup). Transparent is the default.</div>
+					<div class="option-desc">The local-zone type used for the ZGate system domain (System &gt; General Setup). Transparent is the default.</div>
 				</div>
 			</div>
 

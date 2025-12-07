@@ -1,24 +1,20 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">ZGate Global Support is available 24/7</li>
-        </ol>
-    </nav>
 
-    <div class="mb-2">
-        <span class="badge bg-danger">Step 1 of 9</span>
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+    Wizard / ZGate Setup / ZGate Global Support is available 24/7
+</div>
+
+<div class="mb-3">
+    <span class="badge bg-danger">Step 1 of 9</span>
+</div>
+
+<div class="settings-section">
+    <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">
+        ZGate Global Support is available 24/7
     </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">
-            ZGate Global Support is available 24/7
-        </div>
-        <div class="card-body">
             <p class="card-text">Our 24/7 worldwide team of support engineers are the most qualified to diagnose your issue and resolve it quickly, from branch office to enterprise — on premises to cloud.</p>
 
             <p class="card-text">We offer several support subscription plans tailored to fit different environment sizes and requirements. Many companies around the world choose ZGate support because:</p>
@@ -29,15 +25,13 @@
                 <li>Our support engineers hold many prestigious network engineer certificates and have years of hands-on experience with networking.</li>
             </ul>
 
-            <a href="#" class="btn btn-info">Learn more</a>
-        </div>
-    </div>
+    <a href="#" class="btn btn-info">Learn more</a>
+</div>
 
-    <div class="mt-3">
-        <a href="{{ url_for('system.setup_wizard_step', step=3) }}" class="btn btn-primary">
-            &raquo;&raquo; Next
-        </a>
-    </div>
+<div class="d-flex justify-content-start mt-3">
+    <a href="{{ url_for('system.setup_wizard_step', step=3) }}" class="btn btn-primary">
+        &raquo;&raquo; Next
+    </a>
 </div>
 
 {% endblock %}

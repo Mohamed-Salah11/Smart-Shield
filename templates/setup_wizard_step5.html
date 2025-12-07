@@ -1,16 +1,9 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Configure WAN Interface</li>
-        </ol>
-    </nav>
+<div class="breadcrumb">Wizard / ZGate Setup / Configure WAN Interface</div>
 
-    <div class="mb-2">
+<div class="mb-3">
         <div class="progress" style="height:6px;">
             <div class="progress-bar bg-danger" role="progressbar" style="width:44%;" aria-valuenow="44" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
@@ -20,9 +13,8 @@
     </div>
 
     <form method="post" action="#">
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">Configure WAN Interface</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Configure WAN Interface</div>
                 <p>On this screen the Wide Area Network information will be configured.</p>
 
                 <div class="row mb-3">
@@ -36,12 +28,10 @@
                         </select>
                     </div>
                 </div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">General configuration</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">General configuration</div>
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">MAC Address</label>
                     <div class="col-sm-6">
@@ -65,13 +55,10 @@
                         <div class="form-text">If a value is entered in this field, then MSS clamping for TCP connections to the value entered above minus 40 (TCP/IP header size) will be in effect.</div>
                     </div>
                 </div>
-
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">Static IP Configuration</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">Static IP Configuration</div>
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">IP Address</label>
                     <div class="col-sm-4">
@@ -96,12 +83,10 @@
                         <input class="form-control" name="upstream_gateway" value="">
                     </div>
                 </div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">DHCP client configuration</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">DHCP client configuration</div>
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">DHCP Hostname</label>
                     <div class="col-sm-6">
@@ -109,12 +94,10 @@
                         <div class="form-text">The value in this field is sent as the DHCP client identifier and hostname when requesting a DHCP lease. Some ISPs may require this (for client identification).</div>
                     </div>
                 </div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">PPPoE configuration</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">PPPoE configuration</div>
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">PPPoE Username</label>
                     <div class="col-sm-6"><input class="form-control" name="pppoe_user"></div>
@@ -150,12 +133,10 @@
                     <label class="col-sm-2 col-form-label">PPPoE Idle timeout</label>
                     <div class="col-sm-4"><input class="form-control" name="pppoe_idle"></div>
                 </div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">PPTP configuration</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">PPTP configuration</div>
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">PPTP Username</label>
                     <div class="col-sm-6"><input class="form-control" name="pptp_user"></div>
@@ -206,34 +187,28 @@
                     <label class="col-sm-2 col-form-label">PPTP Idle timeout</label>
                     <div class="col-sm-4"><input class="form-control" name="pptp_idle"></div>
                 </div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">RFC1918 Networks</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">RFC1918 Networks</div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="block_rfc1918" checked>
                     <label class="form-check-label" for="block_rfc1918">Block private networks from entering via WAN</label>
                 </div>
                 <div class="form-text">When set, this option blocks traffic from IP addresses that are reserved for private networks as per RFC 1918 (10/8, 172.16/12, 192.168/16) as well as loopback addresses (127/8). This option should generally be left turned on, unless the WAN network lies in such a private address space, too.</div>
-            </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
-            <div class="card-header bg-dark text-white">Block bogon networks</div>
-            <div class="card-body">
+        <div class="settings-section">
+            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">Block bogon networks</div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="block_bogon" checked>
                     <label class="form-check-label" for="block_bogon">Block non-Internet routed networks from entering via WAN</label>
                 </div>
                 <div class="form-text">When set, this option blocks traffic from IP addresses that are reserved (but not RFC 1918) or not yet assigned by IANA. Bogons are prefixes that should never appear in the Internet routing table, and obviously should not appear as the source address in any packets received.</div>
-            </div>
         </div>
 
-        <div class="mt-3">
+        <div class="d-flex justify-content-start mt-3">
             <a href="{{ url_for('system.setup_wizard_step', step=6) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
         </div>
     </form>
-</div>
 {% endblock %}

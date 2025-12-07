@@ -224,6 +224,14 @@ def advanced_system_tunables_delete(index):
 def certificates():
     return render_template("certificates.html")
 
+@system_bp.route("/add_ca")
+def add_ca():
+    return render_template("add_ca.html")
+
+@system_bp.route("/add_certificate")
+def add_certificate():
+    return render_template("add_certificate.html")
+
 
 # ----------------------------
 # HIGH AVAILABILITY

@@ -1,97 +1,74 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<style>
-    .section-header { background-color: #333; color: white; padding: 12px 15px; margin-top: 20px; margin-bottom: 15px; font-weight: bold; }
-    .section-content { background: white; padding: 20px; border: 1px solid #ddd; }
-    .form-row { display: flex; margin-bottom: 20px; align-items: flex-start; }
-    .form-label { flex: 0 0 200px; font-weight: bold; padding-top: 5px; }
-    .form-input-area { flex: 1; }
-    .form-input-area input, .form-input-area select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
-    .form-input-area input:focus, .form-input-area select:focus { outline: none; border-color: #0275d8; }
-    .help-text { color: #666; font-size: 0.9em; margin-top: 5px; }
-    .checkbox-label { display: flex; align-items: center; margin-bottom: 10px; }
-    .checkbox-label input { margin-right: 8px; width: auto; }
-    .btn-save { background-color: #0275d8; color: white; padding: 10px 30px; border: none; border-radius: 3px; cursor: pointer; margin-top: 20px; }
-    .btn-save:hover { background-color: #0250a8; }
-    .btn-add { background-color: #5cb85c; color: white; padding: 8px 15px; border: none; border-radius: 3px; cursor: pointer; margin-top: 5px; }
-    .btn-add:hover { background-color: #4cae4c; }
-    .btn-remove { background-color: #f0ad4e; color: white; padding: 6px 12px; border: none; border-radius: 3px; cursor: pointer; margin-left: 5px; }
-    .btn-remove:hover { background-color: #ec971f; }
-    .upstream-server-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-    .upstream-server-row input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
-</style>
+<div class="breadcrumb">
+    <span>Services / DHCPv6 Relay</span>
+</div>
 
-<div class="container">
-    <!-- Page Title -->
-    <h2>Services / DHCPv6 Relay</h2>
-
-    <!-- DHCPv6 Relay Configuration Section -->
-    <div class="section-header">DHCPv6 Relay Configuration</div>
+<div class="settings-section">
+    <h5>DHCPv6 Relay Configuration</h5>
     
-    <div class="section-content">
-        <!-- Enable -->
-        <div class="form-row">
-            <div class="form-label">Enable</div>
-            <div class="form-input-area">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="enable_relay" class="enable-checkbox"> Enable DHCPv6 Relay
-                </label>
-            </div>
-        </div>
-
-        <!-- Downstream Interfaces -->
-        <div class="form-row">
-            <div class="form-label">Downstream Interfaces</div>
-            <div class="form-input-area">
-                <input type="text" id="downstream_interfaces" placeholder="">
-                <div class="help-text">Interfaces without an IPv6 address will not be shown</div>
-            </div>
-        </div>
-
-        <!-- CARP Status VIP -->
-        <div class="form-row">
-            <div class="form-label">CARP Status VIP</div>
-            <div class="form-input-area">
-                <select id="carp_status_vip" style="width: 100%; padding: 8px;">
-                    <option value="">none</option>
-                </select>
-                <div class="help-text">DHCPv6 Relay will be stopped when the chosen VIP is in BACKUP status, and started in MASTER status.</div>
-                <label class="checkbox-label" style="margin-top: 10px;">
-                    <input type="checkbox" class="carp-checkbox"> Append circuit ID and agent ID to requests
-                </label>
-                <div class="help-text">Append the circuit ID (interface number) and the agent ID to the DHCPv6 request</div>
-            </div>
-        </div>
-
-        <!-- Upstream Servers -->
-        <div class="form-row">
-            <div class="form-label">Upstream Servers</div>
-            <div class="form-input-area">
-                <div id="upstream_servers_container">
-                    <div class="upstream-server-row">
-                        <input type="text" placeholder="Upstream Server" class="upstream-server-input">
-                        <button type="button" class="btn-remove" onclick="removeUpstreamServer(this)" style="display: none;">✕</button>
-                    </div>
-                </div>
-                <button class="btn-add" onclick="addUpstreamServer()">+ Add Upstream Server</button>
-                <div class="help-text">The IPv6 addresses of the servers to which DHCPv6 requests are relayed</div>
+    
+    <div class="form-group">
+        <label>Enable</label>
+        <div class="form-group-content">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="enable_relay">
+                <label class="form-check-label" for="enable_relay">Enable DHCPv6 Relay</label>
             </div>
         </div>
     </div>
 
-    <!-- Save Button -->
-    <button class="btn-save" onclick="saveConfiguration()">💾 Save</button>
+    <div class="form-group">
+        <label>Downstream Interfaces</label>
+        <div class="form-group-content">
+            <input type="text" class="form-control" id="downstream_interfaces" placeholder="">
+            <div class="help-text">Interfaces without an IPv6 address will not be shown</div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>CARP Status VIP</label>
+        <div class="form-group-content">
+            <select class="form-control" id="carp_status_vip">
+                <option value="">none</option>
+            </select>
+            <div class="help-text">DHCPv6 Relay will be stopped when the chosen VIP is in BACKUP status, and started in MASTER status.</div>
+            <div class="form-check mt-2">
+                <input type="checkbox" class="form-check-input" id="append_circuit_id">
+                <label class="form-check-label" for="append_circuit_id">Append circuit ID and agent ID to requests</label>
+            </div>
+            <div class="help-text">Append the circuit ID (interface number) and the agent ID to the DHCPv6 request</div>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Upstream Servers</label>
+        <div class="form-group-content">
+            <div id="upstream_servers_container">
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control upstream-server-input" placeholder="Upstream Server">
+                    <button type="button" class="btn btn-danger" onclick="removeUpstreamServer(this)" style="display: none;">Delete</button>
+                </div>
+            </div>
+            <button class="btn btn-success" onclick="addUpstreamServer()">+ Add Upstream Server</button>
+            <div class="help-text">The IPv6 addresses of the servers to which DHCPv6 requests are relayed</div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 mt-3">
+    <button class="btn btn-primary" onclick="saveConfiguration()">Save</button>
 </div>
 
 <script>
     function addUpstreamServer() {
         const container = document.getElementById('upstream_servers_container');
         const rowDiv = document.createElement('div');
-        rowDiv.className = 'upstream-server-row';
+        rowDiv.className = 'd-flex gap-2 mb-2';
         rowDiv.innerHTML = `
-            <input type="text" placeholder="Upstream Server" class="upstream-server-input" style="padding: 8px;">
-            <button type="button" class="btn-remove" onclick="removeUpstreamServer(this)">✕</button>
+            <input type="text" placeholder="Upstream Server" class="form-control upstream-server-input">
+            <button type="button" class="btn btn-danger" onclick="removeUpstreamServer(this)">Delete</button>
         `;
         container.appendChild(rowDiv);
     }
@@ -105,7 +82,7 @@
             enable: document.getElementById('enable_relay').checked,
             downstream_interfaces: document.getElementById('downstream_interfaces').value,
             carp_status_vip: document.getElementById('carp_status_vip').value,
-            append_circuit_id: document.querySelector('.carp-checkbox').checked,
+            append_circuit_id: document.getElementById('append_circuit_id').checked,
             upstream_servers: Array.from(document.querySelectorAll('.upstream-server-input')).map(input => input.value).filter(v => v)
         };
         
@@ -121,7 +98,7 @@
             document.getElementById('enable_relay').checked = config.enable;
             document.getElementById('downstream_interfaces').value = config.downstream_interfaces || '';
             document.getElementById('carp_status_vip').value = config.carp_status_vip || '';
-            document.querySelector('.carp-checkbox').checked = config.append_circuit_id;
+            document.getElementById('append_circuit_id').checked = config.append_circuit_id;
             
             const container = document.getElementById('upstream_servers_container');
             container.innerHTML = '';
@@ -129,16 +106,16 @@
             if (config.upstream_servers && config.upstream_servers.length > 0) {
                 config.upstream_servers.forEach((server, index) => {
                     const rowDiv = document.createElement('div');
-                    rowDiv.className = 'upstream-server-row';
+                    rowDiv.className = 'd-flex gap-2 mb-2';
                     if (index === 0) {
                         rowDiv.innerHTML = `
-                            <input type="text" placeholder="Upstream Server" class="upstream-server-input" value="${server}" style="padding: 8px;">
-                            <button type="button" class="btn-remove" onclick="removeUpstreamServer(this)" style="display: none;">✕</button>
+                            <input type="text" placeholder="Upstream Server" class="form-control upstream-server-input" value="${server}">
+                            <button type="button" class="btn btn-danger" onclick="removeUpstreamServer(this)" style="display: none;">Delete</button>
                         `;
                     } else {
                         rowDiv.innerHTML = `
-                            <input type="text" placeholder="Upstream Server" class="upstream-server-input" value="${server}" style="padding: 8px;">
-                            <button type="button" class="btn-remove" onclick="removeUpstreamServer(this)">✕</button>
+                            <input type="text" placeholder="Upstream Server" class="form-control upstream-server-input" value="${server}">
+                            <button type="button" class="btn btn-danger" onclick="removeUpstreamServer(this)">Delete</button>
                         `;
                     }
                     container.appendChild(rowDiv);
