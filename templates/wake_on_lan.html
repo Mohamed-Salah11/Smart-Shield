@@ -21,7 +21,7 @@
 <div class="container-fluid">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('services') }}">Services</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('services.services_home') }}">Services</a></li>
       <li class="breadcrumb-item active" aria-current="page">Wake-on-LAN</li>
     </ol>
   </nav>
@@ -34,7 +34,7 @@
   <div class="card mb-4">
     <div class="card-header">Wake-on-LAN</div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('wake_on_lan') }}">
+      <form method="POST" action="{{ url_for('services.wake_on_lan') }}">
         <div class="mb-3">
           <label class="form-label"><strong>Interface</strong></label>
           <select class="form-select" name="interface" required>
@@ -123,7 +123,7 @@
       
       if (confirm('Send Wake-on-LAN packet to ' + mac + '?')) {
         // Send AJAX request to wake device
-        fetch('{{ url_for("wake_on_lan") }}', {
+        fetch('{{ url_for("services.wake_on_lan") }}', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

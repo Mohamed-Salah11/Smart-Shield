@@ -2,1043 +2,159 @@
 
 {% block main %}
 <div class="container-fluid">
-    <!-- Page Header -->
-    <div class="row">
-        <div class="col-12">
-            <h2>System / User Manager / Users</h2>
+
+    <h2>System / User Manager / Users</h2>
+
+    <div class="card mt-3">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Users</h5>
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Status</th>
+                        <th>Groups</th>
+                        <th style="width:100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>{{ u.username }}</td>
+                        <td>{{ u.full_name or '-' }}</td>
+                        <td>{{ u.status }}</td>
+                        <td>{{ u.groups or '-' }}</td>
+                        <td>
+                            <!-- Change PW Button -->
+                            <button class="btn btn-sm btn-primary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#pwModal{{ u.id }}">
+                                Change PW
+                            </button>
+
+                            <!-- Delete -->
+                            <form method="POST"
+                                  action="/system/user-manager/delete/{{ u.id }}"
+                                  style="display:inline-block;"
+                                  onsubmit="return confirm('Delete this user?')">
+
+                                <button class="btn btn-sm btn-danger">X</button>
+                            </form>
+                        </td>
+                    </tr>
+
+                    <!-- Password Modal -->
+                    <div class="modal fade" id="pwModal{{ u.id }}">
+                        <div class="modal-dialog">
+                            <form method="POST" action="/system/user-manager/change-password/{{ u.id }}">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5>Change Password for {{ u.username }}</h5>
+                                        <button class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+
+                                        <label>New Password</label>
+                                        <input type="password" name="new_password" class="form-control" required>
+
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-primary">Save</button>
+                                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                + Add User
+            </button>
+
+            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+                + Add Group
+            </button>
         </div>
     </div>
 
-    <!-- Tab Navigation -->
-    <ul class="nav nav-tabs" id="userManagerTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" 
-                    type="button" role="tab" aria-controls="users" aria-selected="true">
-                Users
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" 
-                    type="button" role="tab" aria-controls="groups" aria-selected="false">
-                Groups
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" 
-                    type="button" role="tab" aria-controls="settings" aria-selected="false">
-                Settings
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="change-password-tab" data-bs-toggle="tab" data-bs-target="#change-password" 
-                    type="button" role="tab" aria-controls="change-password" aria-selected="false">
-                Change Password
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="auth-servers-tab" data-bs-toggle="tab" data-bs-target="#auth-servers" 
-                    type="button" role="tab" aria-controls="auth-servers" aria-selected="false">
-                Authentication Servers
-            </button>
-        </li>
-    </ul>
-
-    <!-- Tab Content -->
-    <div class="tab-content" id="userManagerTabsContent">
-        <!-- Users Tab -->
-        <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Users</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th width="5%">
-                                        <input type="checkbox" class="form-check-input">
-                                    </th>
-                                    <th>Username</th>
-                                    <th>Full name</th>
-                                    <th>Status</th>
-                                    <th>Groups</th>
-                                    <th width="10%">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        <input type="checkbox" class="form-check-input">
-                                    </td>
-                                    <td>
-                                        <i class="fas fa-user-shield me-2"></i>admin
-                                    </td>
-                                    <td>System Administrator</td>
-                                    <td>
-                                        <i class="fas fa-check text-success"></i>
-                                    </td>
-                                    <td>admins</td>
-                                    <td>
-                                        <i class="fas fa-pen text-primary" title="Edit" style="cursor: pointer;"></i>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Action Buttons Below Table -->
-                    <div class="mt-3 d-flex justify-content-end">
-                        <button class="btn btn-success me-2" title="Add User" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                            <i class="fas fa-plus"></i> Add
-                        </button>
-                        <button class="btn btn-danger" title="Delete User">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                    
-                    <!-- Info Icon -->
-                    <div class="mt-3">
-                        <i class="fas fa-info-circle text-primary"></i>
-                        <span class="ms-2 text-muted">Additional packages may add other users that are not shown here</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Groups Tab -->
-        <div class="tab-pane fade" id="groups" role="tabpanel" aria-labelledby="groups-tab">
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Groups</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Group name</th>
-                                    <th>Description</th>
-                                    <th>Member Count</th>
-                                    <th width="15%">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>all</td>
-                                    <td>All Users</td>
-                                    <td>1</td>
-                                    <td>
-                                        <i class="fas fa-pen text-primary me-2" title="Edit" style="cursor: pointer;"></i>
-                                        <i class="fas fa-copy text-secondary" title="Copy" style="cursor: pointer;"></i>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>admins</td>
-                                    <td>System Administrators</td>
-                                    <td>1</td>
-                                    <td>
-                                        <i class="fas fa-pen text-primary me-2" title="Edit" style="cursor: pointer;"></i>
-                                        <i class="fas fa-copy text-secondary" title="Copy" style="cursor: pointer;"></i>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Add Button Below Table -->
-                    <div class="mt-3 d-flex justify-content-end">
-                        <button class="btn btn-success" title="Add Group" data-bs-toggle="modal" data-bs-target="#addGroupModal">
-                            <i class="fas fa-plus"></i> Add
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings Tab -->
-        <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Settings</h5>
-                </div>
-                <div class="card-body">
-                    <form id="settingsForm">
-                        <div class="row mb-4">
-                            <label for="session_timeout" class="col-sm-3 col-form-label">Session timeout</label>
-                            <div class="col-sm-6">
-                                <input type="number" class="form-control" id="session_timeout" name="session_timeout" value="240">
-                                <div class="form-text">
-                                    Time in minutes to expire idle management sessions. The default is 4 hours (240 minutes). Enter 0 to never expire sessions. NOTE: This is a security risk!
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <label for="auth_server" class="col-sm-3 col-form-label">Authentication Server</label>
-                            <div class="col-sm-6">
-                                <select class="form-select" id="auth_server" name="auth_server">
-                                    <option value="local" selected>Local Database</option>
-                                    <option value="ldap">LDAP Server</option>
-                                    <option value="radius">RADIUS Server</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <label for="password_hash" class="col-sm-3 col-form-label">Password Hash Algorithm</label>
-                            <div class="col-sm-6">
-                                <select class="form-select" id="password_hash" name="password_hash">
-                                    <option value="bcrypt" selected>bcrypt - Blowfish-based crypt</option>
-                                    <option value="sha512">SHA-512 based crypt</option>
-                                    <option value="md5">MD5 based crypt</option>
-                                </select>
-                                <div class="form-text">
-                                    Selects which algorithm the firewall will use when creating hashes for local user passwords.<br>
-                                    The most secure option is currently bcrypt. Some users may prefer SHA-512 based crypt hashes for compatibility or compliance purposes.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <label class="col-sm-3 col-form-label">Shell Authentication</label>
-                            <div class="col-sm-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="shell_auth" name="shell_auth">
-                                    <label class="form-check-label" for="shell_auth">
-                                        Use Authentication Server for Shell Authentication
-                                    </label>
-                                </div>
-                                <div class="form-text mt-2">
-                                    If RADIUS or LDAP server is selected it is used for console and SSH authentication. Otherwise, the Local Database is used.<br>
-                                    To allow logins with RADIUS credentials, equivalent local users with the expected privileges must be created first.<br>
-                                    To allow logins with LDAP credentials, Shell Authentication Group DN must be specified on the LDAP server configuration page.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <label for="auth_refresh" class="col-sm-3 col-form-label">Auth Refresh Time</label>
-                            <div class="col-sm-6">
-                                <input type="number" class="form-control" id="auth_refresh" name="auth_refresh" value="30">
-                                <div class="form-text">
-                                    Time in seconds to cache authentication results. The default is 30 seconds, maximum 3600 (one hour). Shorter times result in more frequent queries to authentication servers.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-sm-3"></div>
-                            <div class="col-sm-6">
-                                <button type="submit" class="btn btn-primary me-2">
-                                    <i class="fas fa-save"></i> Save
-                                </button>
-                                <button type="button" class="btn btn-info">
-                                    <i class="fas fa-edit"></i> Save & Test
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Change Password Tab -->
-        <div class="tab-pane fade" id="change-password" role="tabpanel" aria-labelledby="change-password-tab">
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Change Password</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-4">
-                        <p class="mb-2">
-                            This page changes the password for the current user in the local configuration. This affects all services which utilize the Local Authentication database (User Manager).
-                        </p>
-                        <p class="mb-0">
-                            This page cannot change passwords for users from other authentication sources such as LDAP or RADIUS.
-                        </p>
-                    </div>
-
-                    <form id="changePasswordForm">
-                        <div class="row mb-3">
-                            <label for="database" class="col-sm-3 col-form-label">Database</label>
-                            <div class="col-sm-6">
-                                <input type="text" class="form-control" id="database" name="database" value="Local Authentication" readonly>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label for="username_display" class="col-sm-3 col-form-label">Username</label>
-                            <div class="col-sm-6">
-                                <input type="text" class="form-control" id="username_display" name="username_display" value="admin" readonly>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label for="new_password" class="col-sm-3 col-form-label">Password</label>
-                            <div class="col-sm-6">
-                                <input type="password" class="form-control mb-2" id="new_password" name="new_password" placeholder="Enter a new password">
-                                <div class="form-text">
-                                    <strong>Hints:</strong><br>
-                                    Current NIST guidelines prioritize password length over complexity.<br>
-                                    The password cannot be identical to the username.
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <label for="confirm_password" class="col-sm-3 col-form-label">Confirmation</label>
-                            <div class="col-sm-6">
-                                <input type="password" class="form-control mb-2" id="confirm_password" name="confirm_password" placeholder="Type the new password again for confirmation.">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-sm-3"></div>
-                            <div class="col-sm-6">
-                                <button type="submit" class="btn btn-primary" onclick="changePassword(event)">
-                                    <i class="fas fa-save"></i> Save
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Authentication Servers Tab -->
-        <div class="tab-pane fade" id="auth-servers" role="tabpanel" aria-labelledby="auth-servers-tab">
-            <div class="card mt-3">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Authentication Servers</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Server Name</th>
-                                    <th>Type</th>
-                                    <th>Host Name</th>
-                                    <th width="15%">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Local Database</td>
-                                    <td></td>
-                                    <td>zgate</td>
-                                    <td>
-                                        <!-- No actions for Local Database -->
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Add Button Below Table -->
-                    <div class="mt-3 d-flex justify-content-end">
-                        <button class="btn btn-success" title="Add Authentication Server" data-bs-toggle="modal" data-bs-target="#addAuthServerModal">
-                            <i class="fas fa-plus"></i> Add
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
-<!-- Add Authentication Server Modal -->
-<div class="modal fade" id="addAuthServerModal" tabindex="-1" aria-labelledby="addAuthServerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addAuthServerModalLabel">Add Authentication Server</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addAuthServerForm">
-                    <!-- Server Settings -->
-                    <div class="card mb-3">
-                        <div class="card-header bg-dark text-white">
-                            <h6 class="mb-0">Server Settings</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <label for="descriptive_name" class="col-sm-3 col-form-label">Descriptive name</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="descriptive_name" name="descriptive_name" required>
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <label for="server_type" class="col-sm-3 col-form-label">Type</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="server_type" name="server_type" onchange="toggleServerOptions()">
-                                        <option value="ldap" selected>LDAP</option>
-                                        <option value="radius">RADIUS</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- LDAP Server Settings -->
-                    <div class="card mb-3" id="ldap-settings">
-                        <div class="card-header bg-dark text-white">
-                            <h6 class="mb-0">LDAP Server Settings</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <label for="hostname" class="col-sm-3 col-form-label">Hostname or IP address</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="hostname" name="hostname" required>
-                                    <div class="form-text">
-                                        <strong>NOTE:</strong> When using SSL/TLS or StartTLS, this hostname MUST match a Subject Alternative Name (SAN) or the Common Name (CN) of the LDAP server SSL/TLS certificate.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="port_value" class="col-sm-3 col-form-label">Port value</label>
-                                <div class="col-sm-6">
-                                    <input type="number" class="form-control" id="port_value" name="port_value" value="389">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="transport" class="col-sm-3 col-form-label">Transport</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="transport" name="transport">
-                                        <option value="standard" selected>Standard TCP</option>
-                                        <option value="ssl">SSL/TLS Encrypted</option>
-                                        <option value="starttls">StartTLS Encrypted</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="peer_certificate" class="col-sm-3 col-form-label">Peer Certificate Authority</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="peer_certificate" name="peer_certificate">
-                                        <option value="global" selected>Global Root CA List</option>
-                                        <option value="custom">Custom CA</option>
-                                    </select>
-                                    <div class="form-text">
-                                        This CA is used to validate the LDAP server certificate when 'SSL/TLS Encrypted' or 'StartTLS Encrypted' Transport is active. This CA must match the CA used by the LDAP server.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="protocol_version" class="col-sm-3 col-form-label">Protocol version</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="protocol_version" name="protocol_version">
-                                        <option value="3" selected>3</option>
-                                        <option value="2">2</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="server_timeout" class="col-sm-3 col-form-label">Server Timeout</label>
-                                <div class="col-sm-6">
-                                    <input type="number" class="form-control" id="server_timeout" name="server_timeout" value="25">
-                                    <div class="form-text">
-                                        Timeout for LDAP operations (seconds)
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="search_scope" class="col-sm-3 col-form-label">Search scope</label>
-                                <div class="col-sm-6">
-                                    <div class="mb-2">
-                                        <strong>Level</strong>
-                                    </div>
-                                    <select class="form-select mb-2" id="search_scope_level" name="search_scope_level">
-                                        <option value="one" selected>One Level</option>
-                                        <option value="subtree">Subtree</option>
-                                        <option value="base">Base</option>
-                                    </select>
-                                    <div class="mb-2">
-                                        <strong>Base DN</strong>
-                                    </div>
-                                    <input type="text" class="form-control" id="base_dn" name="base_dn">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="auth_containers" class="col-sm-3 col-form-label">Authentication containers</label>
-                                <div class="col-sm-6">
-                                    <textarea class="form-control mb-2" id="auth_containers" name="auth_containers" rows="3" placeholder="Containers"></textarea>
-                                    <button type="button" class="btn btn-info btn-sm">
-                                        <i class="fas fa-search"></i> Select a container
-                                    </button>
-                                    <div class="form-text mt-2">
-                                        <strong>Note:</strong> Semi-Colon separated. This will be prepended to the search base dn above or the full container path can be specified containing a dc= component.<br>
-                                        Example: CN=Users,DC=example,DC=com or OU=Staff,OU=Freelancers
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-3"></div>
-                                <div class="col-sm-6">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="extended_query" name="extended_query">
-                                        <label class="form-check-label" for="extended_query">
-                                            Enable extended query
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="bind_anonymous" name="bind_anonymous" checked>
-                                        <label class="form-check-label" for="bind_anonymous">
-                                            Use anonymous binds to resolve distinguished names
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="initial_template" class="col-sm-3 col-form-label">Initial Template</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="initial_template" name="initial_template">
-                                        <option value="openldap" selected>OpenLDAP</option>
-                                        <option value="msad">Microsoft Active Directory</option>
-                                        <option value="novell">Novell eDirectory</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="user_naming_attr" class="col-sm-3 col-form-label">User naming attribute</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="user_naming_attr" name="user_naming_attr" value="cn">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="group_naming_attr" class="col-sm-3 col-form-label">Group naming attribute</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="group_naming_attr" name="group_naming_attr" value="cn">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="group_member_attr" class="col-sm-3 col-form-label">Group member attribute</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="group_member_attr" name="group_member_attr" value="member">
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-3"></div>
-                                <div class="col-sm-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="rfc2307_groups" name="rfc2307_groups">
-                                        <label class="form-check-label" for="rfc2307_groups">
-                                            LDAP Server uses RFC 2307 style group membership
-                                        </label>
-                                        <div class="form-text">
-                                            RFC 2307 style group membership has members listed on the group object rather than using groups listed on user object. Leave unchecked for Active Directory style group membership (RFC 2307bis).
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="group_object_class" class="col-sm-3 col-form-label">Group Object Class</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="group_object_class" name="group_object_class" value="posixGroup">
-                                    <div class="form-text">
-                                        Object class used for groups in RFC2307 mode. Typically 'posixGroup' or 'group'.
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <label for="shell_auth_group_dn" class="col-sm-3 col-form-label">Shell Authentication Group DN</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="shell_auth_group_dn" name="shell_auth_group_dn">
-                                    <div class="form-text">
-                                        If LDAP server is used for shell authentication, user must be a member of this group and have a valid posixAccount attributes to be able to login.<br>
-                                        Example: CN=remoteusers,CN=Users,DC=example,DC=com
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-sm-3"></div>
-                                <div class="col-sm-6">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="utf8_encode" name="utf8_encode">
-                                        <label class="form-check-label" for="utf8_encode">
-                                            UTF8 encode LDAP parameters before sending them to the server.
-                                        </label>
-                                        <div class="form-text">
-                                            Required to support international characters, but may not be supported by every LDAP server.
-                                        </div>
-                                    </div>
-
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="username_alterations" name="username_alterations">
-                                        <label class="form-check-label" for="username_alterations">
-                                            Do not strip away parts of the username after the @ symbol
-                                        </label>
-                                        <div class="form-text">
-                                            e.g. user@host becomes user when unchecked.
-                                        </div>
-                                    </div>
-
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="allow_unauthenticated" name="allow_unauthenticated" checked>
-                                        <label class="form-check-label" for="allow_unauthenticated">
-                                            Allow unauthenticated bind
-                                        </label>
-                                        <div class="form-text">
-                                            Unauthenticated binds are sent with an existing login but with an empty password. Some LDAP servers (Microsoft AD) allow this type of bind without any possibility to disable it.
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="saveAuthServer()">
-                    <i class="fas fa-save"></i> Save
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Group Modal -->
-<div class="modal fade" id="addGroupModal" tabindex="-1" aria-labelledby="addGroupModalLabel" aria-hidden="true">
+<!-- ADD USER MODAL -->
+<div class="modal fade" id="addUserModal">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addGroupModalLabel">System / User Manager / Groups / Edit</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <form method="POST" action="/system/user-manager/add">
+            <div class="modal-content">
+
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="mb-0">Add New User</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <label>Username</label>
+                    <input name="username" class="form-control" required>
+
+                    <label class="mt-3">Password</label>
+                    <input name="password" type="password" class="form-control" required>
+
+                    <label class="mt-3">Full Name</label>
+                    <input name="full_name" class="form-control">
+
+                    <label class="mt-3">Assign Group</label>
+                    <select name="groups" class="form-select">
+                        <option value="">None</option>
+                        {% for g in groups %}
+                        <option value="{{ g.name }}">{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary">Save</button>
+                </div>
+
             </div>
-            <div class="modal-body">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h6 class="mb-0">Group Properties</h6>
-                    </div>
-                    <div class="card-body">
-                        <form id="addGroupForm">
-                            <div class="row mb-3">
-                                <label for="group_name" class="col-sm-3 col-form-label">Group name</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="group_name" name="group_name" required>
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <label for="scope" class="col-sm-3 col-form-label">Scope</label>
-                                <div class="col-sm-6">
-                                    <select class="form-select" id="scope" name="scope">
-                                        <option value="Local" selected>Local</option>
-                                        <option value="Remote">Remote</option>
-                                    </select>
-                                    <div class="form-text text-warning">
-                                        <strong>Warning:</strong> Changing this setting may affect the local groups file, in which case a reboot may be required for the changes to take effect.
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-4">
-                                <label for="description" class="col-sm-3 col-form-label">Description</label>
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" id="description" name="description" 
-                                           placeholder="Group description, for administrative information only">
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <label class="col-sm-3 col-form-label">Group membership</label>
-                                <div class="col-sm-9">
-                                    <div class="row">
-                                        <div class="col-6">
-                                            <label class="form-label">Not members</label>
-                                            <input type="text" class="form-control mb-1" id="search_not_members" placeholder="Type to search or add..." 
-                                                   onkeyup="filterMembers('not_members', this.value)" 
-                                                   onkeypress="handleEnterKey(event, 'not_members')">
-                                            <select class="form-select mb-2" id="not_members" name="not_members" multiple size="4" style="height: 100px;">
-                                                <option value="admin">admin</option>
-                                            </select>
-                                            <div class="text-center">
-                                                <button type="button" class="btn btn-info btn-sm mb-1" onclick="moveToMembers()" style="width: 100%;">
-                                                    Move to Members
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label">Members</label>
-                                            <input type="text" class="form-control mb-1" id="search_members" placeholder="Type to search or add..." 
-                                                   onkeyup="filterMembers('members', this.value)" 
-                                                   onkeypress="handleEnterKey(event, 'members')">
-                                            <select class="form-select mb-2" id="members" name="members" multiple size="4" style="height: 100px;">
-                                                <!-- Members will be moved here -->
-                                            </select>
-                                            <div class="text-center">
-                                                <button type="button" class="btn btn-info btn-sm mb-1" onclick="moveToNotMembers()" style="width: 100%;">
-                                                    Move to Not members
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="form-text mt-2">
-                                        Hold down CTRL (PC)/COMMAND (Mac) key to select multiple items. Press Enter in search box to add new member.
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ADD GROUP MODAL -->
+<div class="modal fade" id="addGroupModal">
+    <div class="modal-dialog">
+        <form method="POST" action="/system/user-manager/add-group">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5>Add New Group</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <label>Group Name</label>
+                    <input name="group_name" class="form-control" required>
+
+                    <label class="mt-3">Description</label>
+                    <input name="description" class="form-control">
+
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary">Save</button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="saveGroup()">
-                    <i class="fas fa-save"></i> Save
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            </div>
-        </div>
+        </form>
     </div>
 </div>
 
-<!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addUserForm">
-                    <!-- Basic User Information -->
-                    <div class="row mb-3">
-                        <label for="username" class="col-sm-3 col-form-label">Username</label>
-                        <div class="col-sm-6">
-                            <input type="text" class="form-control" id="username" name="username" required>
-                        </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <label for="password" class="col-sm-3 col-form-label">Password</label>
-                        <div class="col-sm-6">
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <label for="full_name" class="col-sm-3 col-form-label">Full Name</label>
-                        <div class="col-sm-6">
-                            <input type="text" class="form-control" id="full_name" name="full_name">
-                        </div>
-                    </div>
-
-                    <!-- Certificate Section -->
-                    <div class="card mt-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Certificate</h6>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-muted">No private CAs found. A private CA is required to create a new user certificate. Save the user first to import an external certificate.</p>
-                        </div>
-                    </div>
-
-                    <!-- Keys Section -->
-                    <div class="card mt-3">
-                        <div class="card-header bg-dark text-white">
-                            <h6 class="mb-0">Keys</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <label for="ssh_keys" class="col-sm-3 col-form-label">Authorized SSH Keys</label>
-                                <div class="col-sm-8">
-                                    <textarea class="form-control" id="ssh_keys" name="ssh_keys" rows="4" placeholder="Enter authorized SSH keys for this user"></textarea>
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <label for="ipsec_key" class="col-sm-3 col-form-label">IPsec Pre-Shared Key</label>
-                                <div class="col-sm-8">
-                                    <input type="text" class="form-control" id="ipsec_key" name="ipsec_key">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Shell Behavior Section -->
-                    <div class="card mt-3">
-                        <div class="card-header bg-dark text-white">
-                            <h6 class="mb-0">Shell Behavior</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <label class="col-sm-3 col-form-label">Keep Command History</label>
-                                <div class="col-sm-8">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="keep_history" name="keep_history">
-                                        <label class="form-check-label" for="keep_history">
-                                            Keep shell command history between login sessions
-                                        </label>
-                                    </div>
-                                    <div class="form-text">
-                                        If this user has shell access, this option preserves the last 1000 unique commands entered at a shell prompt between login sessions. The user can access history using the up and down arrows at an SSH or console shell prompt and search the history by typing a partial command and then using the up or down arrows.
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Group Membership -->
-                    <div class="row mt-4 mb-3">
-                        <label for="groups" class="col-sm-3 col-form-label">Groups</label>
-                        <div class="col-sm-6">
-                            <select class="form-select" id="groups" name="groups">
-                                <option value="">Select a group</option>
-                                <option value="admins">admins</option>
-                                <option value="users">users</option>
-                            </select>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" onclick="saveUser()">
-                    <i class="fas fa-save"></i> Save
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-.alert-warning {
-    border-left: 4px solid #fd7e14;
-}
-.card-header.bg-dark {
-    background-color: #343a40 !important;
-}
-.nav-tabs .nav-link.active {
-    background-color: #fff;
-    border-color: #dee2e6 #dee2e6 #fff;
-    color: #dc3545;
-    border-bottom: 2px solid #dc3545;
-}
-.nav-tabs .nav-link {
-    color: #6c757d;
-}
-.table th {
-    background-color: #f8f9fa;
-    border-bottom: 2px solid #dee2e6;
-}
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-</style>
-
-<script>
-// Initialize Bootstrap tabs
-document.addEventListener('DOMContentLoaded', function() {
-    var triggerTabList = [].slice.call(document.querySelectorAll('#userManagerTabs button'))
-    triggerTabList.forEach(function (triggerEl) {
-        var tabTrigger = new bootstrap.Tab(triggerEl)
-        
-        triggerEl.addEventListener('click', function (event) {
-            event.preventDefault()
-            tabTrigger.show()
-        })
-    })
-});
-
-// Save user function
-function saveUser() {
-    const form = document.getElementById('addUserForm');
-    const formData = new FormData(form);
-    
-    // Here you would typically send the data to your Flask backend
-    // For now, just close the modal and show a success message
-    const modal = bootstrap.Modal.getInstance(document.getElementById('addUserModal'));
-    modal.hide();
-    
-    // You can add actual form submission logic here
-    alert('User saved successfully!');
-}
-
-// Save group function
-function saveGroup() {
-    const form = document.getElementById('addGroupForm');
-    const formData = new FormData(form);
-    
-    // Here you would typically send the data to your Flask backend
-    // For now, just close the modal and show a success message
-    const modal = bootstrap.Modal.getInstance(document.getElementById('addGroupModal'));
-    modal.hide();
-    
-    // You can add actual form submission logic here
-    alert('Group saved successfully!');
-}
-
-// Move users between not members and members lists
-function moveToMembers() {
-    const notMembers = document.getElementById('not_members');
-    const members = document.getElementById('members');
-    
-    for (let i = notMembers.options.length - 1; i >= 0; i--) {
-        if (notMembers.options[i].selected) {
-            members.appendChild(notMembers.options[i]);
-        }
-    }
-}
-
-function moveToNotMembers() {
-    const notMembers = document.getElementById('not_members');
-    const members = document.getElementById('members');
-    
-    for (let i = members.options.length - 1; i >= 0; i--) {
-        if (members.options[i].selected) {
-            notMembers.appendChild(members.options[i]);
-        }
-    }
-}
-
-// Filter members based on search input
-function filterMembers(selectId, searchTerm) {
-    const select = document.getElementById(selectId);
-    const options = select.getElementsByTagName('option');
-    
-    for (let i = 0; i < options.length; i++) {
-        const optionText = options[i].textContent || options[i].innerText;
-        if (optionText.toLowerCase().indexOf(searchTerm.toLowerCase()) > -1) {
-            options[i].style.display = "";
-        } else {
-            options[i].style.display = "none";
-        }
-    }
-}
-
-// Handle Enter key to add new member
-function handleEnterKey(event, selectId) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        const searchInput = event.target;
-        const searchTerm = searchInput.value.trim();
-        
-        if (searchTerm && !optionExists(selectId, searchTerm)) {
-            addNewMember(selectId, searchTerm);
-            searchInput.value = '';
-        }
-    }
-}
-
-// Check if option already exists in select
-function optionExists(selectId, value) {
-    const select = document.getElementById(selectId);
-    const options = select.getElementsByTagName('option');
-    
-    for (let i = 0; i < options.length; i++) {
-        if (options[i].value === value) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Add new member to select list
-function addNewMember(selectId, memberName) {
-    const select = document.getElementById(selectId);
-    const option = document.createElement('option');
-    option.value = memberName;
-    option.textContent = memberName;
-    option.selected = true;
-    select.appendChild(option);
-}
-
-// Change password function
-function changePassword(event) {
-    event.preventDefault();
-    
-    const newPassword = document.getElementById('new_password').value;
-    const confirmPassword = document.getElementById('confirm_password').value;
-    const username = document.getElementById('username_display').value;
-    
-    // Validation
-    if (!newPassword) {
-        alert('Please enter a new password.');
-        return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-        alert('Password and confirmation do not match.');
-        return;
-    }
-    
-    if (newPassword === username) {
-        alert('The password cannot be identical to the username.');
-        return;
-    }
-    
-    // Here you would typically send the data to your Flask backend
-    // For now, just show a success message
-    alert('Password changed successfully!');
-    
-    // Clear the form
-    document.getElementById('new_password').value = '';
-    document.getElementById('confirm_password').value = '';
-}
-
-// Toggle server type specific options
-function toggleServerOptions() {
-    const serverType = document.getElementById('server_type').value;
-    const ldapOptions = document.getElementById('ldap-options');
-    const radiusOptions = document.getElementById('radius-options');
-    const portField = document.getElementById('port');
-    
-    // Hide all options first
-    ldapOptions.style.display = 'none';
-    radiusOptions.style.display = 'none';
-    
-    // Show relevant options and set default ports
-    if (serverType === 'ldap') {
-        ldapOptions.style.display = 'block';
-        portField.value = '389';
-    } else if (serverType === 'radius') {
-        radiusOptions.style.display = 'block';
-        portField.value = '1812';
-    }
-}
-
-// Save authentication server function
-function saveAuthServer() {
-    const form = document.getElementById('addAuthServerForm');
-    const formData = new FormData(form);
-    
-    // Basic validation
-    const serverName = document.getElementById('server_name').value;
-    const serverType = document.getElementById('server_type').value;
-    const hostName = document.getElementById('host_name').value;
-    
-    if (!serverName || !serverType || !hostName) {
-        alert('Please fill in all required fields.');
-        return;
-    }
-    
-    // Here you would typically send the data to your Flask backend
-    // For now, just close the modal and show a success message
-    const modal = bootstrap.Modal.getInstance(document.getElementById('addAuthServerModal'));
-    modal.hide();
-    
-    alert('Authentication server saved successfully!');
-}
-</script>
 {% endblock %}

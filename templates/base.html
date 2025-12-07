@@ -9,7 +9,7 @@
 <body>
 <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+        <a class="navbar-brand" href="{{ url_for('system.dashboard') }}">
             <img src="{{ url_for('static', filename='images/ZGate.jpeg') }}" alt="Logo">
             ZGate
         </a>
@@ -22,18 +22,18 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="systemDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">System</a>
                     <ul class="dropdown-menu" aria-labelledby="systemDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('advanced') }}">Advanced</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('certificates') }}">Certificates</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('general_setup') }}">General Setup</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('high_availability') }}">High Availability</a></li>
-                        <!-- <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li> -->
-                        <li><a class="dropdown-item" href="{{ url_for('package_manager') }}">Package Manager</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('register') }}">Register</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('routing') }}">Routing</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('setup_wizard') }}">Setup Wizard</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('update_page') }}">Update</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('user_manager') }}">User Manager</a></li>
-                        <!-- <li><a class="dropdown-item" href="{{ url_for('user_password_manager') }}">User Password Manager</a></li> -->
+                        <li><a class="dropdown-item" href="{{ url_for('system.advanced') }}">Advanced</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.certificates') }}">Certificates</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.general_setup') }}">General Setup</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.high_availability') }}">High Availability</a></li>
+                        {# <li><a class="dropdown-item" href="{{ url_for('system.logout') }}">Logout</a></li> #}
+                        <li><a class="dropdown-item" href="{{ url_for('system.package_manager') }}">Package Manager</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.register') }}">Register</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('routing.routing_index') }}">Routing</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.update_page') }}">Update</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('users.user_manager') }}">User Manager</a></li>
+                        {# <li><a class="dropdown-item" href="{{ url_for('user_password_manager') }}">User Password Manager</a></li> #}
                     </ul>
                 </li>
 
@@ -41,9 +41,9 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="interfacesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Interfaces</a>
                     <ul class="dropdown-menu" aria-labelledby="interfacesDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('interfaces_wan') }}">WAN</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('interfaces_lan') }}">LAN</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('interfaces_assignments') }}">Assignments</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('interfaces.interfaces_wan') }}">WAN</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('interfaces.interfaces_lan') }}">LAN</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('interfaces.interfaces_assignments') }}">Assignments</a></li>
                     </ul>
                 </li>
 
@@ -51,12 +51,12 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="firewallDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Firewall</a>
                     <ul class="dropdown-menu" aria-labelledby="firewallDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('rules') }}">Rules</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('nat') }}">NAT</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('aliases') }}">Aliases</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('schedules') }}">Schedules</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('traffic_shaper') }}">Traffic Shaper</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('virtual_ips') }}">Virtual IPs</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.rules') }}">Rules</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.nat') }}">NAT</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.aliases') }}">Aliases</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.schedules') }}">Schedules</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.traffic_shaper') }}">Traffic Shaper</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('firewall.virtual_ips') }}">Virtual IPs</a></li>
                     </ul>
                 </li>
 
@@ -64,22 +64,22 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="servicesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Services</a>
                     <ul class="dropdown-menu" aria-labelledby="servicesDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('auto_config_backup') }}">Auto Config Backup</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('captive_portal') }}">Captive Portal</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcp_relay') }}">DHCP Relay</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcp_server') }}">DHCP Server</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcpv6_relay') }}">DHCPv6 Relay</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcpv6_server') }}">DHCPv6 Server</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dns_forwarder') }}">DNS Forwarder</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dns_resolver') }}">DNS Resolver</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dynamic_dns') }}">Dynamic DNS</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('igmp_proxy') }}">IGMP Proxy</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ntp') }}">NTP</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('openvpn_server') }}">OpenVPN Server</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('router_advertisement') }}">Router Advertisement</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('snmp') }}">SNMP</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('wake_on_lan') }}">Wake-on-LAN</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.auto_config_backup') }}">Auto Config Backup</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dhcp_relay') }}">DHCP Relay</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dhcp_server') }}">DHCP Server</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dhcpv6_relay') }}">DHCPv6 Relay</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dhcpv6_server') }}">DHCPv6 Server</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dns_forwarder') }}">DNS Forwarder</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dns_resolver') }}">DNS Resolver</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.igmp_proxy') }}">IGMP Proxy</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.ntp') }}">NTP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.openvpn_server') }}">OpenVPN Server</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.router_advertisement') }}">Router Advertisement</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.snmp') }}">SNMP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.wake_on_lan') }}">Wake-on-LAN</a></li>
                     </ul>
                 </li>
 
@@ -87,9 +87,9 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="vpnDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">VPN</a>
                     <ul class="dropdown-menu" aria-labelledby="vpnDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('openvpn') }}">OpenVPN</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ipsec') }}">IPsec</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('l2tp') }}">L2TP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('vpn.l2tp') }}">L2TP</a></li>
                     </ul>
                 </li>
 
@@ -97,76 +97,76 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="statusDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Status</a>
                     <ul class="dropdown-menu" aria-labelledby="statusDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('captive_portal') }}">Captive Portal</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('carp_failover') }}">CARP (failover)</a></li>
-                        <!-- <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcp_leases') }}">DHCP Leases</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dhcpv6_leases') }}">DHCPv6 Leases</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dns_resolver') }}">DNS Resolver</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('filter_reload') }}">Filter Reload</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('gateways') }}">Gateways</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('interfaces') }}">Interfaces</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ipsec') }}">IPsec</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('monitoring') }}">Monitoring</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ntp') }}">NTP</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('openvpn') }}">OpenVPN</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('queues') }}">Queues</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('services') }}">Services</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('system_logs') }}">System Logs</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('traffic_graph') }}">Traffic Graph</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li> -->
+                        <li><a class="dropdown-item" href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.carp_failover') }}">CARP (failover)</a></li>
+                        {# <li><a class="dropdown-item" href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.dhcp_leases') }}">DHCP Leases</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.dhcpv6_leases') }}">DHCPv6 Leases</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.dns_resolver') }}">DNS Resolver</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.filter_reload') }}">Filter Reload</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.gateways') }}">Gateways</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('interfaces.interfaces') }}">Interfaces</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.monitoring') }}">Monitoring</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.ntp') }}">NTP</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.queues') }}">Queues</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.services_home') }}">Services</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.system_logs') }}">System Logs</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('status.traffic_graph') }}">Traffic Graph</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('services.upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li> #}
                     </ul>
                 </li>
 
-                <!-- Diagnostics dropdown -->
-                <!-- <li class="nav-item dropdown">
+                {# Diagnostics dropdown
+                <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="diagnosticsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Diagnostics</a>
                     <ul class="dropdown-menu" aria-labelledby="diagnosticsDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('diagnostics') }}">Overview</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('arp_table') }}">ARP Table</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('authentication') }}">Authentication</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('backup_restore') }}">Backup &amp; Restore</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('command_prompt') }}">Command Prompt</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('dns_lookup') }}">DNS Lookup</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('edit_file') }}">Edit File</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('factory_defaults') }}">Factory Defaults</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('halt_system') }}">Halt System</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('limiter_info') }}">Limiter Info</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ndp_table') }}">NDP Table</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ndp_table') }}">NDP Table</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('packet_capture') }}">Packet Capture</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('pfinfo') }}">pfInfo</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('pftop') }}">pfTop</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('ping_diag') }}">Ping</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('reboot') }}">Reboot</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('routes_diag') }}">Routes</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('smart_status') }}">S.M.A.R.T. Status</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('sockets') }}">Sockets</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('states') }}">States</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('status_summary') }}">Status Summary</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('system_activity') }}">System Activity</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('tables') }}">Tables</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('test_port') }}">Test Port</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('tunnels') }}">Tunnels</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.diagnostics_home') }}">Overview</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.arp_table') }}">ARP Table</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.authentication') }}">Authentication</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.backup_restore') }}">Backup &amp; Restore</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.command_prompt') }}">Command Prompt</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.dns_lookup') }}">DNS Lookup</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.edit_file') }}">Edit File</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.factory_defaults') }}">Factory Defaults</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.halt_system') }}">Halt System</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.limiter_info') }}">Limiter Info</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.ndp_table') }}">NDP Table</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.ndp_table') }}">NDP Table</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.packet_capture') }}">Packet Capture</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.pfinfo') }}">pfInfo</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.pftop') }}">pfTop</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.ping_diag') }}">Ping</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.reboot') }}">Reboot</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.routes_diag') }}">Routes</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.smart_status') }}">S.M.A.R.T. Status</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.sockets') }}">Sockets</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.states') }}">States</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.status_summary') }}">Status Summary</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.system_activity') }}">System Activity</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.tables') }}">Tables</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.test_port') }}">Test Port</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('diagnostics.tunnels') }}">Tunnels</a></li>
                     </ul>
-                </li> -->
+                </li> #}
 
-                <!-- Help dropdown -->
-                <!-- <li class="nav-item dropdown">
+                {# Help dropdown
+                <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="helpDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Help</a>
                     <ul class="dropdown-menu" aria-labelledby="helpDropdown">
-                        <li><a class="dropdown-item" href="{{ url_for('docs') }}">Docs</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('about') }}">About</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('bug') }}">Bug</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('forum') }}">Forum</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('freebsd') }}">FreeBSD</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('pfsense_book') }}">ZGate Book</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('paid_support') }}">Paid Support</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('survey') }}">Survey</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('upgrade') }}">Upgrade</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('docs') }}">Documentation</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.docs') }}">Docs</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.about') }}">About</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.bug') }}">Bug</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.forum') }}">Forum</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.freebsd') }}">FreeBSD</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.pfsense_book') }}">ZGate Book</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.paid_support') }}">Paid Support</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.survey') }}">Survey</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.upgrade') }}">Upgrade</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('system.docs') }}">Documentation</a></li>
                     </ul>
-                </li> -->
+                </li> #}
             </ul>
         </div>
     </div>

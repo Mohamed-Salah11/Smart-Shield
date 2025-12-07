@@ -24,7 +24,7 @@
 <div class="container">
     <!-- Breadcrumb Navigation -->
     <div class="nav-breadcrumb">
-        Services / <a href="{{ url_for('dhcp_server_lan') }}">DHCP Server</a> / <a href="{{ url_for('dhcp_server_lan') }}">LAN</a> / Static Mapping / <strong>Edit</strong>
+        Services / <a href="{{ url_for('services.dhcp_server_lan') }}">DHCP Server</a> / <a href="{{ url_for('services.dhcp_server_lan') }}">LAN</a> / Static Mapping / <strong>Edit</strong>
     </div>
 
     <!-- Static DHCP Mapping Section -->
@@ -221,7 +221,7 @@
         
         // Redirect back to DHCP Server LAN page
         alert('Static mapping saved successfully!');
-        window.location.href = '{{ url_for("dhcp_server_lan") }}';
+        window.location.href = '{{ url_for("services.dhcp_server_lan") }}';
     }
     
     // Load existing mapping if editing

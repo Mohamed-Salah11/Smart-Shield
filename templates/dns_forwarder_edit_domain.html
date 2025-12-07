@@ -7,9 +7,9 @@
 {% block main %}
 <div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
   <div>
-    <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+    <a href="{{ url_for('services.services_home') }}" class="small-muted">Services</a>
     <span class="small-muted"> / </span>
-    <a href="{{ url_for('dns_forwarder') }}" class="breadcrumb-link">DNS Forwarder</a>
+    <a href="{{ url_for('services.dns_forwarder') }}" class="breadcrumb-link">DNS Forwarder</a>
     <span class="small-muted"> / </span>
     <span class="breadcrumb-link">Edit Domain Override</span>
   </div>

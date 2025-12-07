@@ -9,9 +9,9 @@
 <!-- Breadcrumb and notice -->
 <div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
 	<div>
-		<a href="{{ url_for('services') }}" class="small-muted">Services</a>
+		<a href="{{ url_for('services.services_home') }}" class="small-muted">Services</a>
 		<span class="small-muted"> / </span>
-		<a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
+		<a href="{{ url_for('services.dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
 		<span class="small-muted"> / </span>
 		<span class="breadcrumb-link">General Settings</span>
 	</div>
@@ -26,9 +26,9 @@
 
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-3">
-	<li class="nav-item"><a class="nav-link active" href="{{ url_for('dns_resolver') }}">General Settings</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver_advanced') }}">Advanced Settings</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('dns_resolver_access_lists') }}">Access Lists</a></li>
+	<li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dns_resolver') }}">General Settings</a></li>
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_advanced') }}">Advanced Settings</a></li>
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_access_lists') }}">Access Lists</a></li>
 </ul>
 
 <div class="card mb-3">
@@ -242,7 +242,7 @@
 		</table>
 	</div>
 	<div class="p-3 text-end">
-		<a class="btn btn-success btn-sm" href="{{ url_for('dns_resolver_edit_host') }}">+ Add</a>
+		<a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_host') }}">+ Add</a>
 	</div>
 </div>
 
@@ -279,7 +279,7 @@
 		</table>
 	</div>
 	<div class="p-3 text-end">
-		<a class="btn btn-success btn-sm" href="{{ url_for('dns_resolver_edit_domain') }}">+ Add</a>
+		<a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_domain') }}">+ Add</a>
 	</div>
 </div>
 
