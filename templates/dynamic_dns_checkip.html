@@ -8,7 +8,7 @@
 
 <div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
     <div>
-        <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+        <a href="{{ url_for('services.services_home') }}" class="small-muted">Services</a>
         <span class="small-muted"> / </span>
         <a href="{{ url_for('dynamic_dns') }}" class="breadcrumb-link">Dynamic DNS</a>
         <span class="small-muted"> / </span>
@@ -21,15 +21,15 @@
 
 <!-- Tabs (Check IP active) -->
 <ul class="nav nav-tabs mb-3">
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns') }}">Dynamic DNS Clients</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
-    <li class="nav-item"><a class="nav-link active" href="{{ url_for('dynamic_dns_checkip') }}">Check IP Services</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS Clients</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
+    <li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dynamic_dns_checkip') }}">Check IP Services</a></li>
 </ul>
 
 <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
         <div>Check IP Services</div>
-        <div><a class="btn btn-success btn-sm add-btn" href="{{ url_for('dynamic_dns_checkip_edit') }}"><span class="me-1">+</span> Add</a></div>
+        <div><a class="btn btn-success btn-sm add-btn" href="{{ url_for('services.dynamic_dns_checkip_edit') }}"><span class="me-1">+</span> Add</a></div>
     </div>
     <div class="card-body p-0">
         <table class="table mb-0">
