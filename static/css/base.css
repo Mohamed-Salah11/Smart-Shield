@@ -225,6 +225,56 @@ small {
   color: #17232b;
 }
 
+/* User panel in navbar */
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(11,18,24,0.55);
+}
+
+.user-avatar img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(11,18,24,0.75);
+}
+
+#userDropdown {
+  padding: 6px 12px;
+}
+
+#userDropdown:hover {
+  background: rgba(0,0,0,0.04);
+  border-radius: 6px;
+}
+
+.dropdown-menu-end {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.1);
+  min-width: 200px;
+}
+
+.dropdown-item svg {
+  vertical-align: middle;
+}
+
+.dropdown-item.text-danger:hover {
+  background-color: #dc3545;
+  color: white !important;
+}
+
+.dropdown-item.text-danger:hover svg {
+  fill: white;
+}
+
 /* ========================================
    BREADCRUMBS & PAGE TOOLBAR
 ======================================== */
