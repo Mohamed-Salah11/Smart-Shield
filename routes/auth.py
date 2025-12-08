@@ -27,6 +27,11 @@ def login():
         if user:
             session["username"] = username
             session["user_id"] = user["id"]
+            # Store profile picture in session
+            if user["profile_picture"]:
+                session["user_avatar"] = url_for('static', filename=user["profile_picture"])
+            else:
+                session.pop("user_avatar", None)
             return redirect(url_for("system.dashboard"))
         else:
             error = "Invalid username or password"

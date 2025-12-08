@@ -18,7 +18,10 @@ def init_db():
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         full_name TEXT,
-        status TEXT DEFAULT 'active'
+        status TEXT DEFAULT 'active',
+        profile_picture TEXT,
+        email TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
