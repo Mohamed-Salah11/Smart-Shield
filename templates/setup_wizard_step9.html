@@ -1,16 +1,9 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Reload in progress</li>
-        </ol>
-    </nav>
+<div class="breadcrumb">Wizard / ZGate Setup / Reload in Progress</div>
 
-    <div class="mb-2">
+<div class="mb-3">
         <div class="progress" style="height:6px;">
             <div class="progress-bar bg-danger" role="progressbar" style="width:88%;" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
@@ -19,19 +12,16 @@
         </div>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">Reload in progress</div>
-        <div class="card-body">
+    <div class="settings-section">
+        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Reload in progress</div>
             <p>A reload is now in progress. Please wait.</p>
             <p>The wizard will redirect to the next step once the reload is completed.</p>
-        </div>
     </div>
 
     <script>
     // Simulate reload progress then redirect to the final completion page after a short delay.
     setTimeout(function() {
-        window.location.href = "{{ url_for('setup_wizard_step', step=10) }}";
+        window.location.href = "{{ url_for('system.setup_wizard_step', step=10) }}";
     }, 3000);
     </script>
-</div>
 {% endblock %}

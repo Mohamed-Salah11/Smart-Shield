@@ -1,73 +1,57 @@
 {% extends 'base.html' %}
 
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
-{% endblock %}
-
 {% block main %}
-
-<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
-    <div>
-        <a href="{{ url_for('services') }}" class="small-muted">Services</a>
-        <span class="small-muted"> / </span>
-        <a href="{{ url_for('dynamic_dns') }}" class="breadcrumb-link">Dynamic DNS</a>
-        <span class="small-muted"> / </span>
-        <a href="{{ url_for('dynamic_dns_rfc2136') }}" class="breadcrumb-link">RFC 2136 Clients</a>
-    </div>
-    <div class="breadcrumb-actions">
-        <button class="btn btn-sm btn-danger" aria-label="help">?</button>
-    </div>
+<div class="breadcrumb">
+	<span>Services / Dynamic DNS / RFC 2136 Clients</span>
 </div>
 
-<!-- Tabs (RFC2136 active) -->
-<ul class="nav nav-tabs mb-3">
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns') }}">Dynamic DNS Clients</a></li>
-    <li class="nav-item"><a class="nav-link active" href="{{ url_for('dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
-    <li class="nav-item"><a class="nav-link" href="{{ url_for('dynamic_dns_checkip') }}">Check IP Services</a></li>
+<ul class="nav nav-tabs">
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS Clients</a></li>
+	<li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
+	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns_checkip') }}">Check IP Services</a></li>
 </ul>
 
-<div class="card mb-3">
-    <div class="card-header d-flex align-items-center justify-content-between">
-        <div>RFC2136 Clients</div>
-        <div><a class="btn btn-success btn-sm add-btn" href="{{ url_for('dynamic_dns_rfc2136_edit') }}"><span class="me-1">+</span> Add</a></div>
-    </div>
-    <div class="card-body p-0">
-        <table class="table mb-0">
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Interface</th>
-                    <th>Server</th>
-                    <th>Hostname</th>
-                    <th>Cached IP</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% set clients = session.get('rfc2136_clients', []) %}
-                {% if clients %}
-                    {% for c in clients %}
-                    <tr>
-                        <td>{% if not c.disabled %}<span class="status-green">●</span>{% else %}&nbsp;{% endif %}</td>
-                        <td>{{ c.interface }}</td>
-                        <td>{{ c.server }}</td>
-                        <td>{{ c.hostname }}</td>
-                        <td>&nbsp;</td>
-                        <td>{{ c.description }}</td>
-                        <td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="7">&nbsp;</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
+<div class="settings-section">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h5>RFC 2136 Clients</h5>
+		<a class="btn btn-success" href="{{ url_for('services.dynamic_dns_rfc2136_edit') }}">+ Add</a>
+	</div>
+	
+	<table class="table-bordered">
+		<thead>
+			<tr>
+				<th>Status</th>
+				<th>Interface</th>
+				<th>Server</th>
+				<th>Hostname</th>
+				<th>Cached IP</th>
+				<th>Description</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% set clients = session.get('rfc2136_clients', []) %}
+			{% if clients %}
+				{% for c in clients %}
+				<tr>
+					<td>{% if not c.disabled %}<span class="status-green">●</span>{% else %}&nbsp;{% endif %}</td>
+					<td>{{ c.interface }}</td>
+					<td>{{ c.server }}</td>
+					<td>{{ c.hostname }}</td>
+					<td>&nbsp;</td>
+					<td>{{ c.description }}</td>
+					<td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
+				</tr>
+				{% endfor %}
+			{% else %}
+				<tr>
+					<td colspan="7" style="text-align: center; padding: 20px;">No RFC 2136 clients configured.</td>
+				</tr>
+			{% endif %}
+		</tbody>
+	</table>
+	
+	<div class="help-text mt-2">Entries with a <span class="status-green">●</span> status column icon and IP address appearing in <span class="status-green">green</span> are up to date with Dynamic DNS provider. An update can be forced on the edit page for an entry.</div>
 </div>
-
-<p class="text-muted">Entries with a <span class="status-green">●</span> status column icon and IP address appearing in <span class="status-green">green</span> are up to date with Dynamic DNS provider. An update can be forced on the edit page for an entry.</p>
 
 {% endblock %}

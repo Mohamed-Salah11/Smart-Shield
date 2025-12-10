@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced.css') }}">
 
 <script>
     // Toggle Maximum MSS field visibility based on Enable Maximum MSS checkbox
@@ -26,31 +25,28 @@
 </script>
 
 <div class="breadcrumb">
-    System / <a href="{{ url_for('admin_access') }}">Advanced</a> / Firewall & NAT
+    System / <a href="{{ url_for('system.admin_access') }}">Advanced</a> / Firewall & NAT
 </div>
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('admin_access') }}">Admin Access</a>
+        <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('advanced_firewall_nat') }}">Firewall & NAT</a>
+        <a class="nav-link active" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('advanced_network') }}">Network</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('advanced_miscellaneous') }}">Miscellaneous</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('advanced_system_tunables') }}">System Tunables</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('notifications') }}">Notifications</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
     </li>
 </ul>
 
-<form method="POST" action="{{ url_for('advanced_firewall_nat') }}">
+<form method="POST" action="{{ url_for('system.advanced_firewall_nat') }}">
 
 <div class="settings-section">
     <h5>Packet Processing</h5>
@@ -237,7 +233,7 @@
                     </label>
                 </div>
                 <div class="help-text">
-                    Note: This converts pfSense into a routing only platform!
+                    Note: This converts ZGate into a routing only platform!
                 </div>
                 <div class="help-text" style="margin-top: 5px;">
                     Note: This will also turn off NAT! To only disable NAT, and not firewall rules, visit the <a href="#" style="color: #007bff;">Outbound NAT</a> page.

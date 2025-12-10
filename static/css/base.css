@@ -1,40 +1,1483 @@
-/* Base Layout Styles */
+/* ========================================
+   BASE RESET & ROOT VARIABLES
+======================================== */
+
+:root {
+  --bg: #d9dee2;
+  --panel: #f5f5f5;
+  --text-color: #000000;
+
+  --primary: #0066cc;
+  --primary-dark: #0052a3;
+  --primary-soft: #f0f7ff;
+
+  --secondary: #6c757d;
+  --secondary-dark: #5a6268;
+
+  --success: #28a745;
+  --success-dark: #218838;
+
+  --danger: #dc3545;
+  --danger-dark: #c82333;
+
+  --warning: #ffc107;
+  --info: #17a2b8;
+
+  --border-color: #e0e0e0;
+  --border-color-soft: #dee2e6;
+
+  --muted: #6c757d;
+  --heading-blue: #003366;
+
+  --shadow-soft: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ========================================
+   BASE TYPOGRAPHY & BODY
+======================================== */
+
 body {
-    background-color: #f5f5f5;
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-	background:var(--bg);
-	color:#000000;
-
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-color);
 }
 
-/* Top navbar style to match design: full-width rounded light bar */
-.navbar{
-	background:var(--panel) !important;
-	border-radius:10px;
-	/* margin:12px 12px 0 12px; small gap to the viewport edges */
-    padding:8px 14px; 
-	box-shadow: 0 6px 0 rgba(0,0,0,0.12), inset 0 -2px 0 rgba(0,0,0,0.04);
-	align-items:center;
+h1, h2, h3, h4, h5 {
+  margin-top: 0;
+  font-weight: 600;
+  color: var(--heading-blue);
 }
 
-.navbar .container-fluid{padding-left:8px;padding-right:8px}
-
-.navbar-brand{display:flex;align-items:center;gap:10px;font-weight:600;color:rgba(11,18,24,0.55) !important}
-.navbar-brand img{width:36px;height:36px;object-fit:cover;border-radius:6px}
-
-.navbar .nav-link{color:rgba(11,18,24,0.55) !important;padding:8px 12px;border-radius:6px}
-.navbar .nav-link:hover{background:rgba(0,0,0,0.04)}
-
-.navbar-toggler{border:0}
-.navbar-toggler-icon{background-image:none}
-
-/* Dropdown menus keep default bootstrap appearance but slightly darker text */
-.dropdown-menu{color:#17232b}
-
-@media (max-width:575px){
-	.navbar{margin:8px;border-radius:8px;padding:6px}
-	.navbar-brand img{width:32px;height:32px}
+h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
 }
 
+h2 {
+  font-size: 1.3rem;
+  margin: 1.5rem 0 0.75rem;
+  border-bottom: 2px solid #e0f2fe;
+  padding-bottom: 0.5rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Page header block used on many pages */
+.page-header h1 {
+  margin-top: 0.25rem;
+  font-size: 1.5rem;
+}
+
+.page-header .lead {
+  margin-bottom: 0.75rem;
+  color: #666;
+}
+
+/* ========================================
+   LAYOUT & CONTAINERS
+======================================== */
+
+.container,
+.pf-container,
+.cp-container,
+.dhcp-relay-container,
+.acb-container {
+  max-width: 960px;
+  margin: 20px auto;
+  background-color: var(--panel);
+  border-radius: 8px;
+  border: 1px solid #b3b3b3;
+  box-shadow: var(--shadow-soft);
+  padding: 20px;
+}
+
+/* Inner content area for captive portal / relay pages */
+.cp-content {
+  padding: 20px;
+}
+
+/* Generic section box */
+.section,
+.settings-section,
+.ha-section,
+.file-manager-section,
+.file-upload-section,
+.voucher-section,
+.mac-table-section,
+.ip-table-section,
+.add-hostname-form-section,
+.add-mac-form-section,
+.add-ip-form-section {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+/* Card-like sections with header */
+.section-header,
+.table-header,
+.config-header,
+.edit-header,
+.add-zone-header {
+  background-color: #4a4a4a;
+  color: #ffffff;
+  padding: 12px 15px;
+  margin: 0;
+}
+
+.section-header h2,
+.table-header h2,
+.config-header h2,
+.edit-header h2,
+.add-zone-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Generic card header (Bootstrap card-style) */
+.card-header {
+  background: #343a40;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+}
+
+.card-header .add-btn {
+  background-color: var(--success);
+  border-color: var(--success);
+}
+
+.card-header .add-btn span {
+  font-weight: 700;
+}
+
+/* ========================================
+   NAVBAR
+======================================== */
+
+.navbar {
+  background: var(--panel) !important;
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.12), inset 0 -2px 0 rgba(0,0,0,0.04);
+  align-items: center;
+}
+
+.navbar .container-fluid {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: rgba(11,18,24,0.55) !important;
+}
+
+.navbar-brand img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.navbar .nav-link {
+  color: rgba(11,18,24,0.55) !important;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.navbar .nav-link:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.navbar-toggler {
+  border: 0;
+}
+
+.navbar-toggler-icon {
+  background-image: none;
+}
+
+.dropdown-menu {
+  color: #17232b;
+}
+
+/* User panel in navbar */
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(11,18,24,0.55);
+}
+
+.user-avatar img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(11,18,24,0.75);
+}
+
+#userDropdown {
+  padding: 6px 12px;
+}
+
+#userDropdown:hover {
+  background: rgba(0,0,0,0.04);
+  border-radius: 6px;
+}
+
+.dropdown-menu-end {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.1);
+  min-width: 200px;
+}
+
+.dropdown-item svg {
+  vertical-align: middle;
+}
+
+.dropdown-item.text-danger:hover {
+  background-color: #dc3545;
+  color: white !important;
+}
+
+.dropdown-item.text-danger:hover svg {
+  fill: white;
+}
+
+/* ========================================
+   BREADCRUMBS & PAGE TOOLBAR
+======================================== */
+
+.breadcrumb-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid var(--border-color);
+  margin: 0 -20px 0 -20px;
+}
+
+.breadcrumb {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+
+.breadcrumb-item {
+  font-size: 0.875rem;
+  color: #333;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: " / ";
+  color: #999;
+  margin: 0 5px;
+}
+
+.breadcrumb-item a {
+  color: #333;
+  text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+  color: var(--primary);
+}
+
+.breadcrumb-item.active {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Auto config backup breadcrumb variant */
+.breadcrumb-item.active.acb-active {
+  color: #666;
+}
+
+/* Icon & info buttons next to breadcrumb */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background-color: transparent;
+  border: 1px solid #ccc;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background-color: #e8e8e8;
+  border-color: #999;
+}
+
+.info-btn,
+.alert-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #cc0000;
+  color: white;
+  border: none;
+  font-weight: bold;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.info-btn:hover,
+.alert-button:hover {
+  background-color: #990000;
+}
+
+/* Compact breadcrumb box used on Services pages */
+.breadcrumb-box {
+  background: #ececec;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.breadcrumb-box .small-muted {
+  color: #575757;
+  margin-right: 0.35rem;
+  font-size: 1rem;
+}
+
+.breadcrumb-box .breadcrumb-link {
+  color: #1e73be;
+  font-weight: 600;
+  font-size: 1.125rem;
+  text-decoration: none;
+}
+
+.breadcrumb-actions button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin-left: 0.35rem;
+  border-radius: 4px;
+}
+
+/* ========================================
+   TABS / NAV-TABS
+======================================== */
+
+.nav-tabs {
+  margin-bottom: 20px;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #ffffff;
+}
+
+.nav-tabs .nav-link {
+  color: #495057;
+  border: none;
+  background: none;
+  padding: 10px 15px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.nav-tabs .nav-link:hover {
+  border: none;
+  color: #333;
+  background-color: #f9f9f9;
+}
+
+.nav-tabs .nav-link.active {
+  color: #c0392b;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid #c0392b;
+}
+
+/* Generic tabbed navigation (ACB / Captive Portal) */
+.tabs-container,
+.config-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+  background-color: #ffffff;
+}
+
+.tab-button,
+.config-tab-btn {
+  padding: 12px 20px;
+  background-color: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #333;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: -2px;
+}
+
+.tab-button:hover,
+.config-tab-btn:hover {
+  background-color: #f9f9f9;
+  color: var(--primary);
+}
+
+.tab-button.active,
+.config-tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background-color: var(--primary-soft);
+}
+
+.tab-content,
+.config-tab-content {
+  display: none;
+  background-color: #ffffff;
+  animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active,
+.config-tab-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ========================================
+   FORMS – GENERIC CONTROLS
+======================================== */
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+select,
+textarea,
+.form-control {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #333;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus,
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+/* Read-only/disabled state */
+.form-control:disabled {
+  background-color: #f0f0f0;
+  color: #666;
+  cursor: not-allowed;
+}
+
+/* Textarea variants */
+textarea,
+.textarea-control {
+  min-height: 80px;
+  resize: vertical;
+  font-family: monospace;
+  white-space: pre;
+}
+
+/* Select dropdown arrow */
+select,
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23333' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  background-color: #ffffff;
+}
+
+select:hover,
+select.form-control:hover {
+  cursor: pointer;
+}
+
+/* Generic form layout blocks */
+.form-group {
+  margin-bottom: 20px;
+}
+
+/* Advanced settings style (kept scoped) */
+.settings-section .form-group {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.settings-section .form-group > label:first-child {
+  font-weight: bold;
+  width: 200px;
+  padding-top: 7px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 15px;
+}
+
+.form-group-content {
+  flex: 1;
+}
+
+/* ACB form-group style (scoped so it doesn’t override others) */
+.acb-container .form-group {
+  margin-bottom: 25px;
+  padding: 15px;
+  background-color: #fafafa;
+  border-left: 4px solid var(--primary);
+  border-radius: 4px;
+}
+
+.acb-container .form-group label {
+  display: block;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+/* High availability label-column layout */
+.label-cell {
+  width: 250px;
+  min-width: 150px;
+  font-weight: bold;
+  color: #343a40;
+  padding-right: 20px;
+  align-self: flex-start;
+  padding-top: 5px;
+}
+
+.input-cell {
+  flex-grow: 1;
+  min-width: 280px;
+}
+
+/* Row-based form layout (DHCP relay, IP edit, file upload, etc.) */
+.form-row {
+  margin-bottom: 20px;
+}
+
+/* Grid row used by DHCP relay & IP/host forms */
+.dhcp-relay-form .form-row,
+.edit-ip-form .form-row,
+.file-upload-form .form-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 15px;
+  padding: 15px 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  margin: 0;
+  align-items: center;
+}
+
+.dhcp-relay-form .form-label,
+.edit-ip-form .form-row .form-label,
+.file-upload-form .form-label {
+  text-align: right;
+  margin-bottom: 0;
+  font-size: 0.8125rem;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.dhcp-relay-form .form-column,
+.file-upload-form .form-column,
+.edit-ip-form .form-row > div:nth-child(2) {
+  display: block;
+  grid-column: 2;
+}
+
+/* Labels in simple stacked forms */
+.form-label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.35rem;
+}
+
+/* Service card forms */
+.card-body .form-label {
+  font-weight: 600;
+}
+
+.card-body .form-select,
+.card-body .form-control {
+  display: block;
+  width: 100%;
+}
+
+.card-body .option-desc {
+  margin-left: 0;
+  color: #6c757d;
+}
+
+/* Checkbox / radio layout */
+.checkbox-wrapper,
+.checkbox-item,
+.checkbox-label,
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-item {
+  align-items: flex-start;
+  font-size: 0.95em;
+  color: #343a40;
+}
+
+.checkbox-item input[type="checkbox"],
+.form-checkbox,
+.checkbox-label input,
+.radio-label input {
+  margin-top: 3px;
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.checkbox-label span,
+.radio-label span,
+.checkbox-label,
+.radio-label {
+  font-size: 0.8125rem;
+  color: #333;
+  cursor: pointer;
+}
+
+.radio-group {
+  margin-left: 10px;
+}
+
+/* Checkbox grid (HA-like feature grids) */
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px 20px;
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px dashed #ced4da;
+  border-radius: 6px;
+  background-color: #ffffff;
+}
+
+/* Input groups (ACB/API keys, upstream servers) */
+.input-group,
+.upstream-server-input-group,
+.ip-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.input-group .form-control,
+.upstream-server-input-group .form-control,
+.ip-input-group .form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+/* IP + CIDR chooser */
+.cidr-selector {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 40px;
+}
+
+.cidr-slash {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.cidr-input {
+  border: none !important;
+  background-color: transparent !important;
+  padding: 8px 3px !important;
+  font-size: 13px;
+  width: 50px;
+  box-shadow: none !important;
+}
+
+.cidr-input:focus {
+  box-shadow: none !important;
+  outline: none;
+}
+
+/* Password input grid (ACB) */
+.password-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.password-inputs .form-control {
+  grid-column: span 1;
+}
+
+.password-label {
+  grid-column: 2;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  padding-top: 8px;
+}
+
+/* Services options layout */
+.option-row {
+  margin-bottom: 1rem;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.option-title {
+  font-weight: 600;
+}
+
+.option-desc {
+  margin-top: 0.25rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* DNS query forwarder specific */
+.dns-query-title {
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.dns-query-col .form-check {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.dns-query-col .form-check-input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.dns-query-col .form-check-label {
+  margin-top: 0.25rem;
+}
+
+/* ========================================
+   BUTTONS
+======================================== */
+
+button,
+input[type="submit"],
+.btn {
+  padding: 8px 15px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Generic primary action */
+.btn-primary,
+input[type="submit"],
+button.primary {
+  background-color: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary-dark);
+}
+
+.btn-primary:hover,
+input[type="submit"]:hover,
+button.primary:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Secondary / gray */
+.btn-secondary {
+  background-color: var(--secondary);
+  color: #ffffff;
+}
+
+.btn-secondary:hover {
+  background-color: var(--secondary-dark);
+}
+
+/* Success / green */
+.btn-success,
+.save-button,
+.btn-add,
+.btn-add-small,
+.btn-add-server,
+.btn-copy {
+  background-color: var(--success);
+  color: #ffffff;
+  border-color: var(--success-dark);
+}
+
+.btn-success:hover,
+.save-button:hover,
+.btn-add:hover,
+.btn-add-small:hover,
+.btn-add-server:hover,
+.btn-copy:hover {
+  background-color: var(--success-dark);
+}
+
+/* Danger / red */
+.btn-danger,
+.btn-delete {
+  background-color: var(--danger);
+  color: #ffffff;
+}
+
+.btn-danger:hover,
+.btn-delete:hover {
+  background-color: var(--danger-dark);
+}
+
+/* Warning / orange small delete (upstream server) */
+.upstream-server-entry .btn-delete {
+  padding: 8px 12px;
+  background-color: #ffa500;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.upstream-server-entry .btn-delete:hover {
+  background-color: #ff8c00;
+}
+
+/* Info / teal (change key) */
+.change-key-btn {
+  white-space: nowrap;
+  padding: 10px 15px;
+  background-color: var(--info);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.change-key-btn:hover {
+  background-color: #138496;
+}
+
+/* Flat outline browse button */
+.btn-browse {
+  padding: 8px 15px;
+  background-color: #ffffff;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.btn-browse:hover {
+  background-color: var(--primary-soft);
+}
+
+/* Small buttons (MAC/IP table actions) */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-width: auto;
+  margin-right: 5px;
+}
+
+/* Save bar button (HA) */
+.save-bar {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #ccc;
+  text-align: left;
+}
+
+.save-button {
+  padding: 14px 30px;
+  border-radius: 6px;
+  font-size: 1.05rem;
+  font-weight: bold;
+  box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);
+}
+
+.save-button:before {
+  content: "💾";
+  margin-right: 8px;
+}
+
+/* New / add buttons used in tables */
+.btn-new {
+  background-color: var(--success);
+  color: white;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 15px;
+}
+
+.btn-new:hover {
+  background-color: #4cae4c;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Float-right small success (Services tables) */
+.btn-success.btn-sm {
+  float: right;
+}
+
+/* Form action groups */
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   TABLES
+======================================== */
+
+table,
+.zones-table,
+.mac-table,
+.ip-table,
+.hostname-table,
+.file-table,
+.voucher-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #ffffff;
+}
+
+table thead,
+.zones-table thead,
+.mac-table thead,
+.ip-table thead,
+.hostname-table thead,
+.file-table thead,
+.voucher-table thead {
+  background-color: #f5f5f5;
+}
+
+table th,
+table td,
+.zones-table thead th,
+.zones-table tbody td,
+.mac-table thead th,
+.mac-table tbody td,
+.ip-table thead th,
+.ip-table tbody td,
+.hostname-table thead th,
+.hostname-table tbody td,
+.file-table thead th,
+.file-table tbody td,
+.voucher-table thead th,
+.voucher-table tbody td {
+  padding: 12px 15px;
+  font-size: 13px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  color: #333;
+}
+
+table thead th,
+.zones-table thead th,
+.mac-table thead th,
+.ip-table thead th,
+.hostname-table thead th,
+.file-table thead th,
+.voucher-table thead th,
+.table thead th {
+  font-weight: 600;
+}
+
+/* Hover state for table rows */
+table tbody tr:hover,
+.zones-table tbody tr:hover,
+.mac-table tbody tr:hover,
+.ip-table tbody tr:hover,
+.hostname-table tbody tr:hover,
+.file-table tbody tr:hover,
+.voucher-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+/* Remove last border */
+table tbody tr:last-child td,
+.zones-table tbody tr:last-child td,
+.mac-table tbody tr:last-child td,
+.ip-table tbody tr:last-child td,
+.hostname-table tbody tr:last-child td,
+.file-table tbody tr:last-child td,
+.voucher-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Table footer with right-aligned actions */
+.table-footer {
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #e0e0e0;
+  text-align: right;
+}
+
+/* ========================================
+   ALERTS, NOTICES & INFO BOXES
+======================================== */
+
+.alert,
+.alert-box,
+.info-alert,
+.important-notice,
+.notice-alert {
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+/* Basic Bootstrap-like alert */
+.alert {
+  padding: 12px 20px;
+  background-color: #d9edf7;
+  border: 1px solid #bce8f1;
+  color: #31708f;
+}
+
+.alert-info {
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+  color: #31708f;
+}
+
+.alert-warning {
+  background-color: #fcf8e3;
+  border-color: #faebcc;
+  color: #8a6d3b;
+}
+
+/* Notice alert under breadcrumb (Services) */
+.notice-alert {
+  background: #fff9e6;
+  border: 1px solid #ffd54f;
+  padding: 12px 16px;
+  color: #d35400;
+  margin-top: 8px;
+  border-top: 6px solid #ffd000;
+  margin-bottom: 1rem;
+}
+
+.notice-alert a {
+  color: #1e73be;
+  font-weight: 500;
+}
+
+/* ACB alert box */
+.alert-box {
+  background-color: #f8f9fa;
+  border-left: 4px solid #ffc107;
+  padding: 15px;
+}
+
+.alert-box p {
+  margin: 8px 0;
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Info alert (HA / ACB) */
+.info-alert {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background-color: #d1ecf1;
+  border-left: 4px solid #0c5460;
+  color: #0c5460;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}
+
+.info-alert .alert-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.info-alert p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.info-alert .alert-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #0c5460;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-alert .alert-close:hover {
+  opacity: 0.7;
+}
+
+/* Important notice (HA) */
+.important-notice {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #fff3cd;
+  border-left: 4px solid #ffc107;
+  color: #856404;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Generic help / warning text */
+.help-text {
+  color: #6c757d;
+  font-size: 0.9em;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.help-text a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.help-text a:hover {
+  text-decoration: underline;
+}
+
+.warning-text {
+  font-size: 12px;
+  color: #c33;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+/* Status text */
+.status-green {
+  color: var(--success);
+  font-weight: 700;
+}
+
+/* ========================================
+   FILE MANAGER & UPLOAD
+======================================== */
+
+.file-table-container {
+  overflow-x: auto;
+}
+
+.file-name-display {
+  font-size: 13px;
+  color: var(--primary);
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-height: 36px;
+}
+
+/* ========================================
+   VOUCHER / MISC SECTIONS
+======================================== */
+
+.section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Pass list / multi-field items */
+.pass-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Action icons in tables */
+.action-icon {
+  cursor: pointer;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.action-icon:hover {
+  color: #0056b3;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+======================================== */
+
+@media (max-width: 1024px) {
+  .dhcp-relay-form .form-row,
+  .edit-ip-form .form-row,
+  .file-upload-form .form-row {
+    grid-template-columns: 120px 1fr;
+  }
+
+  .acb-container {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  .acb-container .form-group {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    margin: 8px;
+    border-radius: 8px;
+    padding: 6px;
+  }
+
+  .navbar-brand img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .breadcrumb-section {
+    padding: 10px 15px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 -15px;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .cp-content {
+    padding: 15px;
+  }
+
+  .container,
+  .pf-container,
+  .cp-container,
+  .dhcp-relay-container,
+  .acb-container {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  .dhcp-relay-form .form-row,
+  .edit-ip-form .form-row,
+  .file-upload-form .form-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px 15px;
+  }
+
+  .dhcp-relay-form .form-label,
+  .edit-ip-form .form-row .form-label,
+  .file-upload-form .form-label {
+    text-align: left;
+    margin-bottom: 5px;
+  }
+
+  .dhcp-relay-form .form-column,
+  .file-upload-form .form-column,
+  .edit-ip-form .form-row > div:nth-child(2) {
+    grid-column: 1;
+  }
+
+  .tabs-container,
+  .config-tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab-button,
+  .config-tab-btn {
+    padding: 10px 15px;
+    font-size: 12px;
+  }
+
+  .password-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .password-label {
+    grid-column: 1;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn,
+  button,
+  input[type="submit"] {
+    width: 100%;
+  }
+
+  .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .breadcrumb-section {
+    padding: 8px 10px;
+  }
+
+  .breadcrumb {
+    font-size: 12px;
+  }
+
+  .icon-btn,
+  .info-btn,
+  .alert-button {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .dhcp-relay-form .form-row,
+  .edit-ip-form .form-row {
+    padding: 10px;
+  }
+
+  .section-header {
+    padding: 10px 15px;
+  }
+
+  .table-header h2 {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .zones-table thead th,
+  .zones-table tbody td,
+  .mac-table thead th,
+  .mac-table tbody td,
+  .ip-table thead th,
+  .ip-table tbody td {
+    padding: 8px;
+  }
+}

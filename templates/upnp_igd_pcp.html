@@ -1,290 +1,188 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UPnP Settings</title>
-<style>
-body {
-  font-family: "Segoe UI", Arial, sans-serif;
-  background-color: #f5f5f5;
-  color: #222;
-  margin: 0;
-  padding: 20px;
-}
+{% block main %}
+<div class="breadcrumb">
+	<span>Services / UPnP & NAT-PMP</span>
+</div>
 
-.page {
-  max-width: 800px;
-  margin: 0 auto;
-}
+<div class="settings-section">
+	<h5>Service Settings</h5>
 
-.section-title {
-  font-size: 1.5em;
-  margin-bottom: 15px;
-  font-weight: 600;
-}
+	<div class="form-group">
+		<label>Port Mapping</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="enable_port_mapping">
+				<label class="form-check-label" for="enable_port_mapping">Enable port mapping service</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="allow_upnp_igd">
+				<label class="form-check-label" for="allow_upnp_igd">Allow UPnP IGD port mapping</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="allow_pcp_natpmp">
+				<label class="form-check-label" for="allow_pcp_natpmp">Allow PCP/NAT-PMP port mapping</label>
+			</div>
+		</div>
+	</div>
 
-.card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  margin-bottom: 20px;
-  padding: 20px;
-}
+	<div class="form-group">
+		<label>External interface</label>
+		<div class="form-group-content">
+			<select class="form-control" id="external_interface" style="max-width: 200px;">
+				<option>wan</option>
+				<option>lan</option>
+				<option>localhost</option>
+			</select>
+		</div>
+	</div>
 
-.card-title {
-  font-size: 1.1em;
-  margin-bottom: 10px;
-  color: #333;
-  font-weight: 600;
-}
+	<div class="form-group">
+		<label>Internal interfaces</label>
+		<div class="form-group-content">
+			<select class="form-control" id="internal_interfaces" style="max-width: 200px;">
+				<option>wan</option>
+				<option>lan</option>
+				<option>loopback</option>
+			</select>
+		</div>
+	</div>
+</div>
 
-.card-content label {
-  display: block;
-  margin-bottom: 10px;
-}
+<div class="settings-section">
+	<h5>External Address Settings</h5>
 
-.field {
-  margin-bottom: 15px;
-}
+	<div class="form-group">
+		<label>STUN</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="enable_stun">
+				<label class="form-check-label" for="enable_stun">Enable STUN</label>
+			</div>
+		</div>
+	</div>
 
-.field label {
-  display: block;
-  font-weight: 500;
-  margin-bottom: 5px;
-}
+	<div class="form-group">
+		<label>STUN server</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="stun_server" placeholder="stun.example.com" style="max-width: 300px;">
+		</div>
+	</div>
 
-input[type="text"], select {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 0.95em;
-  background-color: #fafafa;
-  transition: border 0.2s;
-}
+	<div class="form-group">
+		<label>STUN port</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="stun_port" placeholder="3478" style="max-width: 150px;">
+		</div>
+	</div>
 
-input[type="text"]:focus, select:focus {
-  border-color: #0078d7;
-  outline: none;
-  background-color: #fff;
-}
+	<div class="form-group">
+		<label>Override WAN address</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="override_wan_address" placeholder="e.g. 203.0.113.5" style="max-width: 250px;">
+		</div>
+	</div>
+</div>
 
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
+<div class="settings-section">
+	<h5>Advanced Settings</h5>
 
-.checkbox input {
-  width: 18px;
-  height: 18px;
-}
+	<div class="form-group">
+		<label>Download speed</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="download_speed" placeholder="Mbps" style="max-width: 150px;">
+		</div>
+	</div>
 
-.btn {
-  background: #0078d7;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9em;
-}
+	<div class="form-group">
+		<label>Upload speed</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="upload_speed" placeholder="Mbps" style="max-width: 150px;">
+		</div>
+	</div>
 
-.btn:hover {
-  background: #005ea6;
-}
+	<div class="form-group">
+		<label>Traffic shaping</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="traffic_shaping" style="max-width: 300px;">
+		</div>
+	</div>
 
-.field-inline {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
+	<div class="form-group">
+		<label>Custom presentation URL</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="custom_presentation_url" style="max-width: 400px;">
+		</div>
+	</div>
 
-.acl-list {
-  margin-top: 10px;
-  background: #fafafa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 10px;
-  min-height: 40px;
-}
+	<div class="form-group">
+		<label>Custom model number</label>
+		<div class="form-group-content">
+			<input type="text" class="form-control" id="custom_model_number" style="max-width: 250px;">
+		</div>
+	</div>
 
-.acl-item {
-  padding: 6px 10px;
-  background: #e8f0fe;
-  border-radius: 4px;
-  margin-bottom: 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+	<div class="form-group">
+		<label>Logging & Reporting</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="firewall_logs">
+				<label class="form-check-label" for="firewall_logs">Log mapped connections</label>
+			</div>
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="report_uptime">
+				<label class="form-check-label" for="report_uptime">Report system uptime</label>
+			</div>
+		</div>
+	</div>
+</div>
 
-.acl-item button {
-  background: none;
-  border: none;
-  color: #d00;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 1em;
-}
-</style>
-</head>
-<body>
+<div class="settings-section">
+	<h5>Service Access Control List</h5>
 
-<div class="page upnp-settings">
+	<div class="form-group">
+		<label>Default Access</label>
+		<div class="form-group-content">
+			<div class="form-check">
+				<input type="checkbox" class="form-check-input" id="default_deny">
+				<label class="form-check-label" for="default_deny">Deny access to port mapping service by default</label>
+			</div>
+		</div>
+	</div>
 
-  <h2 class="section-title">UPnP Settings</h2>
+	<div class="form-group">
+		<label>ACL Entries</label>
+		<div class="form-group-content">
+			<div class="d-flex gap-2 mb-2">
+				<input type="text" class="form-control" id="acl_entry" placeholder="e.g. 192.168.1.100" style="max-width: 250px;">
+				<button type="button" class="btn btn-success" id="add_acl">Add</button>
+			</div>
+			<div id="acl_entries" style="min-height: 40px;"></div>
+		</div>
+	</div>
+</div>
 
-  <!-- Service Settings -->
-  <div class="card">
-    <h3 class="card-title">Service Settings</h3>
-    <div class="card-content">
-      <label class="checkbox">
-        <input type="checkbox" id="enable_port_mapping">
-        Enable port mapping service
-      </label>
-
-      <label class="checkbox">
-        <input type="checkbox" id="allow_upnp_igd">
-        Allow UPnP IGD port mapping
-      </label>
-
-      <label class="checkbox">
-        <input type="checkbox" id="allow_pcp_natpmp">
-        Allow PCP/NAT-PMP port mapping
-      </label>
-
-      <div class="field">
-        <label for="external_interface">External interface</label>
-        <select id="external_interface">
-          <option>wan</option>
-          <option>lan</option>
-          <option>localhost</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="internal_interfaces">Internal interfaces</label>
-        <select id="internal_interfaces">
-          <option>wan</option>
-          <option>lan</option>
-          <option>loopback</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- External Address Settings -->
-  <div class="card">
-    <h3 class="card-title">External Address Settings</h3>
-    <div class="card-content">
-      <label class="checkbox">
-        <input type="checkbox" id="enable_stun">
-        Enable STUN
-      </label>
-
-      <div class="field">
-        <label for="stun_server">STUN server</label>
-        <input type="text" id="stun_server" placeholder="stun.example.com">
-      </div>
-
-      <div class="field">
-        <label for="stun_port">STUN port</label>
-        <input type="text" id="stun_port" placeholder="3478">
-      </div>
-
-      <div class="field">
-        <label for="override_wan_address">Override WAN address</label>
-        <input type="text" id="override_wan_address" placeholder="e.g. 203.0.113.5">
-      </div>
-    </div>
-  </div>
-
-  <!-- Advanced Settings -->
-  <div class="card">
-    <h3 class="card-title">Advanced Settings</h3>
-    <div class="card-content">
-      <div class="field">
-        <label for="download_speed">Download speed</label>
-        <input type="text" id="download_speed" placeholder="Mbps">
-      </div>
-
-      <div class="field">
-        <label for="upload_speed">Upload speed</label>
-        <input type="text" id="upload_speed" placeholder="Mbps">
-      </div>
-
-      <div class="field">
-        <label for="traffic_shaping">Traffic shaping</label>
-        <input type="text" id="traffic_shaping">
-      </div>
-
-      <div class="field">
-        <label for="custom_presentation_url">Custom presentation URL</label>
-        <input type="text" id="custom_presentation_url">
-      </div>
-
-      <div class="field">
-        <label for="custom_model_number">Custom model number</label>
-        <input type="text" id="custom_model_number">
-      </div>
-
-      <label class="checkbox">
-        <input type="checkbox" id="firewall_logs">
-        Log mapped connections
-      </label>
-
-      <label class="checkbox">
-        <input type="checkbox" id="report_uptime">
-        Report system uptime
-      </label>
-    </div>
-  </div>
-
-  <!-- Service Access Control List -->
-  <div class="card">
-    <h3 class="card-title">Service Access Control List</h3>
-    <div class="card-content">
-      <label class="checkbox">
-        <input type="checkbox" id="default_deny">
-        Deny access to port mapping service by default
-      </label>
-
-      <div class="acl-section">
-        <div class="field-inline">
-          <input type="text" id="acl_entry" placeholder="e.g. 192.168.1.100">
-          <button class="btn" id="add_acl">Add</button>
-        </div>
-
-        <div id="acl_entries" class="acl-list"></div>
-      </div>
-    </div>
-  </div>
-
+<div class="d-flex gap-2 mt-3">
+	<button type="submit" class="btn btn-primary">Save</button>
 </div>
 
 <script>
 document.getElementById("add_acl").addEventListener("click", function() {
-  const input = document.getElementById("acl_entry");
-  const value = input.value.trim();
-  if (value === "") return;
+	const input = document.getElementById("acl_entry");
+	const value = input.value.trim();
+	if (value === "") return;
 
-  const list = document.getElementById("acl_entries");
-  const item = document.createElement("div");
-  item.className = "acl-item";
-  item.innerHTML = `<span>${value}</span><button>&times;</button>`;
-  item.querySelector("button").addEventListener("click", () => item.remove());
-  list.appendChild(item);
-  input.value = "";
+	const list = document.getElementById("acl_entries");
+	const item = document.createElement("div");
+	item.className = "d-flex gap-2 align-items-center mb-2";
+	item.innerHTML = `
+		<span class="form-control" style="max-width: 250px; background: #e8f0fe;">${value}</span>
+		<button type="button" class="btn btn-danger btn-sm">Delete</button>
+	`;
+	item.querySelector("button").addEventListener("click", () => item.remove());
+	list.appendChild(item);
+	input.value = "";
 });
 </script>
-
-</body>
-</html>
 
 {% endblock %}

@@ -1,266 +1,325 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Router Advertisement</title>
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f5f6f7;
-  margin: 0;
-  padding: 0;
-}
-.tabs {
-  display: flex;
-  background: #b01f24;
-  color: white;
-  font-weight: bold;
-}
-.tabs div {
-  padding: 10px 30px;
-  cursor: pointer;
-  user-select: none;
-}
-.tabs div.active {
-  background: #fff;
-  color: #b01f24;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px;
-}
-.container {
-  background: #fff;
-  margin: 20px;
-  border-radius: 6px;
-  padding: 20px;
-  box-shadow: 0 0 5px rgba(0,0,0,0.1);
-}
-h2 {
-  margin-top: 0;
-  border-bottom: 2px solid #ddd;
-  padding-bottom: 10px;
-}
-.section {
-  margin-bottom: 25px;
-}
-label {
-  display: block;
-  margin: 8px 0 4px;
-  font-weight: bold;
-}
-select, input[type="text"], input[type="number"] {
-  width: 100%;
-  padding: 6px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-button, .add-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  margin-top: 10px;
-  cursor: pointer;
-}
-button:hover, .add-btn:hover {
-  background: #0056b3;
-}
-.delete-btn {
-  background: #c9302c;
-  border: none;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.delete-btn:hover {
-  background: #a52622;
-}
-.ra-subnet {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.ra-subnet input {
-  flex: 1;
-}
-.save-btn {
-  background: #28a745;
-  color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-}
-.save-btn:hover {
-  background: #1e7e34;
-}
-</style>
-</head>
-<body>
-
-<div class="tabs">
-  <div class="tab active" data-tab="WAN">WAN</div>
-  <div class="tab" data-tab="LAN">LAN</div>
+<div class="breadcrumb">
+	<span>Services / Router Advertisement</span>
 </div>
 
+<ul class="nav nav-tabs mb-3">
+	<li class="nav-item">
+		<a class="nav-link active" id="tab-wan" href="#" onclick="switchTab('WAN'); return false;">WAN</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link" id="tab-lan" href="#" onclick="switchTab('LAN'); return false;">LAN</a>
+	</li>
+</ul>
+
 <!-- WAN TAB -->
-<div id="WAN" class="container tab-content">
-  <h2>Router Advertisement</h2>
-  <div class="section">
-    <label>Router Mode</label>
-    <select>
-      <option>Disabled</option>
-      <option>Enabled</option>
-    </select>
+<div id="WAN" class="tab-content">
+	<div class="settings-section">
+		<h5>Router Advertisement</h5>
 
-    <label>Router Priority</label>
-    <select>
-      <option>Low</option>
-      <option>Medium</option>
-      <option>High</option>
-    </select>
+		<div class="form-group">
+			<label>Router Mode</label>
+			<div class="form-group-content">
+				<select class="form-control">
+					<option>Disabled</option>
+					<option>Enabled</option>
+				</select>
+			</div>
+		</div>
 
-    <label>Valid Lifetime (seconds)</label>
-    <input type="number" value="86400">
+		<div class="form-group">
+			<label>Router Priority</label>
+			<div class="form-group-content">
+				<select class="form-control">
+					<option>Low</option>
+					<option>Medium</option>
+					<option>High</option>
+				</select>
+			</div>
+		</div>
 
-    <label>Preferred Lifetime (seconds)</label>
-    <input type="number" value="14400">
+		<div class="form-group">
+			<label>Valid Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="86400" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Minimum RA Interval (seconds)</label>
-    <input type="number" value="200">
+		<div class="form-group">
+			<label>Preferred Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="14400" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Maximum RA Interval (seconds)</label>
-    <input type="number" value="600">
+		<div class="form-group">
+			<label>Minimum RA Interval (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="200" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Router Lifetime (seconds)</label>
-    <input type="number" value="1800">
+		<div class="form-group">
+			<label>Maximum RA Interval (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="600" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>NAT64 Prefix</label>
-    <input type="text" value="64:ff9b::/96">
+		<div class="form-group">
+			<label>Router Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>NAT64 Prefix Lifetime (seconds)</label>
-    <input type="number" value="1800">
+		<div class="form-group">
+			<label>NAT64 Prefix</label>
+			<div class="form-group-content">
+				<input type="text" value="64:ff9b::/96" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
 
-    <div id="raSubnetsWAN">
-      <label>RA Subnet(s)</label>
-    </div>
-    <button class="add-btn" onclick="addRASubnet('WAN')">+ Add RA Subnet</button>
-  </div>
+		<div class="form-group">
+			<label>NAT64 Prefix Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-  <div class="section">
-    <h2>DNS Configuration</h2>
-    <label><input type="checkbox" id="dnsEnableWAN"> Enable DNS via RA Daemon</label>
-    <label><input type="checkbox" id="mirrorDHCPWAN"> Mirror DHCPv6 DNS Configuration</label>
+		<div class="form-group">
+			<label>RA Subnet(s)</label>
+			<div class="form-group-content">
+				<div id="raSubnetsWAN"></div>
+				<button type="button" class="btn btn-success mt-2" onclick="addRASubnet('WAN')">Add RA Subnet</button>
+			</div>
+		</div>
+	</div>
 
-    <label>DNS Server 1</label>
-    <input type="text" placeholder="DNS Server 1">
-    <label>DNS Server 2</label>
-    <input type="text" placeholder="DNS Server 2">
-    <label>DNS Server 3</label>
-    <input type="text" placeholder="DNS Server 3">
-    <label>DNS Server 4</label>
-    <input type="text" placeholder="DNS Server 4">
-    <label>Domain Search List</label>
-    <input type="text" placeholder="example.com;sub.example.com">
+	<div class="settings-section">
+		<h5>DNS Configuration</h5>
 
-    <button class="save-btn">Save</button>
-  </div>
+		<div class="form-group">
+			<label>DNS Options</label>
+			<div class="form-group-content">
+				<div class="form-check">
+					<input type="checkbox" class="form-check-input" id="dnsEnableWAN">
+					<label class="form-check-label" for="dnsEnableWAN">Enable DNS via RA Daemon</label>
+				</div>
+				<div class="form-check">
+					<input type="checkbox" class="form-check-input" id="mirrorDHCPWAN">
+					<label class="form-check-label" for="mirrorDHCPWAN">Mirror DHCPv6 DNS Configuration</label>
+				</div>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 1</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 1" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 2</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 2" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 3</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 3" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 4</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 4" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>Domain Search List</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="example.com;sub.example.com" class="form-control" style="max-width: 350px;">
+			</div>
+		</div>
+	</div>
+
+	<div class="d-flex gap-2 mt-3">
+		<button type="submit" class="btn btn-primary">Save</button>
+	</div>
 </div>
 
 <!-- LAN TAB -->
-<div id="LAN" class="container tab-content" style="display:none;">
-  <h2>Router Advertisement</h2>
-  <div class="section">
-    <label>Router Mode</label>
-    <select>
-      <option>Disabled</option>
-      <option>Enabled</option>
-    </select>
+<div id="LAN" class="tab-content" style="display:none;">
+	<div class="settings-section">
+		<h5>Router Advertisement</h5>
 
-    <label>Router Priority</label>
-    <select>
-      <option>Low</option>
-      <option>Medium</option>
-      <option>High</option>
-    </select>
+		<div class="form-group">
+			<label>Router Mode</label>
+			<div class="form-group-content">
+				<select class="form-control">
+					<option>Disabled</option>
+					<option>Enabled</option>
+				</select>
+			</div>
+		</div>
 
-    <label>Valid Lifetime (seconds)</label>
-    <input type="number" value="86400">
+		<div class="form-group">
+			<label>Router Priority</label>
+			<div class="form-group-content">
+				<select class="form-control">
+					<option>Low</option>
+					<option>Medium</option>
+					<option>High</option>
+				</select>
+			</div>
+		</div>
 
-    <label>Preferred Lifetime (seconds)</label>
-    <input type="number" value="14400">
+		<div class="form-group">
+			<label>Valid Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="86400" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Minimum RA Interval (seconds)</label>
-    <input type="number" value="200">
+		<div class="form-group">
+			<label>Preferred Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="14400" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Maximum RA Interval (seconds)</label>
-    <input type="number" value="600">
+		<div class="form-group">
+			<label>Minimum RA Interval (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="200" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>Router Lifetime (seconds)</label>
-    <input type="number" value="1800">
+		<div class="form-group">
+			<label>Maximum RA Interval (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="600" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>NAT64 Prefix</label>
-    <input type="text" value="64:ff9b::/96">
+		<div class="form-group">
+			<label>Router Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-    <label>NAT64 Prefix Lifetime (seconds)</label>
-    <input type="number" value="1800">
+		<div class="form-group">
+			<label>NAT64 Prefix</label>
+			<div class="form-group-content">
+				<input type="text" value="64:ff9b::/96" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
 
-    <div id="raSubnetsLAN">
-      <label>RA Subnet(s)</label>
-    </div>
-    <button class="add-btn" onclick="addRASubnet('LAN')">+ Add RA Subnet</button>
-  </div>
+		<div class="form-group">
+			<label>NAT64 Prefix Lifetime (seconds)</label>
+			<div class="form-group-content">
+				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
+			</div>
+		</div>
 
-  <div class="section">
-    <h2>DNS Configuration</h2>
-    <label><input type="checkbox" id="dnsEnableLAN"> Enable DNS via RA Daemon</label>
-    <label><input type="checkbox" id="mirrorDHCPv6LAN"> Mirror DHCPv6 DNS Configuration</label>
+		<div class="form-group">
+			<label>RA Subnet(s)</label>
+			<div class="form-group-content">
+				<div id="raSubnetsLAN"></div>
+				<button type="button" class="btn btn-success mt-2" onclick="addRASubnet('LAN')">Add RA Subnet</button>
+			</div>
+		</div>
+	</div>
 
-    <label>DNS Server 1</label>
-    <input type="text" placeholder="DNS Server 1">
-    <label>DNS Server 2</label>
-    <input type="text" placeholder="DNS Server 2">
-    <label>DNS Server 3</label>
-    <input type="text" placeholder="DNS Server 3">
-    <label>DNS Server 4</label>
-    <input type="text" placeholder="DNS Server 4">
-    <label>Domain Search List</label>
-    <input type="text" placeholder="example.com;sub.example.com">
+	<div class="settings-section">
+		<h5>DNS Configuration</h5>
 
-    <button class="save-btn">Save</button>
-  </div>
+		<div class="form-group">
+			<label>DNS Options</label>
+			<div class="form-group-content">
+				<div class="form-check">
+					<input type="checkbox" class="form-check-input" id="dnsEnableLAN">
+					<label class="form-check-label" for="dnsEnableLAN">Enable DNS via RA Daemon</label>
+				</div>
+				<div class="form-check">
+					<input type="checkbox" class="form-check-input" id="mirrorDHCPv6LAN">
+					<label class="form-check-label" for="mirrorDHCPv6LAN">Mirror DHCPv6 DNS Configuration</label>
+				</div>
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 1</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 1" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 2</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 2" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 3</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 3" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>DNS Server 4</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="DNS Server 4" class="form-control" style="max-width: 250px;">
+			</div>
+		</div>
+
+		<div class="form-group">
+			<label>Domain Search List</label>
+			<div class="form-group-content">
+				<input type="text" placeholder="example.com;sub.example.com" class="form-control" style="max-width: 350px;">
+			</div>
+		</div>
+	</div>
+
+	<div class="d-flex gap-2 mt-3">
+		<button type="submit" class="btn btn-primary">Save</button>
+	</div>
 </div>
 
 <script>
 function switchTab(tabName) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-  document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
-  document.getElementById(tabName).style.display = 'block';
+	document.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
+	document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+	document.getElementById('tab-' + tabName.toLowerCase()).classList.add('active');
+	document.getElementById(tabName).style.display = 'block';
 }
 
 function addRASubnet(tab) {
-  const container = document.getElementById('raSubnets' + tab);
-  const div = document.createElement('div');
-  div.className = 'ra-subnet';
-  div.innerHTML = `
-    <input type="text" placeholder="RA Subnet (CIDR)">
-    <input type="number" placeholder="/128" value="128" style="width:80px">
-    <button class="delete-btn" onclick="this.parentElement.remove()">Delete</button>
-  `;
-  container.appendChild(div);
+	const container = document.getElementById('raSubnets' + tab);
+	const div = document.createElement('div');
+	div.className = 'd-flex gap-2 mb-2';
+	div.innerHTML = `
+		<input type="text" placeholder="RA Subnet (CIDR)" class="form-control" style="max-width: 200px;">
+		<input type="number" placeholder="/128" value="128" class="form-control" style="max-width: 80px;">
+		<button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">Delete</button>
+	`;
+	container.appendChild(div);
 }
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
-});
+// Initialize WAN tab on page load
+window.onload = () => switchTab('WAN');
 </script>
-
-</body>
-</html>
 
 {% endblock %}

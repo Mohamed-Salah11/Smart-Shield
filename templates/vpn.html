@@ -1,6 +1,69 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>VPN</h1>
-<p>VPN page placeholder.</p>
+{% block main %}
+<div class="breadcrumb">
+	<span>Dashboard / VPN</span>
+</div>
+
+<div class="settings-section">
+	<h5>Virtual Private Network</h5>
+	<p>Configure VPN connections to allow secure remote access to your network.</p>
+
+	<table>
+		<thead>
+			<tr>
+				<th>VPN Type</th>
+				<th>Description</th>
+				<th>Status</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><strong>OpenVPN</strong></td>
+				<td>SSL/TLS-based VPN solution supporting both site-to-site and remote access configurations</td>
+				<td><span class="badge bg-secondary">Not configured</span></td>
+				<td>
+					<a href="{{ url_for('vpn.openvpn') }}" class="btn btn-primary btn-sm">Configure</a>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>IPsec</strong></td>
+				<td>Industry-standard VPN protocol for secure site-to-site connections</td>
+				<td><span class="badge bg-secondary">Not configured</span></td>
+				<td>
+					<a href="{{ url_for('vpn.ipsec') }}" class="btn btn-primary btn-sm">Configure</a>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>L2TP</strong></td>
+				<td>Layer 2 Tunneling Protocol for remote access VPN</td>
+				<td><span class="badge bg-secondary">Not configured</span></td>
+				<td>
+					<a href="{{ url_for('vpn.l2tp') }}" class="btn btn-primary btn-sm">Configure</a>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+
+<div class="settings-section">
+	<h5>VPN Status Overview</h5>
+	<p>Monitor active VPN connections and tunnel status.</p>
+	
+	<div class="form-group">
+		<label>Active Connections</label>
+		<div class="form-group-content">
+			<div class="help-text">No active VPN connections</div>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label>Total Tunnels</label>
+		<div class="form-group-content">
+			<div class="help-text">0 configured</div>
+		</div>
+	</div>
+</div>
+
 {% endblock %}

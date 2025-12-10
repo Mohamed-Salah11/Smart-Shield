@@ -1,10 +1,9 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced.css') }}">
 
 <div class="breadcrumb">
-    System / <a href="{{ url_for('admin_access') }}">Advanced</a> / Notifications
+    System / <a href="{{ url_for('system.admin_access') }}">Advanced</a> / Notifications
 </div>
 
 <ul class="nav nav-tabs">
@@ -28,7 +27,7 @@
     </li>
 </ul>
 
-<form method="POST" action="{{ url_for('notifications') }}">
+<form method="POST" action="{{ url_for('system.notifications') }}">
 
 <div class="settings-section">
     <h5>General Settings</h5>
