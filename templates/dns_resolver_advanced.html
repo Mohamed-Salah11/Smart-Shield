@@ -1,16 +1,12 @@
 {% extends 'base.html' %}
 
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/services.css') }}">
-{% endblock %}
-
 {% block main %}
 
 <div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
     <div>
-        <a href="{{ url_for('services') }}" class="small-muted">Services</a>
+        <a href="{{ url_for('services.services_home') }}" class="small-muted">Services</a>
         <span class="small-muted"> / </span>
-        <a href="{{ url_for('dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
+        <a href="{{ url_for('services.dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
         <span class="small-muted"> / </span>
         <span class="breadcrumb-link">Advanced Settings</span>
     </div>
@@ -356,7 +352,7 @@
 
         <div class="mt-3 d-flex align-items-center">
             <button class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
-            <a href="{{ url_for('dns_resolver_access_lists') }}" class="btn btn-outline-secondary ms-3">Access Lists</a>
+            <a href="{{ url_for('services.dns_resolver_access_lists') }}" class="btn btn-outline-secondary ms-3">Access Lists</a>
         </div>
 
     </div>

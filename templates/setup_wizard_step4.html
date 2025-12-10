@@ -1,36 +1,32 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb bg-transparent p-0">
-            <li class="breadcrumb-item">Wizard</li>
-            <li class="breadcrumb-item"><a href="{{ url_for('setup_wizard') }}">ZGate Setup</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Time Server Information</li>
-        </ol>
-    </nav>
 
-    <div class="mb-2">
-        <div class="progress" style="height:6px;">
-            <div class="progress-bar bg-danger" role="progressbar" style="width:33%;" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-2">
-            <span class="badge bg-danger">Step 3 of 9</span>
-        </div>
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+    Wizard / ZGate Setup / Time Server Information
+</div>
+
+<div class="mb-3">
+    <div class="progress" style="height:6px;">
+        <div class="progress-bar bg-danger" role="progressbar" style="width:33%;" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100"></div>
     </div>
+    <div class="mt-2">
+        <span class="badge bg-danger">Step 3 of 9</span>
+    </div>
+</div>
 
-    <form method="post" action="#">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                Time Server Information
-            </div>
-            <div class="card-body">
+<form method="post" action="#">
+    <div class="settings-section">
+        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">
+            Time Server Information
+        </div>
                 <p>Please enter the time, date and time zone.</p>
 
                 <div class="row mb-3">
                     <label class="col-sm-2 col-form-label">Time server hostname</label>
                     <div class="col-sm-6">
-                        <input type="text" class="form-control" name="ntp_server" value="2.pfsense.pool.ntp.org">
+                        <input type="text" class="form-control" name="ntp_server" value="2.ZGate.pool.ntp.org">
                         <div class="form-text">Enter the hostname (FQDN) of the time server.</div>
                     </div>
                 </div>
@@ -86,16 +82,15 @@
                             <option>Asia/Shanghai</option>
                             <option>Asia/Kolkata</option>
                             <option>Australia/Sydney</option>
-                        </select>
-                    </div>
+                    </select>
                 </div>
-
             </div>
-        </div>
 
-        <div class="mt-3">
-            <a href="{{ url_for('setup_wizard_step', step=5) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
-        </div>
-    </form>
-</div>
+    </div>
+
+    <div class="d-flex justify-content-start mt-3">
+        <a href="{{ url_for('system.setup_wizard_step', step=5) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
+    </div>
+</form>
+
 {% endblock %}

@@ -1,238 +1,270 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/auto_config_backup.css') }}">
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+	<a href="{{ url_for('services.services_home') }}">Services</a>
+	<span>/</span>
+	<a href="{{ url_for('services.auto_config_backup') }}">Auto Configuration Backup</a>
+	<span>/</span>
+	<span>Settings</span>
+</div>
 
-<div class="acb-container">
-    <!-- Breadcrumb Navigation -->
-    <div class="breadcrumb-section">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('services') }}">Services</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('auto_config_backup') }}">Auto Configuration Backup</a></li>
-                <li class="breadcrumb-item active">Settings</li>
-            </ol>
-        </nav>
-        <button class="alert-button" title="Information">?</button>
-    </div>
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs">
+	<li class="nav-item"><a href="#settings" class="nav-link active" data-tab="settings">Settings</a></li>
+	<li class="nav-item"><a href="#restore" class="nav-link" data-tab="restore">Restore</a></li>
+	<li class="nav-item"><a href="#backup" class="nav-link" data-tab="backup">Backup Now</a></li>
+	<li class="nav-item"><a href="#change-device-key" class="nav-link" data-tab="change-device-key">Change Device Key</a></li>
+</ul>
 
-    <!-- Tabs Navigation -->
-    <div class="tabs-container">
-        <button class="tab-button active" onclick="switchTab('settings')">Settings</button>
-        <button class="tab-button" onclick="switchTab('restore')">Restore</button>
-        <button class="tab-button" onclick="switchTab('backup')">Backup Now</button>
-        <button class="tab-button" onclick="switchTab('change-device-key')">Change Device Key</button>
-    </div>
+<!-- Settings Tab -->
+<div id="settings" class="tab-content" style="display: block;">
+	<div class="settings-section">
+		<h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Auto Config Backup</h5>
+		
+		<div style="padding: 20px;">
+			<div class="form-group">
+				<label>Enable automatic configuration backups</label>
+				<div class="form-group-content">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="enable-acb">
+						<label class="form-check-label" for="enable-acb">Enable automatic configuration backups</label>
+					</div>
+					<div class="help-text">Auto Configuration Backup automatically encrypts configuration backup content using the Encryption Password below and then securely uploads the encrypted backup over HTTPS to Netgate servers.</div>
+				</div>
+			</div>
 
-    <!-- Settings Tab -->
-    <div id="settings" class="tab-content active">
-        <div class="settings-section">
-            <h2>Auto Config Backup</h2>
-            
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="enable-acb" name="enable-acb">
-                    <span>Enable automatic configuration backups</span>
-                </label>
-                <p class="help-text">
-                    Auto Configuration Backup automatically encrypts configuration backup content using the Encryption Password below and then securely uploads the encrypted backup over HTTPS to Netgate servers.
-                </p>
-            </div>
+			<div class="form-group">
+				<label>Backup Frequency</label>
+				<div class="form-group-content">
+					<div class="form-check">
+						<input class="form-check-input" type="radio" name="backup-frequency" id="freq-change" value="change" checked>
+						<label class="form-check-label" for="freq-change">Automatically backup on every configuration change</label>
+					</div>
+					<div class="form-check">
+						<input class="form-check-input" type="radio" name="backup-frequency" id="freq-schedule" value="schedule">
+						<label class="form-check-label" for="freq-schedule">Automatically backup on a regular schedule</label>
+					</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <h3>Backup Frequency</h3>
-                <div class="radio-group">
-                    <label class="radio-label">
-                        <input type="radio" name="backup-frequency" value="change" checked>
-                        <span>Automatically backup on every configuration change</span>
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="backup-frequency" value="schedule">
-                        <span>Automatically backup on a regular schedule</span>
-                    </label>
-                </div>
-            </div>
+			<div class="form-group">
+				<label>Device Key</label>
+				<div class="form-group-content">
+					<div class="d-flex gap-2 mb-2">
+						<input type="text" id="device-key" class="form-control" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
+						<button type="button" class="btn btn-primary" onclick="switchTab('change-device-key')">Change Key</button>
+						<button type="button" class="btn btn-secondary" onclick="downloadDeviceKey()">Download</button>
+					</div>
+					<div class="help-text">Unique key which identifies backups associated with this device.</div>
+					<div class="help-text" style="color: #d9534f; font-weight: 600;">📋 Keep a secure copy of this value!</div>
+					<div class="help-text">If this key is lost, all backups for this device will be lost!</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="device-key">Device Key</label>
-                <div class="input-group">
-                    <input type="text" id="device-key" class="form-control" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
-                    <button class="btn btn-primary change-key-btn" onclick="switchTab('change-device-key')">🔄 Change Key</button>
-                    <button class="btn btn-download" onclick="downloadDeviceKey()" title="Download Device Key">⬇ Download</button>
-                </div>
-                <p class="help-text">Unique key which identifies backups associated with this device.</p>
-                <p class="warning-text">📋 Keep a secure copy of this value!</p>
-                <p class="help-text">If this key is lost, all backups for this device will be lost!</p>
-            </div>
+			<div class="form-group">
+				<label>Encryption Password</label>
+				<div class="form-group-content">
+					<div class="row mb-2">
+						<div class="col-md-6">
+							<input type="password" id="encryption-password" class="form-control" placeholder="Encryption Password">
+						</div>
+						<div class="col-md-6">
+							<input type="password" id="encryption-password-confirm" class="form-control" placeholder="Confirm Password">
+							<small class="text-muted">Confirm</small>
+						</div>
+					</div>
+					<div class="help-text">AutoConfigBackup uses this string to encrypt the contents of the backup before upload. The best practice for security is to use a long and complex string.</div>
+					<div class="help-text" style="color: #d9534f; font-weight: 600;">Keep a secure copy of this value!</div>
+					<div class="help-text">If this password is lost, any backups encrypted with this string will be unreadable!</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="encryption-password">Encryption Password</label>
-                <div class="password-inputs">
-                    <input type="password" id="encryption-password" class="form-control" placeholder="*Encryption Password">
-                    <input type="password" id="encryption-password-confirm" class="form-control" placeholder="*Encryption Password">
-                    <p class="password-label">Confirm</p>
-                </div>
-                <p class="help-text">
-                    AutoConfigBackup uses this string to encrypt the contents of the backup before upload. The best practice for security is to use a long and complex string.
-                </p>
-                <p class="warning-text">Keep a secure copy of this value!</p>
-                <p class="help-text">If this password is lost, any backups encrypted with this string will be unreadable!</p>
-            </div>
+			<div class="form-group">
+				<label>Hint/Identifier</label>
+				<div class="form-group-content">
+					<input type="text" id="hint-identifier" class="form-control" placeholder="Optional identifier" style="max-width: 400px;">
+					<div class="help-text">Optional identifier which AutoConfigBackup will store in plain text along with each encrypted backup. This may allow Netgate TAC to recover a device key should it become lost.</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="hint-identifier">Hint/Identifier</label>
-                <input type="text" id="hint-identifier" class="form-control" placeholder="Optional identifier">
-                <p class="help-text">
-                    Optional identifier which AutoConfigBackup will store in plain text along with each encrypted backup. This may allow Netgate TAC to recover a device key should it become lost.
-                </p>
-            </div>
+			<div class="form-group">
+				<label>Manual Backup Limit</label>
+				<div class="form-group-content">
+					<input type="text" id="manual-backup-limit" class="form-control" style="max-width: 400px;">
+					<div class="help-text">Number of manual backup entries AutoConfigBackup will retain on the server, which will not be overwritten by automatic backups. The maximum value is 50 retained manual backups out of the 100 total entries.</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="manual-backup-limit">Manual Backup Limit</label>
-                <input type="text" id="manual-backup-limit" class="form-control" placeholder="">
-                <p class="help-text">
-                    Number of manual backup entries AutoConfigBackup will retain on the server, which will not be overwritten by automatic backups. The maximum value is 50 retained manual backups out of the 100 total entries.
-                </p>
-            </div>
+			<div class="form-group">
+				<label>List Order</label>
+				<div class="form-group-content">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="descending-date-order">
+						<label class="form-check-label" for="descending-date-order">List backups in descending order by revision date/time</label>
+					</div>
+					<div class="help-text">List backups in descending order (newest first) when viewing the restore section.</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="descending-date-order" name="descending-date-order">
-                    <span>List backups in descending order by revision date/time</span>
-                </label>
-                <p class="help-text">
-                    List backups in descending order (newest first) when viewing the restore section.
-                </p>
-            </div>
+			<div class="d-flex gap-2" style="margin-top: 15px;">
+				<button type="button" class="btn btn-primary">Save</button>
+			</div>
+		</div>
+	</div>
+</div>
 
-            <div class="form-actions">
-                <button class="btn btn-primary">Save</button>
-            </div>
-        </div>
-    </div>
+<!-- Restore Tab -->
+<div id="restore" class="tab-content" style="display: none;">
+	<div class="settings-section">
+		<h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Restore Configuration</h5>
+		
+		<div style="padding: 20px;">
+			<p>Restore functionality will be implemented here.</p>
+		</div>
+	</div>
+</div>
 
-    <!-- Restore Tab -->
-    <div id="restore" class="tab-content">
-        <div class="settings-section">
-            <h2>Restore Configuration</h2>
-            <p>Restore functionality will be implemented here.</p>
-        </div>
-    </div>
+<!-- Backup Now Tab -->
+<div id="backup" class="tab-content" style="display: none;">
+	<div class="settings-section">
+		<h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">AutoConfigBackup Disabled</h5>
+		
+		<div style="padding: 20px;">
+			<div class="alert alert-warning">
+				<p>The AutoConfigBackup service is currently disabled, manual backups are not possible.</p>
+				<p>Enable AutoConfigBackup on the <a href="#" onclick="switchTab('settings'); return false;">Settings tab</a>.</p>
+			</div>
+			<div class="d-flex gap-2" style="margin-top: 15px;">
+				<button type="button" class="btn btn-primary">Backup</button>
+			</div>
+		</div>
+	</div>
+</div>
 
-    <!-- Backup Now Tab -->
-    <div id="backup" class="tab-content">
-        <div class="settings-section">
-            <h2>AutoConfigBackup Disabled</h2>
-            <div class="alert-box">
-                <p>The AutoConfigBackup service is currently disabled, manual backups are not possible.</p>
-                <p>Enable AutoConfigBackup on the <a href="#" onclick="switchTab('settings'); return false;">Settings tab</a>.</p>
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-primary backup-btn">🔒 Backup</button>
-            </div>
-        </div>
-    </div>
+<!-- Change Device Key Tab -->
+<div id="change-device-key" class="tab-content" style="display: none;">
+	<div class="settings-section">
+		<h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Change Device Key</h5>
+		
+		<div style="padding: 20px;">
+			<div class="form-group">
+				<label>Current Device Key</label>
+				<div class="form-group-content">
+					<input type="text" id="current-device-key" class="form-control" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
+					<div class="help-text">Unique key which identifies backups associated with this device.</div>
+					<div class="help-text" style="color: #d9534f; font-weight: 600;">📋 Keep a secure copy of this value!</div>
+					<div class="help-text">If this key is lost, all backups for this device will be lost!</div>
+					<div class="help-text">Hosted backups for this device key: 0</div>
+				</div>
+			</div>
 
-    <!-- Change Device Key Tab -->
-    <div id="change-device-key" class="tab-content">
-        <div class="settings-section">
-            <h2>Change Device Key</h2>
+			<div class="form-group">
+				<label>New Device Key</label>
+				<div class="form-group-content">
+					<div class="d-flex gap-2 mb-2">
+						<input type="text" id="new-device-key" class="form-control" placeholder="Device Key">
+						<button type="button" class="btn btn-info">Generate New Key</button>
+					</div>
+					<div class="help-text">New device key, replaces the Current Device Key.</div>
+					<div class="help-text">Use the <strong>Generate New Key</strong> button to create a new randomized key in the proper format, or paste a properly formatted key into the field. Keys must be 64 character hexadecimal strings (0-9, a-f).</div>
+					<div class="help-text" style="color: #d9534f; font-weight: 600;">Treat this key as a secret!</div>
+					<div class="help-text">Anyone who has this key can manipulate the backups for this key.</div>
+					<div class="help-text" style="color: #d9534f; font-weight: 600;">Changing the Device Key removes the existing device key!</div>
+					<div class="help-text">Use the download icon above to save a copy of the old key before continuing!</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="current-device-key">Current Device Key</label>
-                <input type="text" id="current-device-key" class="form-control" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
-                <p class="help-text">Unique key which identifies backups associated with this device.</p>
-                <p class="warning-text">📋 Keep a secure copy of this value!</p>
-                <p class="help-text">If this key is lost, all backups for this device will be lost!</p>
-                <p class="help-text">Hosted backups for this device key: 0</p>
-            </div>
+			<div class="form-group">
+				<label>Acknowledgement</label>
+				<div class="form-group-content">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="acknowledge-key-change">
+						<label class="form-check-label" for="acknowledge-key-change">Check this box to acknowledge that the Device Key will change, disconnecting from previous backups</label>
+					</div>
+					<div class="help-text">Checking this box enables the Update Key button. Save a copy of the old Device Key before continuing.</div>
+					<div class="help-text">Old backups are not automatically removed from the server and must be removed manually.</div>
+				</div>
+			</div>
 
-            <div class="form-group">
-                <label for="new-device-key">New Device Key</label>
-                <div class="input-group">
-                    <input type="text" id="new-device-key" class="form-control" placeholder="Device Key">
-                    <button class="btn btn-info generate-key-btn">🔄 Generate New Key</button>
-                </div>
-                <p class="help-text">New device key, replaces the Current Device Key.</p>
-                <p class="help-text">
-                    Use the <strong>Generate New Key</strong> button to create a new randomized key in the proper format, or paste a properly formatted key into the field. Keys must be 64 character hexadecimal strings (0-9, a-f).
-                </p>
-                <p class="warning-text">Treat this key as a secret!</p>
-                <p class="help-text">Anyone who has this key can manipulate the backups for this key.</p>
-                <p class="warning-text">Changing the Device Key removes the existing device key!</p>
-                <p class="help-text">Use the download icon above to save a copy of the old key before continuing!</p>
-            </div>
-
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="acknowledge-key-change" name="acknowledge-key-change">
-                    <span>Check this box to acknowledge that the Device Key will change, disconnecting from previous backups</span>
-                </label>
-                <p class="help-text">Checking this box enables the Update Key button. Save a copy of the old Device Key before continuing.</p>
-                <p class="help-text">Old backups are not automatically removed from the server and must be removed manually.</p>
-            </div>
-
-            <div class="form-actions">
-                <button class="btn btn-danger update-key-btn" disabled>🔒 Update Key</button>
-            </div>
-        </div>
-    </div>
+			<div class="d-flex gap-2" style="margin-top: 15px;">
+				<button type="button" class="btn btn-danger update-key-btn" disabled>Update Key</button>
+			</div>
+		</div>
+	</div>
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+	// Handle tab switching
+	document.querySelectorAll('.nav-link').forEach(link => {
+		link.addEventListener('click', (e) => {
+			e.preventDefault();
+			const tab = link.dataset.tab;
+			switchTab(tab);
+		});
+	});
+
+	// Enable/disable Update Key button based on checkbox
+	const acknowledgeCheckbox = document.getElementById('acknowledge-key-change');
+	const updateKeyBtn = document.querySelector('.update-key-btn');
+	
+	if (acknowledgeCheckbox && updateKeyBtn) {
+		acknowledgeCheckbox.addEventListener('change', function() {
+			updateKeyBtn.disabled = !this.checked;
+		});
+	}
+});
+
 function switchTab(tabName) {
-    // Hide all tabs
-    const tabs = document.querySelectorAll('.tab-content');
-    tabs.forEach(tab => tab.classList.remove('active'));
-    
-    // Show selected tab
-    document.getElementById(tabName).classList.add('active');
-    
-    // Update button styles
-    const buttons = document.querySelectorAll('.tab-button');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+	// Hide all tabs
+	document.querySelectorAll('.tab-content').forEach(tab => {
+		tab.style.display = 'none';
+	});
+	
+	// Show selected tab
+	const selectedTab = document.getElementById(tabName);
+	if (selectedTab) {
+		selectedTab.style.display = 'block';
+	}
+	
+	// Update nav-link active state
+	document.querySelectorAll('.nav-link').forEach(link => {
+		link.classList.remove('active');
+		if (link.dataset.tab === tabName) {
+			link.classList.add('active');
+		}
+	});
 }
 
 function downloadDeviceKey() {
-    const deviceKey = document.getElementById('device-key').value;
-    
-    if (!deviceKey) {
-        alert('No device key to download');
-        return;
-    }
-    
-    // Create a text blob
-    const blob = new Blob([deviceKey], { type: 'text/plain' });
-    
-    // Create a temporary download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'device-key-backup.txt';
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    window.URL.revokeObjectURL(url);
-    
-    // Show success message
-    alert('Device key downloaded successfully as device-key-backup.txt');
+	const deviceKey = document.getElementById('device-key').value;
+	
+	if (!deviceKey) {
+		alert('No device key to download');
+		return;
+	}
+	
+	// Create a text blob
+	const blob = new Blob([deviceKey], { type: 'text/plain' });
+	
+	// Create a temporary download link
+	const url = window.URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = 'device-key-backup.txt';
+	
+	// Trigger download
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	
+	// Clean up
+	window.URL.revokeObjectURL(url);
+	
+	// Show success message
+	alert('Device key downloaded successfully as device-key-backup.txt');
 }
-
-// Enable/disable Update Key button based on checkbox
-document.addEventListener('DOMContentLoaded', function() {
-    const acknowledgeCheckbox = document.getElementById('acknowledge-key-change');
-    const updateKeyBtn = document.querySelector('.update-key-btn');
-    
-    if (acknowledgeCheckbox && updateKeyBtn) {
-        acknowledgeCheckbox.addEventListener('change', function() {
-            updateKeyBtn.disabled = !this.checked;
-        });
-    }
-});
 </script>
 {% endblock %}

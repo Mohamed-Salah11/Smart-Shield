@@ -24,7 +24,7 @@
 <div class="container">
     <!-- Breadcrumb Navigation -->
     <div class="nav-breadcrumb">
-        Services / <a href="{{ url_for('dhcp_server') }}">DHCP Server</a> / <a href="{{ url_for('dhcp_server') }}">WAN</a> / Static Mapping / <strong>Edit</strong>
+        Services / <a href="{{ url_for('services.dhcp_server') }}">DHCP Server</a> / <a href="{{ url_for('services.dhcp_server') }}">WAN</a> / Static Mapping / <strong>Edit</strong>
     </div>
 
     <!-- Static DHCP Mapping Section -->
@@ -40,7 +40,7 @@
             <label for="mac_address">MAC Address</label>
             <div style="position: relative;">
                 <input type="text" id="mac_address" placeholder="xx:xx:xx:xx:xx" style="padding-right: 110px;">
-                <button class="copy-btn" style="position: absolute; right: 5px; top: 5px;">📋 Copy My MAC</button>
+                <button class="copy-btn" style="position: absolute; right: 5px; top: 5px;">Copy My MAC</button>
             </div>
             <div class="help-text">MAC address of the client to match (6 hex octets separated by colons)</div>
         </div>
@@ -134,37 +134,37 @@
 
         <div class="form-group">
             <label for="dynamic_dns">Dynamic DNS</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
 
         <div class="form-group">
             <label for="ntp">NTP</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
 
         <div class="form-group">
             <label for="tftp">TFTP</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
 
         <div class="form-group">
             <label for="ldap">LDAP</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
 
         <div class="form-group">
             <label for="network_booting">Network Booting</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
 
         <div class="form-group">
             <label for="custom_dhcp">Custom DHCP Options</label>
-            <button class="btn-advanced">⚙️ Display Advanced</button>
+            <button class="btn-advanced">Display Advanced</button>
         </div>
     </div>
 
     <!-- Save Button -->
-    <button class="btn-save" onclick="saveMapping()">💾 Save</button>
+    <button class="btn-save" onclick="saveMapping()">Save</button>
 </div>
 
 <script>
@@ -221,7 +221,7 @@
         
         // Redirect back to DHCP Server page
         alert('Static mapping saved successfully!');
-        window.location.href = '{{ url_for("dhcp_server") }}';
+        window.location.href = '{{ url_for("services.dhcp_server") }}';
     }
     
     // Load existing mapping if editing

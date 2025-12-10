@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced.css') }}">
 
 <script>
     let passListCounter = 0;
@@ -40,7 +39,7 @@
 </script>
 
 <div class="breadcrumb">
-    System / <a href="{{ url_for('advanced') }}">Advanced</a> / Admin Access
+    System / <a href="{{ url_for('system.advanced') }}">Advanced</a> / Admin Access
 </div>
 
 <ul class="nav nav-tabs">
@@ -59,12 +58,9 @@
     <li class="nav-item">
         <a class="nav-link" href="#">System Tunables</a>
     </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#">Notifications</a>
-    </li>
 </ul>
 
-<form method="POST" action="{{ url_for('advanced') }}">
+<form method="POST" action="{{ url_for('system.advanced') }}">
 
 <div class="settings-section">
     <h5>webConfigurator</h5>
@@ -446,7 +442,7 @@
                     <option value="serial">Serial Console</option>
                 </select>
                 <div class="help-text">
-                    Select the preferred console if multiple consoles are present. The preferred console will show pfSense boot script output. All consoles display OS boot messages, console messages, and the console menu.
+                    Select the preferred console if multiple consoles are present. The preferred console will show ZGate boot script output. All consoles display OS boot messages, console messages, and the console menu.
                 </div>
             </div>
         </div>
