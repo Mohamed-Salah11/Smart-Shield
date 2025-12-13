@@ -1,87 +1,97 @@
 {% extends "base.html" %}
 {% block main %}
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>VPN / IPsec / Tunnels</h2>
-    <div>
-        <button class="btn btn-sm btn-outline-secondary me-2">
-            <i class="bi bi-arrow-repeat"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-secondary me-2">
-            <i class="bi bi-arrow-down-up"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-danger">
-            <i class="bi bi-x-circle"></i>
-        </button>
-    </div>
+<div class="breadcrumb">
+    <span>Dashboard / VPN / IPsec / Tunnels</span>
 </div>
 
 <!-- Navigation tabs -->
-<ul class="nav nav-tabs mb-4" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="tunnels-tab" data-bs-toggle="tab" data-bs-target="#tunnels" type="button" role="tab" aria-controls="tunnels" aria-selected="true">
-            Tunnels
-        </button>
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link active" href="#" onclick="showTab('tunnels'); return false;">Tunnels</a>
     </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="mobile-clients-tab" data-bs-toggle="tab" data-bs-target="#mobile-clients" type="button" role="tab" aria-controls="mobile-clients" aria-selected="false">
-            Mobile Clients
-        </button>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('mobile-clients'); return false;">Mobile Clients</a>
     </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="pre-shared-keys-tab" data-bs-toggle="tab" data-bs-target="#pre-shared-keys" type="button" role="tab" aria-controls="pre-shared-keys" aria-selected="false">
-            Pre-Shared Keys
-        </button>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('pre-shared-keys'); return false;">Pre-Shared Keys</a>
     </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="advanced-settings-tab" data-bs-toggle="tab" data-bs-target="#advanced-settings" type="button" role="tab" aria-controls="advanced-settings" aria-selected="false">
-            Advanced Settings
-        </button>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('advanced-settings'); return false;">Advanced Settings</a>
     </li>
 </ul>
 
-<!-- Tab content -->
-<div class="tab-content">
-    <!-- Tunnels tab -->
-    <div class="tab-pane fade show active" id="tunnels" role="tabpanel" aria-labelledby="tunnels-tab">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5>IPsec Tunnels</h5>
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addP1Modal">
-                <i class="bi bi-plus"></i> Add P1
-            </button>
-        </div>
+<script>
+    function showTab(tabName) {
+        // Hide all tabs
+        var tabs = document.querySelectorAll('.tab-content-section');
+        tabs.forEach(function(tab) {
+            tab.style.display = 'none';
+        });
         
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>ID</th>
-                        <th>IKE</th>
-                        <th>Remote Gateway</th>
-                        <th>Auth/Mode</th>
-                        <th>P1 Protocol</th>
-                        <th>P1 Transforms</th>
-                        <th>P1 DH-Group</th>
-                        <th>P1 Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="9" class="text-center py-4">
-                            <div class="text-muted">
-                                <i class="bi bi-info-circle"></i> No IPsec tunnels configured.
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        // Show selected tab
+        var selectedTab = document.getElementById('tab-' + tabName);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+        }
+        
+        // Update active link
+        var links = document.querySelectorAll('.nav-link');
+        links.forEach(function(link) {
+            link.classList.remove('active');
+        });
+        event.target.classList.add('active');
+    }
+</script>
+
+<!-- Tab content -->
+<div class="settings-section">
+    <!-- Tunnels tab -->
+    <div id="tab-tunnels" class="tab-content-section" style="display: block;">
+        <h5>IPsec Tunnels</h5>
+        
+        <div style="padding: 20px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addP1Modal">
+                    <i class="bi bi-plus"></i> Add P1
+                </button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>IKE</th>
+                            <th>Remote Gateway</th>
+                            <th>Auth/Mode</th>
+                            <th>P1 Protocol</th>
+                            <th>P1 Transforms</th>
+                            <th>P1 DH-Group</th>
+                            <th>P1 Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="bi bi-info-circle"></i> No IPsec tunnels configured.
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <!-- Mobile Clients tab -->
-    <div class="tab-pane fade" id="mobile-clients" role="tabpanel" aria-labelledby="mobile-clients-tab">
-        <form id="mobileClientsForm">
+    <div id="tab-mobile-clients" class="tab-content-section" style="display: none;">
+        <h5>Mobile Clients</h5>
+        
+        <div style="padding: 20px;">
+            <form id="mobileClientsForm">
             <!-- Enable IPsec Mobile Client Support Section -->
             <div class="mb-4">
                 <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -254,42 +264,49 @@
                 </button>
             </div>
         </form>
+        </div>
     </div>
 
     <!-- Pre-Shared Keys tab -->
-    <div class="tab-pane fade" id="pre-shared-keys" role="tabpanel" aria-labelledby="pre-shared-keys-tab">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5>Pre-Shared Keys</h5>
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addPSKModal">
-                <i class="bi bi-plus"></i> Add PSK
-            </button>
-        </div>
+    <div id="tab-pre-shared-keys" class="tab-content-section" style="display: none;">
+        <h5>Pre-Shared Keys</h5>
         
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Identifier</th>
-                        <th>Secret Type</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="3" class="text-center py-4">
-                            <div class="text-muted">
-                                <i class="bi bi-info-circle"></i> No Pre-Shared Keys configured.
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <div style="padding: 20px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addPSKModal">
+                    <i class="bi bi-plus"></i> Add PSK
+                </button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Identifier</th>
+                            <th>Secret Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="3" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="bi bi-info-circle"></i> No Pre-Shared Keys configured.
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <!-- Advanced Settings tab -->
-    <div class="tab-pane fade" id="advanced-settings" role="tabpanel" aria-labelledby="advanced-settings-tab">
-        <form id="advancedSettingsForm">
+    <div id="tab-advanced-settings" class="tab-content-section" style="display: none;">
+        <h5>Advanced Settings</h5>
+        
+        <div style="padding: 20px;">
+            <form id="advancedSettingsForm">
             <!-- IPsec Logging Controls Section -->
             <div class="mb-4">
                 <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -789,6 +806,7 @@
                 </div>
             </div>
         </form>
+        </div>
     </div>
 </div>
 

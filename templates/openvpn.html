@@ -5,123 +5,149 @@
 	<span>Dashboard / VPN / OpenVPN</span>
 </div>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="servers-tab" data-bs-toggle="tab" data-bs-target="#servers" type="button" role="tab" aria-controls="servers" aria-selected="true">Servers</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab" aria-controls="clients" aria-selected="false">Clients</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="overrides-tab" data-bs-toggle="tab" data-bs-target="#overrides" type="button" role="tab" aria-controls="overrides" aria-selected="false">Client Specific Overrides</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="wizards-tab" data-bs-toggle="tab" data-bs-target="#wizards" type="button" role="tab" aria-controls="wizards" aria-selected="false">Wizards</button>
-        </li>
-    </ul>
+<!-- Tabs -->
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+        <a class="nav-link active" href="#" onclick="showTab('servers'); return false;">Servers</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('clients'); return false;">Clients</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('overrides'); return false;">Client Specific Overrides</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="#" onclick="showTab('wizards'); return false;">Wizards</a>
+    </li>
+</ul>
 
-    <!-- Tab Content -->
-    <div class="tab-content">
-        <!-- Servers Tab -->
-        <div class="tab-pane fade show active" id="servers" role="tabpanel" aria-labelledby="servers-tab">
-            <div class="settings-section" style="padding: 20px;">
-                <h5>OpenVPN Servers</h5>
+<script>
+    function showTab(tabName) {
+        // Hide all tabs
+        var tabs = document.querySelectorAll('.tab-content-section');
+        tabs.forEach(function(tab) {
+            tab.style.display = 'none';
+        });
+        
+        // Show selected tab
+        var selectedTab = document.getElementById('tab-' + tabName);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+        }
+        
+        // Update active link
+        var links = document.querySelectorAll('.nav-link');
+        links.forEach(function(link) {
+            link.classList.remove('active');
+        });
+        event.target.classList.add('active');
+    }
+</script>
 
-                <table>
-                        <thead>
-                            <tr>
-                                <th>Interface</th>
-                                <th>Protocol / Port</th>
-                                <th>Tunnel Network</th>
-                                <th>Mode / Crypto</th>
-                                <th>Description</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    No OpenVPN servers configured.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
 
-                <div class="d-flex gap-2 mt-3">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServerModal">
-                        Add
-                    </button>
-                </div>
+<!-- Tab Content -->
+<div class="settings-section">
+    <!-- Servers Tab -->
+    <div id="tab-servers" class="tab-content-section" style="display: block;">
+        <h5>OpenVPN Servers</h5>
+        
+        <div style="padding: 20px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Interface</th>
+                        <th>Protocol / Port</th>
+                        <th>Tunnel Network</th>
+                        <th>Mode / Crypto</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No OpenVPN servers configured.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="d-flex gap-2 mt-3">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServerModal">
+                    Add
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Clients Tab -->
-        <div class="tab-pane fade" id="clients" role="tabpanel" aria-labelledby="clients-tab">
-            <div class="settings-section" style="padding: 20px;">
-                <h5>OpenVPN Clients</h5>
+    <!-- Clients Tab -->
+    <div id="tab-clients" class="tab-content-section" style="display: none;">
+        <h5>OpenVPN Clients</h5>
+        
+        <div style="padding: 20px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Interface</th>
+                        <th>Protocol</th>
+                        <th>Server</th>
+                        <th>Mode / Crypto</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No OpenVPN clients configured.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
 
-                <table>
-                        <thead>
-                            <tr>
-                                <th>Interface</th>
-                                <th>Protocol</th>
-                                <th>Server</th>
-                                <th>Mode / Crypto</th>
-                                <th>Description</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    No OpenVPN clients configured.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                <div class="d-flex gap-2 mt-3">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addClientModal">
-                        Add
-                    </button>
-                </div>
+            <div class="d-flex gap-2 mt-3">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                    Add
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Client Specific Overrides Tab -->
-        <div class="tab-pane fade" id="overrides" role="tabpanel" aria-labelledby="overrides-tab">
-            <div class="settings-section" style="padding: 20px;">
-                <h5>CSC Overrides</h5>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Disabled</th>
-                            <th>Common Name</th>
-                            <th>Description</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="4" class="text-center text-muted">
-                                No Client Specific Overrides configured.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="d-flex gap-2 mt-3">
-                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCSCModal">
-                        Add
-                    </button>
-                </div>
+    <!-- Client Specific Overrides Tab -->
+    <div id="tab-overrides" class="tab-content-section" style="display: none;">
+        <h5>CSC Overrides</h5>
+        
+        <div style="padding: 20px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Disabled</th>
+                        <th>Common Name</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            No Client Specific Overrides configured.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="d-flex gap-2 mt-3">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCSCModal">
+                    Add
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Wizards Tab -->
-        <div class="tab-pane fade" id="wizards" role="tabpanel" aria-labelledby="wizards-tab">
-            <div class="settings-section" style="padding: 20px;">
+    <!-- Wizards Tab -->
+    <div id="tab-wizards" class="tab-content-section" style="display: none;">
+        <h5>OpenVPN Wizards</h5>
+        
+        <div style="padding: 20px;">
                 <!-- Step 1: Select Authentication Backend Type -->
                 <div id="wizardStep1" class="wizard-step">
                     <div class="p-4 mb-4 bg-light border rounded">
@@ -324,6 +350,8 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
         </div>
     </div>
 </div>
@@ -2414,18 +2442,8 @@
     </div>
 </div>
 
-<script>
-// Initialize Bootstrap tabs on page load
-window.addEventListener('DOMContentLoaded', function() {
-    // Ensure the first tab is shown
-    const firstTabButton = document.querySelector('#servers-tab');
-    const firstTabPane = document.querySelector('#servers');
-    
-    if (firstTabButton && firstTabPane) {
-        firstTabButton.classList.add('active');
-        firstTabPane.classList.add('show', 'active');
-    }
-});
-</script>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
