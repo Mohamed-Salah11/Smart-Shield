@@ -8,15 +8,15 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs">
     <li class="nav-item">
-        <a class="nav-link active" href="#" onclick="showTab('configuration'); return false;">Configuration</a>
+        <a class="nav-link active" href="#" onclick="showTab('configuration', event); return false;">Configuration</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="#" onclick="showTab('users'); return false;">Users</a>
+        <a class="nav-link" href="#" onclick="showTab('users', event); return false;">Users</a>
     </li>
 </ul>
 
 <script>
-    function showTab(tabName) {
+    function showTab(tabName, ev) {
         // Hide all tabs
         var tabs = document.querySelectorAll('.tab-content-section');
         tabs.forEach(function(tab) {
@@ -34,7 +34,9 @@
         links.forEach(function(link) {
             link.classList.remove('active');
         });
-        event.target.classList.add('active');
+        if (ev && ev.target) {
+            ev.target.classList.add('active');
+        }
     }
 </script>
 
@@ -45,7 +47,7 @@
         <h5>L2TP Configuration</h5>
         
         <div style="padding: 20px;">
-            <form id="l2tpConfigForm">
+            <form id="l2tpConfigForm" method="post" action="{{ url_for('vpn.l2tp') }}">
                 <!-- Enable L2TP Section -->
                 <div class="mb-4">
                     <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -58,7 +60,7 @@
                         </div>
                         <div class="col-md-9">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="enableL2TP" name="enableL2TP">
+                                <input class="form-check-input" type="checkbox" id="enableL2TP" name="l2tp_enabled" {% if l2tp_config and l2tp_config.get('enabled') %}checked{% endif %}>
                                 <label class="form-check-label" for="enableL2TP">
                                     Enable L2TP server
                                 </label>
@@ -69,7 +71,7 @@
 
                 <!-- Save Button -->
                 <div class="mb-4">
-                    <button type="button" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary">
                         <i class="bi bi-download"></i> Save
                     </button>
                 </div>
@@ -101,11 +103,41 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox"></i> No L2TP users configured.
-                                </td>
-                            </tr>
+                            {% if l2tp_users and l2tp_users|length > 0 %}
+                                {% for u in l2tp_users %}
+                                <tr>
+                                    <td>{{ u.username }}</td>
+                                    <td>{{ u.ip_address or '' }}</td>
+                                    <td>
+                                        <div class="d-flex gap-2">
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary l2tp-edit-user-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editUserModal"
+                                                data-user-id="{{ u.id }}"
+                                                data-username="{{ (u.username or '')|e }}"
+                                                data-ip-address="{{ (u.ip_address or '')|e }}"
+                                            >
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
+
+                                            <form method="POST" action="{{ url_for('vpn.l2tp_users_delete', user_id=u.id) }}" onsubmit="return confirm('Delete this user?');">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox"></i> No L2TP users configured.
+                                    </td>
+                                </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
@@ -129,7 +161,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="addUserForm">
+                <form id="addUserForm" method="POST" action="{{ url_for('vpn.l2tp_users_add') }}">
                     <!-- User Section -->
                     <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
                         User
@@ -141,7 +173,7 @@
                                 <label for="username" class="form-label"><strong>Username</strong></label>
                             </div>
                             <div class="col-md-8">
-                                <input type="text" class="form-control" id="username" placeholder="" required>
+                                <input type="text" class="form-control" id="username" name="username" placeholder="" required>
                             </div>
                         </div>
                     </div>
@@ -154,7 +186,7 @@
                             <div class="col-md-8">
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <input type="password" class="form-control" id="password" placeholder="*Password" required>
+                                        <input type="password" class="form-control" id="password" name="password" placeholder="*Password" required>
                                     </div>
                                     <div class="col-md-6">
                                         <input type="password" class="form-control" id="passwordConfirm" placeholder="*Password" required>
@@ -171,7 +203,7 @@
                                 <label for="ipAddress" class="form-label"><strong>IP Address</strong></label>
                             </div>
                             <div class="col-md-8">
-                                <input type="text" class="form-control" id="ipAddress" placeholder="">
+                                <input type="text" class="form-control" id="ipAddress" name="ip_address" placeholder="">
                                 <small class="text-muted">To assign the user a specific IP address, enter it here.</small>
                             </div>
                         </div>
@@ -179,12 +211,102 @@
                 </form>
             </div>
             <div class="modal-body bg-light">
-                <button type="button" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" form="addUserForm">
                     <i class="bi bi-download"></i> Save
                 </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal for Edit L2TP User -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="editUserModalLabel">Edit L2TP User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm" method="POST" action="" data-edit-url-template="{{ url_for('vpn.l2tp_users_edit', user_id=0) }}">
+                    <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">User</div>
+
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="edit_username" class="form-label"><strong>Username</strong></label>
+                            </div>
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="edit_username" name="username" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="edit_password" class="form-label"><strong>Password</strong></label>
+                            </div>
+                            <div class="col-md-8">
+                                <input type="password" class="form-control" id="edit_password" name="password" placeholder="Leave empty to keep current">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="edit_ipAddress" class="form-label"><strong>IP Address</strong></label>
+                            </div>
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="edit_ipAddress" name="ip_address">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-body bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="editUserForm"><i class="bi bi-download"></i> Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Populate Edit modal and set correct POST action
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.l2tp-edit-user-btn');
+        if (!btn) return;
+
+        var userId = btn.getAttribute('data-user-id');
+        var username = btn.getAttribute('data-username') || '';
+        var ipAddress = btn.getAttribute('data-ip-address') || '';
+
+        var form = document.getElementById('editUserForm');
+        var template = form.getAttribute('data-edit-url-template');
+        if (template) {
+            form.action = template.replace(/0$/, userId);
+        }
+
+        document.getElementById('edit_username').value = username;
+        document.getElementById('edit_ipAddress').value = ipAddress;
+        document.getElementById('edit_password').value = '';
+    });
+
+    // Basic confirm password check for Add modal
+    (function () {
+        var addForm = document.getElementById('addUserForm');
+        if (!addForm) return;
+        addForm.addEventListener('submit', function (ev) {
+            var p1 = document.getElementById('password')?.value || '';
+            var p2 = document.getElementById('passwordConfirm')?.value || '';
+            if (p1 !== p2) {
+                ev.preventDefault();
+                alert('Passwords do not match.');
+            }
+        });
+    })();
+</script>
 
 {% endblock %}
