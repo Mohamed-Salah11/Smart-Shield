@@ -62,4 +62,128 @@ def init_db():
         """)
 
     conn.commit()
+
+
+    # database.py - Add these inside init_db()
+
+    # NAT Port Forward Rules
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS nat_pf (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        protocol TEXT,
+        src_type TEXT,
+        src_address TEXT,
+        dst_type TEXT,
+        dst_address TEXT,
+        redirect_ip TEXT,
+        description TEXT,
+        nat_reflection TEXT
+    )
+    """)
+
+    # 1:1 NAT Mappings
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS nat_1to1 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        external_address TEXT,
+        internal_address TEXT,
+        destination_address TEXT,
+        description TEXT
+    )
+    """)
+
+    # Outbound NAT Rules
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS nat_outbound (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        src_address TEXT,
+        dst_address TEXT,
+        nat_address TEXT,
+        static_port INTEGER DEFAULT 0,
+        description TEXT
+    )
+    """)
+
+    # NPt (Network Prefix Translation) IPv6
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS nat_npt (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        src_not INTEGER DEFAULT 0,
+        src_prefix TEXT,
+        src_prefix_length INTEGER,
+        dst_not INTEGER DEFAULT 0,
+        dst_type TEXT,
+        dst_prefix TEXT,
+        dst_prefix_length INTEGER,
+        description TEXT
+    )
+    """)
+
+    # Firewall Rules - Floating
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_rules_floating (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        protocol TEXT,
+        source TEXT,
+        source_port TEXT,
+        destination TEXT,
+        dest_port TEXT,
+        gateway TEXT,
+        queue TEXT,
+        schedule TEXT,
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
+    )
+    """)
+
+    # Firewall Rules - WAN
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_rules_wan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT DEFAULT 'pass',
+        disabled INTEGER DEFAULT 0,
+        protocol TEXT,
+        source TEXT,
+        destination TEXT,
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
+    )
+    """)
+
+    # Firewall Rules - LAN
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_rules_lan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        interface TEXT,
+        protocol TEXT,
+        source TEXT,
+        destination TEXT,
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
+    )
+    """)
+
+    # Firewall Aliases
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_aliases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        type TEXT,
+        alias_values TEXT,
+        description TEXT
+    )
+    """)
+    
+    conn.commit()
     conn.close()
