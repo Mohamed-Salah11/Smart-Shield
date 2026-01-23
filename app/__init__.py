@@ -1,15 +1,5 @@
 from flask import Flask
 from .database import init_db
-from .vpndb import init_vpn_db
-from .vpn_servers_db import init_vpn_servers_db
-from .cscdb import init_csc_db
-from .wizardsdb import init_wizards_db
-from .tunnelsdb import init_tunnels_table
-from .mobclientsdb import init_mobile_clients_table
-from .pskdb import init_psk_table
-from .advs import init_advanced_settings_table
-from .l2configdb import init_l2tp_config_table
-from .l2users import init_l2tp_users_table
 import os
 
 def create_app():
@@ -23,16 +13,6 @@ def create_app():
 
     # Initialize SQLite database and ensure default admin user is created
     init_db()
-    init_vpn_servers_db()
-    init_vpn_db()
-    init_csc_db()
-    init_wizards_db()
-    init_tunnels_table()
-    init_mobile_clients_table()
-    init_psk_table()
-    init_advanced_settings_table()
-    init_l2tp_config_table()
-    init_l2tp_users_table()
 
     # Import blueprints
     from routes.auth import auth_bp

@@ -73,69 +73,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% if tunnels and tunnels|length > 0 %}
-                            {% for t in tunnels %}
-                            <tr
-                                data-tunnel-id="{{ t.id }}"
-                                data-description="{{ (t.description or '')|e }}"
-                                data-key-exchange="{{ (t.key_exchange or '')|e }}"
-                                data-internet-protocol="{{ (t.internet_protocol or '')|e }}"
-                                data-interface="{{ (t.interface or '')|e }}"
-                                data-remote-gateway="{{ (t.remote_gateway or '')|e }}"
-                                data-auth-method="{{ (t.auth_method or '')|e }}"
-                                data-my-identifier="{{ (t.my_identifier or '')|e }}"
-                                data-peer-identifier="{{ (t.peer_identifier or '')|e }}"
-                                data-pre-shared-key="{{ (t.pre_shared_key or '')|e }}"
-                                data-algorithms-json="{{ (t.algorithms_json or '[]')|e }}"
-                                data-life-time="{{ t.life_time }}"
-                                data-rekey-time="{{ t.rekey_time }}"
-                                data-reauth-time="{{ t.reauth_time }}"
-                                data-rand-time="{{ t.rand_time }}"
-                                data-child-sa-start-action="{{ (t.child_sa_start_action or '')|e }}"
-                                data-child-sa-close-action="{{ (t.child_sa_close_action or '')|e }}"
-                                data-nat-traversal="{{ (t.nat_traversal or '')|e }}"
-                                data-mobike="{{ (t.mobike or '')|e }}"
-                                data-gateway-duplicates="{{ t.gateway_duplicates }}"
-                                data-split-connections="{{ t.split_connections }}"
-                                data-prf-selection="{{ t.prf_selection }}"
-                                data-remote-ike-port="{{ t.remote_ike_port or '' }}"
-                                data-remote-natt-port="{{ t.remote_natt_port or '' }}"
-                                data-enable-dpd="{{ t.enable_dpd }}"
-                                data-dpd-delay="{{ t.dpd_delay }}"
-                                data-max-failures="{{ t.max_failures }}"
-                            >
-                                <td>{{ t.id }}</td>
-                                <td>{{ t.key_exchange }}</td>
-                                <td>{{ t.remote_gateway }}</td>
-                                <td>{{ t.auth_method }}</td>
-                                <td>{{ t.internet_protocol }}</td>
-                                <td>{{ t.algorithms_json }}</td>
-                                <td>{{ t.remote_ike_port or '' }}</td>
-                                <td>{{ t.description }}</td>
-                                <td>
-                                    <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-sm btn-primary ipsec-edit-btn" data-bs-toggle="modal" data-bs-target="#editP1Modal">
-                                            <i class="bi bi-pencil"></i> Edit
-                                        </button>
-
-                                        <form method="POST" action="{{ url_for('vpn.ipsec_delete_tunnel', tunnel_id=t.id) }}" onsubmit="return confirm('Delete this tunnel?');">
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="bi bi-trash"></i> Delete
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="9" class="text-center py-4">
-                                    <div class="text-muted">
-                                        <i class="bi bi-info-circle"></i> No IPsec tunnels configured.
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endif %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="bi bi-info-circle"></i> No IPsec tunnels configured.
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -147,7 +91,7 @@
         <h5>Mobile Clients</h5>
         
         <div style="padding: 20px;">
-            <form id="mobileClientsForm" method="POST" action="{{ url_for('vpn.ipsec_mobile_clients_save') }}">
+            <form id="mobileClientsForm">
             <!-- Enable IPsec Mobile Client Support Section -->
             <div class="mb-4">
                 <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -156,7 +100,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="enableMobileClientSupport" name="enableMobileClientSupport" {% if mobile_clients and mobile_clients.enable_mobile_client_support %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="enableMobileClientSupport" name="enableMobileClientSupport">
                         <label class="form-check-label" for="enableMobileClientSupport">
                             <strong>IKE Extensions</strong> - Enable IPsec Mobile Client Support
                         </label>
@@ -172,13 +116,13 @@
 
                 <div class="mb-3">
                     <label for="userAuthentication" class="form-label"><strong>User Authentication</strong></label>
-                    <textarea class="form-control" id="userAuthentication" name="userAuthentication" rows="4" placeholder="Local Database">{% if mobile_clients %}{{ mobile_clients.user_authentication_source }}{% else %}Local Database{% endif %}</textarea>
+                    <textarea class="form-control" id="userAuthentication" rows="4" placeholder="Local Database">Local Database</textarea>
                     <small class="text-muted">Source</small>
                 </div>
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="groupAuthentication" name="groupAuthentication" {% if mobile_clients and mobile_clients.group_authentication %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="groupAuthentication" name="groupAuthentication">
                         <label class="form-check-label" for="groupAuthentication">
                             <strong>Group Authentication</strong> - Authenticate members of groups which have either "User - VPN: IPsec with Dialin" or "WebCfg - All pages" privileges.
                         </label>
@@ -187,7 +131,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="radiusAccounting" name="radiusAccounting" {% if mobile_clients and mobile_clients.radius_accounting %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="radiusAccounting" name="radiusAccounting">
                         <label class="form-check-label" for="radiusAccounting">
                             <strong>RADIUS Accounting</strong> - Enable RADIUS Accounting
                         </label>
@@ -204,7 +148,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="virtualAddressPool" name="virtualAddressPool" {% if mobile_clients and mobile_clients.virtual_address_pool %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="virtualAddressPool" name="virtualAddressPool">
                         <label class="form-check-label" for="virtualAddressPool">
                             <strong>Virtual Address Pool</strong> - Provide a virtual IP address to clients
                         </label>
@@ -213,7 +157,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="virtualIPv6AddressPool" name="virtualIPv6AddressPool" {% if mobile_clients and mobile_clients.virtual_ipv6_address_pool %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="virtualIPv6AddressPool" name="virtualIPv6AddressPool">
                         <label class="form-check-label" for="virtualIPv6AddressPool">
                             <strong>Virtual IPv6 Address Pool</strong> - Provide a virtual IPv6 address to clients
                         </label>
@@ -222,7 +166,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="radiusIPPriority" name="radiusIPPriority" {% if mobile_clients and mobile_clients.radius_ip_priority %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="radiusIPPriority" name="radiusIPPriority">
                         <label class="form-check-label" for="radiusIPPriority">
                             <strong>RADIUS IP address priority</strong> - IPv4/IPv6 address pool is used if address is not supplied by RADIUS server
                         </label>
@@ -231,7 +175,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="radiusAdvanced" name="radiusAdvanced" {% if mobile_clients and mobile_clients.radius_advanced %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="radiusAdvanced" name="radiusAdvanced">
                         <label class="form-check-label" for="radiusAdvanced">
                             <strong>RADIUS Advanced Parameters</strong> - Set Advanced RADIUS parameters
                         </label>
@@ -241,7 +185,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="networkList" name="networkList" {% if mobile_clients and mobile_clients.network_list %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="networkList" name="networkList">
                         <label class="form-check-label" for="networkList">
                             <strong>Network List</strong> - Provide a list of accessible networks to clients
                         </label>
@@ -250,7 +194,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="saveXauthPassword" name="saveXauthPassword" {% if mobile_clients and mobile_clients.save_xauth_password %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="saveXauthPassword" name="saveXauthPassword">
                         <label class="form-check-label" for="saveXauthPassword">
                             <strong>Save Xauth Password</strong> - Allow clients to save Xauth passwords (Cisco VPN client only).
                         </label>
@@ -260,7 +204,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="dnsDefaultDomain" name="dnsDefaultDomain" {% if mobile_clients and mobile_clients.dns_default_domain %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="dnsDefaultDomain" name="dnsDefaultDomain">
                         <label class="form-check-label" for="dnsDefaultDomain">
                             <strong>DNS Default Domain</strong> - Provide a default domain name to clients
                         </label>
@@ -269,7 +213,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="splitDns" name="splitDns" {% if mobile_clients and mobile_clients.split_dns %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="splitDns" name="splitDns">
                         <label class="form-check-label" for="splitDns">
                             <strong>Split DNS</strong> - Provide a list of split DNS domain names to clients. Enter a space separated list.
                         </label>
@@ -278,7 +222,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="dnsServers" name="dnsServers" {% if mobile_clients and mobile_clients.dns_servers %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="dnsServers" name="dnsServers">
                         <label class="form-check-label" for="dnsServers">
                             <strong>DNS Servers</strong> - Provide a DNS server list to clients
                         </label>
@@ -288,7 +232,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="winsServers" name="winsServers" {% if mobile_clients and mobile_clients.wins_servers %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="winsServers" name="winsServers">
                         <label class="form-check-label" for="winsServers">
                             <strong>WINS Servers</strong> - Provide a WINS server list to clients
                         </label>
@@ -297,7 +241,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="phase2PFSGroup" name="phase2PFSGroup" {% if mobile_clients and mobile_clients.phase2_pfs_group %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="phase2PFSGroup" name="phase2PFSGroup">
                         <label class="form-check-label" for="phase2PFSGroup">
                             <strong>Phase2 PFS Group</strong> - Provide the Phase2 PFS group to clients ( overrides all mobile phase2 settings )
                         </label>
@@ -306,7 +250,7 @@
 
                 <div class="mb-3">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="loginBanner" name="loginBanner" {% if mobile_clients and mobile_clients.login_banner %}checked{% endif %}>
+                        <input class="form-check-input" type="checkbox" id="loginBanner" name="loginBanner">
                         <label class="form-check-label" for="loginBanner">
                             <strong>Login Banner</strong> - Provide a login banner to clients
                         </label>
@@ -315,7 +259,7 @@
             </div>
 
             <div class="mb-3">
-                <button type="submit" class="btn btn-primary">
+                <button type="button" class="btn btn-primary">
                     <i class="bi bi-download"></i> Save
                 </button>
             </div>
@@ -344,34 +288,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% if psks and psks|length > 0 %}
-                            {% for p in psks %}
-                                <tr data-psk-id="{{ p.id }}" data-psk-identifier="{{ (p.identifier or '')|e }}" data-psk-secret-type="{{ (p.secret_type or 'psk')|e }}" data-psk-secret="{{ (p.secret or '')|e }}">
-                                    <td>{{ p.identifier }}</td>
-                                    <td>{{ p.secret_type }}</td>
-                                    <td>
-                                        <div class="d-flex gap-2">
-                                            <button type="button" class="btn btn-sm btn-primary psk-edit-btn" data-bs-toggle="modal" data-bs-target="#editPSKModal">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </button>
-                                            <form method="POST" action="{{ url_for('vpn.ipsec_psk_delete', psk_id=p.id) }}" onsubmit="return confirm('Delete this PSK?');">
-                                                <button type="submit" class="btn btn-sm btn-danger">
-                                                    <i class="bi bi-trash"></i> Delete
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center py-4">
-                                    <div class="text-muted">
-                                        <i class="bi bi-info-circle"></i> No Pre-Shared Keys configured.
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endif %}
+                        <tr>
+                            <td colspan="3" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="bi bi-info-circle"></i> No Pre-Shared Keys configured.
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -383,7 +306,7 @@
         <h5>Advanced Settings</h5>
         
         <div style="padding: 20px;">
-            <form id="advancedSettingsForm" method="POST" action="{{ url_for('vpn.ipsec_advanced_settings_save') }}">
+            <form id="advancedSettingsForm">
             <!-- IPsec Logging Controls Section -->
             <div class="mb-4">
                 <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -396,208 +319,208 @@
                             <tr>
                                 <td><strong>Daemon</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_daemon">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.daemon == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.daemon == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.daemon == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.daemon == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.daemon == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.daemon == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>SA Manager</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_sa_manager">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.sa_manager == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.sa_manager == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.sa_manager == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.sa_manager == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.sa_manager == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.sa_manager == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>IKE SA</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_ike_sa">
-                                        <option value="control" {% if adv_settings and adv_settings.logging.ike_sa == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.ike_sa == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.ike_sa == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if not adv_settings or adv_settings.logging.ike_sa == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.ike_sa == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.ike_sa == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>IKE Child SA</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_ike_child_sa">
-                                        <option value="control" {% if adv_settings and adv_settings.logging.ike_child_sa == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.ike_child_sa == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.ike_child_sa == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if not adv_settings or adv_settings.logging.ike_child_sa == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.ike_child_sa == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.ike_child_sa == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Job Processing</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_job_processing">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.job_processing == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.job_processing == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.job_processing == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.job_processing == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.job_processing == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.job_processing == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Configuration backend</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_config_backend">
-                                        <option value="control" {% if adv_settings and adv_settings.logging.config_backend == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.config_backend == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.config_backend == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if not adv_settings or adv_settings.logging.config_backend == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.config_backend == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.config_backend == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="diag" selected>Diag</option>
+                                        <option value="control">Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Kernel Interface</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_kernel_interface">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.kernel_interface == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.kernel_interface == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.kernel_interface == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.kernel_interface == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.kernel_interface == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.kernel_interface == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Networking</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_networking">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.networking == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.networking == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.networking == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.networking == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.networking == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.networking == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>ASN encoding</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_asn_encoding">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.asn_encoding == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.asn_encoding == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.asn_encoding == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.asn_encoding == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.asn_encoding == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.asn_encoding == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Message encoding</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_message_encoding">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.message_encoding == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.message_encoding == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.message_encoding == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.message_encoding == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.message_encoding == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.message_encoding == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Integrity checker</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_integrity_checker">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.integrity_checker == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.integrity_checker == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.integrity_checker == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.integrity_checker == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.integrity_checker == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.integrity_checker == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Integrity Verifier</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_integrity_verifier">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.integrity_verifier == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.integrity_verifier == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.integrity_verifier == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.integrity_verifier == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.integrity_verifier == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.integrity_verifier == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>Platform Trust Service</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_pts">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.pts == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.pts == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.pts == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.pts == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.pts == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.pts == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>TLS handler</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_tls">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.tls == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.tls == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.tls == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.tls == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.tls == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.tls == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>IPsec traffic</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_ipsec_traffic">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.ipsec_traffic == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.ipsec_traffic == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.ipsec_traffic == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.ipsec_traffic == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.ipsec_traffic == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.ipsec_traffic == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td><strong>StrongSwan Lib</strong></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="log_strongswan_lib">
-                                        <option value="control" {% if not adv_settings or adv_settings.logging.strongswan_lib == 'control' %}selected{% endif %}>Control</option>
-                                        <option value="silent" {% if adv_settings and adv_settings.logging.strongswan_lib == 'silent' %}selected{% endif %}>Silent</option>
-                                        <option value="audit" {% if adv_settings and adv_settings.logging.strongswan_lib == 'audit' %}selected{% endif %}>Audit</option>
-                                        <option value="diag" {% if adv_settings and adv_settings.logging.strongswan_lib == 'diag' %}selected{% endif %}>Diag</option>
-                                        <option value="raw" {% if adv_settings and adv_settings.logging.strongswan_lib == 'raw' %}selected{% endif %}>Raw</option>
-                                        <option value="highest" {% if adv_settings and adv_settings.logging.strongswan_lib == 'highest' %}selected{% endif %}>Highest</option>
+                                    <select class="form-select form-select-sm">
+                                        <option value="control" selected>Control</option>
+                                        <option value="silent">Silent</option>
+                                        <option value="audit">Audit</option>
+                                        <option value="diag">Diag</option>
+                                        <option value="raw">Raw</option>
+                                        <option value="highest">Highest</option>
                                     </select>
                                 </td>
                             </tr>
@@ -620,11 +543,11 @@
                             <label for="configureUniqueIDs" class="form-label"><strong>Configure Unique IDs as</strong></label>
                         </div>
                         <div class="col-md-8">
-                            <select class="form-select" id="configureUniqueIDs" name="configure_unique_ids">
-                                <option value="yes" {% if adv_settings and adv_settings.settings.configure_unique_ids == 'yes' %}selected{% endif %}>Yes (Replace)</option>
-                                <option value="no" {% if adv_settings and adv_settings.settings.configure_unique_ids == 'no' %}selected{% endif %}>No</option>
-                                <option value="never" {% if adv_settings and adv_settings.settings.configure_unique_ids == 'never' %}selected{% endif %}>Never</option>
-                                <option value="keep" {% if adv_settings and adv_settings.settings.configure_unique_ids == 'keep' %}selected{% endif %}>Keep</option>
+                            <select class="form-select" id="configureUniqueIDs">
+                                <option value="yes" selected>Yes (Replace)</option>
+                                <option value="no">No</option>
+                                <option value="never">Never</option>
+                                <option value="keep">Keep</option>
                             </select>
                             <small class="text-muted d-block mt-2">Whether a particular participant ID should be kept unique, with any new IKE_SA using an ID deemed to replace all old ones using that ID. Participant IDs normally are unique, so a new IKE_SA using the same ID is almost invariably intended to replace an old one. The difference between <strong>no</strong> and <strong>never</strong> is that the old IKE_SAs will be replaced when receiving an INITIAL_CONTACT notify if the option is not set. The daemon also accepts the value <strong>keep</strong> to reject new IKE_SA setups and keep the duplicate established earlier. Defaults to Yes.</small>
                         </div>
@@ -637,9 +560,9 @@
                             <label for="ipsecFilterMode" class="form-label"><strong>IPsec Filter Mode</strong></label>
                         </div>
                         <div class="col-md-8">
-                            <select class="form-select" id="ipsecFilterMode" name="ipsec_filter_mode">
-                                <option value="tunnel" {% if adv_settings and adv_settings.settings.ipsec_filter_mode == 'tunnel' %}selected{% endif %}>Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)</option>
-                                <option value="vti_transport" {% if adv_settings and adv_settings.settings.ipsec_filter_mode == 'vti_transport' %}selected{% endif %}>Filter [IPsec VTI and Transport on assigned interfaces, block all tunnel mode traffic]</option>
+                            <select class="form-select" id="ipsecFilterMode">
+                                <option value="tunnel" selected>Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)</option>
+                                <option value="vti_transport">Filter [IPsec VTI and Transport on assigned interfaces, block all tunnel mode traffic]</option>
                             </select>
                             <small class="text-muted d-block mt-2">Experimental. Controls how the firewall will filter IPsec traffic. By default, rules on the IPsec tab filter all IPsec traffic, including tunnel mode, transport mode, and VTI mode.<br><br>This is limited in that it does not allow for filtering on assigned VTI or transport mode interfaces (e.g. GRE), and it does not support features such as NAT rules and reply-to for return routing. When set to filter on assigned VTI and transport interfaces, <strong>all tunnel mode traffic is blocked</strong>. Do not set this option unless <strong>all IPsec tunnels are using VTI or transport mode</strong>.</small>
                         </div>
@@ -653,7 +576,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="ikev2Retransmission" name="ikev2_retransmission" {% if adv_settings and adv_settings.settings.ikev2_retransmission %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="ikev2Retransmission" name="ikev2Retransmission">
                                 <label class="form-check-label" for="ikev2Retransmission">
                                     Set IKEv2 Retransmission parameters
                                 </label>
@@ -670,7 +593,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="ipCompression" name="ip_compression" {% if adv_settings and adv_settings.settings.ip_compression %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="ipCompression" name="ipCompression">
                                 <label class="form-check-label" for="ipCompression">
                                     Enable IPCompression
                                 </label>
@@ -687,7 +610,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="pkcs11Support" name="pkcs11_support" {% if adv_settings and adv_settings.settings.pkcs11_support %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="pkcs11Support" name="pkcs11Support">
                                 <label class="form-check-label" for="pkcs11Support">
                                     Enable PKCS#11
                                 </label>
@@ -704,7 +627,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="strictInterfaceBinding" name="strict_interface_binding" {% if adv_settings and adv_settings.settings.strict_interface_binding %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="strictInterfaceBinding" name="strictInterfaceBinding">
                                 <label class="form-check-label" for="strictInterfaceBinding">
                                     Enable strict interface binding
                                 </label>
@@ -721,7 +644,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="unencryptedPayloads" name="unencrypted_payloads" {% if adv_settings and adv_settings.settings.unencrypted_payloads %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="unencryptedPayloads" name="unencryptedPayloads">
                                 <label class="form-check-label" for="unencryptedPayloads">
                                     Accept unencrypted ID and HASH payloads in IKEv1 Main Mode
                                 </label>
@@ -737,7 +660,7 @@
                             <label for="maxIKEv1Phase2" class="form-label"><strong>Maximum IKEv1 Phase 2 Exchanges</strong></label>
                         </div>
                         <div class="col-md-8">
-                            <input type="number" class="form-control" id="maxIKEv1Phase2" name="max_ikev1_phase2" value="{{ (adv_settings.settings.max_ikev1_phase2 if adv_settings else '3') }}" placeholder="3">
+                            <input type="number" class="form-control" id="maxIKEv1Phase2" value="3" placeholder="3">
                             <small class="text-muted d-block mt-2">IKEv1 phase 2 rekeying for one VPN gateway can be initiated in parallel. By default only 3 parallel rekeys are allowed. Undersized values can break VPN connections with many phase 2 definitions. If unsure, set this value to match the largest number of phase 2 entries on any phase 1.</small>
                         </div>
                     </div>
@@ -750,7 +673,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="ciscoExtensions" name="cisco_extensions" {% if adv_settings and adv_settings.settings.cisco_extensions %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="ciscoExtensions" name="ciscoExtensions">
                                 <label class="form-check-label" for="ciscoExtensions">
                                     Enable Unity Plugin
                                 </label>
@@ -767,7 +690,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="strictCRLChecking" name="strict_crl_checking" {% if adv_settings and adv_settings.settings.strict_crl_checking %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="strictCRLChecking" name="strictCRLChecking">
                                 <label class="form-check-label" for="strictCRLChecking">
                                     Enable strict Certificate Revocation List checking
                                 </label>
@@ -783,7 +706,7 @@
                             <label for="fqdnResolveInterval" class="form-label"><strong>FQDN Endpoints Resolve Interval</strong></label>
                         </div>
                         <div class="col-md-8">
-                            <input type="number" class="form-control" id="fqdnResolveInterval" name="fqdn_resolve_interval" value="{{ (adv_settings.settings.fqdn_resolve_interval if adv_settings else '60') }}" placeholder="60">
+                            <input type="number" class="form-control" id="fqdnResolveInterval" value="60" placeholder="60">
                             <small class="text-muted d-block mt-2">Interval, in seconds, that will be used to resolve FQDN remote gateways.</small>
                         </div>
                     </div>
@@ -796,7 +719,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="makeBeforeBreak" name="make_before_break" {% if adv_settings and adv_settings.settings.make_before_break %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="makeBeforeBreak" name="makeBeforeBreak">
                                 <label class="form-check-label" for="makeBeforeBreak">
                                     Initiate IKEv2 reauthentication with a make-before-break
                                 </label>
@@ -813,7 +736,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="asyncCrypto" name="async_crypto" {% if adv_settings and adv_settings.settings.async_crypto %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="asyncCrypto" name="asyncCrypto">
                                 <label class="form-check-label" for="asyncCrypto">
                                     Use asynchronous mode to parallelize multiple cryptography jobs
                                 </label>
@@ -831,10 +754,10 @@
                         <div class="col-md-8">
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <input type="number" class="form-control" id="ikePorts" name="ike_port" placeholder="IKE port" value="{{ (adv_settings.settings.ike_port if adv_settings else '500') }}">
+                                    <input type="number" class="form-control" id="ikePorts" placeholder="IKE port" value="500">
                                 </div>
                                 <div class="col-md-6">
-                                    <input type="number" class="form-control" id="nattPorts" name="natt_port" placeholder="NAT-T port" value="{{ (adv_settings.settings.natt_port if adv_settings else '4500') }}">
+                                    <input type="number" class="form-control" id="nattPorts" placeholder="NAT-T port" value="4500">
                                 </div>
                             </div>
                             <small class="text-muted d-block mt-2"><strong>IKE port</strong> - Local UDP port for IKE (Default: 500)<br><strong>NAT-T port</strong> - Local UDP port for NAT-T (Default: 4500)</small>
@@ -849,7 +772,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="autoExcludeLAN" name="auto_exclude_lan" {% if adv_settings and adv_settings.settings.auto_exclude_lan %}checked{% elif not adv_settings %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="autoExcludeLAN" name="autoExcludeLAN" checked>
                                 <label class="form-check-label" for="autoExcludeLAN">
                                     Enable bypass for LAN interface IP
                                 </label>
@@ -866,7 +789,7 @@
                         </div>
                         <div class="col-md-8">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="additionalBypass" name="additional_bypass" {% if adv_settings and adv_settings.settings.additional_bypass %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="additionalBypass" name="additionalBypass">
                                 <label class="form-check-label" for="additionalBypass">
                                     Enable extra IPsec bypass rules
                                 </label>
@@ -877,7 +800,7 @@
                 </div>
 
                 <div class="mt-4">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="button" class="btn btn-primary">
                         <i class="bi bi-download"></i> Save
                     </button>
                 </div>
@@ -896,8 +819,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="addP1Form" method="POST" action="{{ url_for('vpn.ipsec_add_tunnel') }}">
-                    <input type="hidden" id="algorithms_json" name="algorithms_json" value="[]">
+                <form id="addP1Form">
                     <!-- General Information Section -->
                     <div class="mb-4">
                         <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
@@ -906,7 +828,7 @@
                         
                         <div class="mb-3">
                             <label for="description" class="form-label"><strong>Description</strong></label>
-                            <input type="text" class="form-control" id="description" name="description" placeholder="">
+                            <input type="text" class="form-control" id="description" placeholder="">
                             <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
                         </div>
 
@@ -928,7 +850,7 @@
 
                         <div class="mb-3">
                             <label for="keyExchange" class="form-label"><strong>Key Exchange version</strong></label>
-                            <select class="form-select" id="keyExchange" name="keyExchange">
+                            <select class="form-select" id="keyExchange">
                                 <option value="auto">Auto</option>
                                 <option value="ikev1">IKEv1</option>
                                 <option value="ikev2" selected>IKEv2</option>
@@ -938,7 +860,7 @@
 
                         <div class="mb-3">
                             <label for="protocol" class="form-label"><strong>Internet Protocol</strong></label>
-                            <select class="form-select" id="protocol" name="protocol">
+                            <select class="form-select" id="protocol">
                                 <option value="ipv4" selected>IPv4</option>
                                 <option value="ipv6">IPv6</option>
                                 <option value="both">Both</option>
@@ -948,7 +870,7 @@
 
                         <div class="mb-3">
                             <label for="interface" class="form-label"><strong>Interface</strong></label>
-                            <select class="form-select" id="interface" name="interface">
+                            <select class="form-select" id="interface">
                                 <option value="wan" selected>WAN</option>
                                 <option value="lan">LAN</option>
                             </select>
@@ -958,7 +880,7 @@
                         <div class="mb-3">
                             <label for="remoteGateway" class="form-label"><strong>Remote Gateway</strong></label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="remoteGateway" name="remoteGateway" placeholder="">
+                                <input type="text" class="form-control" id="remoteGateway" placeholder="">
                                 <button class="btn btn-outline-secondary" type="button" data-bs-toggle="tooltip" data-bs-title="Info">
                                     <i class="bi bi-info-circle"></i>
                                 </button>
@@ -975,7 +897,7 @@
 
                         <div class="mb-3">
                             <label for="authMethod" class="form-label"><strong>Authentication Method</strong></label>
-                            <select class="form-select" id="authMethod" name="authMethod">
+                            <select class="form-select" id="authMethod">
                                 <option value="mutual-psk" selected>Mutual PSK</option>
                                 <option value="mutual-rsa">Mutual RSA</option>
                             </select>
@@ -984,7 +906,7 @@
 
                         <div class="mb-3">
                             <label for="myIdentifier" class="form-label"><strong>My identifier</strong></label>
-                            <select class="form-select" id="myIdentifier" name="myIdentifier">
+                            <select class="form-select" id="myIdentifier">
                                 <option value="my-ip" selected>My IP address</option>
                                 <option value="ip-address">IP address</option>
                                 <option value="fqdn">Fully qualified domain name</option>
@@ -998,7 +920,7 @@
 
                         <div class="mb-3">
                             <label for="peerIdentifier" class="form-label"><strong>Peer identifier</strong></label>
-                            <select class="form-select" id="peerIdentifier" name="peerIdentifier">
+                            <select class="form-select" id="peerIdentifier">
                                 <option value="peer-ip" selected>Peer IP address</option>
                                 <option value="ip-address">IP address</option>
                                 <option value="fqdn">Fully qualified domain name</option>
@@ -1012,7 +934,7 @@
 
                         <div class="mb-3">
                             <label for="preSharedKey" class="form-label"><strong>Pre-Shared Key</strong></label>
-                            <textarea class="form-control" id="preSharedKey" name="preSharedKey" rows="3" placeholder=""></textarea>
+                            <textarea class="form-control" id="preSharedKey" rows="3" placeholder=""></textarea>
                             <small class="text-muted">Enter the Pre-Shared Key string. This key must match on both peers. This key should be long and random to protect the tunnel and its contents. A weak Pre-Shared Key can lead to a tunnel compromise.</small>
                             <div class="mt-2">
                                 <button type="button" class="btn btn-warning btn-sm">
@@ -1035,7 +957,7 @@
                                 <div class="algorithm-row mb-3">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-md-3">
-                                            <select class="form-select algorithm-encryption" name="algorithms_encryption[]">
+                                            <select class="form-select algorithm-encryption">
                                                 <option value="aes" selected>AES</option>
                                                 <option value="aes128-gcm">AES128-GCM</option>
                                                 <option value="aes192-gcm">AES192-GCM</option>
@@ -1045,7 +967,7 @@
                                             <small class="text-muted">Algorithm</small>
                                         </div>
                                         <div class="col-md-3">
-                                            <select class="form-select algorithm-keylength" name="algorithms_keylength[]">
+                                            <select class="form-select algorithm-keylength">
                                                 <option value="128" selected>128 bits</option>
                                                 <option value="192">192 bits</option>
                                                 <option value="256">256 bits</option>
@@ -1053,7 +975,7 @@
                                             <small class="text-muted">Key length</small>
                                         </div>
                                         <div class="col-md-3">
-                                            <select class="form-select algorithm-hash" name="algorithms_hash[]">
+                                            <select class="form-select algorithm-hash">
                                                 <option value="sha256" selected>SHA256</option>
                                                 <option value="sha1">SHA1</option>
                                                 <option value="sha384">SHA384</option>
@@ -1063,7 +985,7 @@
                                             <small class="text-muted">Hash</small>
                                         </div>
                                         <div class="col-md-2">
-                                            <select class="form-select algorithm-dhgroup" name="algorithms_dhgroup[]">
+                                            <select class="form-select algorithm-dhgroup">
                                                 <option value="14" selected>14 (2048 bit)</option>
                                                 <option value="1">1 (768 bit)</option>
                                                 <option value="2">2 (1024 bit)</option>
@@ -1115,25 +1037,25 @@
 
                         <div class="mb-3">
                             <label for="lifeTime" class="form-label"><strong>Life Time</strong></label>
-                            <input type="number" class="form-control" id="lifeTime" name="lifeTime" value="28800" placeholder="">
+                            <input type="number" class="form-control" id="lifeTime" value="28800" placeholder="">
                             <small class="text-muted">Hard IKE SA life time, in seconds, after which the IKE SA will be expired. Must be larger than Rekey Time and Reauth Time. Cannot be set to the same value as Rekey Time or Reauth Time. If left empty, defaults to 110% of whichever timer is higher (reauth or rekey)</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="rekeyTime" class="form-label"><strong>Rekey Time</strong></label>
-                            <input type="number" class="form-control" id="rekeyTime" name="rekeyTime" value="25920" placeholder="">
+                            <input type="number" class="form-control" id="rekeyTime" value="25920" placeholder="">
                             <small class="text-muted">Time, in seconds, before an IKE SA establishes new keys. This works without interruption. Cannot be set to the same value as Life Time. Only supported by IKEv2, and is recommended for use with IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv2. Enter a value of 0 to disable.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="reAuthTime" class="form-label"><strong>Reauth Time</strong></label>
-                            <input type="number" class="form-control" id="reAuthTime" name="reAuthTime" value="0" placeholder="">
+                            <input type="number" class="form-control" id="reAuthTime" value="0" placeholder="">
                             <small class="text-muted">Time, in seconds, before an IKE SA is torn down and recreated from scratch, including authentication. This can be disruptive unless both sides support make-before-break and overlapping IKE SA entries. Cannot be set to the same value as Life Time. Supported by IKEv1 and IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv1. Enter a value of 0 to disable.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="randTime" class="form-label"><strong>Rand Time</strong></label>
-                            <input type="number" class="form-control" id="randTime" name="randTime" value="2880" placeholder="">
+                            <input type="number" class="form-control" id="randTime" value="2880" placeholder="">
                             <small class="text-muted">A random value up to this amount will be subtracted from Rekey Time/Reauth Time to avoid simultaneous renegotiation. If left empty, defaults to 10% of Life Time. Enter 0 to disable randomness, but be aware that simultaneous renegotiation can lead to duplicate security associations.</small>
                         </div>
                     </div>
@@ -1146,7 +1068,7 @@
 
                         <div class="mb-3">
                             <label for="childSAStartAction" class="form-label"><strong>Child SA Start Action</strong></label>
-                            <select class="form-select" id="childSAStartAction" name="childSAStartAction">
+                            <select class="form-select" id="childSAStartAction">
                                 <option value="default" selected>Default</option>
                                 <option value="none">None (Responder Only)</option>
                                 <option value="initiate-start">Initiate at start (VTI or Tunnel Mode)</option>
@@ -1157,7 +1079,7 @@
 
                         <div class="mb-3">
                             <label for="childSACloseAction" class="form-label"><strong>Child SA Close Action</strong></label>
-                            <select class="form-select" id="childSACloseAction" name="childSACloseAction">
+                            <select class="form-select" id="childSACloseAction">
                                 <option value="default" selected>Default</option>
                                 <option value="close-clear">Close connection and clear SA</option>
                                 <option value="restart-reconnect">Restart/Reconnect</option>
@@ -1168,7 +1090,7 @@
 
                         <div class="mb-3">
                             <label for="natTraversal" class="form-label"><strong>NAT Traversal</strong></label>
-                            <select class="form-select" id="natTraversal" name="natTraversal">
+                            <select class="form-select" id="natTraversal">
                                 <option value="auto" selected>Auto</option>
                                 <option value="force">Force</option>
                             </select>
@@ -1177,7 +1099,7 @@
 
                         <div class="mb-3">
                             <label for="mobike" class="form-label"><strong>MOBIKE</strong></label>
-                            <select class="form-select" id="mobike" name="mobike">
+                            <select class="form-select" id="mobike">
                                 <option value="disable" selected>Disable</option>
                                 <option value="enable">Enable</option>
                             </select>
@@ -1186,7 +1108,7 @@
 
                         <div class="mb-3">
                             <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="gatewayDuplicates" name="gatewayDuplicates">
+                                <input class="form-check-input" type="checkbox" id="gatewayDuplicates" name="gatewayDuplicates">
                                 <label class="form-check-label" for="gatewayDuplicates">
                                     <strong>Gateway duplicates</strong> - Enable this to allow multiple phase 1 configurations with the same endpoint. When enabled, Smart Shield does not manage routing to the remote gateway and traffic will follow the default route without regard for the chosen interface. Static routes can override this behavior.
                                 </label>
@@ -1195,7 +1117,7 @@
 
                         <div class="mb-3">
                             <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="splitConnections" name="splitConnections">
+                                <input class="form-check-input" type="checkbox" id="splitConnections" name="splitConnections">
                                 <label class="form-check-label" for="splitConnections">
                                     <strong>Split connections</strong> - Enable this to split connection entries with multiple phase 2 configuration. Required for remote endpoints that support only a single traffic selector per child SA.
                                 </label>
@@ -1204,7 +1126,7 @@
 
                         <div class="mb-3">
                             <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="prfSelection" name="prfSelection">
+                                <input class="form-check-input" type="checkbox" id="prfSelection" name="prfSelection">
                                 <label class="form-check-label" for="prfSelection">
                                     <strong>PRF Selection</strong> - Enable manual Pseudo-Random Function (PRF) selection
                                 </label>
@@ -1216,12 +1138,12 @@
                             <label for="customIKEPorts" class="form-label"><strong>Custom IKE/NAT-T Ports</strong></label>
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <input type="number" class="form-control" id="remoteIKEPort" name="remoteIKEPort" placeholder="Remote IKE Port">
+                                    <input type="number" class="form-control" id="remoteIKEPort" placeholder="Remote IKE Port">
                                     <small class="text-muted">UDP port for IKE on the remote gateway. Leave empty for default automatic behavior (500/4500).</small>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="input-group">
-                                        <input type="number" class="form-control" id="remoteNATTPort" name="remoteNATTPort" placeholder="Remote NAT-T Port">
+                                        <input type="number" class="form-control" id="remoteNATTPort" placeholder="Remote NAT-T Port">
                                         <button class="btn btn-outline-secondary" type="button" data-bs-toggle="tooltip" data-bs-title="Info">
                                             <i class="bi bi-info-circle"></i>
                                         </button>
@@ -1243,566 +1165,64 @@
 
                         <div class="mb-3">
                             <label for="dpdDelay" class="form-label"><strong>Delay</strong></label>
-                            <input type="number" class="form-control" id="dpdDelay" name="dpdDelay" value="10" placeholder="">
+                            <input type="number" class="form-control" id="dpdDelay" value="10" placeholder="">
                             <small class="text-muted">Delay between sending peer acknowledgement messages. In IKEv2, a value of 0 sends no additional messages and only standard messages (such as those to rekey) are used to detect dead peers.</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="maxFailures" class="form-label"><strong>Max failures</strong></label>
-                            <input type="number" class="form-control" id="maxFailures" name="maxFailures" value="5" placeholder="">
+                            <input type="number" class="form-control" id="maxFailures" value="5" placeholder="">
                             <small class="text-muted">Number of consecutive failures allowed before disconnecting. This only applies to IKEv1; in IKEv2 the <a href="#" style="color: #0d6efd;">retransmission timeout</a> is used instead.</small>
                         </div>
                     </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="saveP1Btn">Save P1 Configuration</button>
-                    </div>
                 </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save P1 Configuration</button>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Modal for Edit P1 -->
-<div class="modal fade" id="editP1Modal" tabindex="-1" aria-labelledby="editP1ModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="editP1ModalLabel">Edit Phase 1 (P1) Configuration</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editP1Form" method="POST" action="" data-edit-url-template="{{ url_for('vpn.ipsec_edit_tunnel', tunnel_id=0) }}">
-                    <input type="hidden" id="edit_algorithms_json" name="algorithms_json" value="[]">
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            General Information
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_description" class="form-label"><strong>Description</strong></label>
-                            <input type="text" class="form-control" id="edit_description" name="description" placeholder="">
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="edit_disabled" name="disabled">
-                                <label class="form-check-label" for="edit_disabled">
-                                    <strong>Disabled</strong>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            IKE Endpoint Configuration
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_keyExchange" class="form-label"><strong>Key Exchange version</strong></label>
-                            <select class="form-select" id="edit_keyExchange" name="keyExchange">
-                                <option value="auto">Auto</option>
-                                <option value="ikev1">IKEv1</option>
-                                <option value="ikev2">IKEv2</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_protocol" class="form-label"><strong>Internet Protocol</strong></label>
-                            <select class="form-select" id="edit_protocol" name="protocol">
-                                <option value="ipv4">IPv4</option>
-                                <option value="ipv6">IPv6</option>
-                                <option value="both">Both</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_interface" class="form-label"><strong>Interface</strong></label>
-                            <select class="form-select" id="edit_interface" name="interface">
-                                <option value="wan">WAN</option>
-                                <option value="lan">LAN</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_remoteGateway" class="form-label"><strong>Remote Gateway</strong></label>
-                            <input type="text" class="form-control" id="edit_remoteGateway" name="remoteGateway" placeholder="">
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            Phase 1 Proposal (Authentication)
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_authMethod" class="form-label"><strong>Authentication Method</strong></label>
-                            <select class="form-select" id="edit_authMethod" name="authMethod">
-                                <option value="mutual-psk">Mutual PSK</option>
-                                <option value="mutual-rsa">Mutual RSA</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_myIdentifier" class="form-label"><strong>My identifier</strong></label>
-                            <select class="form-select" id="edit_myIdentifier" name="myIdentifier">
-                                <option value="my-ip">My IP address</option>
-                                <option value="ip-address">IP address</option>
-                                <option value="fqdn">Fully qualified domain name</option>
-                                <option value="user-fqdn">User fully qualified domain name / E-mail</option>
-                                <option value="asn1-dn">ASN.1 distinguished Name</option>
-                                <option value="keyid">KeyID tag</option>
-                                <option value="ddns">Dynamic DNS</option>
-                                <option value="auto">Automatic based on content</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_peerIdentifier" class="form-label"><strong>Peer identifier</strong></label>
-                            <select class="form-select" id="edit_peerIdentifier" name="peerIdentifier">
-                                <option value="peer-ip">Peer IP address</option>
-                                <option value="ip-address">IP address</option>
-                                <option value="fqdn">Fully qualified domain name</option>
-                                <option value="user-fqdn">User fully qualified domain name / E-mail</option>
-                                <option value="asn1-dn">ASN.1 distinguished Name</option>
-                                <option value="keyid">KeyID tag</option>
-                                <option value="ddns">Dynamic DNS</option>
-                                <option value="auto">Automatic based on content</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_preSharedKey" class="form-label"><strong>Pre-Shared Key</strong></label>
-                            <textarea class="form-control" id="edit_preSharedKey" name="preSharedKey" rows="3"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            Phase 1 Proposal (Encryption Algorithm)
-                        </div>
-                        <div class="mb-3">
-                            <div id="edit_algorithmsContainer"></div>
-                            <button type="button" class="btn btn-success btn-sm" id="edit_addAlgorithmBtn">
-                                <i class="bi bi-plus"></i> Add Algorithm
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            Expiration and Replacement
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_lifeTime" class="form-label"><strong>Life Time</strong></label>
-                            <input type="number" class="form-control" id="edit_lifeTime" name="lifeTime">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_rekeyTime" class="form-label"><strong>Rekey Time</strong></label>
-                            <input type="number" class="form-control" id="edit_rekeyTime" name="rekeyTime">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_reAuthTime" class="form-label"><strong>Reauth Time</strong></label>
-                            <input type="number" class="form-control" id="edit_reAuthTime" name="reAuthTime">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_randTime" class="form-label"><strong>Rand Time</strong></label>
-                            <input type="number" class="form-control" id="edit_randTime" name="randTime">
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="bg-dark text-white p-2 mb-3" style="font-weight: bold;">
-                            Advanced Options
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_childSAStartAction" class="form-label"><strong>Child SA Start Action</strong></label>
-                            <select class="form-select" id="edit_childSAStartAction" name="childSAStartAction">
-                                <option value="default">Default</option>
-                                <option value="none">None (Responder Only)</option>
-                                <option value="initiate-start">Initiate at start</option>
-                                <option value="initiate-demand">Initiate on demand</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_childSACloseAction" class="form-label"><strong>Child SA Close Action</strong></label>
-                            <select class="form-select" id="edit_childSACloseAction" name="childSACloseAction">
-                                <option value="default">Default</option>
-                                <option value="close-clear">Close connection and clear SA</option>
-                                <option value="restart-reconnect">Restart/Reconnect</option>
-                                <option value="close-demand">Close connection and reconnect on demand</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_natTraversal" class="form-label"><strong>NAT Traversal</strong></label>
-                            <select class="form-select" id="edit_natTraversal" name="natTraversal">
-                                <option value="auto">Auto</option>
-                                <option value="force">Force</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_mobike" class="form-label"><strong>MOBIKE</strong></label>
-                            <select class="form-select" id="edit_mobike" name="mobike">
-                                <option value="disable">Disable</option>
-                                <option value="enable">Enable</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="edit_gatewayDuplicates" name="gatewayDuplicates">
-                                <label class="form-check-label" for="edit_gatewayDuplicates"><strong>Gateway duplicates</strong></label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="edit_splitConnections" name="splitConnections">
-                                <label class="form-check-label" for="edit_splitConnections"><strong>Split connections</strong></label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="edit_prfSelection" name="prfSelection">
-                                <label class="form-check-label" for="edit_prfSelection"><strong>PRF Selection</strong></label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <input type="number" class="form-control" id="edit_remoteIKEPort" name="remoteIKEPort" placeholder="Remote IKE Port">
-                                </div>
-                                <div class="col-md-6">
-                                    <input type="number" class="form-control" id="edit_remoteNATTPort" name="remoteNATTPort" placeholder="Remote NAT-T Port">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="edit_enableDPD" name="enableDPD">
-                                <label class="form-check-label" for="edit_enableDPD"><strong>Dead Peer Detection</strong></label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_dpdDelay" class="form-label"><strong>Delay</strong></label>
-                            <input type="number" class="form-control" id="edit_dpdDelay" name="dpdDelay">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_maxFailures" class="form-label"><strong>Max failures</strong></label>
-                            <input type="number" class="form-control" id="edit_maxFailures" name="maxFailures">
-                        </div>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Serialize dynamic algorithm rows into JSON before form submission.
-    (function () {
-        var form = document.getElementById('addP1Form');
-        if (!form) return;
-
-        form.addEventListener('submit', function () {
-            var rows = document.querySelectorAll('#algorithmsContainer .algorithm-row');
-            var algorithms = [];
-            rows.forEach(function (row) {
-                var enc = row.querySelector('.algorithm-encryption');
-                var keylen = row.querySelector('.algorithm-keylength');
-                var hash = row.querySelector('.algorithm-hash');
-                var dh = row.querySelector('.algorithm-dhgroup');
-                algorithms.push({
-                    encryption: enc ? enc.value : '',
-                    keylength: keylen ? keylen.value : '',
-                    hash: hash ? hash.value : '',
-                    dhgroup: dh ? dh.value : ''
-                });
-            });
-            var hidden = document.getElementById('algorithms_json');
-            if (hidden) hidden.value = JSON.stringify(algorithms);
-        });
-    })();
-
-    // Edit modal: populate fields from table row + serialize algorithms on submit.
-    (function () {
-        var editForm = document.getElementById('editP1Form');
-        if (!editForm) return;
-
-        function setValue(id, value) {
-            var el = document.getElementById(id);
-            if (!el) return;
-            el.value = value != null ? value : '';
-        }
-
-        function setChecked(id, raw) {
-            var el = document.getElementById(id);
-            if (!el) return;
-            var v = String(raw || '').toLowerCase();
-            el.checked = v === '1' || v === 'true' || v === 'yes' || v === 'on';
-        }
-
-        function parseJsonSafe(raw, fallback) {
-            try {
-                if (!raw) return fallback;
-                return JSON.parse(raw);
-            } catch (_e) {
-                return fallback;
-            }
-        }
-
-        function clearAlgorithms(container) {
-            if (!container) return;
-            container.innerHTML = '';
-        }
-
-        function createAlgorithmRow(container, algo) {
-            var newRow = document.createElement('div');
-            newRow.className = 'algorithm-row mb-3';
-            newRow.innerHTML = `
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <select class="form-select algorithm-encryption">
-                            <option value="aes">AES</option>
-                            <option value="aes128-gcm">AES128-GCM</option>
-                            <option value="aes192-gcm">AES192-GCM</option>
-                            <option value="aes256-gcm">AES256-GCM</option>
-                            <option value="chacha20-poly1305">CHACHA20-POLY1305</option>
-                        </select>
-                        <small class="text-muted">Algorithm</small>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select algorithm-keylength">
-                            <option value="128">128 bits</option>
-                            <option value="192">192 bits</option>
-                            <option value="256">256 bits</option>
-                        </select>
-                        <small class="text-muted">Key length</small>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select algorithm-hash">
-                            <option value="sha256">SHA256</option>
-                            <option value="sha1">SHA1</option>
-                            <option value="sha384">SHA384</option>
-                            <option value="sha512">SHA512</option>
-                            <option value="aes-xcbc">AES-XCBC</option>
-                        </select>
-                        <small class="text-muted">Hash</small>
-                    </div>
-                    <div class="col-md-2">
-                        <select class="form-select algorithm-dhgroup">
-                            <option value="14">14 (2048 bit)</option>
-                            <option value="1">1 (768 bit)</option>
-                            <option value="2">2 (1024 bit)</option>
-                            <option value="5">5 (1536 bit)</option>
-                            <option value="15">15 (3072 bit)</option>
-                            <option value="16">16 (4096 bit)</option>
-                            <option value="17">17 (6144 bit)</option>
-                            <option value="18">18 (8192 bit)</option>
-                            <option value="19">19 (nist ecp256)</option>
-                            <option value="20">20 (nist ecp384)</option>
-                            <option value="21">21 (nist ecp521)</option>
-                            <option value="22">22 (1024(sub 160) bit)</option>
-                            <option value="23">23 (2048(sub 224) bit)</option>
-                            <option value="24">24 (2048(sub 256) bit)</option>
-                            <option value="25">25 (nist ecp192)</option>
-                            <option value="26">26 (nist ecp224)</option>
-                            <option value="27">27 (brainpool ecp224)</option>
-                            <option value="28">28 (brainpool ecp256)</option>
-                            <option value="29">29 (brainpool ecp384)</option>
-                            <option value="30">30 (brainpool ecp512)</option>
-                            <option value="31">31 (Elliptic Curve 25519, 256 bit)</option>
-                            <option value="32">32 (Elliptic Curve 448, 448 bit)</option>
-                        </select>
-                        <small class="text-muted">DH Group</small>
-                    </div>
-                    <div class="col-md-1">
-                        <button type="button" class="btn btn-danger btn-sm w-100 delete-algorithm-btn" style="padding: 0.375rem 0.5rem;">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.appendChild(newRow);
-            newRow.querySelector('.delete-algorithm-btn').addEventListener('click', function () {
-                newRow.remove();
-            });
-            if (algo) {
-                var enc = newRow.querySelector('.algorithm-encryption');
-                var keylen = newRow.querySelector('.algorithm-keylength');
-                var hash = newRow.querySelector('.algorithm-hash');
-                var dh = newRow.querySelector('.algorithm-dhgroup');
-                if (enc && algo.encryption) enc.value = algo.encryption;
-                if (keylen && algo.keylength != null) keylen.value = String(algo.keylength);
-                if (hash && algo.hash) hash.value = algo.hash;
-                if (dh && algo.dhgroup != null) dh.value = String(algo.dhgroup);
-            }
-        }
-
-        // Prefill edit modal on Edit click
-        document.querySelectorAll('.ipsec-edit-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var tr = this.closest('tr');
-                if (!tr) return;
-
-                var tunnelId = tr.getAttribute('data-tunnel-id');
-                var baseEditUrl = editForm.getAttribute('data-edit-url-template') || '';
-                if (tunnelId && baseEditUrl) {
-                    editForm.action = baseEditUrl.replace(/0$/, String(tunnelId));
-                } else {
-                    // Fallback: prevent posting to the wrong endpoint.
-                    editForm.action = baseEditUrl;
-                }
-
-                setValue('edit_description', tr.getAttribute('data-description'));
-                setChecked('edit_disabled', tr.getAttribute('data-disabled'));
-
-                setValue('edit_keyExchange', tr.getAttribute('data-key-exchange'));
-                setValue('edit_protocol', tr.getAttribute('data-internet-protocol'));
-                setValue('edit_interface', tr.getAttribute('data-interface'));
-                setValue('edit_remoteGateway', tr.getAttribute('data-remote-gateway'));
-
-                setValue('edit_authMethod', tr.getAttribute('data-auth-method'));
-                setValue('edit_myIdentifier', tr.getAttribute('data-my-identifier'));
-                setValue('edit_peerIdentifier', tr.getAttribute('data-peer-identifier'));
-                setValue('edit_preSharedKey', tr.getAttribute('data-pre-shared-key'));
-
-                setValue('edit_lifeTime', tr.getAttribute('data-life-time'));
-                setValue('edit_rekeyTime', tr.getAttribute('data-rekey-time'));
-                setValue('edit_reAuthTime', tr.getAttribute('data-reauth-time'));
-                setValue('edit_randTime', tr.getAttribute('data-rand-time'));
-
-                setValue('edit_childSAStartAction', tr.getAttribute('data-child-sa-start-action'));
-                setValue('edit_childSACloseAction', tr.getAttribute('data-child-sa-close-action'));
-                setValue('edit_natTraversal', tr.getAttribute('data-nat-traversal'));
-                setValue('edit_mobike', tr.getAttribute('data-mobike'));
-                setChecked('edit_gatewayDuplicates', tr.getAttribute('data-gateway-duplicates'));
-                setChecked('edit_splitConnections', tr.getAttribute('data-split-connections'));
-                setChecked('edit_prfSelection', tr.getAttribute('data-prf-selection'));
-                setValue('edit_remoteIKEPort', tr.getAttribute('data-remote-ike-port'));
-                setValue('edit_remoteNATTPort', tr.getAttribute('data-remote-natt-port'));
-                setChecked('edit_enableDPD', tr.getAttribute('data-enable-dpd'));
-                setValue('edit_dpdDelay', tr.getAttribute('data-dpd-delay'));
-                setValue('edit_maxFailures', tr.getAttribute('data-max-failures'));
-
-                var algorithmsRaw = tr.getAttribute('data-algorithms-json');
-                var algos = parseJsonSafe(algorithmsRaw, []);
-                var editContainer = document.getElementById('edit_algorithmsContainer');
-                clearAlgorithms(editContainer);
-                if (Array.isArray(algos) && algos.length) {
-                    algos.forEach(function (a) {
-                        createAlgorithmRow(editContainer, a);
-                    });
-                } else {
-                    createAlgorithmRow(editContainer, { encryption: 'aes', keylength: '128', hash: 'sha256', dhgroup: '14' });
-                }
-            });
-        });
-
-        // Add row button in edit modal
-        var editAddBtn = document.getElementById('edit_addAlgorithmBtn');
-        if (editAddBtn) {
-            editAddBtn.addEventListener('click', function () {
-                var editContainer = document.getElementById('edit_algorithmsContainer');
-                createAlgorithmRow(editContainer, { encryption: 'aes', keylength: '128', hash: 'sha256', dhgroup: '14' });
-            });
-        }
-
-        // Serialize edit algorithms JSON on submit
-        editForm.addEventListener('submit', function () {
-            var rows = document.querySelectorAll('#edit_algorithmsContainer .algorithm-row');
-            var algorithms = [];
-            rows.forEach(function (row) {
-                var enc = row.querySelector('.algorithm-encryption');
-                var keylen = row.querySelector('.algorithm-keylength');
-                var hash = row.querySelector('.algorithm-hash');
-                var dh = row.querySelector('.algorithm-dhgroup');
-                algorithms.push({
-                    encryption: enc ? enc.value : '',
-                    keylength: keylen ? keylen.value : '',
-                    hash: hash ? hash.value : '',
-                    dhgroup: dh ? dh.value : ''
-                });
-            });
-            var hidden = document.getElementById('edit_algorithms_json');
-            if (hidden) hidden.value = JSON.stringify(algorithms);
-        });
-    })();
-</script>
 
 <!-- Modal for Add PSK -->
 <div class="modal fade" id="addPSKModal" tabindex="-1" aria-labelledby="addPSKModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
-        <h5 class="modal-title" id="addPSKModalLabel">Add Pre-Shared Key</h5>
+                <h5 class="modal-title" id="addPSKModalLabel">Edit Pre-Shared-Secret</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-        <form id="addPSKForm" method="POST" action="{{ url_for('vpn.ipsec_psk_add') }}">
+                <form id="addPSKForm">
                     <div class="mb-3">
                         <label for="pskIdentifier" class="form-label"><strong>Identifier</strong></label>
-            <input type="text" class="form-control" id="pskIdentifier" name="identifier" placeholder="">
+                        <input type="text" class="form-control" id="pskIdentifier" placeholder="">
                         <small class="text-muted">This can be either an IP address, fully qualified domain name or an e-mail address.</small>
                     </div>
 
                     <div class="mb-3">
                         <label for="pskSecretType" class="form-label"><strong>Secret type</strong></label>
-                        <select class="form-select" id="pskSecretType" name="secret_type">
+                        <select class="form-select" id="pskSecretType">
                             <option value="psk" selected>PSK</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
                         <label for="pskSecret" class="form-label"><strong>Pre-Shared Key</strong></label>
-                        <input type="text" class="form-control" id="pskSecret" name="secret" placeholder="">
-                    </div>
-                    <div class="alert alert-info" role="alert">
-                        <i class="bi bi-info-circle"></i> <strong>PSK for any user can be set by using an identifier of any.</strong>
-                    </div>
-
-                    <div class="modal-footer px-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-download"></i> Save
-                        </button>
+                        <input type="text" class="form-control" id="pskSecret" placeholder="">
                     </div>
                 </form>
+
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i> <strong>PSK for any user can be set by using an identifier of any.</strong>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal for Edit PSK -->
-<div class="modal fade" id="editPSKModal" tabindex="-1" aria-labelledby="editPSKModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="editPSKModalLabel">Edit Pre-Shared Key</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editPSKForm" method="POST" action="" data-edit-url-template="{{ url_for('vpn.ipsec_psk_edit', psk_id=0) }}">
-                    <div class="mb-3">
-                        <label for="editPskIdentifier" class="form-label"><strong>Identifier</strong></label>
-                        <input type="text" class="form-control" id="editPskIdentifier" name="identifier" placeholder="">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="editPskSecretType" class="form-label"><strong>Secret type</strong></label>
-                        <select class="form-select" id="editPskSecretType" name="secret_type">
-                            <option value="psk" selected>PSK</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="editPskSecret" class="form-label"><strong>Pre-Shared Key</strong></label>
-                        <input type="text" class="form-control" id="editPskSecret" name="secret" placeholder="">
-                    </div>
-
-                    <div class="modal-footer px-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-download"></i> Save Changes
-                        </button>
-                    </div>
-                </form>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Save
+                </button>
             </div>
         </div>
     </div>
@@ -1892,35 +1312,6 @@ document.querySelectorAll('.delete-algorithm-btn').forEach(btn => {
         this.closest('.algorithm-row').remove();
     });
 });
-
-// Prefill Edit PSK modal
-(function () {
-    var editForm = document.getElementById('editPSKForm');
-    if (!editForm) return;
-
-    function setValue(id, value) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.value = value != null ? value : '';
-    }
-
-    document.querySelectorAll('.psk-edit-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var tr = this.closest('tr');
-            if (!tr) return;
-
-            var pskId = tr.getAttribute('data-psk-id');
-            var templateUrl = editForm.getAttribute('data-edit-url-template') || '';
-            if (pskId && templateUrl) {
-                editForm.action = templateUrl.replace(/0$/, String(pskId));
-            }
-
-            setValue('editPskIdentifier', tr.getAttribute('data-psk-identifier'));
-            setValue('editPskSecretType', tr.getAttribute('data-psk-secret-type'));
-            setValue('editPskSecret', tr.getAttribute('data-psk-secret'));
-        });
-    });
-})();
 </script>
 
 {% endblock %}
