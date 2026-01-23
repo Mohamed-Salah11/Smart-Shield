@@ -96,10 +96,10 @@
             <label>Protocol</label>
             <div class="form-group-content">
                 <div>
-                    <input type="radio" id="http" name="protocol" value="http">
+                    <input type="radio" id="http" name="protocol" value="http" {{ 'checked' if config and config.protocol == 'http' else '' }}>
                     <label for="http" style="font-weight: normal; display: inline; margin-left: 5px;">HTTP</label>
                     
-                    <input type="radio" id="https" name="protocol" value="https" checked style="margin-left: 20px;">
+                    <input type="radio" id="https" name="protocol" value="https" {{ 'checked' if not config or config.protocol == 'https' else '' }} style="margin-left: 20px;">
                     <label for="https" style="font-weight: normal; display: inline; margin-left: 5px;">HTTPS (SSL/TLS)</label>
                 </div>
             </div>
@@ -109,7 +109,7 @@
             <label for="ssl_cert">SSL/TLS Certificate</label>
             <div class="form-group-content">
                 <select id="ssl_cert" name="ssl_cert" class="form-control" style="max-width: 400px;">
-                    <option value="default">GUI default (68f1fb0486f1a)</option>
+                    <option value="default" {{ 'selected' if not config or config.ssl_cert == 'default' else '' }}>GUI default (68f1fb0486f1a)</option>
                 </select>
                 <div class="help-text">
                     Certificates known to be incompatible with use for HTTPS are not included in this list, such as certificates using incompatible ECDSA curves or weak digest algorithms.
@@ -120,7 +120,7 @@
         <div class="form-group" id="tcp_port_group">
             <label for="tcp_port">TCP port</label>
             <div class="form-group-content">
-                <input type="number" id="tcp_port" name="tcp_port" class="form-control" style="max-width: 200px;" placeholder="">
+                <input type="number" id="tcp_port" name="tcp_port" class="form-control" style="max-width: 200px;" placeholder="" value="{{ config.tcp_port if config and config.tcp_port else '' }}">
                 <div class="help-text">
                     Enter a custom port number for the webConfigurator above to override the default (80 for HTTP, 443 for HTTPS). Changes will take effect immediately after save.
                 </div>
@@ -130,7 +130,7 @@
         <div class="form-group" id="max_processes_group">
             <label for="max_processes">Max Processes</label>
             <div class="form-group-content">
-                <input type="number" id="max_processes" name="max_processes" class="form-control" style="max-width: 200px;" value="2" placeholder="2">
+                <input type="number" id="max_processes" name="max_processes" class="form-control" style="max-width: 200px;" value="{{ config.max_processes if config else 2 }}" placeholder="2">
                 <div class="help-text">
                     Enter the number of webConfigurator processes to run. This defaults to 2. Increasing this will allow more users/browsers to access the GUI concurrently.
                 </div>
@@ -141,7 +141,7 @@
             <label for="webgui_redirect">WebGUI redirect</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="webgui_redirect" name="webgui_redirect">
+                    <input type="checkbox" class="form-check-input" id="webgui_redirect" name="webgui_redirect" {{ 'checked' if config and config.webgui_redirect else '' }}>
                     <label class="form-check-label" for="webgui_redirect">
                         Disable webConfigurator redirect rule
                     </label>
@@ -156,7 +156,7 @@
             <label for="ocsp_stapling">OCSP Must-Staple</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="ocsp_stapling" name="ocsp_stapling">
+                    <input type="checkbox" class="form-check-input" id="ocsp_stapling" name="ocsp_stapling" {{ 'checked' if config and config.ocsp_stapling else '' }}>
                     <label class="form-check-label" for="ocsp_stapling">
                         Force OCSP Stapling in nginx
                     </label>
@@ -171,7 +171,7 @@
             <label for="webgui_autocomplete">WebGUI Login Autocomplete</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="webgui_autocomplete" name="webgui_autocomplete" checked>
+                    <input type="checkbox" class="form-check-input" id="webgui_autocomplete" name="webgui_autocomplete" {{ 'checked' if not config or config.webgui_autocomplete else '' }}>
                     <label class="form-check-label" for="webgui_autocomplete">
                         Enable webConfigurator login autocomplete
                     </label>
@@ -186,7 +186,7 @@
             <label for="gui_login_messages">GUI login messages</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="gui_login_messages" name="gui_login_messages">
+                    <input type="checkbox" class="form-check-input" id="gui_login_messages" name="gui_login_messages" {{ 'checked' if config and config.gui_login_messages else '' }}>
                     <label class="form-check-label" for="gui_login_messages">
                         Lower syslog level for successful GUI login events
                     </label>
@@ -201,7 +201,7 @@
             <label for="roaming">Roaming</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="roaming" name="roaming" checked>
+                    <input type="checkbox" class="form-check-input" id="roaming" name="roaming" {{ 'checked' if not config or config.roaming else '' }}>
                     <label class="form-check-label" for="roaming">
                         Allow GUI administrator client IP address to change during a login session
                     </label>
@@ -216,7 +216,7 @@
             <label for="hsts">HSTS</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="hsts" name="hsts">
+                    <input type="checkbox" class="form-check-input" id="hsts" name="hsts" {{ 'checked' if config and config.hsts else '' }}>
                     <label class="form-check-label" for="hsts">
                         Disable HTTP Strict Transport Security
                     </label>
@@ -231,7 +231,7 @@
             <label for="anti_lockout">Anti-lockout</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="anti_lockout" name="anti_lockout">
+                    <input type="checkbox" class="form-check-input" id="anti_lockout" name="anti_lockout" {{ 'checked' if config and config.anti_lockout else '' }}>
                     <label class="form-check-label" for="anti_lockout">
                         Disable webConfigurator anti-lockout rule
                     </label>
@@ -246,7 +246,7 @@
             <label for="dns_rebind">DNS Rebind Check</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="dns_rebind" name="dns_rebind">
+                    <input type="checkbox" class="form-check-input" id="dns_rebind" name="dns_rebind" {{ 'checked' if config and config.dns_rebind else '' }}>
                     <label class="form-check-label" for="dns_rebind">
                         Disable DNS Rebinding Checks
                     </label>
@@ -260,7 +260,7 @@
         <div class="form-group">
             <label for="alternate_hostnames">Alternate Hostnames</label>
             <div class="form-group-content">
-                <input type="text" id="alternate_hostnames" name="alternate_hostnames" class="form-control" style="max-width: 500px;">
+                <input type="text" id="alternate_hostnames" name="alternate_hostnames" class="form-control" style="max-width: 500px;" value="{{ config.alternate_hostnames if config and config.alternate_hostnames else '' }}">
                 <div class="help-text">
                     Alternate Hostnames for DNS Rebinding and HTTP_REFERER Checks. Specify alternate hostnames by which the router may be queried, to bypass the DNS Rebinding Attack checks. Separate hostnames with spaces.
                 </div>
@@ -271,7 +271,7 @@
             <label for="http_referer">Browser HTTP_REFERER enforcement</label>
             <div class="form-group-content">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="http_referer" name="http_referer">
+                    <input type="checkbox" class="form-check-input" id="http_referer" name="http_referer" {{ 'checked' if config and config.http_referer else '' }}>
                     <label class="form-check-label" for="http_referer">
                         Disable HTTP_REFERER enforcement check
                     </label>
@@ -468,7 +468,7 @@
                     <option value="serial">Serial Console</option>
                 </select>
                 <div class="help-text">
-                    Select the preferred console if multiple consoles are present. The preferred console will show ZGate boot script output. All consoles display OS boot messages, console messages, and the console menu.
+                    Select the preferred console if multiple consoles are present. The preferred console will show Smart Shield boot script output. All consoles display OS boot messages, console messages, and the console menu.
                 </div>
             </div>
         </div>

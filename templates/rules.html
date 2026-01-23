@@ -1,333 +1,498 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block main %}
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2>Firewall Rules</h2>
 
-<div class="breadcrumb">
-    Firewall / Rules / <span id="active-section">Floating</span>
-</div>
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link active" data-tab="floating" href="#">Floating</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-tab="wan" href="#">WAN</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-tab="lan" href="#">LAN</a>
+        </li>
+    </ul>
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link active" href="#" data-tab="floating">Floating</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="wan">WAN</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="lan">LAN</a>
-    </li>
-</ul>
-
-<!-- Floating Rules -->
-<div class="tab-content active" id="tab-floating">
-    <div class="settings-section">
-        <div style="padding: 20px;">
-            <div class="alert alert-warning">
-                No floating rules are currently defined. Click the button to add a new rule.
-            </div>
-            
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th style="width: 30px;"><input type="checkbox" id="floatingCheckAll"></th>
-                        <th>States</th>
-                        <th>Interfaces</th>
-                        <th>Protocol</th>
-                        <th>Source</th>
-                        <th>Port</th>
-                        <th>Destination</th>
-                        <th>Port</th>
-                        <th>Gateway</th>
-                        <th>Queue</th>
-                        <th>Schedule</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="floating-tbody">
-                    <!-- Rules will be added here dynamically -->
-                </tbody>
-            </table>
-            
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-success add-rule-btn" data-interface="floating">Add</button>
-                <button type="button" class="btn btn-success add-rule-btn" data-interface="floating">Add</button>
-                <button type="button" class="btn btn-danger">Delete</button>
-                <button type="button" class="btn btn-primary">Toggle</button>
-                <button type="button" class="btn btn-primary">Save</button>
-            </div>
+    <!-- Floating Rules Tab -->
+    <div id="tab-floating" class="tab-content">
+        <h4>Floating Rules</h4>
+        <div class="mb-3">
+            <button id="floating-add-top-btn" class="btn btn-success btn-sm">Add Rule (Top)</button>
+            <button id="floating-add-bottom-btn" class="btn btn-success btn-sm">Add Rule (Bottom)</button>
         </div>
-    </div>
-</div>
 
-<!-- WAN Rules -->
-<div class="tab-content" id="tab-wan" style="display: none;">
-    <div class="settings-section">
-        <h5 style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Rules (Drag to Change Order)</span>
-            <button type="button" class="btn btn-sm btn-success" id="wanAddBtn">Add</button>
-        </h5>
-        
-        <div style="padding: 20px;">
-            <!-- Add Rule Form (Hidden by default) -->
-            <div id="wanAddForm" style="display:none; margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Enabled</th>
+                    <th>Interface</th>
+                    <th>Protocol</th>
+                    <th>Source</th>
+                    <th>Port</th>
+                    <th>Destination</th>
+                    <th>Port</th>
+                    <th>Gateway</th>
+                    <th>Queue</th>
+                    <th>Schedule</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="floating-tbody">
+                <!-- Rules will be added here dynamically -->
+            </tbody>
+        </table>
+
+        <!-- Floating Rule Add Form -->
+        <div id="floatingAddForm" class="card mt-3" style="display: none;">
+            <div class="card-body">
+                <h5>Add Floating Rule</h5>
                 <form>
-                    <div class="form-group">
-                        <label for="wan_rule_action">Action</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_action" class="form-control" style="max-width: 300px;">
-                                <option>Pass</option>
-                                <option>Block</option>
-                                <option>Reject</option>
-                                <option>Match</option>
-                            </select>
-                            <div class="help-text">
-                                Choose what to do with packets that match the criteria specified below.<br>
-                                Hint: the difference between block and reject is that with reject, a packet (TCP RST or ICMP port unreachable for UDP) is returned to the sender, whereas with block the packet is dropped silently.
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Disabled</label>
+                        <input type="checkbox" id="floating_disabled" class="form-check-input">
                     </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_disabled">Disabled</label>
-                        <div class="form-group-content">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="wan_rule_disabled">
-                                <label class="form-check-label" for="wan_rule_disabled">
-                                    Disable this rule
-                                </label>
-                            </div>
-                            <div class="help-text">
-                                Set this option to disable this rule without removing it from the list.
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Interface</label>
+                        <select id="floating_interface" class="form-select">
+                            <option value="WAN">WAN</option>
+                            <option value="LAN">LAN</option>
+                        </select>
                     </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_quick">Quick</label>
-                        <div class="form-group-content">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="wan_rule_quick">
-                                <label class="form-check-label" for="wan_rule_quick">
-                                    Apply the action immediately on match
-                                </label>
-                            </div>
-                            <div class="help-text">
-                                Set this option to apply this action to traffic that matches this rule immediately.
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Protocol</label>
+                        <select id="floating_protocol" class="form-select">
+                            <option value="any">Any</option>
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="icmp">ICMP</option>
+                        </select>
                     </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_interface">Interface</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_interface" class="form-control" style="max-width: 400px;">
-                                <option>Any</option>
-                                <option>WAN</option>
-                                <option>LAN</option>
-                            </select>
-                            <div class="help-text">
-                                Choose the interface from which packets must come to match this rule.
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="floating_description" class="form-control">
                     </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_direction">Direction</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_direction" class="form-control" style="max-width: 400px;">
-                                <option>any</option>
-                                <option>in</option>
-                                <option>out</option>
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Redirect IP</label>
+                        <input type="text" id="floating_redirect_ip" class="form-control">
                     </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_addr_family">Address Family</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_addr_family" class="form-control" style="max-width: 400px;">
-                                <option>IPv4</option>
-                                <option>IPv6</option>
-                                <option>IPv4+IPv6</option>
-                            </select>
-                            <div class="help-text">
-                                Select the Internet Protocol version this rule applies to.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_protocol">Protocol</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_protocol" class="form-control" style="max-width: 400px;">
-                                <option>TCP</option>
-                                <option>UDP</option>
-                                <option>TCP/UDP</option>
-                                <option>ICMP</option>
-                                <option>ESP</option>
-                                <option>Any</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_source">Source</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_source" class="form-control" style="max-width: 400px;">
-                                <option>any</option>
-                                <option>Single host or alias</option>
-                                <option>Network</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="wan_rule_destination">Destination</label>
-                        <div class="form-group-content">
-                            <select id="wan_rule_destination" class="form-control" style="max-width: 400px;">
-                                <option>any</option>
-                                <option>Single host or alias</option>
-                                <option>Network</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="rule_log">Log</label>
-                        <div class="form-group-content">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="rule_log">
-                                <label class="form-check-label" for="rule_log">
-                                    Log packets that are handled by this rule
-                                </label>
-                            </div>
-                            <div class="help-text">
-                                Hint: the firewall has limited local log space. Don't turn on logging for everything.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="rule_desc">Description</label>
-                        <div class="form-group-content">
-                            <textarea id="rule_desc" class="form-control" rows="3" style="max-width: 600px;"></textarea>
-                            <div class="help-text">
-                                A description may be entered here for administrative reference.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-primary" id="ruleEditSaveBtn">Save</button>
-                        <button type="button" class="btn btn-secondary" id="ruleEditCancelBtn">Cancel</button>
-                    </div>
+                    <button type="button" id="floatingRuleSaveBtn" class="btn btn-primary">Save</button>
+                    <button type="button" id="floatingRuleCancelBtn" class="btn btn-secondary">Cancel</button>
                 </form>
             </div>
-            
-            <table class="table table-bordered" id="wan-rules-table">
-                <thead>
-                    <tr>
-                        <th style="width: 30px;"><input type="checkbox"></th>
-                        <th>Protocol</th>
-                        <th>Source</th>
-                        <th>Port</th>
-                        <th>Destination</th>
-                        <th>Port</th>
-                        <th>Gateway</th>
-                        <th>Queue</th>
-                        <th>Schedule</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Rules will be added here dynamically -->
-                </tbody>
-            </table>
         </div>
     </div>
-</div>
 
-<!-- LAN Rules -->
-<div class="tab-content" id="tab-lan" style="display: none;">
-    <div class="settings-section">
-        <h5 style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Rules (Drag to Change Order)</span>
-            <button type="button" class="btn btn-sm btn-success">Add</button>
-        </h5>
-        
-        <div style="padding: 20px;">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th style="width: 30px;"><input type="checkbox"></th>
-                        <th>Protocol</th>
-                        <th>Source</th>
-                        <th>Port</th>
-                        <th>Destination</th>
-                        <th>Port</th>
-                        <th>Gateway</th>
-                        <th>Queue</th>
-                        <th>Schedule</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Rules will be added here dynamically -->
-                </tbody>
-            </table>
+    <!-- WAN Rules Tab -->
+    <div id="tab-wan" class="tab-content" style="display: none;">
+        <h4>WAN Rules</h4>
+        <button id="wanAddBtn" class="btn btn-success btn-sm mb-3">Add Rule</button>
+
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Action</th>
+                    <th>Disabled</th>
+                    <th>Protocol</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="wan-tbody">
+                <!-- WAN rules will be added here -->
+            </tbody>
+        </table>
+
+        <!-- WAN Rule Add Form -->
+        <div id="wanAddForm" class="card mt-3" style="display: none;">
+            <div class="card-body">
+                <h5>Add WAN Rule</h5>
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Action</label>
+                        <select id="wan_rule_action" class="form-select">
+                            <option value="pass">Pass</option>
+                            <option value="block">Block</option>
+                            <option value="reject">Reject</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Disabled</label>
+                        <input type="checkbox" id="wan_rule_disabled" class="form-check-input">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Protocol</label>
+                        <select id="wan_rule_protocol" class="form-select">
+                            <option value="any">Any</option>
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="icmp">ICMP</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="rule_desc" class="form-control">
+                    </div>
+                    <button type="button" id="ruleEditSaveBtn" class="btn btn-primary">Save</button>
+                    <button type="button" id="ruleEditCancelBtn" class="btn btn-secondary">Cancel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- LAN Rules Tab -->
+    <div id="tab-lan" class="tab-content" style="display: none;">
+        <h4>LAN Rules</h4>
+        <button id="lan-add-btn" class="btn btn-success btn-sm mb-3">Add Rule</button>
+
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Interface</th>
+                    <th>Protocol</th>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="lan-tbody">
+                <!-- LAN rules will be added here -->
+            </tbody>
+        </table>
+
+        <!-- LAN Rule Add Form -->
+        <div id="lanAddForm" class="card mt-3" style="display: none;">
+            <div class="card-body">
+                <h5>Add LAN Rule</h5>
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Interface</label>
+                        <select id="lan_interface" class="form-select">
+                            <option value="LAN">LAN</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Protocol</label>
+                        <select id="lan_protocol" class="form-select">
+                            <option value="any">Any</option>
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="icmp">ICMP</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" id="lan_description" class="form-control">
+                    </div>
+                    <button type="button" id="lanRuleSaveBtn" class="btn btn-primary">Save</button>
+                    <button type="button" id="lanRuleCancelBtn" class="btn btn-secondary">Cancel</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+    // --- UTILITY FUNCTION: SEND TO BACKEND ---
+    // This connects your frontend to the Flask server
+    async function saveRuleToBackend(ruleData, type) {
+        try {
+            let endpoint = '';
+            if (type === 'floating') {
+                endpoint = '/firewall/api/rules/floating';
+            } else if (type === 'wan') {
+                endpoint = '/firewall/api/rules/wan';
+            } else if (type === 'lan') {
+                endpoint = '/firewall/api/rules/lan';
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ruleData)
+            });
+
+            const result = await response.json();
+            if (response.ok && result.success) {
+                console.log("Success:", result);
+                return result;
+            } else {
+                alert("Error saving to backend: " + (result.error || 'Unknown error'));
+                return null;
+            }
+        } catch (error) {
+            console.error("Backend connection failed:", error);
+            alert("Could not connect to the backend server.");
+            return null;
+        }
+    }
+
     // Handle tab switching
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const tab = link.dataset.tab;
-            
-            // Update active tab
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
             link.classList.add('active');
-            
-            // Update active content
             document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
             document.getElementById('tab-' + tab).style.display = 'block';
-            
-            // Update breadcrumb
-            document.getElementById('active-section').textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
         });
     });
 
-    // WAN Add button toggle form
+    // --- FLOATING RULES LOGIC ---
+    const floatingAddTopBtn = document.getElementById('floating-add-top-btn');
+    const floatingAddBottomBtn = document.getElementById('floating-add-bottom-btn');
+    const floatingTbody = document.getElementById('floating-tbody');
+    const floatingAddForm = document.getElementById('floatingAddForm');
+    const floatingRuleSaveBtn = document.getElementById('floatingRuleSaveBtn');
+
+    let addPosition = 'bottom';
+
+    if (floatingAddTopBtn) floatingAddTopBtn.addEventListener('click', () => { addPosition = 'top'; floatingAddForm.style.display = 'block'; });
+    if (floatingAddBottomBtn) floatingAddBottomBtn.addEventListener('click', () => { addPosition = 'bottom'; floatingAddForm.style.display = 'block'; });
+
+    if (floatingRuleSaveBtn) {
+        floatingRuleSaveBtn.addEventListener('click', async () => {
+            // 1. Collect Data from Form
+            const ruleData = {
+                disabled: document.getElementById('floating_disabled').checked ? 1 : 0,
+                interface: document.getElementById('floating_interface').value,
+                protocol: document.getElementById('floating_protocol').value,
+                source: 'any',
+                source_port: '',
+                destination: 'any',
+                dest_port: '',
+                gateway: '',
+                queue: '',
+                schedule: '',
+                description: document.getElementById('floating_description').value || 'New floating rule'
+            };
+
+            // 2. Send to Backend
+            const result = await saveRuleToBackend(ruleData, 'floating');
+
+            if (result) {
+                // 3. Update UI only if backend call succeeded
+                const row = document.createElement('tr');
+                row.dataset.ruleId = result.id;
+                row.innerHTML = `<td><input type="checkbox"></td><td>${ruleData.disabled ? '✗' : '✓'}</td><td>${ruleData.interface}</td><td>${ruleData.protocol}</td><td>${ruleData.source}</td><td>*</td><td>${ruleData.destination}</td><td>*</td><td>-</td><td>none</td><td>-</td><td>${ruleData.description}</td><td><button class="btn btn-sm btn-primary">Edit</button><button class="btn btn-sm btn-danger">Delete</button></td>`;
+                if (addPosition === 'top') floatingTbody.insertBefore(row, floatingTbody.firstChild);
+                else floatingTbody.appendChild(row);
+
+                floatingAddForm.style.display = 'none';
+                // Clear form
+                document.getElementById('floating_disabled').checked = false;
+                document.getElementById('floating_description').value = '';
+                alert('Rule saved successfully!');
+            }
+        });
+    }
+
+    // --- WAN RULES LOGIC ---
     const wanAddBtn = document.getElementById('wanAddBtn');
     const wanAddForm = document.getElementById('wanAddForm');
-    
-    if (wanAddBtn) {
-        wanAddBtn.addEventListener('click', () => {
-            wanAddForm.style.display = wanAddForm.style.display === 'none' || wanAddForm.style.display === '' ? 'block' : 'none';
-        });
-    }
-
-    // Cancel button
-    const ruleEditCancelBtn = document.getElementById('ruleEditCancelBtn');
-    if (ruleEditCancelBtn) {
-        ruleEditCancelBtn.addEventListener('click', () => {
-            wanAddForm.style.display = 'none';
-        });
-    }
-
-    // Save button (placeholder)
     const ruleEditSaveBtn = document.getElementById('ruleEditSaveBtn');
+
+    if (wanAddBtn) wanAddBtn.addEventListener('click', () => { wanAddForm.style.display = 'block'; });
+
     if (ruleEditSaveBtn) {
-        ruleEditSaveBtn.addEventListener('click', () => {
-            alert('Rule saved (placeholder)');
-            wanAddForm.style.display = 'none';
+        ruleEditSaveBtn.addEventListener('click', async () => {
+            const ruleData = {
+                action: document.getElementById('wan_rule_action').value,
+                disabled: document.getElementById('wan_rule_disabled').checked ? 1 : 0,
+                protocol: document.getElementById('wan_rule_protocol').value,
+                source: 'any',
+                destination: 'any',
+                description: document.getElementById('rule_desc').value || 'New WAN rule'
+            };
+
+            const result = await saveRuleToBackend(ruleData, 'wan');
+            if (result) {
+                alert('WAN Rule saved successfully!');
+                wanAddForm.style.display = 'none';
+                // Clear form
+                document.getElementById('wan_rule_disabled').checked = false;
+                document.getElementById('rule_desc').value = '';
+                // Reload the page or add to table
+                location.reload();
+            }
         });
     }
-</script>
 
+    // --- LAN RULES LOGIC ---
+    const lanAddBtn = document.getElementById('lan-add-btn');
+    const lanAddForm = document.getElementById('lanAddForm');
+    const lanRuleSaveBtn = document.getElementById('lanRuleSaveBtn');
+
+    if (lanAddBtn) lanAddBtn.addEventListener('click', () => { lanAddForm.style.display = 'block'; });
+
+    if (lanRuleSaveBtn) {
+        lanRuleSaveBtn.addEventListener('click', async () => {
+            const ruleData = {
+                disabled: 0,
+                interface: document.getElementById('lan_interface').value,
+                protocol: document.getElementById('lan_protocol').value,
+                source: 'any',
+                destination: 'any',
+                description: document.getElementById('lan_description').value || 'New LAN rule'
+            };
+
+            const result = await saveRuleToBackend(ruleData, 'lan');
+            if (result) {
+                alert('LAN Rule saved successfully!');
+                lanAddForm.style.display = 'none';
+                // Clear form
+                document.getElementById('lan_description').value = '';
+                // Reload the page or add to table
+                location.reload();
+            }
+        });
+    }
+
+    // Cancel Buttons
+    document.getElementById('floatingRuleCancelBtn').addEventListener('click', () => { floatingAddForm.style.display = 'none'; });
+    document.getElementById('ruleEditCancelBtn').addEventListener('click', () => { wanAddForm.style.display = 'none'; });
+    document.getElementById('lanRuleCancelBtn').addEventListener('click', () => { lanAddForm.style.display = 'none'; });
+
+    // --- LOAD EXISTING RULES FROM DATABASE ---
+    async function loadFloatingRules() {
+        try {
+            const response = await fetch('/firewall/api/rules/floating');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                const tbody = document.getElementById('floating-tbody');
+                tbody.innerHTML = ''; // Clear existing
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.disabled ? '✗' : '✓'}</td>
+                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.protocol || 'any'}</td>
+                        <td>${rule.source || 'any'}</td>
+                        <td>${rule.source_port || '*'}</td>
+                        <td>${rule.destination || 'any'}</td>
+                        <td>${rule.dest_port || '*'}</td>
+                        <td>${rule.gateway || '-'}</td>
+                        <td>${rule.queue || 'none'}</td>
+                        <td>${rule.schedule || '-'}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('floating', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading floating rules:', error);
+        }
+    }
+
+    async function loadWanRules() {
+        try {
+            const response = await fetch('/firewall/api/rules/wan');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                const tbody = document.getElementById('wan-tbody');
+                tbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.action || 'pass'}</td>
+                        <td>${rule.disabled ? 'Yes' : 'No'}</td>
+                        <td>${rule.protocol || 'any'}</td>
+                        <td>${rule.source || 'any'}</td>
+                        <td>${rule.destination || 'any'}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('wan', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('wan', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading WAN rules:', error);
+        }
+    }
+
+    async function loadLanRules() {
+        try {
+            const response = await fetch('/firewall/api/rules/lan');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                const tbody = document.getElementById('lan-tbody');
+                tbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.interface || 'LAN'}</td>
+                        <td>${rule.protocol || 'any'}</td>
+                        <td>${rule.source || 'any'}</td>
+                        <td>${rule.destination || 'any'}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('lan', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('lan', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading LAN rules:', error);
+        }
+    }
+
+    // Delete rule function
+    async function deleteRule(type, ruleId) {
+        if (!confirm('Are you sure you want to delete this rule?')) return;
+
+        try {
+            const response = await fetch(`/firewall/api/rules/${type}/${ruleId}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('Rule deleted successfully!');
+                // Reload the appropriate rules
+                if (type === 'floating') loadFloatingRules();
+                else if (type === 'wan') loadWanRules();
+                else if (type === 'lan') loadLanRules();
+            } else {
+                alert('Error deleting rule: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error deleting rule:', error);
+            alert('Could not delete rule');
+        }
+    }
+
+    // Edit rule function (placeholder - can be expanded)
+    function editRule(type, ruleId) {
+        alert(`Edit ${type} rule #${ruleId} - Feature coming soon!`);
+    }
+
+    // Load all rules on page load
+    loadFloatingRules();
+    loadWanRules();
+    loadLanRules();
+</script>
 {% endblock %}
