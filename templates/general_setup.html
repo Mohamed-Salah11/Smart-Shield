@@ -97,7 +97,7 @@
             <div class="form-group-content">
                 <input type="text" id="timeservers" name="timeservers" class="form-control" style="max-width: 400px;" value="{{ config.timeservers }}">
                 <div class="help-text">
-                    Use a space to separate multiple timeservers. Example: 0.ZGate.pool.ntp.org 1.ZGate.pool.ntp.org
+                    Use a space to separate multiple timeservers. Example: 0.Smart Shield.pool.ntp.org 1.Smart Shield.pool.ntp.org
                 </div>
             </div>
         </div>
@@ -126,7 +126,7 @@
             <label for="theme">Theme</label>
             <div class="form-group-content">
                 <select id="theme" name="theme" class="form-control" style="max-width: 400px;">
-                    <option value="ZGate" {% if config.theme=="ZGate" %}selected{% endif %}>ZGate</option>
+                    <option value="Smart Shield" {% if config.theme=="Smart Shield" %}selected{% endif %}>Smart Shield</option>
                     <option value="Light">Light</option>
                     <option value="Dark">Dark</option>
                 </select>
