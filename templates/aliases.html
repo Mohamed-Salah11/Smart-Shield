@@ -4,137 +4,208 @@
 {% block main %}
 
 <div class="breadcrumb">
-    Firewall / Aliases / {{ tab|upper }}
+  Firewall / Aliases / {{ tab|upper }}
 </div>
 
 <ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if tab=='all' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='all') }}">All</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if tab=='ip' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='ip') }}">IP</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if tab=='ports' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='ports') }}">Ports</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if tab=='urls' }}" href="{{ url_for('firewall.firewall_aliases_tab', tab='urls') }}">URLs</a>
-    </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='all' }}"
+      href="{{ url_for('firewall.firewall_aliases_tab', tab='all') }}">All</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='ip' }}"
+      href="{{ url_for('firewall.firewall_aliases_tab', tab='ip') }}">IP</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='ports' }}"
+      href="{{ url_for('firewall.firewall_aliases_tab', tab='ports') }}">Ports</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if tab=='urls' }}"
+      href="{{ url_for('firewall.firewall_aliases_tab', tab='urls') }}">URLs</a>
+  </li>
 </ul>
 
 <div class="settings-section">
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th style="width:28%">Name</th>
-                <th style="width:14%">Type</th>
-                <th style="width:30%">Values</th>
-                <th style="width:18%">Description</th>
-                <th style="width:10%">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Aliases will be populated here -->
-        </tbody>
-    </table>
-    
-    <div class="d-flex gap-2" style="margin-top: 15px;">
-        <button type="button" class="btn btn-success">Add</button>
-        <button type="button" class="btn btn-primary" id="importBtn">Import</button>
-    </div>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th style="width:28%">Name</th>
+        <th style="width:14%">Type</th>
+        <th style="width:30%">Values</th>
+        <th style="width:18%">Description</th>
+        <th style="width:10%">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Aliases will be populated here -->
+    </tbody>
+  </table>
+
+  <div class="d-flex gap-2" style="margin-top: 15px;">
+    <button type="button" class="btn btn-success" id="addBtn">Add</button>
+    <button type="button" class="btn btn-primary" id="importBtn">Import</button>
+  </div>
 </div>
 
 <!-- Import Modal -->
 <div class="modal fade" id="importModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{% if tab == 'ports' %}Port Alias Details{% else %}IP Alias Details{% endif %}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Alias Name</label>
-                    <div class="form-group-content">
-                        <input type="text" id="impName" class="form-control" style="max-width: 400px;">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Description</label>
-                    <div class="form-group-content">
-                        <input type="text" id="impDesc" class="form-control" placeholder="A description may be entered here for administrative reference (not parsed).">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Aliases to import</label>
-                    <div class="form-group-content">
-                        <textarea id="impAliases" rows="8" class="form-control"></textarea>
-                        <div class="help-text">
-                            {% if tab == 'ports' %}
-                            Paste in the ports to import separated by a carriage return. The list may contain port numbers, port ranges, blank lines (ignored) and an optional description after each port. e.g.:
-                            <ul>
-                                <li>22</li>
-                                <li>1234:1250</li>
-                                <li>443 HTTPS port</li>
-                                <li>4000:4099 Description of a port range</li>
-                            </ul>
-                            {% else %}
-                            Paste in the aliases to import separated by a carriage return. Common examples are lists of IPs, networks, blocklists, etc. The list may contain addresses, with or without CIDR prefix, IP ranges, blank lines (ignored) and an optional description after each IP. e.g.:
-                            <ul>
-                                <li>172.16.1.2</li>
-                                <li>172.16.0.0/24</li>
-                                <li>10.11.12.100-10.11.12.200</li>
-                                <li>192.168.1.254 Home router</li>
-                                <li>10.20.0.0/16 Office network</li>
-                                <li>10.40.1.10-10.40.1.19 Managed switches</li>
-                            </ul>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="impSave">Save</button>
-            </div>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{% if tab == 'ports' %}Port Alias Details{% else %}IP Alias Details{% endif %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Alias Name</label>
+          <div class="form-group-content">
+            <input type="text" id="impName" class="form-control" style="max-width: 400px;">
+          </div>
         </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <div class="form-group-content">
+            <input type="text" id="impDesc" class="form-control"
+              placeholder="A description may be entered here for administrative reference (not parsed).">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Aliases to import</label>
+          <div class="form-group-content">
+            <textarea id="impAliases" rows="8" class="form-control"></textarea>
+            <div class="help-text">
+              {% if tab == 'ports' %}
+              Paste in the ports to import separated by a carriage return. The list may contain port numbers, port
+              ranges, blank lines (ignored) and an optional description after each port. e.g.:
+              <ul>
+                <li>22</li>
+                <li>1234:1250</li>
+                <li>443 HTTPS port</li>
+                <li>4000:4099 Description of a port range</li>
+              </ul>
+              {% else %}
+              Paste in the aliases to import separated by a carriage return. Common examples are lists of IPs, networks,
+              blocklists, etc. The list may contain addresses, with or without CIDR prefix, IP ranges, blank lines
+              (ignored) and an optional description after each IP. e.g.:
+              <ul>
+                <li>172.16.1.2</li>
+                <li>172.16.0.0/24</li>
+                <li>10.11.12.100-10.11.12.200</li>
+                <li>192.168.1.254 Home router</li>
+                <li>10.20.0.0/16 Office network</li>
+                <li>10.40.1.10-10.40.1.19 Managed switches</li>
+              </ul>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="impSave">Save</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function(){
+  document.addEventListener('DOMContentLoaded', function () {
     const importBtn = document.getElementById('importBtn');
     if (importBtn) {
-        importBtn.addEventListener('click', function() {
-            const modal = new bootstrap.Modal(document.getElementById('importModal'));
-            modal.show();
-        });
+      importBtn.addEventListener('click', function () {
+        const modal = new bootstrap.Modal(document.getElementById('importModal'));
+        modal.show();
+      });
     }
-    
+
     const impSave = document.getElementById('impSave');
     if (impSave) {
-        impSave.addEventListener('click', function() {
-            // TODO: handle import
+      impSave.addEventListener('click', async function () {
+        const name = document.getElementById('impName').value;
+        const description = document.getElementById('impDesc').value;
+        const aliasesText = document.getElementById('impAliases').value;
+
+        if (!name || !aliasesText) {
+          alert('Please enter alias name and values');
+          return;
+        }
+
+        // Parse the aliases text into values array
+        const lines = aliasesText.split('\n');
+        const valuesArray = [];
+        lines.forEach(line => {
+          line = line.trim();
+          if (line) {
+            // Try to split by space to separate value and description
+            const parts = line.split(/\s+/);
+            const value = parts[0];
+            const desc = parts.slice(1).join(' ');
+            valuesArray.push({ value: value, description: desc });
+          }
+        });
+
+        // Determine type based on current tab
+        const pageTab = '{{ tab|lower }}';
+        let type = 'Host(s)';
+        if (pageTab === 'ports') type = 'Port(s)';
+        else if (pageTab === 'urls') type = 'URL (IPs)';
+
+        const aliasData = {
+          name: name,
+          type: type,
+          values: valuesArray,
+          description: description
+        };
+
+        try {
+          const response = await fetch('/firewall/api/aliases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(aliasData)
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            alert('Alias imported successfully!');
             const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
             modal.hide();
-        });
+            // Clear form
+            document.getElementById('impName').value = '';
+            document.getElementById('impDesc').value = '';
+            document.getElementById('impAliases').value = '';
+            // Reload aliases
+            loadAliases();
+          } else {
+            alert('Error importing alias: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Could not connect to the backend server.');
+        }
+      });
     }
-});
+  });
 </script>
 <!-- Modal for Add/Edit -->
-<div id="aliasModal" class="aliases-modal" style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.5);z-index:1200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:6px;max-width:960px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden">
+<div id="aliasModal" class="aliases-modal"
+  style="display:none;position:fixed;inset:0;background:rgba(11,22,33,.5);z-index:1200;align-items:center;justify-content:center;padding:20px">
+  <div
+    style="background:#fff;border-radius:6px;max-width:960px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);overflow:hidden">
     <div style="background:#3e3e3e;color:#fff;padding:12px 16px;font-weight:700">Firewall / Aliases / Edit</div>
     <div style="padding:16px">
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
         <label style="width:110px;font-weight:700;color:#4b5563">Name</label>
-        <input type="text" id="aliasName" placeholder="Name" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+        <input type="text" id="aliasName" placeholder="Name"
+          style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
         <label style="width:110px;font-weight:700;color:#4b5563">Description</label>
-        <input type="text" id="aliasDesc" placeholder="A description may be entered here for administrative reference (not parsed)." style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+        <input type="text" id="aliasDesc"
+          placeholder="A description may be entered here for administrative reference (not parsed)."
+          style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
         <label style="width:110px;font-weight:700;color:#4b5563">Type</label>
@@ -150,161 +221,366 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
 
       <div style="border-top:1px solid #eee;padding-top:12px;margin-top:8px">
-        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter as many hosts as desired. Hosts must be specified by their IP address or fully qualified domain name (FQDN). If multiple IPs are returned by a DNS query, all are used. An IP range such as 192.168.1.1-192.168.1.10 or a small subnet such as 192.168.1.16/28 may also be entered and a list of individual IP addresses will be generated.</div>
+        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter as many hosts as desired. Hosts must be
+          specified by their IP address or fully qualified domain name (FQDN). If multiple IPs are returned by a DNS
+          query, all are used. An IP range such as 192.168.1.1-192.168.1.10 or a small subnet such as 192.168.1.16/28
+          may also be entered and a list of individual IP addresses will be generated.</div>
 
         <div id="hostsList">
           <div class="host-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-            <input type="text" class="host-ip" placeholder="IP or FQDN" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <input type="text" class="host-desc" placeholder="Description" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <button type="button" class="remove-host" style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
+            <input type="text" class="host-ip" placeholder="IP or FQDN"
+              style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <input type="text" class="host-desc" placeholder="Description"
+              style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <button type="button" class="remove-host"
+              style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
           </div>
         </div>
 
         <div style="margin-top:8px">
-          <button type="button" id="addHostBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">＋ Add Host</button>
+          <button type="button" id="addHostBtn"
+            style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">＋
+            Add Host</button>
         </div>
       </div>
 
       <!-- Ports container (visible when Type == Port(s) or when on ports tab) -->
       <div id="portsContainer" style="border-top:1px solid #eee;padding-top:12px;margin-top:8px;display:none">
-        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter ports as desired, with a single port or port range per entry. Port ranges can be expressed by separating with a colon.</div>
+        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter ports as desired, with a single port or
+          port range per entry. Port ranges can be expressed by separating with a colon.</div>
         <div id="portsList">
           <div class="port-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-            <input type="text" class="port-val" placeholder="Port" style="width:200px;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <input type="text" class="port-desc" placeholder="Description" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <button type="button" class="remove-port" style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
+            <input type="text" class="port-val" placeholder="Port"
+              style="width:200px;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <input type="text" class="port-desc" placeholder="Description"
+              style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <button type="button" class="remove-port"
+              style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
           </div>
         </div>
         <div style="margin-top:8px">
-          <button type="button" id="addPortBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">＋ Add Port</button>
+          <button type="button" id="addPortBtn"
+            style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">＋
+            Add Port</button>
         </div>
       </div>
 
       <!-- URLs container (visible when Type is URL related or when on urls tab) -->
       <div id="urlsContainer" style="border-top:1px solid #eee;padding-top:12px;margin-top:8px;display:none">
-        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter as many URLs as desired. After saving, the URLs will be downloaded and the items imported into the alias. Use only with small sets of IP addresses (less than 3000).</div>
+        <div style="font-size:13px;color:#6b7683;margin-bottom:10px">Hint: Enter as many URLs as desired. After saving,
+          the URLs will be downloaded and the items imported into the alias. Use only with small sets of IP addresses
+          (less than 3000).</div>
         <div id="urlsList">
           <div class="url-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-            <input type="text" class="url-val" placeholder="URL" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <input type="text" class="url-desc" placeholder="Description" style="width:260px;padding:8px;border:1px solid #d6dde6;border-radius:4px">
-            <button type="button" class="remove-url" style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
+            <input type="text" class="url-val" placeholder="URL"
+              style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <input type="text" class="url-desc" placeholder="Description"
+              style="width:260px;padding:8px;border:1px solid #d6dde6;border-radius:4px">
+            <button type="button" class="remove-url"
+              style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button>
           </div>
         </div>
         <div style="margin-top:8px">
-          <button type="button" id="addUrlBtn" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">＋ Add URL</button>
+          <button type="button" id="addUrlBtn"
+            style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">＋
+            Add URL</button>
         </div>
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;background:#fbfbfb">
-  <button type="button" id="cancelModal" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
-  <button type="button" id="saveModal" style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">Save</button>
+      <button type="button" id="cancelModal"
+        style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#e9eef5;color:#3b4450">Cancel</button>
+      <button type="button" id="saveModal"
+        style="padding:8px 12px;border-radius:4px;border:none;font-weight:700;cursor:pointer;background:#2e7d32;color:#fff">Save</button>
     </div>
   </div>
 </div>
 
 <script>
-// open modal when Add is clicked
-document.addEventListener('DOMContentLoaded', function(){
-  const openBtn = document.querySelector('.footer .btn.add');
-  const modal = document.getElementById('aliasModal');
-  const cancel = document.getElementById('cancelModal');
-  const save = document.getElementById('saveModal');
-  const addHost = document.getElementById('addHostBtn');
-  const hostsList = document.getElementById('hostsList');
-  const aliasType = document.getElementById('aliasType');
-  const portsContainer = document.getElementById('portsContainer');
-  const portsList = document.getElementById('portsList');
-  const addPortBtn = document.getElementById('addPortBtn');
-  const urlsContainer = document.getElementById('urlsContainer');
-  const urlsList = document.getElementById('urlsList');
-  const addUrlBtn = document.getElementById('addUrlBtn');
+  // open modal when Add is clicked
+  document.addEventListener('DOMContentLoaded', function () {
+    const openBtn = document.getElementById('addBtn');
+    const modal = document.getElementById('aliasModal');
+    const cancel = document.getElementById('cancelModal');
+    const save = document.getElementById('saveModal');
+    const addHost = document.getElementById('addHostBtn');
+    const hostsList = document.getElementById('hostsList');
+    const aliasType = document.getElementById('aliasType');
+    const portsContainer = document.getElementById('portsContainer');
+    const portsList = document.getElementById('portsList');
+    const addPortBtn = document.getElementById('addPortBtn');
+    const urlsContainer = document.getElementById('urlsContainer');
+    const urlsList = document.getElementById('urlsList');
+    const addUrlBtn = document.getElementById('addUrlBtn');
 
-  function openModal(){ modal.style.display = 'flex'; }
-  function closeModal(){ modal.style.display = 'none'; }
+    function openModal() { modal.style.display = 'flex'; }
+    function closeModal() { modal.style.display = 'none'; }
 
-  if(openBtn) openBtn.addEventListener('click', function(e){ e.preventDefault(); openModal(); });
-  if(cancel) cancel.addEventListener('click', function(e){ e.preventDefault(); closeModal(); });
-  if(save) save.addEventListener('click', function(e){ e.preventDefault(); closeModal(); /* TODO: submit form */ });
+    if (openBtn) openBtn.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
+    if (cancel) cancel.addEventListener('click', function (e) { e.preventDefault(); closeModal(); });
+    if (save) save.addEventListener('click', async function (e) {
+      e.preventDefault();
 
-  // click outside to close
-  modal.addEventListener('click', function(ev){ if(ev.target === modal) closeModal(); });
+      // Get form values
+      const aliasName = document.getElementById('aliasName').value;
+      const aliasDesc = document.getElementById('aliasDesc').value;
+      const aliasTypeVal = document.getElementById('aliasType').value;
 
-  function makeRow(){
-    const row = document.createElement('div');
-    row.className = 'host-row';
-    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
-    const ip = document.createElement('input'); ip.type='text'; ip.className='host-ip'; ip.placeholder='IP or FQDN'; ip.style.cssText='flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const desc = document.createElement('input'); desc.type='text'; desc.className='host-desc'; desc.placeholder='Description'; desc.style.cssText='flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const rm = document.createElement('button'); rm.type='button'; rm.className='remove-host'; rm.textContent='−'; rm.style.cssText='background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function(){ row.remove(); });
-    row.appendChild(ip); row.appendChild(desc); row.appendChild(rm);
-    return row;
-  }
+      // Validate alias name
+      if (!aliasName || aliasName.trim() === '') {
+        alert('Please enter an alias name');
+        return;
+      }
 
-  if(addHost) addHost.addEventListener('click', function(e){ e.preventDefault(); hostsList.appendChild(makeRow()); });
-  // wire up existing remove
-  document.querySelectorAll('.remove-host').forEach(b=>b.addEventListener('click', function(){ this.closest('.host-row').remove(); }));
+      // Collect values based on type
+      let valuesArray = [];
+      if (aliasTypeVal.toLowerCase().startsWith('port')) {
+        // Collect port values
+        const portRows = portsList.querySelectorAll('.port-row');
+        portRows.forEach(row => {
+          const portVal = row.querySelector('.port-val').value;
+          const portDesc = row.querySelector('.port-desc').value;
+          if (portVal) valuesArray.push({ value: portVal, description: portDesc });
+        });
+      } else if (aliasTypeVal.toLowerCase().includes('url')) {
+        // Collect URL values
+        const urlRows = urlsList.querySelectorAll('.url-row');
+        urlRows.forEach(row => {
+          const urlVal = row.querySelector('.url-val').value;
+          const urlDesc = row.querySelector('.url-desc').value;
+          if (urlVal) valuesArray.push({ value: urlVal, description: urlDesc });
+        });
+      } else {
+        // Collect host/IP values
+        const hostRows = hostsList.querySelectorAll('.host-row');
+        hostRows.forEach(row => {
+          const hostVal = row.querySelector('.host-ip').value;
+          const hostDesc = row.querySelector('.host-desc').value;
+          if (hostVal) valuesArray.push({ value: hostVal, description: hostDesc });
+        });
+      }
 
-  // Ports behavior
-  function makePortRow(){
-    const row = document.createElement('div');
-    row.className = 'port-row';
-    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
-    const port = document.createElement('input'); port.type='text'; port.className='port-val'; port.placeholder='Port'; port.style.cssText='width:200px;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const desc = document.createElement('input'); desc.type='text'; desc.className='port-desc'; desc.placeholder='Description'; desc.style.cssText='flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const rm = document.createElement('button'); rm.type='button'; rm.className='remove-port'; rm.textContent='−'; rm.style.cssText='background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function(){ row.remove(); });
-    row.appendChild(port); row.appendChild(desc); row.appendChild(rm);
-    return row;
-  }
-  if(addPortBtn) addPortBtn.addEventListener('click', function(e){ e.preventDefault(); portsList.appendChild(makePortRow()); });
-  document.querySelectorAll('.remove-port').forEach(b=>b.addEventListener('click', function(){ this.closest('.port-row').remove(); }));
+      // Prepare data for backend
+      const aliasData = {
+        name: aliasName,
+        type: aliasTypeVal,
+        values: valuesArray,
+        description: aliasDesc
+      };
 
-  // URL behavior
-  function makeUrlRow(){
-    const row = document.createElement('div');
-    row.className = 'url-row';
-    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
-    const url = document.createElement('input'); url.type='text'; url.className='url-val'; url.placeholder='URL'; url.style.cssText='flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const desc = document.createElement('input'); desc.type='text'; desc.className='url-desc'; desc.placeholder='Description'; desc.style.cssText='width:260px;padding:8px;border:1px solid #d6dde6;border-radius:4px';
-    const rm = document.createElement('button'); rm.type='button'; rm.className='remove-url'; rm.textContent='−'; rm.style.cssText='background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function(){ row.remove(); });
-    row.appendChild(url); row.appendChild(desc); row.appendChild(rm);
-    return row;
-  }
-  if(addUrlBtn) addUrlBtn.addEventListener('click', function(e){ e.preventDefault(); urlsList.appendChild(makeUrlRow()); });
-  document.querySelectorAll('.remove-url').forEach(b=>b.addEventListener('click', function(){ this.closest('.url-row').remove(); }));
+      // Send to backend
+      try {
+        const response = await fetch('/firewall/api/aliases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(aliasData)
+        });
 
-  // toggle sections by Type
-  function updateSections(){
-    const t = (aliasType && aliasType.value)||'';
-    if(t.toLowerCase().startsWith('port')){
-      portsContainer.style.display = 'block';
-      hostsList.closest('div').style.display = 'none';
-      urlsContainer.style.display = 'none';
-    } else {
-      portsContainer.style.display = 'none';
-      hostsList.closest('div').style.display = '';
+        const result = await response.json();
+        if (result.success) {
+          alert('Alias saved successfully!');
+
+          // Reset form
+          document.getElementById('aliasName').value = '';
+          document.getElementById('aliasDesc').value = '';
+          hostsList.innerHTML = '<div class="host-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="text" class="host-ip" placeholder="IP or FQDN" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px"><input type="text" class="host-desc" placeholder="Description" style="flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px"><button type="button" class="remove-host" style="background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer">−</button></div>';
+
+          closeModal();
+
+          // Reload aliases
+          loadAliases();
+        } else {
+          alert('Error saving alias: ' + result.error);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Could not connect to the backend server.');
+      }
+    });
+
+    // click outside to close
+    modal.addEventListener('click', function (ev) { if (ev.target === modal) closeModal(); });
+
+    function makeRow() {
+      const row = document.createElement('div');
+      row.className = 'host-row';
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+      const ip = document.createElement('input'); ip.type = 'text'; ip.className = 'host-ip'; ip.placeholder = 'IP or FQDN'; ip.style.cssText = 'flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const desc = document.createElement('input'); desc.type = 'text'; desc.className = 'host-desc'; desc.placeholder = 'Description'; desc.style.cssText = 'flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'remove-host'; rm.textContent = '−'; rm.style.cssText = 'background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function () { row.remove(); });
+      row.appendChild(ip); row.appendChild(desc); row.appendChild(rm);
+      return row;
     }
-    if(t.toLowerCase().includes('url')){
-      urlsContainer.style.display = 'block';
-      hostsList.closest('div').style.display = 'none';
-      portsContainer.style.display = 'none';
+
+    if (addHost) addHost.addEventListener('click', function (e) { e.preventDefault(); hostsList.appendChild(makeRow()); });
+    // wire up existing remove
+    document.querySelectorAll('.remove-host').forEach(b => b.addEventListener('click', function () { this.closest('.host-row').remove(); }));
+
+    // Ports behavior
+    function makePortRow() {
+      const row = document.createElement('div');
+      row.className = 'port-row';
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+      const port = document.createElement('input'); port.type = 'text'; port.className = 'port-val'; port.placeholder = 'Port'; port.style.cssText = 'width:200px;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const desc = document.createElement('input'); desc.type = 'text'; desc.className = 'port-desc'; desc.placeholder = 'Description'; desc.style.cssText = 'flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'remove-port'; rm.textContent = '−'; rm.style.cssText = 'background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function () { row.remove(); });
+      row.appendChild(port); row.appendChild(desc); row.appendChild(rm);
+      return row;
     }
-  }
-  aliasType && aliasType.addEventListener('change', updateSections);
+    if (addPortBtn) addPortBtn.addEventListener('click', function (e) { e.preventDefault(); portsList.appendChild(makePortRow()); });
+    document.querySelectorAll('.remove-port').forEach(b => b.addEventListener('click', function () { this.closest('.port-row').remove(); }));
 
-  // if the page tab is 'ports', pre-select Port(s) and show ports section when opening
-  const urlParams = new URLSearchParams(window.location.search);
-  const pageTab = '{{ tab|lower }}';
-  if(pageTab === 'ports'){
-    if(aliasType) aliasType.value = 'Port(s)';
-  }
-  if(pageTab === 'urls'){
-    if(aliasType) aliasType.value = 'URL (IPs)';
-  }
-  // call update initially
-  updateSections();
+    // URL behavior
+    function makeUrlRow() {
+      const row = document.createElement('div');
+      row.className = 'url-row';
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px';
+      const url = document.createElement('input'); url.type = 'text'; url.className = 'url-val'; url.placeholder = 'URL'; url.style.cssText = 'flex:1;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const desc = document.createElement('input'); desc.type = 'text'; desc.className = 'url-desc'; desc.placeholder = 'Description'; desc.style.cssText = 'width:260px;padding:8px;border:1px solid #d6dde6;border-radius:4px';
+      const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'remove-url'; rm.textContent = '−'; rm.style.cssText = 'background:#ef5350;color:#fff;border-radius:4px;padding:6px 8px;border:none;cursor:pointer'; rm.addEventListener('click', function () { row.remove(); });
+      row.appendChild(url); row.appendChild(desc); row.appendChild(rm);
+      return row;
+    }
+    if (addUrlBtn) addUrlBtn.addEventListener('click', function (e) { e.preventDefault(); urlsList.appendChild(makeUrlRow()); });
+    document.querySelectorAll('.remove-url').forEach(b => b.addEventListener('click', function () { this.closest('.url-row').remove(); }));
 
-  // Ensure Add always opens the modal. Guard against missing modal.
-  if(openBtn) openBtn.addEventListener('click', function(e){ e.preventDefault(); if(modal) modal.style.display = 'flex'; });
-});
+    // toggle sections by Type
+    function updateSections() {
+      const t = (aliasType && aliasType.value) || '';
+      if (t.toLowerCase().startsWith('port')) {
+        portsContainer.style.display = 'block';
+        hostsList.closest('div').style.display = 'none';
+        urlsContainer.style.display = 'none';
+      } else {
+        portsContainer.style.display = 'none';
+        hostsList.closest('div').style.display = '';
+      }
+      if (t.toLowerCase().includes('url')) {
+        urlsContainer.style.display = 'block';
+        hostsList.closest('div').style.display = 'none';
+        portsContainer.style.display = 'none';
+      }
+    }
+    aliasType && aliasType.addEventListener('change', updateSections);
+
+    // if the page tab is 'ports', pre-select Port(s) and show ports section when opening
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageTab = '{{ tab|lower }}';
+    if (pageTab === 'ports') {
+      if (aliasType) aliasType.value = 'Port(s)';
+    }
+    if (pageTab === 'urls') {
+      if (aliasType) aliasType.value = 'URL (IPs)';
+    }
+    // call update initially
+    updateSections();
+
+    // Ensure Add always opens the modal. Guard against missing modal.
+    if (openBtn) openBtn.addEventListener('click', function (e) { e.preventDefault(); if (modal) modal.style.display = 'flex'; });
+
+    // Handle delete button clicks using event delegation
+    const aliasTable = document.querySelector('.settings-section tbody');
+    if (aliasTable) {
+      aliasTable.addEventListener('click', async function (e) {
+        if (e.target.classList.contains('btn-danger') || e.target.textContent === 'Delete') {
+          e.preventDefault();
+          const row = e.target.closest('tr');
+          const aliasId = row ? row.dataset.aliasId : null;
+
+          if (aliasId && confirm('Are you sure you want to delete this alias?')) {
+            try {
+              const response = await fetch(`/firewall/api/aliases/${aliasId}`, {
+                method: 'DELETE'
+              });
+              const result = await response.json();
+              if (result.success) {
+                alert('Alias deleted successfully!');
+                loadAliases();
+              } else {
+                alert('Error deleting alias: ' + result.error);
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Could not delete alias');
+            }
+          }
+        }
+      });
+    }
+
+    // Load aliases from backend
+    async function loadAliases() {
+      try {
+        const pageTab = '{{ tab|lower }}';
+        let typeFilter = 'all';
+
+        // Map tab to type filter
+        if (pageTab === 'ip') typeFilter = 'host';
+        else if (pageTab === 'ports') typeFilter = 'port';
+        else if (pageTab === 'urls') typeFilter = 'url';
+
+        const response = await fetch(`/firewall/api/aliases?type=${typeFilter}`);
+        const result = await response.json();
+
+        if (result.success && result.aliases) {
+          const tbody = document.querySelector('.settings-section tbody');
+          tbody.innerHTML = '';
+
+          result.aliases.forEach(alias => {
+            // Parse values from JSON string
+            let valuesArray = [];
+            try {
+              valuesArray = JSON.parse(alias.alias_values || '[]');
+            } catch (e) {
+              valuesArray = [];
+            }
+
+            // Format values for display
+            let valuesDisplay = '';
+            if (Array.isArray(valuesArray) && valuesArray.length > 0) {
+              valuesDisplay = valuesArray.map(v => {
+                if (typeof v === 'object' && v.value) {
+                  return v.description ? `${v.value} (${v.description})` : v.value;
+                }
+                return v;
+              }).join(', ');
+            } else {
+              valuesDisplay = 'N/A';
+            }
+
+            // Truncate if too long
+            if (valuesDisplay.length > 50) {
+              valuesDisplay = valuesDisplay.substring(0, 47) + '...';
+            }
+
+            const row = document.createElement('tr');
+            row.dataset.aliasId = alias.id;
+            row.innerHTML = `
+              <td>${alias.name || ''}</td>
+              <td>${alias.type || ''}</td>
+              <td>${valuesDisplay}</td>
+              <td>${alias.description || ''}</td>
+              <td>
+                <button class="btn btn-sm btn-primary" onclick="editAlias(${alias.id})">Edit</button>
+                <button class="btn btn-sm btn-danger">Delete</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading aliases:', error);
+      }
+    }
+
+    // Edit alias function (placeholder)
+    function editAlias(aliasId) {
+      alert(`Edit alias #${aliasId} - Feature coming soon!`);
+    }
+    window.editAlias = editAlias;
+
+    // Load aliases on page load
+    loadAliases();
+  });
 </script>
 {% endblock %}

@@ -24,8 +24,10 @@
 <!-- Port Forward -->
 <div class="tab-content active" id="tab-pf">
     <div class="settings-section">
-        <div class="d-flex gap-2 align-items-center" style="padding: 8px; background: #fff3cd; border-radius: 4px; margin-bottom: 15px;">
-            <input id="nf_desc_input" class="form-control" placeholder="Enter a description, Save, then drag to final location." style="flex: 1;">
+        <div class="d-flex gap-2 align-items-center"
+            style="padding: 8px; background: #fff3cd; border-radius: 4px; margin-bottom: 15px;">
+            <input id="nf_desc_input" class="form-control"
+                placeholder="Enter a description, Save, then drag to final location." style="flex: 1;">
             <button type="button" class="btn btn-primary" id="nf_save_btn">Save</button>
             <button type="button" class="btn btn-secondary" id="nf_cancel_btn">Cancel</button>
             <div class="d-flex gap-1">
@@ -35,7 +37,7 @@
                 <span style="width:14px;height:14px;border-radius:50%;background:#17a2b8;display:inline-block;"></span>
             </div>
         </div>
-        
+
         <table class="table table-bordered">
             <thead>
                 <tr>
@@ -52,16 +54,192 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="pf-tbody">
                 <!-- Rules will be added here dynamically -->
             </tbody>
         </table>
-        
+
         <div class="d-flex gap-2" style="margin-top: 15px;">
-            <button type="button" class="btn btn-success">Add</button>
-            <button type="button" class="btn btn-danger">Delete</button>
+            <button type="button" class="btn btn-success" id="pf-add-top-btn">Add</button>
+            <button type="button" class="btn btn-success" id="pf-add-bottom-btn">Add</button>
+            <button type="button" class="btn btn-danger" id="pf-delete-btn">Delete</button>
             <button type="button" class="btn btn-primary">Save</button>
         </div>
+    </div>
+
+    <!-- Port Forward Add/Edit Form (Hidden by default) -->
+    <div id="pfAddForm"
+        style="display:none; margin: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <h5
+            style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #333; background: #3e3e3e; color: #fff; padding: 10px;">
+            Edit Redirect Entry</h5>
+        <form>
+            <div class="form-group">
+                <label>Disabled</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="pf_disabled">
+                        <label class="form-check-label" for="pf_disabled">Disable this rule</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>No RDR (NOT)</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="pf_no_rdr">
+                        <label class="form-check-label" for="pf_no_rdr">Disable redirection for traffic matching this
+                            rule</label>
+                    </div>
+                    <div class="help-text">This option is rarely needed. Don't use this without thorough knowledge of
+                        the implications.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_interface">Interface</label>
+                <div class="form-group-content">
+                    <select id="pf_interface" class="form-control" style="max-width: 400px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                        <option>Any</option>
+                    </select>
+                    <div class="help-text">Choose which interface this rule applies to. In most cases "WAN" is
+                        specified.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_address_family">Address Family</label>
+                <div class="form-group-content">
+                    <select id="pf_address_family" class="form-control" style="max-width: 400px;">
+                        <option>IPv4</option>
+                        <option>IPv6</option>
+                        <option>IPv4+IPv6</option>
+                    </select>
+                    <div class="help-text">Select the Internet Protocol version this rule applies to.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_protocol">Protocol</label>
+                <div class="form-group-content">
+                    <select id="pf_protocol" class="form-control" style="max-width: 400px;">
+                        <option>Any</option>
+                        <option>TCP</option>
+                        <option>UDP</option>
+                        <option>TCP/UDP</option>
+                        <option>ICMP</option>
+                        <option>ESP</option>
+                    </select>
+                    <div class="help-text">Choose which protocol this rule should match. In most cases "TCP" is
+                        specified.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Source</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="pf_src_invert">
+                        <label class="form-check-label" for="pf_src_invert">Invert match</label>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select class="form-control" id="pf_src_type" style="max-width: 200px;">
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                            <option>Any</option>
+                        </select>
+                        <input type="text" class="form-control" id="pf_src_address" placeholder="WAN address"
+                            style="flex: 1;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <input type="text" class="form-control" placeholder="Address/mask" style="max-width: 300px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Destination</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="pf_dst_invert">
+                        <label class="form-check-label" for="pf_dst_invert">Invert match</label>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select class="form-control" id="pf_dst_type" style="max-width: 200px;">
+                            <option>WAN address</option>
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                            <option>Any</option>
+                        </select>
+                        <input type="text" class="form-control" id="pf_dst_address" placeholder="Address/mask"
+                            style="flex: 1;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <select class="form-control" id="pf_dst_address_type" style="max-width: 200px;">
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_redirect_ip">Redirect target IP</label>
+                <div class="form-group-content">
+                    <input type="text" id="pf_redirect_ip" class="form-control" placeholder="Address"
+                        style="max-width: 400px;">
+                    <div class="help-text">
+                        Enter the internal IP address of the server on which to map the ports, e.g. "192.168.1.12" for
+                        IPv4.
+                        In case of IPv6 addresses, it must be from the same "scope".
+                        i.e. it is not possible to redirect from link-local addresses scope ("fe80:") to local scope
+                        ("fd80:") or vice versa (::1)
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_description">Description</label>
+                <div class="form-group-content">
+                    <input type="text" id="pf_description" class="form-control"
+                        placeholder="A description may be entered here for administrative reference (not parsed).">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>No XMLRPC Sync</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="pf_no_xmlrpc">
+                        <label class="form-check-label" for="pf_no_xmlrpc">Do not automatically sync to other CARP
+                            members</label>
+                    </div>
+                    <div class="help-text">This prevents the rule on Master from automatically syncing to other CARP
+                        members. This does NOT prevent the rule from being overwritten on Slave.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="pf_nat_reflection">NAT reflection</label>
+                <div class="form-group-content">
+                    <select id="pf_nat_reflection" class="form-control" style="max-width: 400px;">
+                        <option>Use system default</option>
+                        <option>Enable</option>
+                        <option>Disable</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2" style="margin-top: 20px;">
+                <button type="button" class="btn btn-primary" id="pfRuleSaveBtn">Save</button>
+                <button type="button" class="btn btn-secondary" id="pfRuleCancelBtn">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -80,17 +258,179 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="1to1-tbody">
                 <!-- Mappings will be added here dynamically -->
             </tbody>
         </table>
-        
+
         <div class="d-flex gap-2" style="margin-top: 15px;">
-            <button type="button" class="btn btn-success">Add</button>
-            <button type="button" class="btn btn-danger">Delete</button>
+            <button type="button" class="btn btn-success" id="1to1-add-top-btn">Add</button>
+            <button type="button" class="btn btn-success" id="1to1-add-bottom-btn">Add</button>
+            <button type="button" class="btn btn-danger" id="1to1-delete-btn">Delete</button>
             <button type="button" class="btn btn-primary">Toggle</button>
             <button type="button" class="btn btn-primary">Save</button>
         </div>
+    </div>
+
+    <!-- 1:1 NAT Add/Edit Form (Hidden by default) -->
+    <div id="1to1AddForm"
+        style="display:none; margin: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <h5
+            style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #333; background: #3e3e3e; color: #fff; padding: 10px;">
+            Edit 1:1 NAT Entry</h5>
+        <form>
+            <div class="form-group">
+                <label>Disabled</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="1to1_disabled">
+                        <label class="form-check-label" for="1to1_disabled">Disable this rule</label>
+                    </div>
+                    <div class="help-text">When this option is checked, the rule will not have any effect.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>No BINAT (NOT)</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="1to1_no_binat">
+                        <label class="form-check-label" for="1to1_no_binat">Do not perform binat for the specified
+                            address</label>
+                    </div>
+                    <div class="help-text">Excludes the address from a later, more general, rule.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="1to1_interface">Interface</label>
+                <div class="form-group-content">
+                    <select id="1to1_interface" class="form-control" style="max-width: 400px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                        <option>Any</option>
+                    </select>
+                    <div class="help-text">Choose which interface this rule applies to. In most cases "WAN" is
+                        specified.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="1to1_address_family">Address Family</label>
+                <div class="form-group-content">
+                    <select id="1to1_address_family" class="form-control" style="max-width: 400px;">
+                        <option>IPv4</option>
+                        <option>IPv6</option>
+                    </select>
+                    <div class="help-text">Select the Internet Protocol version this rule applies to.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>External subnet IP</label>
+                <div class="form-group-content">
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Address</label>
+                        <select class="form-control" id="1to1_external_type"
+                            style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                        <input type="text" class="form-control" id="1to1_external_address" placeholder="Address"
+                            style="max-width: 400px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <input type="text" class="form-control" placeholder="Address" style="max-width: 400px;">
+                    </div>
+                    <div class="help-text">Enter the external (usually on a WAN) subnet's starting address or interface
+                        for the 1:1 mapping.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Internal IP</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="1to1_internal_not">
+                        <label class="form-check-label" for="1to1_internal_not">Not</label>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Address</label>
+                        <select class="form-control" id="1to1_internal_type"
+                            style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                        <input type="text" class="form-control" id="1to1_internal_address" placeholder="Address/mask"
+                            style="max-width: 400px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <input type="text" class="form-control" placeholder="Address/mask" style="max-width: 400px;">
+                    </div>
+                    <div class="help-text">Enter the internal (LAN) subnet for the 1:1 mapping. The subnet size
+                        specified for the internal subnet will be applied to the external subnet.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Destination</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="1to1_dest_not">
+                        <label class="form-check-label" for="1to1_dest_not">Not</label>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Invert the sense of the
+                            match.</label>
+                        <select class="form-control" id="1to1_dest_type" style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Any</option>
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" id="1to1_dest_address" placeholder="Address/mask"
+                                style="flex: 1;">
+                            <input type="text" class="form-control" placeholder="/" style="width: 60px;">
+                            <select class="form-control" style="max-width: 150px;">
+                                <option>(other)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <input type="text" class="form-control" placeholder="Address/mask" style="max-width: 400px;">
+                    </div>
+                    <div class="help-text">The 1:1 mapping will only be used for connections to or from the specified
+                        destination. Hint: this is usually "Any".</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="1to1_description">Description</label>
+                <div class="form-group-content">
+                    <input type="text" id="1to1_description" class="form-control"
+                        placeholder="A description may be entered here for administrative reference (not parsed).">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="1to1_nat_reflection">NAT reflection</label>
+                <div class="form-group-content">
+                    <select id="1to1_nat_reflection" class="form-control" style="max-width: 400px;">
+                        <option>Use system default</option>
+                        <option>Enable</option>
+                        <option>Disable</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2" style="margin-top: 20px;">
+                <button type="button" class="btn btn-primary" id="1to1RuleSaveBtn">Save</button>
+                <button type="button" class="btn btn-secondary" id="1to1RuleCancelBtn">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -132,7 +472,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="d-flex gap-2" style="margin-top: 15px;">
                 <button type="button" class="btn btn-primary">Save</button>
             </div>
@@ -142,7 +482,7 @@
     <!-- Mappings -->
     <div class="settings-section" style="margin-bottom: 20px;">
         <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Mappings</h5>
-        
+
         <table class="table table-bordered">
             <thead>
                 <tr>
@@ -159,23 +499,213 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="outbound-tbody">
                 <!-- Mappings will be added here dynamically -->
             </tbody>
         </table>
-        
+
         <div class="d-flex gap-2" style="margin-top: 15px;">
-            <button type="button" class="btn btn-success">Add</button>
-            <button type="button" class="btn btn-danger">Delete</button>
+            <button type="button" class="btn btn-success" id="outbound-add-top-btn">Add</button>
+            <button type="button" class="btn btn-success" id="outbound-add-bottom-btn">Add</button>
+            <button type="button" class="btn btn-danger" id="outbound-delete-btn">Delete</button>
             <button type="button" class="btn btn-primary">Toggle</button>
             <button type="button" class="btn btn-primary">Save</button>
         </div>
     </div>
 
+    <!-- Outbound NAT Add/Edit Form (Hidden by default) -->
+    <div id="outboundAddForm"
+        style="display:none; margin: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <h5
+            style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #333; background: #3e3e3e; color: #fff; padding: 10px;">
+            Edit Advanced Outbound NAT Entry</h5>
+        <form>
+            <div class="form-group">
+                <label>Disabled</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="outbound_disabled">
+                        <label class="form-check-label" for="outbound_disabled">Disable this rule</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Do not NAT</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="outbound_do_not_nat">
+                        <label class="form-check-label" for="outbound_do_not_nat">Enabling this option will disable NAT
+                            for traffic matching this rule and stop processing Outbound NAT rules</label>
+                    </div>
+                    <div class="help-text">In most cases this option is not required.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="outbound_interface">Interface</label>
+                <div class="form-group-content">
+                    <select id="outbound_interface" class="form-control" style="max-width: 400px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                        <option>Any</option>
+                    </select>
+                    <div class="help-text">The interface on which traffic is matched as it exits the firewall. In most
+                        cases this is "WAN" or another externally-connected interface.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="outbound_address_family">Address Family</label>
+                <div class="form-group-content">
+                    <select id="outbound_address_family" class="form-control" style="max-width: 400px;">
+                        <option>IPv4+IPv6</option>
+                        <option>IPv4</option>
+                        <option>IPv6</option>
+                    </select>
+                    <div class="help-text">Select the Internet Protocol version this rule applies to.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="outbound_protocol">Protocol</label>
+                <div class="form-group-content">
+                    <select id="outbound_protocol" class="form-control" style="max-width: 400px;">
+                        <option>Any</option>
+                        <option>TCP</option>
+                        <option>UDP</option>
+                        <option>TCP/UDP</option>
+                        <option>ICMP</option>
+                        <option>ESP</option>
+                    </select>
+                    <div class="help-text">Choose which protocol this rule should match. In most cases "any" is
+                        specified.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Source</label>
+                <div class="form-group-content">
+                    <div style="margin-bottom: 10px;">
+                        <select class="form-control" id="outbound_src_type"
+                            style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Any</option>
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" id="outbound_src_address" placeholder="/"
+                                style="width: 60px;">
+                            <input type="text" class="form-control" placeholder="24" style="width: 80px;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <div class="help-text">Source network for the outbound NAT mapping.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Destination</label>
+                <div class="form-group-content">
+                    <div style="margin-bottom: 10px;">
+                        <select class="form-control" id="outbound_dst_type"
+                            style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Any</option>
+                            <option>Address or Alias</option>
+                            <option>Network</option>
+                        </select>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" id="outbound_dst_address" placeholder="/"
+                                style="width: 60px;">
+                            <input type="text" class="form-control" placeholder="24" style="width: 80px;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <div class="form-check" style="margin-top: 10px;">
+                            <input type="checkbox" class="form-check-input" id="outbound_dst_not">
+                            <label class="form-check-label" for="outbound_dst_not">Not</label>
+                        </div>
+                        <div class="help-text">Destination network for the outbound NAT mapping.</div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 style="margin: 20px 0 15px; padding: 10px; background: #3e3e3e; color: #fff;">Translation</h5>
+
+            <div class="form-group">
+                <label>Address</label>
+                <div class="form-group-content">
+                    <div style="margin-bottom: 10px;">
+                        <select class="form-control" id="outbound_translation_address"
+                            style="max-width: 200px; margin-bottom: 10px;">
+                            <option>WAN address</option>
+                            <option>Address or Alias</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <div class="help-text">Connections matching this rule will be mapped to the specified address.
+                            If specifying a custom network or alias, it must be routed to the firewall.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Port or Range</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="outbound_static_port" checked>
+                        <label class="form-check-label" for="outbound_static_port">Static Port</label>
+                    </div>
+                    <input type="text" class="form-control" id="outbound_port_range" placeholder="Port or Range"
+                        style="max-width: 300px;">
+                    <div class="help-text">
+                        Enter the external source Port or Range used for remapping the original source port on
+                        connections matching the rule.
+                        Leave blank when Static Port is checked.<br>
+                        Port ranges are a low and high port number separated by ":".<br>
+                        Leave blank to use the port number generated by "". A Static Port of "" is used.
+                    </div>
+                </div>
+            </div>
+
+            <h5 style="margin: 20px 0 15px; padding: 10px; background: #3e3e3e; color: #fff;">Misc</h5>
+
+            <div class="form-group">
+                <label>No XMLRPC Sync</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="outbound_no_xmlrpc">
+                        <label class="form-check-label" for="outbound_no_xmlrpc">Prevents the rule on Master from
+                            automatically syncing to other CARP members. This does NOT prevent the rule from being
+                            overwritten on Slave.</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="outbound_description">Description</label>
+                <div class="form-group-content">
+                    <input type="text" id="outbound_description" class="form-control"
+                        placeholder="A description may be entered here for administrative reference (not parsed).">
+                </div>
+            </div>
+
+            <div class="d-flex gap-2" style="margin-top: 20px;">
+                <button type="button" class="btn btn-primary" id="outboundRuleSaveBtn">Save</button>
+                <button type="button" class="btn btn-secondary" id="outboundRuleCancelBtn">Cancel</button>
+            </div>
+        </form>
+    </div>
+
     <!-- Automatic Rules -->
     <div class="settings-section">
-        <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Automatic Rules</h5>
-        
+        <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Automatic
+            Rules</h5>
+
         <table class="table table-bordered">
             <thead>
                 <tr>
@@ -227,7 +757,7 @@
         <div class="alert alert-info" style="margin: 20px;">
             NPt provides a one-to-one mapping between IPv6 prefixes, allowing for IPv6 network prefix translation.
         </div>
-        
+
         <table class="table table-bordered">
             <thead>
                 <tr>
@@ -239,16 +769,121 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="npt-tbody">
                 <!-- NPt mappings will be added here dynamically -->
             </tbody>
         </table>
-        
+
         <div class="d-flex gap-2" style="margin-top: 15px;">
-            <button type="button" class="btn btn-success">Add</button>
-            <button type="button" class="btn btn-danger">Delete</button>
+            <button type="button" class="btn btn-success" id="npt-add-top-btn">Add</button>
+            <button type="button" class="btn btn-success" id="npt-add-bottom-btn">Add</button>
+            <button type="button" class="btn btn-danger" id="npt-delete-btn">Delete</button>
             <button type="button" class="btn btn-primary">Save</button>
         </div>
+    </div>
+
+    <!-- NPt Add/Edit Form (Hidden by default) -->
+    <div id="nptAddForm"
+        style="display:none; margin: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <h5
+            style="margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #333; background: #3e3e3e; color: #fff; padding: 10px;">
+            Edit NAT NPt Entry</h5>
+        <form>
+            <div class="form-group">
+                <label>Disabled</label>
+                <div class="form-group-content">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="npt_disabled">
+                        <label class="form-check-label" for="npt_disabled">Disable this rule</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="npt_interface">Interface</label>
+                <div class="form-group-content">
+                    <select id="npt_interface" class="form-control" style="max-width: 400px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                        <option>Any</option>
+                    </select>
+                    <div class="help-text">Choose which interface this rule applies to. Here 'Typically the "WAN" is
+                        used here.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Source IPv6 prefix</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="npt_src_not">
+                        <label class="form-check-label" for="npt_src_not">Not</label>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Invert the sense of the
+                            match.</label>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" class="form-control" id="npt_src_prefix" placeholder="Source prefix"
+                            style="flex: 1;">
+                        <input type="text" class="form-control" placeholder="/" style="width: 60px;">
+                        <input type="text" class="form-control" placeholder="128" style="width: 80px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <div class="help-text">
+                            Internal (LAN) ULA IPv6 Prefix for the Network Prefix translation. The prefix size specified
+                            for the internal IPv6 prefix will be applied to the external prefix.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Destination IPv6 prefix</label>
+                <div class="form-group-content">
+                    <div class="form-check" style="margin-bottom: 10px;">
+                        <input type="checkbox" class="form-check-input" id="npt_dst_not">
+                        <label class="form-check-label" for="npt_dst_not">Not</label>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Invert the sense of the
+                            match.</label>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <select class="form-control" id="npt_dst_type" style="max-width: 200px; margin-bottom: 10px;">
+                            <option>Prefix</option>
+                            <option>Network</option>
+                        </select>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" class="form-control" id="npt_dst_prefix" placeholder="Destination prefix"
+                                style="flex: 1;">
+                            <input type="text" class="form-control" placeholder="/" style="width: 60px;">
+                            <input type="text" class="form-control" placeholder="128" style="width: 80px;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; display: block; margin-bottom: 5px;">Type</label>
+                        <div class="help-text">
+                            Global Unicast routable IPv6 prefix.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="npt_description">Description</label>
+                <div class="form-group-content">
+                    <input type="text" id="npt_description" class="form-control"
+                        placeholder="A description may be entered here for administrative reference (not parsed).">
+                </div>
+            </div>
+
+            <div class="d-flex gap-2" style="margin-top: 20px;">
+                <button type="button" class="btn btn-primary" id="nptRuleSaveBtn">Save</button>
+                <button type="button" class="btn btn-secondary" id="nptRuleCancelBtn">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -258,15 +893,15 @@
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const tab = link.dataset.tab;
-            
+
             // Update active tab
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
             link.classList.add('active');
-            
+
             // Update active content
             document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
             document.getElementById('tab-' + tab).style.display = 'block';
-            
+
             // Update breadcrumb
             const tabNames = {
                 'pf': 'Port Forward',
@@ -282,19 +917,583 @@
     const nfSaveBtn = document.getElementById('nf_save_btn');
     const nfCancelBtn = document.getElementById('nf_cancel_btn');
     const nfDescInput = document.getElementById('nf_desc_input');
-    
+
     if (nfSaveBtn) {
         nfSaveBtn.addEventListener('click', () => {
             alert('Rule saved: ' + nfDescInput.value);
             nfDescInput.value = '';
         });
     }
-    
+
     if (nfCancelBtn) {
         nfCancelBtn.addEventListener('click', () => {
             nfDescInput.value = '';
         });
     }
+
+    // Helper function to create rule rows
+    function createRuleRow(type, description) {
+        const row = document.createElement('tr');
+        if (type === 'pf') {
+            row.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td>WAN</td>
+                <td>TCP</td>
+                <td>*</td>
+                <td>*</td>
+                <td>WAN address</td>
+                <td>80</td>
+                <td>192.168.1.100</td>
+                <td>80</td>
+                <td>${description}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary">Edit</button>
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            `;
+        } else if (type === '1to1') {
+            row.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td>WAN</td>
+                <td>192.168.1.100</td>
+                <td>10.0.0.100</td>
+                <td>*</td>
+                <td>${description}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary">Edit</button>
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            `;
+        } else if (type === 'outbound') {
+            row.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td>WAN</td>
+                <td>10.0.0.0/24</td>
+                <td>*</td>
+                <td>*</td>
+                <td>*</td>
+                <td>WAN address</td>
+                <td>*</td>
+                <td>No</td>
+                <td>${description}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary">Edit</button>
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            `;
+        } else if (type === 'npt') {
+            row.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td>WAN</td>
+                <td>fd00::/64</td>
+                <td>2001:db8::/64</td>
+                <td>${description}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary">Edit</button>
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            `;
+        }
+        return row;
+    }
+
+    // Port Forward Add buttons (top and bottom) with form
+    const pfAddTopBtn = document.getElementById('pf-add-top-btn');
+    const pfAddBottomBtn = document.getElementById('pf-add-bottom-btn');
+    const pfTbody = document.getElementById('pf-tbody');
+    const pfAddForm = document.getElementById('pfAddForm');
+    const pfRuleSaveBtn = document.getElementById('pfRuleSaveBtn');
+    const pfRuleCancelBtn = document.getElementById('pfRuleCancelBtn');
+
+    let pfAddPosition = 'bottom'; // Track where to add the rule
+
+    // Show form for both buttons
+    if (pfAddTopBtn) {
+        pfAddTopBtn.addEventListener('click', () => {
+            pfAddPosition = 'top';
+            pfAddForm.style.display = 'block';
+            pfAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    if (pfAddBottomBtn) {
+        pfAddBottomBtn.addEventListener('click', () => {
+            pfAddPosition = 'bottom';
+            pfAddForm.style.display = 'block';
+            pfAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    // Cancel button for Port Forward form
+    if (pfRuleCancelBtn) {
+        pfRuleCancelBtn.addEventListener('click', () => {
+            pfAddForm.style.display = 'none';
+        });
+    }
+
+    // Save button for Port Forward form
+    if (pfRuleSaveBtn) {
+        pfRuleSaveBtn.addEventListener('click', async () => {
+            const ruleData = {
+                disabled: document.getElementById('pf_disabled').checked ? 1 : 0,
+                interface: document.getElementById('pf_interface').value,
+                protocol: document.getElementById('pf_protocol').value,
+                src_type: document.getElementById('pf_src_type') ? document.getElementById('pf_src_type').value : 'any',
+                src_address: document.getElementById('pf_src_address') ? document.getElementById('pf_src_address').value : '',
+                dst_type: document.getElementById('pf_dst_type') ? document.getElementById('pf_dst_type').value : 'wan_address',
+                dst_address: document.getElementById('pf_dst_address') ? document.getElementById('pf_dst_address').value : '',
+                redirect_ip: document.getElementById('pf_redirect_ip').value || '',
+                description: document.getElementById('pf_description') ? document.getElementById('pf_description').value : 'New port forward rule',
+                nat_reflection: 'default'
+            };
+
+            try {
+                const response = await fetch('/firewall/api/nat/pf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ruleData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Port forward rule saved successfully!');
+                    pfAddForm.style.display = 'none';
+                    // Clear form
+                    document.getElementById('pf_disabled').checked = false;
+                    if (document.getElementById('pf_description')) document.getElementById('pf_description').value = '';
+                    if (document.getElementById('pf_redirect_ip')) document.getElementById('pf_redirect_ip').value = '';
+                    // Reload rules
+                    loadPortForwardRules();
+                } else {
+                    alert('Error saving rule: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Could not connect to the backend server.');
+            }
+        });
+    }
+
+    // 1:1 NAT Add buttons (top and bottom) with form
+    const oneToOneAddTopBtn = document.getElementById('1to1-add-top-btn');
+    const oneToOneAddBottomBtn = document.getElementById('1to1-add-bottom-btn');
+    const oneToOneTbody = document.getElementById('1to1-tbody');
+    const oneToOneAddForm = document.getElementById('1to1AddForm');
+    const oneToOneRuleSaveBtn = document.getElementById('1to1RuleSaveBtn');
+    const oneToOneRuleCancelBtn = document.getElementById('1to1RuleCancelBtn');
+
+    let oneToOneAddPosition = 'bottom'; // Track where to add the rule
+
+    // Show form for both buttons
+    if (oneToOneAddTopBtn) {
+        oneToOneAddTopBtn.addEventListener('click', () => {
+            oneToOneAddPosition = 'top';
+            oneToOneAddForm.style.display = 'block';
+            oneToOneAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    if (oneToOneAddBottomBtn) {
+        oneToOneAddBottomBtn.addEventListener('click', () => {
+            oneToOneAddPosition = 'bottom';
+            oneToOneAddForm.style.display = 'block';
+            oneToOneAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    // Cancel button for 1:1 NAT form
+    if (oneToOneRuleCancelBtn) {
+        oneToOneRuleCancelBtn.addEventListener('click', () => {
+            oneToOneAddForm.style.display = 'none';
+        });
+    }
+
+    // Save button for 1:1 NAT form
+    if (oneToOneRuleSaveBtn) {
+        oneToOneRuleSaveBtn.addEventListener('click', async () => {
+            const ruleData = {
+                disabled: document.getElementById('1to1_disabled') ? (document.getElementById('1to1_disabled').checked ? 1 : 0) : 0,
+                interface: document.getElementById('1to1_interface').value,
+                external_address: document.getElementById('1to1_external_address').value || '',
+                internal_address: document.getElementById('1to1_internal_address').value || '',
+                destination_address: document.getElementById('1to1_destination_address') ? document.getElementById('1to1_destination_address').value : 'any',
+                description: document.getElementById('1to1_description').value || 'New 1:1 NAT mapping'
+            };
+
+            try {
+                const response = await fetch('/firewall/api/nat/1to1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ruleData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('1:1 NAT mapping saved successfully!');
+                    oneToOneAddForm.style.display = 'none';
+                    // Clear form
+                    if (document.getElementById('1to1_description')) document.getElementById('1to1_description').value = '';
+                    if (document.getElementById('1to1_external_address')) document.getElementById('1to1_external_address').value = '';
+                    if (document.getElementById('1to1_internal_address')) document.getElementById('1to1_internal_address').value = '';
+                    // Reload rules
+                    load1to1Rules();
+                } else {
+                    alert('Error saving mapping: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Could not connect to the backend server.');
+            }
+        });
+    }
+
+    // Outbound NAT Add buttons (top and bottom) with form
+    const outboundAddTopBtn = document.getElementById('outbound-add-top-btn');
+    const outboundAddBottomBtn = document.getElementById('outbound-add-bottom-btn');
+    const outboundTbody = document.getElementById('outbound-tbody');
+    const outboundAddForm = document.getElementById('outboundAddForm');
+    const outboundRuleSaveBtn = document.getElementById('outboundRuleSaveBtn');
+    const outboundRuleCancelBtn = document.getElementById('outboundRuleCancelBtn');
+
+    let outboundAddPosition = 'bottom'; // Track where to add the rule
+
+    // Show form for both buttons
+    if (outboundAddTopBtn) {
+        outboundAddTopBtn.addEventListener('click', () => {
+            outboundAddPosition = 'top';
+            outboundAddForm.style.display = 'block';
+            outboundAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    if (outboundAddBottomBtn) {
+        outboundAddBottomBtn.addEventListener('click', () => {
+            outboundAddPosition = 'bottom';
+            outboundAddForm.style.display = 'block';
+            outboundAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    // Cancel button for Outbound NAT form
+    if (outboundRuleCancelBtn) {
+        outboundRuleCancelBtn.addEventListener('click', () => {
+            outboundAddForm.style.display = 'none';
+        });
+    }
+
+    // Save button for Outbound NAT form
+    if (outboundRuleSaveBtn) {
+        outboundRuleSaveBtn.addEventListener('click', async () => {
+            const ruleData = {
+                disabled: document.getElementById('outbound_disabled') ? (document.getElementById('outbound_disabled').checked ? 1 : 0) : 0,
+                interface: document.getElementById('outbound_interface').value,
+                src_address: document.getElementById('outbound_src_address') ? document.getElementById('outbound_src_address').value : '',
+                dst_address: document.getElementById('outbound_dst_address') ? document.getElementById('outbound_dst_address').value : 'any',
+                nat_address: document.getElementById('outbound_nat_address') ? document.getElementById('outbound_nat_address').value : '',
+                static_port: document.getElementById('outbound_static_port').checked ? 1 : 0,
+                description: document.getElementById('outbound_description').value || 'New outbound NAT rule'
+            };
+
+            try {
+                const response = await fetch('/firewall/api/nat/outbound', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ruleData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Outbound NAT rule saved successfully!');
+                    outboundAddForm.style.display = 'none';
+                    // Clear form
+                    if (document.getElementById('outbound_description')) document.getElementById('outbound_description').value = '';
+                    // Reload rules
+                    loadOutboundRules();
+                } else {
+                    alert('Error saving rule: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Could not connect to the backend server.');
+            }
+        });
+    }
+
+    // NPt Add buttons (top and bottom) with form
+    const nptAddTopBtn = document.getElementById('npt-add-top-btn');
+    const nptAddBottomBtn = document.getElementById('npt-add-bottom-btn');
+    const nptTbody = document.getElementById('npt-tbody');
+    const nptAddForm = document.getElementById('nptAddForm');
+    const nptRuleSaveBtn = document.getElementById('nptRuleSaveBtn');
+    const nptRuleCancelBtn = document.getElementById('nptRuleCancelBtn');
+
+    let nptAddPosition = 'bottom'; // Track where to add the rule
+
+    // Show form for both buttons
+    if (nptAddTopBtn) {
+        nptAddTopBtn.addEventListener('click', () => {
+            nptAddPosition = 'top';
+            nptAddForm.style.display = 'block';
+            nptAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    if (nptAddBottomBtn) {
+        nptAddBottomBtn.addEventListener('click', () => {
+            nptAddPosition = 'bottom';
+            nptAddForm.style.display = 'block';
+            nptAddForm.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+
+    // Cancel button for NPt form
+    if (nptRuleCancelBtn) {
+        nptRuleCancelBtn.addEventListener('click', () => {
+            nptAddForm.style.display = 'none';
+        });
+    }
+
+    // Save button for NPt form
+    if (nptRuleSaveBtn) {
+        nptRuleSaveBtn.addEventListener('click', () => {
+            const description = document.getElementById('npt_description').value || 'New NPt mapping';
+            const interfaceVal = document.getElementById('npt_interface').value;
+            const srcPrefix = document.getElementById('npt_src_prefix').value || 'fd00::/64';
+            const dstPrefix = document.getElementById('npt_dst_prefix').value || '2001:db8::/64';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td>${interfaceVal}</td>
+                <td>${srcPrefix}</td>
+                <td>${dstPrefix}</td>
+                <td>${description}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary">Edit</button>
+                    <button class="btn btn-sm btn-danger">Delete</button>
+                </td>
+            `;
+
+            // Add to top or bottom based on which button was clicked
+            if (nptAddPosition === 'top') {
+                nptTbody.insertBefore(row, nptTbody.firstChild);
+            } else {
+                nptTbody.appendChild(row);
+            }
+
+            // Hide form and reset
+            nptAddForm.style.display = 'none';
+            document.getElementById('npt_description').value = '';
+            document.getElementById('npt_src_prefix').value = '';
+            document.getElementById('npt_dst_prefix').value = '';
+        });
+    }
+
+    // Delete button functionality for all sections
+    const pfDeleteBtn = document.getElementById('pf-delete-btn');
+    const oneToOneDeleteBtn = document.getElementById('1to1-delete-btn');
+    const outboundDeleteBtn = document.getElementById('outbound-delete-btn');
+    const nptDeleteBtn = document.getElementById('npt-delete-btn');
+
+    // Port Forward Delete
+    if (pfDeleteBtn) {
+        pfDeleteBtn.addEventListener('click', () => {
+            const checkboxes = pfTbody.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one rule to delete');
+                return;
+            }
+            if (confirm(`Are you sure you want to delete ${checkboxes.length} rule(s)?`)) {
+                checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            }
+        });
+    }
+
+    // 1:1 NAT Delete
+    if (oneToOneDeleteBtn) {
+        oneToOneDeleteBtn.addEventListener('click', () => {
+            const checkboxes = oneToOneTbody.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one mapping to delete');
+                return;
+            }
+            if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
+                checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            }
+        });
+    }
+
+    // Outbound NAT Delete
+    if (outboundDeleteBtn) {
+        outboundDeleteBtn.addEventListener('click', () => {
+            const checkboxes = outboundTbody.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one mapping to delete');
+                return;
+            }
+            if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
+                checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            }
+        });
+    }
+
+    // NPt Delete
+    if (nptDeleteBtn) {
+        nptDeleteBtn.addEventListener('click', () => {
+            const checkboxes = nptTbody.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one mapping to delete');
+                return;
+            }
+            if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
+                checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            }
+        });
+    }
+
+    // Handle individual delete buttons in all tables
+    [pfTbody, oneToOneTbody, outboundTbody, nptTbody].forEach(tbody => {
+        if (tbody) {
+            tbody.addEventListener('click', (e) => {
+                if (e.target.classList.contains('btn-danger') || e.target.closest('.btn-danger')) {
+                    const btn = e.target.classList.contains('btn-danger') ? e.target : e.target.closest('.btn-danger');
+                    if (confirm('Are you sure you want to delete this entry?')) {
+                        btn.closest('tr').remove();
+                    }
+                }
+            });
+        }
+    });
+
+    // --- LOAD EXISTING NAT RULES FROM DATABASE ---
+    async function loadPortForwardRules() {
+        try {
+            const response = await fetch('/firewall/api/nat/pf');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                pfTbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.protocol || 'TCP'}</td>
+                        <td>${rule.src_address || '*'}</td>
+                        <td>*</td>
+                        <td>${rule.dst_address || 'WAN address'}</td>
+                        <td>*</td>
+                        <td>${rule.redirect_ip || ''}</td>
+                        <td>*</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('pf', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('pf', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    pfTbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading port forward rules:', error);
+        }
+    }
+
+    async function load1to1Rules() {
+        try {
+            const response = await fetch('/firewall/api/nat/1to1');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                oneToOneTbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.external_address || ''}</td>
+                        <td>${rule.internal_address || ''}</td>
+                        <td>${rule.destination_address || '*'}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('1to1', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('1to1', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    oneToOneTbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading 1:1 NAT rules:', error);
+        }
+    }
+
+    async function loadOutboundRules() {
+        try {
+            const response = await fetch('/firewall/api/nat/outbound');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                outboundTbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.src_address || '*'}</td>
+                        <td>*</td>
+                        <td>*</td>
+                        <td>${rule.dst_address || '*'}</td>
+                        <td>${rule.nat_address || 'WAN address'}</td>
+                        <td>*</td>
+                        <td>${rule.static_port ? 'Yes' : 'No'}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('outbound', ${rule.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('outbound', ${rule.id})">Delete</button>
+                        </td>
+                    `;
+                    outboundTbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading outbound NAT rules:', error);
+        }
+    }
+
+    // Delete NAT rule function
+    async function deleteNatRule(type, ruleId) {
+        if (!confirm('Are you sure you want to delete this NAT rule?')) return;
+
+        try {
+            const response = await fetch(`/firewall/api/nat/${type}/${ruleId}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            if (result.success) {
+                alert('NAT rule deleted successfully!');
+                // Reload the appropriate rules
+                if (type === 'pf') loadPortForwardRules();
+                else if (type === '1to1') load1to1Rules();
+                else if (type === 'outbound') loadOutboundRules();
+            } else {
+                alert('Error deleting rule: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error deleting NAT rule:', error);
+            alert('Could not delete rule');
+        }
+    }
+
+    // Edit NAT rule function (placeholder)
+    function editNatRule(type, ruleId) {
+        alert(`Edit ${type} NAT rule #${ruleId} - Feature coming soon!`);
+    }
+
+    // Load all NAT rules on page load
+    loadPortForwardRules();
+    load1to1Rules();
+    loadOutboundRules();
 </script>
 
 {% endblock %}
