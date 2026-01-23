@@ -13,10 +13,11 @@ def init_db():
 
     # Create the table based on your image fields
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS port_assignments (
+        CREATE TABLE IF NOT EXISTS interface_groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            interface_label TEXT, -- e.g., 'WAN' or 'LAN'
-            network_port TEXT     -- e.g., 'em0 (00:0c...)'
+            group_name TEXT NOT NULL,
+            group_description TEXT,
+            group_members TEXT
         )
     ''')
 
