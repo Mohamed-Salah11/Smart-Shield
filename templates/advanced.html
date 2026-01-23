@@ -44,19 +44,19 @@
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
-        <a class="nav-link active" href="#">Admin Access</a>
+        <a class="nav-link active" href="{{ url_for('system.admin_access') }}">Admin Access</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="#">Firewall & NAT</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="#">Networking</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="#">Miscellaneous</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link" href="#">System Tunables</a>
+        <a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
     </li>
 </ul>
 
@@ -442,7 +442,7 @@
                     <option value="serial">Serial Console</option>
                 </select>
                 <div class="help-text">
-                    Select the preferred console if multiple consoles are present. The preferred console will show ZGate boot script output. All consoles display OS boot messages, console messages, and the console menu.
+                    Select the preferred console if multiple consoles are present. The preferred console will show Smart Shield boot script output. All consoles display OS boot messages, console messages, and the console menu.
                 </div>
             </div>
         </div>
