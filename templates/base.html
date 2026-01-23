@@ -11,7 +11,7 @@
 <div class="mobile-block-message">
     <div class="icon">🖥️</div>
     <h1>Desktop Only</h1>
-    <p>ZGate Firewall Panel is designed for desktop devices. Please access this application from a computer for the best experience.</p>
+    <p>Smart Shield Firewall Panel is designed for desktop devices. Please access this application from a computer for the best experience.</p>
 </div>
 
 <!-- Top Navigation Bar -->
@@ -22,7 +22,7 @@
         </button>
         <a class="navbar-brand" href="{{ url_for('system.dashboard') }}">
             <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Logo">
-            <span class="label">ZGate</span>
+            <span class="label">Smart Shield</span>
         </a>
         <ul class="navbar-nav ms-auto">
             <li class="nav-item dropdown">
@@ -74,8 +74,8 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a class="sidebar-brand" href="{{ url_for('system.dashboard') }}">
-                <img src="{{ url_for('static', filename='images/SS.png') }}" alt="ZGate" width="28" height="28">
-                <span class="label">ZGate</span>
+                <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield" width="28" height="28">
+                <span class="label">Smart Shield</span>
                 <span class="badge">Panel</span>
             </a>
             <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">&times;</button>
@@ -83,11 +83,11 @@
 
         <nav class="sidebar-nav">
             <!-- System -->
-            <details class="side-group" open>
+            <details class="side-group">
                 <summary><span class="label">System</span> <span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-                    <li><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
+                    <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">Advanced</a></li>
                     <li><a href="{{ url_for('system.certificates') }}">Certificates</a></li>
                     <li><a href="{{ url_for('system.general_setup') }}">General Setup</a></li>
                     <li><a href="{{ url_for('system.high_availability') }}">High Availability</a></li>
@@ -206,6 +206,147 @@
     if (sidebarBackdrop) {
         sidebarBackdrop.addEventListener('click', closeSidebar);
     }
+
+    // Accordion behavior for sidebar menu groups
+    (function setupAccordion() {
+        const sideGroups = document.querySelectorAll('.side-group');
+        
+        sideGroups.forEach(group => {
+            const summary = group.querySelector('summary');
+            const content = group.querySelector('.side-links');
+            
+            if (summary && content) {
+                // Wrap content for animation
+                content.style.overflow = 'hidden';
+                content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+                
+                // Set initial state
+                if (group.hasAttribute('open')) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.style.opacity = '1';
+                } else {
+                    content.style.maxHeight = '0';
+                    content.style.opacity = '0';
+                }
+                
+                summary.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const isOpening = !group.hasAttribute('open');
+                    
+                    if (isOpening) {
+                        // Close all other groups with animation
+                        sideGroups.forEach(otherGroup => {
+                            if (otherGroup !== group && otherGroup.hasAttribute('open')) {
+                                const otherContent = otherGroup.querySelector('.side-links');
+                                if (otherContent) {
+                                    otherContent.style.maxHeight = '0';
+                                    otherContent.style.opacity = '0';
+                                }
+                                setTimeout(() => {
+                                    otherGroup.removeAttribute('open');
+                                }, 300);
+                            }
+                        });
+                        
+                        // Open this group
+                        group.setAttribute('open', '');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        content.style.opacity = '1';
+                    } else {
+                        // Close this group
+                        content.style.maxHeight = '0';
+                        content.style.opacity = '0';
+                        setTimeout(() => {
+                            group.removeAttribute('open');
+                        }, 300);
+                    }
+                });
+            }
+        });
+    })();
+
+    // Highlight active menu item based on current URL
+    (function highlightActiveMenu() {
+        const currentPath = window.location.pathname.replace(/\/$/, ''); // Remove trailing slash
+        const sidebarLinks = document.querySelectorAll('.side-links a');
+        const sideGroups = document.querySelectorAll('.side-group');
+        
+        // Close all details groups first and reset animation state
+        sideGroups.forEach(group => {
+            group.removeAttribute('open');
+            const content = group.querySelector('.side-links');
+            if (content) {
+                content.style.maxHeight = '0';
+                content.style.opacity = '0';
+            }
+        });
+        
+        let bestMatch = null;
+        let bestMatchLength = 0;
+        
+        sidebarLinks.forEach(link => {
+            let linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
+            const matchPatternAttr = link.getAttribute('data-match-pattern');
+            const matchPatterns = matchPatternAttr ? matchPatternAttr.split(',') : [];
+            
+            // Check if the current path matches exactly or starts with the link path
+            let isMatch = currentPath === linkPath || 
+                (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath + '/')) ||
+                (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath));
+            
+            let matchedLength = linkPath.length;
+            
+            // Also check the data-match-pattern attribute for alternative URL patterns
+            if (!isMatch && matchPatterns.length > 0) {
+                for (const pattern of matchPatterns) {
+                    const trimmedPattern = pattern.trim();
+                    if (currentPath === trimmedPattern || 
+                        currentPath.startsWith(trimmedPattern + '/') || 
+                        currentPath.startsWith(trimmedPattern)) {
+                        isMatch = true;
+                        matchedLength = Math.max(matchedLength, trimmedPattern.length);
+                        break;
+                    }
+                }
+            }
+            
+            if (isMatch) {
+                // Find the best (longest) matching path
+                if (matchedLength > bestMatchLength) {
+                    bestMatch = link;
+                    bestMatchLength = matchedLength;
+                }
+            }
+        });
+        
+        // Apply active class to the best match
+        if (bestMatch) {
+            bestMatch.classList.add('active');
+            
+            // Open the parent details group with animation
+            const parentGroup = bestMatch.closest('.side-group');
+            if (parentGroup) {
+                parentGroup.setAttribute('open', '');
+                const content = parentGroup.querySelector('.side-links');
+                if (content) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.style.opacity = '1';
+                }
+            }
+        } else {
+            // If no active link found, open the System group by default
+            const firstGroup = document.querySelector('.side-group');
+            if (firstGroup) {
+                firstGroup.setAttribute('open', '');
+                const content = firstGroup.querySelector('.side-links');
+                if (content) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.style.opacity = '1';
+                }
+            }
+        }
+    })();
 })();
 </script>
 </body>
