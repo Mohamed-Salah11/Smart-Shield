@@ -2,88 +2,10 @@
 
 {% block main %}
 
-<div class="breadcrumb">
-    <strong>System /</strong> <span>Package Manager</span>
-</div>
-
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link active" href="#" onclick="showTab(0); return false;">Installed Packages</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" onclick="showTab(1); return false;">Available Packages</a>
-    </li>
-</ul>
-
-<div class="section" id="section-0">
-    <div class="settings-section">
-        <h5>Installed Packages</h5>
-        <div class="alert alert-warning">There are no packages currently installed.</div>
-    </div>
-</div>
-
-<div class="section" id="section-1" style="display:none;">
-    <div class="settings-section">
-        <h5>Search</h5>
-        <div class="row g-3 align-items-center mb-3">
-            <div class="col-auto">
-                <label class="col-form-label">Search term</label>
-            </div>
-            <div class="col-md-4">
-                <input type="text" class="form-control" placeholder="Enter search string">
-            </div>
-            <div class="col-auto">
-                <select class="form-select">
-                    <option>Both</option>
-                    <option>Name only</option>
-                </select>
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary">Search</button>
-                <button class="btn btn-secondary">Clear</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="settings-section">
-        <h5>Packages</h5>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Version</th>
-                    <th>Description</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>acme</td>
-                    <td>1.0</td>
-                    <td>Automated Certificate Management Environment for LetsEncrypt.</td>
-                    <td><button class="btn btn-success btn-sm">Install</button></td>
-                </tr>
-                <tr>
-                    <td>apcupsd</td>
-                    <td>0.3.92_9</td>
-                    <td>Control and log APC UPS models and perform network-based shutdowns.</td>
-                    <td><button class="btn btn-success btn-sm">Install</button></td>
-                </tr>
-                <tr>
-                    <td>arping</td>
-                    <td>1.2.2_6</td>
-                    <td>Broadcasts who-has ARP packets and prints answers.</td>
-                    <td><button class="btn btn-success btn-sm">Install</button></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
 <script>
     function showTab(index) {
-        const tabs = document.querySelectorAll('.nav-link');
-        const sections = document.querySelectorAll('.section');
+        const tabs = document.querySelectorAll('.nav-pills .nav-link');
+        const sections = document.querySelectorAll('.tab-section');
         
         tabs.forEach((tab, i) => {
             tab.classList.toggle('active', i === index);
@@ -94,5 +16,162 @@
         });
     }
 </script>
+
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Package Manager</li>
+            </ol>
+        </nav>
+        <h1>Package Manager</h1>
+    </div>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="#" onclick="showTab(0); return false;">Installed Packages</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" onclick="showTab(1); return false;">Available Packages</a>
+        </li>
+    </ul>
+
+    <!-- Installed Packages Tab -->
+    <div class="tab-section" id="section-installed">
+        <div class="section">
+            <div class="section-header">
+                <h2>Installed Packages</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="alert alert-info mb-0">
+                    <i class="fa-solid fa-info-circle me-2"></i>
+                    There are no packages currently installed.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Packages Tab -->
+    <div class="tab-section" id="section-available" style="display: none;">
+        <!-- Search Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Search</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-semibold">Search term</label>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" placeholder="Enter search string">
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select">
+                            <option>Both</option>
+                            <option>Name only</option>
+                            <option>Description only</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary">
+                            <i class="fa-solid fa-search me-1"></i>Search
+                        </button>
+                        <button class="btn btn-outline-secondary">
+                            <i class="fa-solid fa-times me-1"></i>Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Packages Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Available Packages</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 15%;">Name</th>
+                                <th style="width: 10%;">Version</th>
+                                <th>Description</th>
+                                <th style="width: 10%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>acme</strong></td>
+                                <td><span class="badge bg-secondary">1.0</span></td>
+                                <td>Automated Certificate Management Environment for LetsEncrypt.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>apcupsd</strong></td>
+                                <td><span class="badge bg-secondary">0.3.92_9</span></td>
+                                <td>Control and log APC UPS models and perform network-based shutdowns.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>arping</strong></td>
+                                <td><span class="badge bg-secondary">1.2.2_6</span></td>
+                                <td>Broadcasts who-has ARP packets and prints answers.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>bandwidthd</strong></td>
+                                <td><span class="badge bg-secondary">2.0.1_9</span></td>
+                                <td>Tracks network usage and builds HTML graphs.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>darkstat</strong></td>
+                                <td><span class="badge bg-secondary">3.0.721</span></td>
+                                <td>Network statistics gatherer with a web interface.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>freeradius3</strong></td>
+                                <td><span class="badge bg-secondary">3.0.25</span></td>
+                                <td>FreeRADIUS authentication and accounting server.</td>
+                                <td>
+                                    <button class="btn btn-success btn-sm">
+                                        <i class="fa-solid fa-download me-1"></i>Install
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
 
 {% endblock %}

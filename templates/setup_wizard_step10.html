@@ -1,42 +1,112 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">Wizard / Smart Shield Setup / Wizard Completed</div>
 
-<div class="mb-3">
-        <div class="progress" style="height:6px;">
-            <div class="progress-bar bg-success" role="progressbar" style="width:100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-2">
-            <span class="badge bg-success">Step 9 of 9</span>
-        </div>
-    </div>
+<div class="container">
+<!-- Page Header -->
+<div class="page-header">
+<nav aria-label="breadcrumb">
+<ol class="breadcrumb mb-2">
+<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+<li class="breadcrumb-item active" aria-current="page">Complete</li>
+</ol>
+</nav>
+<h1>Smart Shield Setup</h1>
+</div>
 
-    <div class="settings-section">
-        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Wizard completed.</div>
-            <h4>Congratulations! Smart Shield is now configured.</h4>
-            <p>We recommend that you check to see if there are any software updates available. Keeping your software up to date is one of the most important things you can do to maintain the security of your network.</p>
-            <a class="btn btn-outline-primary" href="{{ url_for('system.update_page') }}">Check for updates</a>
+<!-- Progress -->
+<div class="mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
+<span class="badge" style="background: #198754;">Complete</span>
+<small class="text-muted">100% Complete</small>
+</div>
+<div class="progress" style="height: 8px; border-radius: 4px;">
+<div class="progress-bar" role="progressbar" style="width: 100%; background: #198754;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+</div>
+</div>
 
-            <h5 class="mt-4">Remember, we're here to help.</h5>
-            <p><a href="#">Click here</a> to learn about Smart Shield 24/7/365 support services.</p>
+<!-- Success Card -->
+<div class="section">
+<div class="section-header" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);">
+<h2 style="color: #fff;">Wizard Completed!</h2>
+</div>
+<div class="section-body" style="padding: 48px 24px;">
+<div class="text-center">
+<div class="mb-4">
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#198754" class="bi bi-check-circle-fill" viewBox="0 0 16 16">
+<path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+</svg>
+</div>
+<h4 class="mb-3">Congratulations!</h4>
+<p class="text-muted mb-4" style="max-width: 500px; margin: 0 auto;">
+Smart Shield has been successfully configured. Your firewall is now ready to protect your network.
+</p>
+<div class="alert alert-success d-inline-block mb-4" style="max-width: 500px;">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle me-2" viewBox="0 0 16 16">
+<path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+<path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+</svg>
+Your settings have been saved and applied successfully.
+</div>
+</div>
+</div>
+</div>
 
-            <h5 class="mt-4">User survey</h5>
-            <p>Please help all the people involved in improving and expanding Smart Shield software by taking a moment to answer this short survey (all answers are anonymous)</p>
-            <p><a href="#">Anonymous User Survey</a></p>
+<!-- Resources Section -->
+<div class="section mt-4">
+<div class="section-header">
+<h2>What's Next?</h2>
+</div>
+<div class="section-body">
+<div class="row">
+<div class="col-md-4 mb-3">
+<div class="d-flex align-items-start">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" class="bi bi-speedometer2 me-3 flex-shrink-0" viewBox="0 0 16 16">
+<path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.5.5 0 0 0-.708 0L9.793 7.207a2.5 2.5 0 1 0 .707.707l1.414-1.414a.5.5 0 0 0 0-.708z"/>
+</svg>
+<div>
+<h6 class="mb-1">Dashboard</h6>
+<p class="text-muted small mb-0">Monitor your firewall status and network activity in real-time.</p>
+</div>
+</div>
+</div>
+<div class="col-md-4 mb-3">
+<div class="d-flex align-items-start">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" class="bi bi-shield-check me-3 flex-shrink-0" viewBox="0 0 16 16">
+<path d="M5.338 1.59a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.7 10.7 0 0 0 2.287 2.233c.346.244.652.42.893.533q.18.085.293.118a1 1 0 0 0 .101.025 1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
+<path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0"/>
+</svg>
+<div>
+<h6 class="mb-1">Firewall Rules</h6>
+<p class="text-muted small mb-0">Configure advanced firewall rules to secure your network.</p>
+</div>
+</div>
+</div>
+<div class="col-md-4 mb-3">
+<div class="d-flex align-items-start">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="var(--primary)" class="bi bi-book me-3 flex-shrink-0" viewBox="0 0 16 16">
+<path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+</svg>
+<div>
+<h6 class="mb-1">Documentation</h6>
+<p class="text-muted small mb-0">Learn more about Smart Shield features and capabilities.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
 
-            <h5 class="mt-4">Useful resources.</h5>
-            <ul>
-                <li>Learn more about our product line, services, and Smart Shield software from our <a href="#">website</a></li>
-                <li>To learn about appliances and other offers, <a href="#">visit our store</a></li>
-                <li>Become part of the community. Visit our <a href="#">forum</a></li>
-                <li>Subscribe to our <a href="#">newsletter</a> for product information and announcements.</li>
-            </ul>
-    </div>
+<!-- Action Button -->
+<div class="d-flex justify-content-center mt-4">
+<a href="{{ url_for('system.dashboard') }}" class="btn btn-primary btn-lg px-5">
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-speedometer2 me-2" viewBox="0 0 16 16">
+<path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4M3.732 5.732a.5.5 0 0 1 .707 0l.915.914a.5.5 0 1 1-.708.708l-.914-.915a.5.5 0 0 1 0-.707M2 10a.5.5 0 0 1 .5-.5h1.586a.5.5 0 0 1 0 1H2.5A.5.5 0 0 1 2 10m9.5 0a.5.5 0 0 1 .5-.5h1.5a.5.5 0 0 1 0 1H12a.5.5 0 0 1-.5-.5m.754-4.246a.5.5 0 0 0-.708 0L9.793 7.207a2.5 2.5 0 1 0 .707.707l1.414-1.414a.5.5 0 0 0 0-.708z"/>
+</svg>
+Go to Dashboard
+</a>
+</div>
+</div>
 
-    <div class="d-flex justify-content-start mt-3">
-        <form method="get" action="{{ url_for('system.copyright_page') }}">
-            <button type="submit" class="btn btn-primary">Finish</button>
-        </form>
-    </div>
 {% endblock %}

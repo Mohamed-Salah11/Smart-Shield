@@ -1,178 +1,251 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'base.html' %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>Add/Sign a New Certificate - Smart Shield Style</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
+{% block main %}
+
+<script>
+    let sanCounter = 0;
+    
+    function addSanRow() {
+        sanCounter++;
+        const container = document.getElementById('san-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'd-flex align-items-center gap-2 mb-2';
+        newRow.id = 'san-row-' + sanCounter;
+        newRow.innerHTML = `
+            <select name="san_type[]" class="form-select" style="max-width: 200px;">
+                <option value="fqdn">FQDN or Hostname</option>
+                <option value="ip">IP Address</option>
+                <option value="uri">URI</option>
+                <option value="email">Email</option>
+            </select>
+            <input type="text" name="san_value[]" class="form-control" placeholder="Value">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeSanRow(${sanCounter})">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+        container.appendChild(newRow);
+    }
+    
+    function removeSanRow(id) {
+        const row = document.getElementById('san-row-' + id);
+        if (row) {
+            row.remove();
         }
+    }
+</script>
 
-        .form-header {
-            background: #34495e;
-            color: white;
-            padding: 10px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .form-group {
-            background: #ecf0f1;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            margin-bottom: 10px;
-        }
-
-        .form-label {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 5px;
-            margin-bottom: 10px;
-        }
-
-        .form-select {
-            width: 100%;
-            padding: 5px;
-            margin-bottom: 10px;
-        }
-
-        .btn {
-            padding: 5px 10px;
-            background: #3498db;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-save {
-            background: #27ae60;
-        }
-    </style>
-</head>
-
-<body>
-    <div class="form-header">Add/Sign a New Certificate</div>
-
-    <div class="form-group">
-        <div class="form-label">Method</div>
-        <select class="form-select">
-            <option value="internal">Create an Internal Certificate</option>
-        </select>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('system.certificates') }}">Certificates</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Add Certificate</li>
+            </ol>
+        </nav>
+        <h1>Add/Sign a New Certificate</h1>
     </div>
 
-    <div class="form-group">
-        <div class="form-label">Descriptive name</div>
-        <input type="text" class="form-input"
-            placeholder="The name of this entry as displayed in the GUI for reference">
-        <div style="font-size: 12px; color: #7f8c8d;">This name can contain spaces but it cannot contain any of the
-            following characters: ?, &, $, ", '.</div>
-    </div>
+    <form method="POST" action="{{ url_for('system.add_certificate') }}">
 
-    <div class="form-header">Internal Certificate</div>
+        <!-- Certificate Method Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Add/Sign a New Certificate</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
 
-    <div class="form-group">
-        <div class="form-label">Certificate authority</div>
-        <select class="form-select">
-            <option value="none">None</option>
-        </select>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="method" class="col-sm-3 col-form-label fw-semibold">Method</label>
+                    <div class="col-sm-9">
+                        <select id="method" name="method" class="form-select">
+                            <option value="internal" selected>Create an Internal Certificate</option>
+                            <option value="import">Import an Existing Certificate</option>
+                            <option value="csr">Create a Certificate Signing Request</option>
+                            <option value="sign">Sign a Certificate Signing Request</option>
+                        </select>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Key type</div>
-        <select class="form-select">
-            <option value="rsa">RSA</option>
-        </select>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="descriptive_name" class="col-sm-3 col-form-label fw-semibold">Descriptive Name</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="descriptive_name" name="descriptive_name" class="form-control" placeholder="The name of this entry as displayed in the GUI for reference" required>
+                        <small class="text-muted">This name can contain spaces but it cannot contain any of the following characters: ?, &, $, ", '.</small>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Key Length</div>
-        <select class="form-select">
-            <option value="2048">2048</option>
-        </select>
-        <div style="font-size: 12px; color: #7f8c8d;">The Key Length should not be lower than 2048 or some platforms may
-            consider the certificate invalid.</div>
-    </div>
+            </div>
+        </div>
 
-    <div class="form-group">
-        <div class="form-label">Digest Algorithm</div>
-        <select class="form-select">
-            <option value="sha256">sha256</option>
-        </select>
-        <div style="font-size: 12px; color: #7f8c8d;">The best practice is to use SHA256 or higher. Some services and
-            platforms, such as the GUI web server and OpenVPN, consider weaker digest algorithms invalid.</div>
-    </div>
+        <!-- Internal Certificate Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Internal Certificate</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
 
-    <div class="form-group">
-        <div class="form-label">Lifetime (days)</div>
-        <input type="number" class="form-input" value="3650">
-        <div style="font-size: 12px; color: #7f8c8d;">Server certificates should not have a lifetime over 398 days or
-            some platforms may consider the certificate invalid.</div>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="certificate_authority" class="col-sm-3 col-form-label fw-semibold">Certificate Authority</label>
+                    <div class="col-sm-9">
+                        <select id="certificate_authority" name="certificate_authority" class="form-select">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Common Name</div>
-        <input type="text" class="form-input" placeholder="e.g. www.example.com">
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="key_type" class="col-sm-3 col-form-label fw-semibold">Key Type</label>
+                    <div class="col-sm-9">
+                        <select id="key_type" name="key_type" class="form-select">
+                            <option value="rsa" selected>RSA</option>
+                            <option value="ecdsa">ECDSA</option>
+                        </select>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Country Code</div>
-        <select class="form-select">
-            <option value="none">None</option>
-        </select>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="key_length" class="col-sm-3 col-form-label fw-semibold">Key Length</label>
+                    <div class="col-sm-9">
+                        <select id="key_length" name="key_length" class="form-select">
+                            <option value="2048" selected>2048</option>
+                            <option value="3072">3072</option>
+                            <option value="4096">4096</option>
+                        </select>
+                        <small class="text-muted">The Key Length should not be lower than 2048 or some platforms may consider the certificate invalid.</small>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">State or Province</div>
-        <input type="text" class="form-input" placeholder="e.g. Texas">
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="digest_algorithm" class="col-sm-3 col-form-label fw-semibold">Digest Algorithm</label>
+                    <div class="col-sm-9">
+                        <select id="digest_algorithm" name="digest_algorithm" class="form-select">
+                            <option value="sha256" selected>sha256</option>
+                            <option value="sha384">sha384</option>
+                            <option value="sha512">sha512</option>
+                        </select>
+                        <small class="text-muted">The best practice is to use SHA256 or higher. Some services and platforms, such as the GUI web server and OpenVPN, consider weaker digest algorithms invalid.</small>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">City</div>
-        <input type="text" class="form-input" placeholder="e.g. Austin">
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="lifetime" class="col-sm-3 col-form-label fw-semibold">Lifetime (days)</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="lifetime" name="lifetime" class="form-control" value="3650">
+                        <small class="text-muted">Server certificates should not have a lifetime over 398 days or some platforms may consider the certificate invalid.</small>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Organization</div>
-        <input type="text" class="form-input" placeholder="e.g. My Company Inc">
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="common_name" class="col-sm-3 col-form-label fw-semibold">Common Name</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="common_name" name="common_name" class="form-control" placeholder="e.g. www.example.com" required>
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Organizational Unit</div>
-        <input type="text" class="form-input" placeholder="e.g. My Department Name (optional)">
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="country_code" class="col-sm-3 col-form-label fw-semibold">Country Code</label>
+                    <div class="col-sm-9">
+                        <select id="country_code" name="country_code" class="form-select">
+                            <option value="">None</option>
+                            <option value="US">United States (US)</option>
+                            <option value="GB">United Kingdom (GB)</option>
+                            <option value="DE">Germany (DE)</option>
+                            <option value="FR">France (FR)</option>
+                            <option value="CA">Canada (CA)</option>
+                            <option value="AU">Australia (AU)</option>
+                            <option value="JP">Japan (JP)</option>
+                            <option value="EG">Egypt (EG)</option>
+                        </select>
+                    </div>
+                </div>
 
-    <div class="form-header">Certificate Attributes</div>
+                <div class="mb-3 row align-items-center">
+                    <label for="state" class="col-sm-3 col-form-label fw-semibold">State or Province</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="state" name="state" class="form-control" placeholder="e.g. Texas">
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Certificate Type</div>
-        <select class="form-select">
-            <option value="user">User Certificate</option>
-        </select>
-        <div style="font-size: 12px; color: #7f8c8d;">Add type-specific usage attributes to the signed certificate. Used
-            for placing usage restrictions on, or granting abilities to, the signed certificate.</div>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="city" class="col-sm-3 col-form-label fw-semibold">City</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="city" name="city" class="form-control" placeholder="e.g. Austin">
+                    </div>
+                </div>
 
-    <div class="form-group">
-        <div class="form-label">Alternative Names</div>
-        <select class="form-select">
-            <option value="fqdn_or_hostname">FQDN or hostname</option>
-        </select>
-        <input type="text" class="form-input" placeholder="Value">
-        <div style="font-size: 12px; color: #7f8c8d;">Enter additional identifiers for the certificate in this list. The
-            Common Name field is automatically added to the certificate as an Alternative Name. The signing CA may
-            ignore or change these values.</div>
-        <button class="btn">+ Add SAN Row</button>
-    </div>
+                <div class="mb-3 row align-items-center">
+                    <label for="organization" class="col-sm-3 col-form-label fw-semibold">Organization</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="organization" name="organization" class="form-control" placeholder="e.g. My Company Inc">
+                    </div>
+                </div>
 
-    <button class="btn btn-save">Save</button>
-</body>
+                <div class="mb-3 row align-items-center">
+                    <label for="organizational_unit" class="col-sm-3 col-form-label fw-semibold">Organizational Unit</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="organizational_unit" name="organizational_unit" class="form-control" placeholder="e.g. My Department Name (optional)">
+                    </div>
+                </div>
 
-</html>
+            </div>
+        </div>
+
+        <!-- Certificate Attributes Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Certificate Attributes</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+
+                <div class="mb-3 row align-items-center">
+                    <label for="certificate_type" class="col-sm-3 col-form-label fw-semibold">Certificate Type</label>
+                    <div class="col-sm-9">
+                        <select id="certificate_type" name="certificate_type" class="form-select">
+                            <option value="user" selected>User Certificate</option>
+                            <option value="server">Server Certificate</option>
+                            <option value="combined">Combined Client/Server</option>
+                        </select>
+                        <small class="text-muted">Add type-specific usage attributes to the signed certificate. Used for placing usage restrictions on, or granting abilities to, the signed certificate.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Alternative Names</label>
+                    <div class="col-sm-9">
+                        <div id="san-container">
+                            <div class="d-flex align-items-center gap-2 mb-2" id="san-row-0">
+                                <select name="san_type[]" class="form-select" style="max-width: 200px;">
+                                    <option value="fqdn">FQDN or Hostname</option>
+                                    <option value="ip">IP Address</option>
+                                    <option value="uri">URI</option>
+                                    <option value="email">Email</option>
+                                </select>
+                                <input type="text" name="san_value[]" class="form-control" placeholder="Value">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addSanRow()">
+                            <i class="fa-solid fa-plus me-1"></i>Add SAN Row
+                        </button>
+                        <small class="text-muted d-block mt-2">Enter additional identifiers for the certificate in this list. The Common Name field is automatically added to the certificate as an Alternative Name. The signing CA may ignore or change these values.</small>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-end gap-2 mb-4">
+            <a href="{{ url_for('system.certificates') }}" class="btn btn-secondary">
+                <i class="fa-solid fa-times me-1"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-save me-1"></i>Save
+            </button>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}

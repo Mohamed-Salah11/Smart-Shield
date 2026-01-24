@@ -2,102 +2,98 @@
 
 {% block main %}
 
-<style>
-    .btn-save {
-        background-color: #337ab7;
-    }
-    .btn-save:hover {
-        background-color: #286090;
-    }
-    .btn-delete {
-        background-color: #d9534f;
-        color: white;
-        border: none;
-        padding: 8px 20px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.95em;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .btn-delete:hover {
-        background-color: #c9302c;
-    }
-</style>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ 'Edit' if index is not none else 'New' }} Tunable</li>
+            </ol>
+        </nav>
+        <h1>Advanced Settings</h1>
+    </div>
 
-<div class="breadcrumb">
-    System / <a href="{{ url_for('system.admin_access') }}">Advanced</a> / <a href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a> / Edit Tunable
-</div>
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
+        </li>
+    </ul>
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
-    </li>
-</ul>
+    <!-- Edit Tunable Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2>{{ 'Edit' if index is not none else 'New' }} Tunable</h2>
+        </div>
+        <div class="section-body">
+            <form method="POST" action="{{ url_for('system.advanced_system_tunables_save') }}">
+                {% if index is not none %}
+                <input type="hidden" name="index" value="{{ index }}">
+                {% endif %}
 
-<div class="settings-section">
-    <h5>Edit Tunable</h5>
-    
-    <div style="padding: 20px;">
-        <form method="POST" action="{{ url_for('system.advanced_system_tunables_save') }}">
-            {% if index is not none %}
-            <input type="hidden" name="index" value="{{ index }}">
-            {% endif %}
-            <div class="form-group">
-                <label for="tunable_name">Tunable</label>
-                <div class="form-group-content">
-                    <input type="text" id="tunable_name" name="tunable_name" class="form-control" style="max-width: 500px;" value="{{ tunable.name if tunable else '' }}" required>
+                <div class="mb-3 row">
+                    <label for="tunable_name" class="col-sm-3 col-form-label fw-semibold">Tunable</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="tunable_name" name="tunable_name" class="form-control" style="max-width: 500px;" value="{{ tunable.name if tunable else '' }}" required>
+                        <small class="text-muted">The name of the sysctl tunable (e.g., net.inet.ip.forwarding)</small>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="tunable_value">Value</label>
-                <div class="form-group-content">
-                    <input type="text" id="tunable_value" name="tunable_value" class="form-control" style="max-width: 500px;" value="{{ tunable.value if tunable else '' }}" required>
+                <div class="mb-3 row">
+                    <label for="tunable_value" class="col-sm-3 col-form-label fw-semibold">Value</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="tunable_value" name="tunable_value" class="form-control" style="max-width: 500px;" value="{{ tunable.value if tunable else '' }}" required>
+                        <small class="text-muted">The value to set for this tunable</small>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="tunable_description">Description</label>
-                <div class="form-group-content">
-                    <input type="text" id="tunable_description" name="tunable_description" class="form-control" style="max-width: 500px;" value="{{ tunable.description if tunable else '' }}">
+                <div class="mb-3 row">
+                    <label for="tunable_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="tunable_description" name="tunable_description" class="form-control" style="max-width: 500px;" value="{{ tunable.description if tunable else '' }}">
+                        <small class="text-muted">Optional description for this tunable</small>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label></label>
-                <div class="form-group-content" style="display: flex; gap: 10px;">
-                    <button type="submit" class="btn-save">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
-                        </svg>
-                        Save
-                    </button>
-                    {% if index is not none %}
-                    <button type="submit" class="btn-delete" formaction="{{ url_for('system.advanced_system_tunables_delete', index=index) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                        </svg>
-                        Delete
-                    </button>
-                    {% endif %}
+                <div class="row">
+                    <div class="col-sm-9 offset-sm-3">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16">
+                                    <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                                </svg>
+                                Save
+                            </button>
+                            {% if index is not none %}
+                            <button type="submit" class="btn btn-danger" formaction="{{ url_for('system.advanced_system_tunables_delete', index=index) }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-2" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                                Delete
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('system.advanced_system_tunables') }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
