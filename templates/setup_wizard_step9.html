@@ -1,27 +1,59 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">Wizard / Smart Shield Setup / Reload in Progress</div>
 
-<div class="mb-3">
-        <div class="progress" style="height:6px;">
-            <div class="progress-bar bg-danger" role="progressbar" style="width:88%;" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-2">
-            <span class="badge bg-danger">Step 8 of 9</span>
-        </div>
-    </div>
+<div class="container">
+<!-- Page Header -->
+<div class="page-header">
+<nav aria-label="breadcrumb">
+<ol class="breadcrumb mb-2">
+<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+<li class="breadcrumb-item active" aria-current="page">Reloading</li>
+</ol>
+</nav>
+<h1>Smart Shield Setup</h1>
+</div>
 
-    <div class="settings-section">
-        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Reload in progress</div>
-            <p>A reload is now in progress. Please wait.</p>
-            <p>The wizard will redirect to the next step once the reload is completed.</p>
-    </div>
+<!-- Progress -->
+<div class="mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
+<span class="badge bg-primary">Step 8 of 9</span>
+<small class="text-muted">88% Complete</small>
+</div>
+<div class="progress" style="height: 8px; border-radius: 4px;">
+<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 88%; background: var(--primary);" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100"></div>
+</div>
+</div>
 
-    <script>
-    // Simulate reload progress then redirect to the final completion page after a short delay.
-    setTimeout(function() {
-        window.location.href = "{{ url_for('system.setup_wizard_step', step=10) }}";
-    }, 3000);
-    </script>
+<!-- Content Card -->
+<div class="section">
+<div class="section-header">
+<h2>Reload in Progress</h2>
+</div>
+<div class="section-body" style="padding: 48px 24px;">
+<div class="text-center">
+<div class="mb-4">
+<div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem;">
+<span class="visually-hidden">Loading...</span>
+</div>
+</div>
+<h4 class="mb-3">Applying Configuration...</h4>
+<p class="text-muted mb-4" style="max-width: 500px; margin: 0 auto;">
+Smart Shield is applying your new configuration. Please wait.
+</p>
+<p class="text-muted small">
+You will be redirected automatically when complete...
+</p>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+setTimeout(function() {
+window.location.href = "{{ url_for('system.setup_wizard_step', step=10) }}";
+}, 3000);
+</script>
+
 {% endblock %}

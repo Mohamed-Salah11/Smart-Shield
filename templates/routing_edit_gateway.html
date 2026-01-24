@@ -1,151 +1,164 @@
 {% extends 'base.html' %}
+{% set title = "Edit Gateway" %}
 
 {% block main %}
-<div class="container-fluid mt-3">
-    <nav aria-label="breadcrumb" class="bg-light rounded p-3 mb-3">
-        <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item"><a href="#">System</a></li>
-            <li class="breadcrumb-item"><a href="#">Routing</a></li>
-            <li class="breadcrumb-item"><a href="#">Gateways</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Edit</li>
-        </ol>
-    </nav>
 
-    <div class="card">
-        <div class="card-header bg-dark text-white">Edit Gateway</div>
-        <form method="post">
-            <div class="card-body">
-                <div class="row mb-3 align-items-center">
-                    <label class="col-sm-2 col-form-label">Disabled</label>
-                    <div class="col-sm-10">
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Edit Gateway</li>
+            </ol>
+        </nav>
+        <h1>Edit Gateway</h1>
+    </div>
+
+    <!-- Edit Form Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Gateway Configuration</h2>
+        </div>
+        <div class="section-body" style="padding: 20px;">
+            <form method="post">
+                <div class="mb-3 row">
+                    <div class="col-sm-3"></div>
+                    <div class="col-sm-9">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="disabled" name="disabled" {% if gateway and gateway.disabled %}checked{% endif %}>
+                            <input type="checkbox" class="form-check-input" id="disabled" name="disabled"
+                                   {% if gateway and gateway.disabled %}checked{% endif %}>
                             <label class="form-check-label" for="disabled">Disable this gateway</label>
-                            <div class="form-text">Set this option to disable this gateway without removing it from the list.</div>
+                            <small class="text-muted d-block">Set this option to disable this gateway without removing it from the list</small>
                         </div>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Interface</label>
-                    <div class="col-sm-10">
-                        <select name="interface" class="form-select">
+                <div class="mb-3 row align-items-center">
+                    <label for="interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
+                    <div class="col-sm-9">
+                        <select name="interface" id="interface" class="form-select">
                             <option {% if gateway and gateway.interface == 'WAN' %}selected{% endif %}>WAN</option>
                             <option {% if gateway and gateway.interface == 'LAN' %}selected{% endif %}>LAN</option>
                         </select>
-                        <div class="form-text">Choose which interface this gateway applies to.</div>
+                        <small class="text-muted">Choose which interface this gateway applies to</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Address Family</label>
-                    <div class="col-sm-10">
-                        <select name="address_family" class="form-select">
+                <div class="mb-3 row align-items-center">
+                    <label for="address_family" class="col-sm-3 col-form-label fw-semibold">Address Family</label>
+                    <div class="col-sm-9">
+                        <select name="address_family" id="address_family" class="form-select">
                             <option value="IPv4" {% if gateway and gateway.address_family=='IPv4' %}selected{% endif %}>IPv4</option>
                             <option value="IPv6" {% if gateway and gateway.address_family=='IPv6' %}selected{% endif %}>IPv6</option>
                         </select>
-                        <div class="form-text">Choose the Internet Protocol this gateway uses.</div>
+                        <small class="text-muted">Choose the Internet Protocol this gateway uses</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Name</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="name" class="form-control" value="{{ gateway.name if gateway }}">
-                        <div class="form-text">Gateway name</div>
+                <div class="mb-3 row align-items-center">
+                    <label for="name" class="col-sm-3 col-form-label fw-semibold">Name</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="name" id="name" class="form-control" value="{{ gateway.name if gateway }}">
+                        <small class="text-muted">Gateway name (alphanumeric characters only)</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Gateway</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="gateway" class="form-control" value="{{ gateway.gateway if gateway }}">
-                        <div class="form-text">Gateway IP address</div>
+                <div class="mb-3 row align-items-center">
+                    <label for="gateway" class="col-sm-3 col-form-label fw-semibold">Gateway IP</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="gateway" id="gateway" class="form-control" value="{{ gateway.gateway if gateway }}" placeholder="e.g. 192.168.1.1">
+                        <small class="text-muted">Gateway IP address</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Gateway Monitoring</label>
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="disable_monitoring" name="disable_monitoring" {% if gateway and gateway.disable_monitoring %}checked{% endif %}>
+                <hr>
+
+                <h5 class="mb-3">Monitoring Options</h5>
+
+                <div class="mb-3 row">
+                    <div class="col-sm-3"></div>
+                    <div class="col-sm-9">
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" id="disable_monitoring" name="disable_monitoring"
+                                   {% if gateway and gateway.disable_monitoring %}checked{% endif %}>
                             <label class="form-check-label" for="disable_monitoring">Disable Gateway Monitoring</label>
-                            <div class="form-text">This will consider this gateway as always being up.</div>
+                            <small class="text-muted d-block">This will consider this gateway as always being up</small>
                         </div>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Gateway Action</label>
-                    <div class="col-sm-10">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="disable_monitoring_action" name="disable_monitoring_action" {% if gateway and gateway.disable_monitoring_action %}checked{% endif %}>
+                            <input type="checkbox" class="form-check-input" id="disable_monitoring_action" name="disable_monitoring_action"
+                                   {% if gateway and gateway.disable_monitoring_action %}checked{% endif %}>
                             <label class="form-check-label" for="disable_monitoring_action">Disable Gateway Monitoring Action</label>
-                            <div class="form-text">No action will be taken on gateway events. The gateway is always considered up.</div>
+                            <small class="text-muted d-block">No action will be taken on gateway events</small>
                         </div>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Monitor IP</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="monitor" class="form-control" value="{{ gateway.monitor if gateway }}">
-                        <div class="form-text">Enter an alternative address here to be used to monitor the link.</div>
+                <div class="mb-3 row align-items-center">
+                    <label for="monitor" class="col-sm-3 col-form-label fw-semibold">Monitor IP</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="monitor" id="monitor" class="form-control" value="{{ gateway.monitor if gateway }}" placeholder="e.g. 8.8.8.8">
+                        <small class="text-muted">Enter an alternative address to monitor the link (leave blank to use gateway IP)</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Static route</label>
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="static_route" name="static_route">
-                            <label class="form-check-label" for="static_route">Do not add static route for gateway monitor IP address via the chosen interface</label>
-                            <div class="form-text">By default the firewall adds static routes for gateway monitor IP addresses to ensure traffic to the monitor IP address leaves via the correct interface.</div>
+                <div class="mb-3 row">
+                    <div class="col-sm-3"></div>
+                    <div class="col-sm-9">
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" id="static_route" name="static_route">
+                            <label class="form-check-label" for="static_route">Do not add static route for monitor IP</label>
+                            <small class="text-muted d-block">By default the firewall adds static routes for monitor IP addresses</small>
                         </div>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Force state</label>
-                    <div class="col-sm-10">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="force_state" name="force_state" {% if gateway and gateway.force_state %}checked{% endif %}>
+                            <input type="checkbox" class="form-check-input" id="force_state" name="force_state"
+                                   {% if gateway and gateway.force_state %}checked{% endif %}>
                             <label class="form-check-label" for="force_state">Mark Gateway as Down</label>
-                            <div class="form-text">This will force this gateway to be considered down.</div>
+                            <small class="text-muted d-block">Force this gateway to be considered down</small>
                         </div>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">State Killing on Gateway Failure</label>
-                    <div class="col-sm-10">
-                        <select name="state_killing" class="form-select w-50">
+                <div class="mb-3 row align-items-center">
+                    <label for="state_killing" class="col-sm-3 col-form-label fw-semibold">State Killing on Failure</label>
+                    <div class="col-sm-9">
+                        <select name="state_killing" id="state_killing" class="form-select">
                             <option value="global" {% if gateway and gateway.state_killing=='global' %}selected{% endif %}>Use global behavior (default)</option>
-                            <option value="kill">Kill states for this gateway</option>
-                            <option value="no_kill">Do not kill states for this gateway</option>
+                            <option value="kill" {% if gateway and gateway.state_killing=='kill' %}selected{% endif %}>Kill states for this gateway</option>
+                            <option value="no_kill" {% if gateway and gateway.state_killing=='no_kill' %}selected{% endif %}>Do not kill states for this gateway</option>
                         </select>
-                        <div class="form-text">Controls the state killing behavior when this specific gateway goes down. Killing states for specific down gateways only affects states created by policy routing rules and reply-to. Has no effect if gateway monitoring or its action are disabled or if the gateway is forced down. May not have any effect on dynamic gateways during a link loss event.</div>
+                        <small class="text-muted">Controls state killing behavior when this gateway goes down</small>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Description</label>
-                    <div class="col-sm-10">
-                        <input type="text" name="description" class="form-control" value="{{ gateway.description if gateway }}">
-                        <div class="form-text">A description may be entered here for reference (not parsed).</div>
+                <hr>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="description" id="description" class="form-control" value="{{ gateway.description if gateway }}" placeholder="Optional description">
+                        <small class="text-muted">A description for reference</small>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <button type="button" id="displayAdvancedBtn" class="btn btn-info"><i class="bi bi-gear-fill"></i> Display Advanced</button>
+                    <button type="button" id="displayAdvancedBtn" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-gear me-1"></i>Display Advanced
+                    </button>
                 </div>
 
-            </div>
-            <div class="card-footer bg-white d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Save</button>
-                <a href="{{ url_for('routing.routing_index') }}" class="btn btn-secondary">Cancel</a>
-            </div>
-        </form>
+                <hr>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routing.routing_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-save me-1"></i>Save
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
+
 {% endblock %}
