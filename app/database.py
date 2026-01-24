@@ -45,6 +45,15 @@ def init_db():
     )
     """)
 
+    # PORT ASSIGNMENTS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS port_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interface_label TEXT, -- e.g., 'WAN' or 'LAN'
+            network_port TEXT     -- e.g., 'em0 (00:0c...)'
+        )
+    ''')
+
     # ADVANCED ADMIN ACCESS TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_admin_access (
