@@ -22,9 +22,20 @@
         </button>
         <a class="navbar-brand" href="{{ url_for('system.dashboard') }}">
             <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Logo">
-            <span class="label">Smart Shield</span>
+            <!-- <span class="label">Smart Shield</span> -->
         </a>
         <ul class="navbar-nav ms-auto">
+            <!-- Dark Mode Toggle -->
+            <li class="nav-item d-flex align-items-center me-3">
+                <div class="dark-mode-toggle">
+                    <input type="checkbox" id="darkModeSwitch" class="dark-mode-input">
+                    <label for="darkModeSwitch" class="dark-mode-label">
+                        <i class="fa-solid fa-sun"></i>
+                        <i class="fa-solid fa-moon"></i>
+                        <span class="dark-mode-ball"></span>
+                    </label>
+                </div>
+            </li>
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="user-avatar me-2">
@@ -366,6 +377,34 @@
             }
         }
     })();
+})();
+
+// Dark Mode Toggle
+(function() {
+    const darkModeSwitch = document.getElementById('darkModeSwitch');
+    const html = document.documentElement;
+    
+    // Check for saved preference or system preference
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        html.setAttribute('data-theme', 'dark');
+        if (darkModeSwitch) darkModeSwitch.checked = true;
+    }
+    
+    // Toggle handler
+    if (darkModeSwitch) {
+        darkModeSwitch.addEventListener('change', function() {
+            if (this.checked) {
+                html.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    }
 })();
 </script>
 </body>
