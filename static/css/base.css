@@ -2095,6 +2095,36 @@ table tbody tr:last-child td,
   color: #e4e6eb;
 }
 
+[data-theme="dark"] .navbar .nav-link {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+[data-theme="dark"] .navbar .nav-link:hover,
+[data-theme="dark"] #userDropdown:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .user-avatar {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .navbar-toggler {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .navbar-toggler:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .navbar-toggler-icon {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .navbar-toggler-icon::before,
+[data-theme="dark"] .navbar-toggler-icon::after {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 /* Dark mode sidebar */
 [data-theme="dark"] .sidebar {
   background: #0f0f1a;
