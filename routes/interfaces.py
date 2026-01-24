@@ -937,6 +937,52 @@ def delete_lagg_config(config_id):
 def interfaces_wan():
     return render_template("interfaces_wan.html")
 
+@interfaces_bp.route("/get-wan-config", methods=['GET'])
+def get_wan_config():
+    try:
+        conn = sqlite3.connect('data.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, username, password, dial_on_demand, idle_timeout, block_private_networks, block_bogon_networks FROM wan_config WHERE id = 1')
+        config = cursor.fetchone()
+        conn.close()
+        
+        if config:
+            return jsonify({'status': 'success', 'data': {
+                'enable_interface': bool(config[0]),
+                'description': config[1],
+                'ipv4_config_type': config[2],
+                'ipv6_config_type': config[3],
+                'mac_address': config[4],
+                'mtu': config[5],
+                'mss': config[6],
+                'speed_and_duplex': config[7],
+                'ipv4_address': config[8],
+                'ipv4_upstream_gateway': config[9],
+                'username': config[10],
+                'password': config[11],
+                'dial_on_demand': bool(config[12]),
+                'idle_timeout': config[13],
+                'block_private_networks': bool(config[14]),
+                'block_bogon_networks': bool(config[15])
+            }})
+        return jsonify({'status': 'error', 'message': 'Config not found'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@interfaces_bp.route("/save-wan-config", methods=['POST'])
+def save_wan_config():
+    try:
+        data = request.get_json()
+        conn = sqlite3.connect('data.db')
+        cursor = conn.cursor()
+        cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = ?, dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
+                       (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], data['password'], data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': 'Config saved'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
 
 # ----------------------------
 # LAN INTERFACE CONFIGURATION
@@ -945,3 +991,45 @@ def interfaces_wan():
 @interfaces_bp.route("/lan")
 def interfaces_lan():
     return render_template("interfaces_lan.html")
+
+@interfaces_bp.route("/get-lan-config", methods=['GET'])
+def get_lan_config():
+    try:
+        conn = sqlite3.connect('data.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, block_private_networks, block_bogon_networks FROM lan_config WHERE id = 1')
+        config = cursor.fetchone()
+        conn.close()
+        
+        if config:
+            return jsonify({'status': 'success', 'data': {
+                'enable_interface': bool(config[0]),
+                'description': config[1],
+                'ipv4_config_type': config[2],
+                'ipv6_config_type': config[3],
+                'mac_address': config[4],
+                'mtu': config[5],
+                'mss': config[6],
+                'speed_and_duplex': config[7],
+                'ipv4_address': config[8],
+                'ipv4_upstream_gateway': config[9],
+                'block_private_networks': bool(config[10]),
+                'block_bogon_networks': bool(config[11])
+            }})
+        return jsonify({'status': 'error', 'message': 'Config not found'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@interfaces_bp.route("/save-lan-config", methods=['POST'])
+def save_lan_config():
+    try:
+        data = request.get_json()
+        conn = sqlite3.connect('data.db')
+        cursor = conn.cursor()
+        cursor.execute('''UPDATE lan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
+                       (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': 'Config saved'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
