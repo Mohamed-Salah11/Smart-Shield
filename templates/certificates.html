@@ -2,165 +2,294 @@
 
 {% block main %}
 
-<div class="breadcrumb">
-    System / Certificates
-</div>
-
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}" href="#" onclick="showSection('authorities'); return false;">Authorities</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}" href="#" onclick="showSection('certificates'); return false;">Certificates</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}" href="#" onclick="showSection('revocation'); return false;">Revocation</a>
-    </li>
-</ul>
-
-<div class="settings-section" style="margin-top: 20px;">
-    <form method="get" class="row g-3 align-items-center">
-        <div class="col-auto">
-            <label class="col-form-label">Search term</label>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Certificates</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Certificate Manager</h1>
+            <button type="button" class="btn btn-outline-secondary" onclick="toggleSearch()" title="Search Certificates">
+                <i class="fa-solid fa-search"></i>
+            </button>
         </div>
-        <div class="col-md-4">
-            <input type="text" name="search_term" class="form-control" placeholder="Enter a search string or regex">
-        </div>
-        <div class="col-auto">
-            <select name="search_type" class="form-select">
-                <option value="Both">Both</option>
-            </select>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Search</button>
-            <button type="button" class="btn btn-secondary">Clear</button>
-        </div>
-    </form>
-    <small class="form-text text-muted">Enter a search string or regex expression to search certificate names and distinguished names</small>
-</div>
-
-<!-- Certificate Authorities Section -->
-<div class="section" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
-    <div class="settings-section">
-        <h5>Certificate Authorities</h5>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Internal</th>
-                    <th>Issuer</th>
-                    <th>Certificates</th>
-                    <th>Distinguished Name</th>
-                    <th>In Use</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if cas %}
-                {% for ca in cas %}
-                <tr>
-                    <td>{{ ca.name }}</td>
-                    <td>{{ ca.internal }}</td>
-                    <td>{{ ca.issuer }}</td>
-                    <td>{{ ca.certificates }}</td>
-                    <td>{{ ca.distinguished_name }}</td>
-                    <td>{{ ca.in_use }}</td>
-                    <td><button class="btn btn-sm btn-success">+</button></td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted">No certificate authorities configured.</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        <button class="btn btn-success" onclick="window.location.href='{{ url_for('system.add_ca') }}'">+ Add</button>
     </div>
-</div>
 
-<!-- Certificates Section -->
-<div class="section" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
-    <div class="settings-section">
-        <h5>Certificates</h5>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Issuer</th>
-                    <th>Distinguished Name</th>
-                    <th>In Use</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if certs %}
-                {% for cert in certs %}
-                <tr>
-                    <td>{{ cert.name }}</td>
-                    <td>{{ cert.issuer }}</td>
-                    <td>{{ cert.distinguished_name }}</td>
-                    <td>{{ cert.in_use }}</td>
-                    <td>View, Edit, Export, Copy</td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center text-muted">No certificates configured.</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        <button class="btn btn-success" onclick="window.location.href='{{ url_for('system.add_certificate') }}'">+ Add / Sign</button>
-    </div>
-</div>
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs">
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}" href="#" onclick="showSection('authorities'); return false;">Authorities</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}" href="#" onclick="showSection('certificates'); return false;">Certificates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}" href="#" onclick="showSection('revocation'); return false;">Revocation</a>
+        </li>
+    </ul>
 
-<!-- Revocation Section -->
-<div class="section" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
-    <div class="settings-section">
-        <h5>Certificate Revocation Lists</h5>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>CA</th>
-                    <th>Method</th>
-                    <th>Serial #</th>
-                    <th>Reason</th>
-                    <th>Revoked At</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if crls %}
-                {% for crl in crls %}
-                <tr>
-                    <td>{{ crl.ca }}</td>
-                    <td>{{ crl.method }}</td>
-                    <td>{{ crl.serial }}</td>
-                    <td>{{ crl.reason }}</td>
-                    <td>{{ crl.revoked_at }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger">Delete</button>
-                    </td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted">No certificate revocations configured.</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        <button class="btn btn-success">+ Add or Import CRL</button>
+    <!-- Search Section (Hidden by default) -->
+    <div class="section mb-4" id="search-section" style="display: none;">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Search Certificates</h2>
+            <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleSearch()" title="Close">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="section-body" style="padding: 15px;">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label">Search Term</label>
+                    <input type="text" name="search_term" class="form-control" placeholder="Enter a search string or regex">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Search In</label>
+                    <select name="search_type" class="form-select">
+                        <option value="Both">Both</option>
+                        <option value="Name">Name Only</option>
+                        <option value="DN">Distinguished Name Only</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fa-solid fa-search me-1"></i>Search
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="clearSearch()">
+                        <i class="fa-solid fa-times me-1"></i>Clear
+                    </button>
+                </div>
+            </form>
+            <small class="text-muted mt-2 d-block">Enter a search string or regex expression to search certificate names and distinguished names.</small>
+        </div>
     </div>
+
+    <!-- Certificate Authorities Section -->
+    <div class="section" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Certificate Authorities</h2>
+            <a href="{{ url_for('system.add_ca') }}" class="btn btn-success btn-sm">
+                <i class="fa-solid fa-plus me-1"></i>Add
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Internal</th>
+                        <th>Issuer</th>
+                        <th>Certificates</th>
+                        <th>Distinguished Name</th>
+                        <th>In Use</th>
+                        <th style="width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if cas %}
+                    {% for ca in cas %}
+                    <tr>
+                        <td><strong>{{ ca.name }}</strong></td>
+                        <td>
+                            {% if ca.internal %}
+                            <span class="badge bg-success">Yes</span>
+                            {% else %}
+                            <span class="badge bg-secondary">No</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ca.issuer }}</td>
+                        <td><span class="badge bg-info">{{ ca.certificates }}</span></td>
+                        <td><code class="small">{{ ca.distinguished_name }}</code></td>
+                        <td>
+                            {% if ca.in_use %}
+                            <span class="badge bg-warning text-dark">In Use</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Not Used</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" title="Edit">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button class="btn btn-outline-info" title="Export">
+                                    <i class="fa-solid fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fa-solid fa-certificate fa-2x mb-2 d-block opacity-50"></i>
+                            No certificate authorities configured.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Certificates Section -->
+    <div class="section" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Certificates</h2>
+            <a href="{{ url_for('system.add_certificate') }}" class="btn btn-success btn-sm">
+                <i class="fa-solid fa-plus me-1"></i>Add / Sign
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Issuer</th>
+                        <th>Distinguished Name</th>
+                        <th>In Use</th>
+                        <th style="width: 180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if certs %}
+                    {% for cert in certs %}
+                    <tr>
+                        <td><strong>{{ cert.name }}</strong></td>
+                        <td>{{ cert.issuer }}</td>
+                        <td><code class="small">{{ cert.distinguished_name }}</code></td>
+                        <td>
+                            {% if cert.in_use %}
+                            <span class="badge bg-warning text-dark">In Use</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Not Used</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" title="View">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-primary" title="Edit">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button class="btn btn-outline-info" title="Export">
+                                    <i class="fa-solid fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-success" title="Copy">
+                                    <i class="fa-solid fa-copy"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="fa-solid fa-file-certificate fa-2x mb-2 d-block opacity-50"></i>
+                            No certificates configured.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Revocation Section -->
+    <div class="section" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Certificate Revocation Lists</h2>
+            <button class="btn btn-success btn-sm">
+                <i class="fa-solid fa-plus me-1"></i>Add or Import CRL
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>CA</th>
+                        <th>Method</th>
+                        <th>Serial #</th>
+                        <th>Reason</th>
+                        <th>Revoked At</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if crls %}
+                    {% for crl in crls %}
+                    <tr>
+                        <td><strong>{{ crl.ca }}</strong></td>
+                        <td>{{ crl.method }}</td>
+                        <td><code>{{ crl.serial }}</code></td>
+                        <td>
+                            <span class="badge bg-danger">{{ crl.reason }}</span>
+                        </td>
+                        <td>{{ crl.revoked_at }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" title="Edit">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            <i class="fa-solid fa-ban fa-2x mb-2 d-block opacity-50"></i>
+                            No certificate revocations configured.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 <script>
     function showSection(section) {
-        document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+        // Hide all sections
+        document.querySelectorAll('.section[id$="-section"]').forEach(s => {
+            if (s.id !== 'search-section') {
+                s.style.display = 'none';
+            }
+        });
+        // Show selected section
         document.getElementById(section + '-section').style.display = 'block';
-        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        // Update active tab
+        document.querySelectorAll('.nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
         event.target.classList.add('active');
+    }
+
+    function toggleSearch() {
+        const searchSection = document.getElementById('search-section');
+        if (searchSection.style.display === 'none') {
+            searchSection.style.display = 'block';
+        } else {
+            searchSection.style.display = 'none';
+        }
+    }
+
+    function clearSearch() {
+        document.querySelector('#search-section input[name="search_term"]').value = '';
+        document.querySelector('#search-section select[name="search_type"]').selectedIndex = 0;
     }
 </script>
 

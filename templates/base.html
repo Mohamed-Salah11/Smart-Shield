@@ -76,7 +76,6 @@
             <a class="sidebar-brand" href="{{ url_for('system.dashboard') }}">
                 <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield" width="28" height="28">
                 <span class="label">Smart Shield</span>
-                <span class="badge">Panel</span>
             </a>
             <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">&times;</button>
         </div>
@@ -272,19 +271,10 @@
         const sidebarLinks = document.querySelectorAll('.side-links a');
         const sideGroups = document.querySelectorAll('.side-group');
         
-        // Close all details groups first and reset animation state
-        sideGroups.forEach(group => {
-            group.removeAttribute('open');
-            const content = group.querySelector('.side-links');
-            if (content) {
-                content.style.maxHeight = '0';
-                content.style.opacity = '0';
-            }
-        });
-        
         let bestMatch = null;
         let bestMatchLength = 0;
         
+        // First, find the best matching link
         sidebarLinks.forEach(link => {
             let linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
             const matchPatternAttr = link.getAttribute('data-match-pattern');
@@ -320,20 +310,45 @@
             }
         });
         
+        // Determine which group should be open
+        let activeGroup = null;
+        if (bestMatch) {
+            activeGroup = bestMatch.closest('.side-group');
+        }
+        
+        // Close all groups except the active one (no animation flicker)
+        sideGroups.forEach(group => {
+            const content = group.querySelector('.side-links');
+            if (group === activeGroup) {
+                // Keep the active group open immediately (no animation)
+                group.setAttribute('open', '');
+                if (content) {
+                    content.style.transition = 'none'; // Disable transition for initial load
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.style.opacity = '1';
+                    // Re-enable transition after a frame
+                    requestAnimationFrame(() => {
+                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+                    });
+                }
+            } else {
+                // Close other groups immediately (no animation)
+                group.removeAttribute('open');
+                if (content) {
+                    content.style.transition = 'none'; // Disable transition for initial load
+                    content.style.maxHeight = '0';
+                    content.style.opacity = '0';
+                    // Re-enable transition after a frame
+                    requestAnimationFrame(() => {
+                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+                    });
+                }
+            }
+        });
+        
         // Apply active class to the best match
         if (bestMatch) {
             bestMatch.classList.add('active');
-            
-            // Open the parent details group with animation
-            const parentGroup = bestMatch.closest('.side-group');
-            if (parentGroup) {
-                parentGroup.setAttribute('open', '');
-                const content = parentGroup.querySelector('.side-links');
-                if (content) {
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.opacity = '1';
-                }
-            }
         } else {
             // If no active link found, open the System group by default
             const firstGroup = document.querySelector('.side-group');
@@ -341,8 +356,12 @@
                 firstGroup.setAttribute('open', '');
                 const content = firstGroup.querySelector('.side-links');
                 if (content) {
+                    content.style.transition = 'none';
                     content.style.maxHeight = content.scrollHeight + 'px';
                     content.style.opacity = '1';
+                    requestAnimationFrame(() => {
+                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+                    });
                 }
             }
         }

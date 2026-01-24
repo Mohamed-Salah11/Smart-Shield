@@ -1505,7 +1505,18 @@ table tbody tr:last-child td,
   overflow-x: hidden;
   z-index: 1050;
   transform: translateX(-100%);
-  transition: transform 0.25s ease;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Sidebar closed state shadow */
+.sidebar {
+  box-shadow: none;
+}
+
+/* Sidebar open state with elevated shadow */
+.app-shell.sidebar-open .sidebar {
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
 }
 
 /* Sidebar OPEN state */
@@ -1690,9 +1701,10 @@ table tbody tr:last-child td,
   min-width: 0;
   padding: 24px 32px;
   margin-left: 0;
-  transition: margin-left 0.25s ease;
+  transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   max-width: 1400px;
   line-height: 1.6;
+  will-change: margin-left;
 }
 
 /* When sidebar is open, push main content over */

@@ -3,57 +3,90 @@
 
 {% block main %}
 
-<!-- Breadcrumb -->
-<div class="breadcrumb">
-    System / Routing / Gateway Groups
-</div>
-
-<!-- Tabs -->
-<ul class="nav nav-tabs">
-    <li class="nav-item"><a class="nav-link" href="/system/routing">Gateways</a></li>
-    <li class="nav-item"><a class="nav-link" href="/system/routing/static">Static Routes</a></li>
-    <li class="nav-item"><a class="nav-link active" href="/system/routing/groups">Gateway Groups</a></li>
-</ul>
-
-<!-- Gateway Groups section -->
-<div class="settings-section">
-    <h5>Gateway Groups</h5>
-    <table class="table table-bordered">
-        <thead>
-                    <tr>
-                        <th>Group Name</th>
-                        <th>Gateways</th>
-                        <th>Priority</th>
-                        <th>Description</th>
-                        <th style="width:120px">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-            {% if gateway_groups %}
-                {% for g in gateway_groups %}
-                <tr>
-                    <td>{{ g.name }}</td>
-                    <td>{{ g.gateways | join(', ') }}</td>
-                    <td>{{ g.priority }}</td>
-                    <td>{{ g.description }}</td>
-                    <td class="text-end">
-                        <a class="btn btn-sm btn-link" href="/system/routing/group/edit/{{ loop.index0 }}">✏️</a>
-                        <form method="post" action="/system/routing/group/delete/{{ loop.index0 }}" style="display:inline">
-                            <button class="btn btn-sm btn-link">🗑️</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="5" class="text-muted py-5 text-center">No gateway groups defined.</td>
-                </tr>
-            {% endif %}
-        </tbody>
-    </table>
-    <div class="d-flex justify-content-end mt-3">
-        <a href="/system/routing/group/edit" class="btn btn-success">➕ Add</a>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Gateway Groups</li>
+            </ol>
+        </nav>
+        <h1>Routing</h1>
     </div>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link" href="/system/routing">Gateways</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/system/routing/static">Static Routes</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="/system/routing/groups">Gateway Groups</a>
+        </li>
+    </ul>
+
+    <!-- Gateway Groups Section -->
+    <div class="section">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Gateway Groups</h2>
+            <a href="/system/routing/group/edit" class="btn btn-success btn-sm">
+                <i class="fa-solid fa-plus me-1"></i>Add Group
+            </a>
+        </div>
+        <div class="section-body" style="padding: 0;">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Group Name</th>
+                            <th>Gateways</th>
+                            <th>Priority</th>
+                            <th>Description</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if gateway_groups %}
+                            {% for g in gateway_groups %}
+                            <tr>
+                                <td class="align-middle"><strong>{{ g.name }}</strong></td>
+                                <td class="align-middle">
+                                    {% for gw in g.gateways %}
+                                        <span class="badge bg-secondary me-1">{{ gw }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td class="align-middle"><span class="badge bg-info">{{ g.priority }}</span></td>
+                                <td class="align-middle">{{ g.description }}</td>
+                                <td class="align-middle text-end">
+                                    <a class="btn btn-outline-primary btn-sm" href="/system/routing/group/edit/{{ loop.index0 }}" title="Edit">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </a>
+                                    <form method="post" action="/system/routing/group/delete/{{ loop.index0 }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <i class="fa-solid fa-layer-group fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted mb-0">No gateway groups defined.</p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 {% endblock %}

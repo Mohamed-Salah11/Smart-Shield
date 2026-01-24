@@ -2,69 +2,90 @@
 
 {% block main %}
 
-<div class="breadcrumb">
-    System / <a href="{{ url_for('system.admin_access') }}">Advanced</a> / System Tunables
-</div>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
+                <li class="breadcrumb-item active" aria-current="page">System Tunables</li>
+            </ol>
+        </nav>
+        <h1>Advanced Settings</h1>
+    </div>
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
-    </li>
-</ul>
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
+        </li>
+    </ul>
 
-<div class="settings-section">
-    <h5>System Tunables</h5>
-    
-    <div style="padding: 20px;">
-        <div class="alert-info">
-            <strong>NOTE:</strong> The options on this page are intended for use by advanced users only.
+    <!-- System Tunables Section -->
+    <div class="section">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>System Tunables</h2>
+            <a href="{{ url_for('system.advanced_system_tunables_edit') }}" class="btn btn-success btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+                New
+            </a>
         </div>
+        <div class="section-body">
+            <div class="alert alert-info d-flex align-items-center mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="me-2 flex-shrink-0" viewBox="0 0 16 16">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>
+                </svg>
+                <strong>NOTE:</strong>&nbsp;The options on this page are intended for use by advanced users only.
+            </div>
 
-        <a href="{{ url_for('system.advanced_system_tunables_edit') }}" class="btn-new">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-            </svg>
-            New
-        </a>
-
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Tunable Name</th>
-                    <th>Description</th>
-                    <th>Value</th>
-                    <th style="width: 60px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for tunable in tunables %}
-                <tr>
-                    <td>{{ tunable.name }}</td>
-                    <td>{{ tunable.description }}</td>
-                    <td>{{ tunable.value }}</td>
-                    <td>
-                        <a href="{{ url_for('system.advanced_system_tunables_edit', index=tunable.id) }}" class="btn-edit" title="Edit">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                            </svg>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tunable Name</th>
+                            <th>Description</th>
+                            <th>Value</th>
+                            <th style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tunable in tunables %}
+                        <tr>
+                            <td><code>{{ tunable.name }}</code></td>
+                            <td>{{ tunable.description }}</td>
+                            <td><span class="badge bg-secondary">{{ tunable.value }}</span></td>
+                            <td>
+                                <a href="{{ url_for('system.advanced_system_tunables_edit', index=tunable.id) }}" class="btn btn-outline-primary btn-sm" title="Edit">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">No system tunables configured.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
