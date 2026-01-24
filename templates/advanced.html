@@ -9,12 +9,12 @@
         passListCounter++;
         const container = document.getElementById('pass-list-container');
         const newItem = document.createElement('div');
-        newItem.className = 'pass-list-item';
+        newItem.className = 'd-flex align-items-center gap-2 mb-2';
         newItem.id = 'pass-list-' + passListCounter;
         newItem.innerHTML = `
-            <input type="text" name="pass_list_address[]" class="form-control" style="max-width: 300px;" placeholder="Address">
-            <span>/</span>
-            <select name="pass_list_cidr[]" class="form-control" style="max-width: 100px;">
+            <input type="text" name="pass_list_address[]" class="form-control" placeholder="Address">
+            <span class="text-muted">/</span>
+            <select name="pass_list_cidr[]" class="form-select" style="max-width: 100px;">
                 <option>128</option>
                 <option>127</option>
                 <option>126</option>
@@ -25,7 +25,9 @@
                 <option>121</option>
                 <option>120</option>
             </select>
-            <button type="button" class="btn-remove" onclick="removePassList(${passListCounter})">Remove</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removePassList(${passListCounter})">
+                <i class="fa-solid fa-trash"></i>
+            </button>
         `;
         container.appendChild(newItem);
     }
@@ -38,447 +40,374 @@
     }
 </script>
 
-<div class="breadcrumb">
-    System / <a href="{{ url_for('system.advanced') }}">Advanced</a> / Admin Access
-</div>
-
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('system.admin_access') }}">Admin Access</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
-    </li>
-</ul>
-
-<form method="POST" action="{{ url_for('system.advanced') }}">
-
-<div class="settings-section">
-    <h5>webConfigurator</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label>Protocol</label>
-            <div class="form-group-content">
-                <div>
-                    <input type="radio" id="http" name="protocol" value="http">
-                    <label for="http" style="font-weight: normal; display: inline; margin-left: 5px;">HTTP</label>
-                    
-                    <input type="radio" id="https" name="protocol" value="https" checked style="margin-left: 20px;">
-                    <label for="https" style="font-weight: normal; display: inline; margin-left: 5px;">HTTPS (SSL/TLS)</label>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ssl_cert">SSL/TLS Certificate</label>
-            <div class="form-group-content">
-                <select id="ssl_cert" name="ssl_cert" class="form-control" style="max-width: 400px;">
-                    <option value="default">GUI default (68f1fb0486f1a)</option>
-                </select>
-                <div class="help-text">
-                    Certificates known to be incompatible with use for HTTPS are not included in this list, such as certificates using incompatible ECDSA curves or weak digest algorithms.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="tcp_port">TCP port</label>
-            <div class="form-group-content">
-                <input type="number" id="tcp_port" name="tcp_port" class="form-control" style="max-width: 200px;" placeholder="">
-                <div class="help-text">
-                    Enter a custom port number for the webConfigurator above to override the default (80 for HTTP, 443 for HTTPS). Changes will take effect immediately after save.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="max_processes">Max Processes</label>
-            <div class="form-group-content">
-                <input type="number" id="max_processes" name="max_processes" class="form-control" style="max-width: 200px;" value="2" placeholder="2">
-                <div class="help-text">
-                    Enter the number of webConfigurator processes to run. This defaults to 2. Increasing this will allow more users/browsers to access the GUI concurrently.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="webgui_redirect">WebGUI redirect</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="webgui_redirect" name="webgui_redirect">
-                    <label class="form-check-label" for="webgui_redirect">
-                        Disable webConfigurator redirect rule
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, access to the webConfigurator is always permitted even on port 80, regardless of the listening port configured. Check this box to disable this automatically added redirect rule.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="hsts">HSTS</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="hsts" name="hsts">
-                    <label class="form-check-label" for="hsts">
-                        Disable HTTP Strict Transport Security
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, Strict-Transport-Security HTTPS response header is sent by the webConfigurator to the browser. This will force the browser to use only HTTPS for future requests to the firewall FQDN. Check this box to disable HSTS. (NOTE: Browser-specific steps are required for disabling to take effect once the browser already visited the FQDN while HSTS was enabled.)
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ocsp_stapling">OCSP Must-Staple</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="ocsp_stapling" name="ocsp_stapling">
-                    <label class="form-check-label" for="ocsp_stapling">
-                        Force OCSP Stapling in nginx
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is checked, OCSP Stapling is forced on in nginx. Remember to upload your certificate as a full chain, not just the certificate, or this option will be ignored by nginx.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="webgui_autocomplete">WebGUI Login Autocomplete</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="webgui_autocomplete" name="webgui_autocomplete" checked>
-                    <label class="form-check-label" for="webgui_autocomplete">
-                        Enable webConfigurator login autocomplete
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is checked, login credentials for the webConfigurator may be saved by the browser. While convenient, some security standards require this be disabled. Check this box to enable autocomplete on the login form so that browsers will prompt to save credentials (NOTE: Some browsers do not respect this option).
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="gui_login_messages">GUI login messages</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="gui_login_messages" name="gui_login_messages">
-                    <label class="form-check-label" for="gui_login_messages">
-                        Lower syslog level for successful GUI login events
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is checked, successful logins to the GUI will be logged as a lower non-emergency level. Note: The console bell behavior can be controlled independently on the Notifications tab.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="roaming">Roaming</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="roaming" name="roaming" checked>
-                    <label class="form-check-label" for="roaming">
-                        Allow GUI administrator client IP address to change during a login session
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is checked, the login session to the webConfigurator remains valid if the client source IP address changes.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="anti_lockout">Anti-lockout</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="anti_lockout" name="anti_lockout">
-                    <label class="form-check-label" for="anti_lockout">
-                        Disable webConfigurator anti-lockout rule
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, access to the webConfigurator on the LAN interface is always permitted, regardless of the user-defined firewall rule set. Check this box to disable this automatically added rule, so access to the webConfigurator is controlled by the user-defined firewall rules (ensure a firewall rule is in place that allows access, to avoid being locked out!) Hint: the "Set interface(s) IP address" option in the console menu resets this setting as well.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="dns_rebind">DNS Rebind Check</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="dns_rebind" name="dns_rebind">
-                    <label class="form-check-label" for="dns_rebind">
-                        Disable DNS Rebinding Checks
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, the system is protected against <a href="#" style="color: #007bff;">DNS Rebinding attacks</a>. This blocks private IP responses from the configured DNS servers. Check this box to disable this protection if it interferes with webConfigurator access or name resolution in the environment.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="alternate_hostnames">Alternate Hostnames</label>
-            <div class="form-group-content">
-                <input type="text" id="alternate_hostnames" name="alternate_hostnames" class="form-control" style="max-width: 500px;">
-                <div class="help-text">
-                    Alternate Hostnames for DNS Rebinding and HTTP_REFERER Checks. Specify alternate hostnames by which the router may be queried, to bypass the DNS Rebinding Attack checks. Separate hostnames with spaces.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="http_referer">Browser HTTP_REFERER enforcement</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="http_referer" name="http_referer">
-                    <label class="form-check-label" for="http_referer">
-                        Disable HTTP_REFERER enforcement check
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, access to the webConfigurator is protected against HTTP_REFERER redirection attempts. Check this box to disable this protection if it interferes with webConfigurator access in certain corner cases such as using external scripts to interact with this system. More information on HTTP_REFERER is available from <a href="#" style="color: #007bff;">Wikipedia</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="browser_tab_text">Browser tab text</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="browser_tab_text" name="browser_tab_text">
-                    <label class="form-check-label" for="browser_tab_text">
-                        Display page name first in browser tab
-                    </label>
-                </div>
-                <div class="help-text">
-                    When this is unchecked, the browser tab shows the host name followed by the current page. Check this box to display the current page followed by the host name.
-                </div>
-            </div>
-        </div>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Admin Access</li>
+            </ol>
+        </nav>
+        <h1>Advanced Settings</h1>
     </div>
-</div>
 
-<div class="settings-section">
-    <h5>Secure Shell</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="enable_ssh">Secure Shell Server</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="enable_ssh" name="enable_ssh">
-                    <label class="form-check-label" for="enable_ssh">
-                        Enable Secure Shell
-                    </label>
-                </div>
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('system.admin_access') }}">Admin Access</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
+        </li>
+    </ul>
+
+    <form method="POST" action="{{ url_for('system.advanced') }}">
+
+        <!-- webConfigurator Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>webConfigurator</h2>
             </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ssh_key_only">SSHd Key Only</label>
-            <div class="form-group-content">
-                <select id="ssh_key_only" name="ssh_key_only" class="form-control" style="max-width: 400px;">
-                    <option value="password_or_key">Password or Public Key</option>
-                    <option value="key_only">Public Key Only</option>
-                    <option value="password_only">Password Only</option>
-                </select>
-                <div class="help-text">
-                    When set to <strong>Public Key</strong>, SSH access requires authorized keys must be configured for each <a href="#" style="color: #007bff;">user</a> that has been granted secure shell access. If set to <em>Require Both Password and Public Key</em>, the SSHd daemon requires both authorized keys and valid passwords to gain access. The default <em>Password or Public Key</em> setting allows either a valid password or a valid authorized key to login.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ssh_agent_forwarding">Allow Agent Forwarding</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="ssh_agent_forwarding" name="ssh_agent_forwarding">
-                    <label class="form-check-label" for="ssh_agent_forwarding">
-                        Enables ssh-agent forwarding support.
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ssh_port">SSH port</label>
-            <div class="form-group-content">
-                <input type="number" id="ssh_port" name="ssh_port" class="form-control" style="max-width: 200px;" value="22" placeholder="22">
-                <div class="help-text">
-                    Note: Leave blank for the default of 22.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Login Protection</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="threshold">Threshold</label>
-            <div class="form-group-content">
-                <input type="number" id="threshold" name="threshold" class="form-control" style="max-width: 200px;" value="30" placeholder="30">
-                <div class="help-text">
-                    Block attackers when their cumulative attack score exceeds threshold. Most attacks have a score of 10.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="blocktime">Blocktime</label>
-            <div class="form-group-content">
-                <input type="number" id="blocktime" name="blocktime" class="form-control" style="max-width: 200px;" value="120" placeholder="120">
-                <div class="help-text">
-                    Number of seconds for initially blocking seconds after exceeding threshold. Subsequent blocks increase by a factor of 1.5. Attackers are unblocked at random intervals, so actual block times will be longer.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="detection_time">Detection time</label>
-            <div class="form-group-content">
-                <input type="number" id="detection_time" name="detection_time" class="form-control" style="max-width: 200px;" value="1800" placeholder="1800">
-                <div class="help-text">
-                    Remember potential attackers for up to detection, time seconds before resetting their score.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="pass_list">Pass list</label>
-            <div class="form-group-content">
-                <div id="pass-list-container">
-                    <div class="pass-list-item" id="pass-list-0">
-                        <input type="text" name="pass_list_address[]" class="form-control" style="max-width: 300px;" placeholder="Address">
-                        <span>/</span>
-                        <select name="pass_list_cidr[]" class="form-control" style="max-width: 100px;">
-                            <option>128</option>
-                            <option>127</option>
-                            <option>126</option>
-                            <option>125</option>
-                            <option>124</option>
-                            <option>123</option>
-                            <option>122</option>
-                            <option>121</option>
-                            <option>120</option>
-                        </select>
-                        <button type="button" class="btn-remove" onclick="removePassList(0)">Remove</button>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Protocol</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input type="radio" class="form-check-input" id="http" name="protocol" value="http">
+                                <label class="form-check-label" for="http">HTTP</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="radio" class="form-check-input" id="https" name="protocol" value="https" checked>
+                                <label class="form-check-label" for="https">HTTPS (SSL/TLS)</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="help-text">
-                    Addresses added to the pass list will bypass login protection.
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ssl_cert" class="col-sm-3 col-form-label fw-semibold">SSL/TLS Certificate</label>
+                    <div class="col-sm-9">
+                        <select id="ssl_cert" name="ssl_cert" class="form-select">
+                            <option value="default">GUI default (68f1fb0486f1a)</option>
+                        </select>
+                        <small class="text-muted">Certificates known to be incompatible with use for HTTPS are not included in this list.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="tcp_port" class="col-sm-3 col-form-label fw-semibold">TCP Port</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="tcp_port" name="tcp_port" class="form-control">
+                        <small class="text-muted">Enter a custom port number (80 for HTTP, 443 for HTTPS). Changes take effect immediately.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="max_processes" class="col-sm-3 col-form-label fw-semibold">Max Processes</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="max_processes" name="max_processes" class="form-control" value="2">
+                        <small class="text-muted">Number of webConfigurator processes. Increasing allows more concurrent users.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">WebGUI Redirect</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="webgui_redirect" name="webgui_redirect">
+                            <label class="form-check-label" for="webgui_redirect">Disable webConfigurator redirect rule</label>
+                        </div>
+                        <small class="text-muted">Check to disable the automatic redirect rule for webConfigurator access.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">HSTS</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="hsts" name="hsts">
+                            <label class="form-check-label" for="hsts">Disable HTTP Strict Transport Security</label>
+                        </div>
+                        <small class="text-muted">When unchecked, Strict-Transport-Security header is sent to force HTTPS.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">OCSP Must-Staple</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="ocsp_stapling" name="ocsp_stapling">
+                            <label class="form-check-label" for="ocsp_stapling">Force OCSP Stapling in nginx</label>
+                        </div>
+                        <small class="text-muted">Upload certificate as a full chain for this option to work.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Login Autocomplete</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="webgui_autocomplete" name="webgui_autocomplete" checked>
+                            <label class="form-check-label" for="webgui_autocomplete">Enable webConfigurator login autocomplete</label>
+                        </div>
+                        <small class="text-muted">Allow browsers to save login credentials.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">GUI Login Messages</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="gui_login_messages" name="gui_login_messages">
+                            <label class="form-check-label" for="gui_login_messages">Lower syslog level for successful GUI login events</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Roaming</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="roaming" name="roaming" checked>
+                            <label class="form-check-label" for="roaming">Allow GUI administrator client IP to change during session</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Anti-lockout</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="anti_lockout" name="anti_lockout">
+                            <label class="form-check-label" for="anti_lockout">Disable webConfigurator anti-lockout rule</label>
+                        </div>
+                        <small class="text-muted">Ensure a firewall rule is in place before enabling to avoid being locked out.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">DNS Rebind Check</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="dns_rebind" name="dns_rebind">
+                            <label class="form-check-label" for="dns_rebind">Disable DNS Rebinding Checks</label>
+                        </div>
+                        <small class="text-muted">Protects against DNS Rebinding attacks by blocking private IP responses.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="alternate_hostnames" class="col-sm-3 col-form-label fw-semibold">Alternate Hostnames</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="alternate_hostnames" name="alternate_hostnames" class="form-control">
+                        <small class="text-muted">Alternate hostnames to bypass DNS Rebinding checks. Separate with spaces.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">HTTP_REFERER Check</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="http_referer" name="http_referer">
+                            <label class="form-check-label" for="http_referer">Disable HTTP_REFERER enforcement check</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Browser Tab Text</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="browser_tab_text" name="browser_tab_text">
+                            <label class="form-check-label" for="browser_tab_text">Display page name first in browser tab</label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="add_address">Add address</label>
-            <div class="form-group-content">
-                <button type="button" class="btn-add" onclick="addPassList()">
-                    <span style="font-size: 1.2em; font-weight: bold;">+</span> Add address
-                </button>
+        <!-- Secure Shell Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Secure Shell</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">SSH Server</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="enable_ssh" name="enable_ssh">
+                            <label class="form-check-label" for="enable_ssh">Enable Secure Shell</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ssh_key_only" class="col-sm-3 col-form-label fw-semibold">SSHd Key Only</label>
+                    <div class="col-sm-9">
+                        <select id="ssh_key_only" name="ssh_key_only" class="form-select">
+                            <option value="password_or_key">Password or Public Key</option>
+                            <option value="key_only">Public Key Only</option>
+                            <option value="password_only">Password Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Agent Forwarding</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="ssh_agent_forwarding" name="ssh_agent_forwarding">
+                            <label class="form-check-label" for="ssh_agent_forwarding">Enable ssh-agent forwarding support</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ssh_port" class="col-sm-3 col-form-label fw-semibold">SSH Port</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="ssh_port" name="ssh_port" class="form-control" value="22">
+                        <small class="text-muted">Leave blank for default (22).</small>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+
+        <!-- Login Protection Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Login Protection</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label for="threshold" class="col-sm-3 col-form-label fw-semibold">Threshold</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="threshold" name="threshold" class="form-control" value="30">
+                        <small class="text-muted">Block attackers when cumulative attack score exceeds threshold. Most attacks score 10.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="blocktime" class="col-sm-3 col-form-label fw-semibold">Blocktime</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="blocktime" name="blocktime" class="form-control" value="120">
+                        <small class="text-muted">Seconds for initial block after exceeding threshold. Subsequent blocks increase by 1.5x.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="detection_time" class="col-sm-3 col-form-label fw-semibold">Detection Time</label>
+                    <div class="col-sm-9">
+                        <input type="number" id="detection_time" name="detection_time" class="form-control" value="1800">
+                        <small class="text-muted">Remember potential attackers for this many seconds before resetting score.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Pass List</label>
+                    <div class="col-sm-9">
+                        <div id="pass-list-container">
+                            <div class="d-flex align-items-center gap-2 mb-2" id="pass-list-0">
+                                <input type="text" name="pass_list_address[]" class="form-control" placeholder="Address">
+                                <span class="text-muted">/</span>
+                                <select name="pass_list_cidr[]" class="form-select" style="max-width: 100px;">
+                                    <option>128</option>
+                                    <option>127</option>
+                                    <option>126</option>
+                                    <option>125</option>
+                                    <option>124</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addPassList()">
+                            <i class="fa-solid fa-plus me-1"></i>Add Address
+                        </button>
+                        <small class="text-muted d-block mt-2">Addresses in pass list bypass login protection.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Serial Communications Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Serial Communications</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Serial Terminal</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="serial_terminal" name="serial_terminal">
+                            <label class="form-check-label" for="serial_terminal">Enable first serial port (115200/8/N/1 default)</label>
+                        </div>
+                        <small class="text-muted">Redirects console output to serial port. Requires null modem cable.</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="serial_speed" class="col-sm-3 col-form-label fw-semibold">Serial Speed</label>
+                    <div class="col-sm-9">
+                        <select id="serial_speed" name="serial_speed" class="form-select">
+                            <option value="115200" selected>115200</option>
+                            <option value="57600">57600</option>
+                            <option value="38400">38400</option>
+                            <option value="19200">19200</option>
+                            <option value="9600">9600</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="primary_console" class="col-sm-3 col-form-label fw-semibold">Primary Console</label>
+                    <div class="col-sm-9">
+                        <select id="primary_console" name="primary_console" class="form-select">
+                            <option value="video">Video Console</option>
+                            <option value="serial">Serial Console</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Options Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Console Options</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label class="col-sm-3 col-form-label fw-semibold">Console Menu</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="console_menu" name="console_menu">
+                            <label class="form-check-label" for="console_menu">Password protect the console menu</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-end gap-2 mb-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-save me-1"></i>Save
+            </button>
+        </div>
+
+    </form>
 </div>
-
-<div class="settings-section">
-    <h5>Serial Communications</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="serial_terminal">Serial Terminal</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="serial_terminal" name="serial_terminal">
-                    <label class="form-check-label" for="serial_terminal">
-                        Enables the first serial port with 115200/8/N/1 by default, or another speed selectable below.
-                    </label>
-                </div>
-                <div class="help-text">
-                    Note: This will redirect the console output and messages to the serial port. The console menu can still be accessed via the internal video card/keyboard. A null modem serial cable or adapter is required to use the serial console.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="serial_speed">Serial Speed</label>
-            <div class="form-group-content">
-                <select id="serial_speed" name="serial_speed" class="form-control" style="max-width: 300px;">
-                    <option value="115200" selected>115200</option>
-                    <option value="57600">57600</option>
-                    <option value="38400">38400</option>
-                    <option value="19200">19200</option>
-                    <option value="9600">9600</option>
-                </select>
-                <div class="help-text">
-                    Allows selection of different speeds for the serial console port.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="primary_console">Primary Console</label>
-            <div class="form-group-content">
-                <select id="primary_console" name="primary_console" class="form-control" style="max-width: 300px;">
-                    <option value="video">Video Console</option>
-                    <option value="serial">Serial Console</option>
-                </select>
-                <div class="help-text">
-                    Select the preferred console if multiple consoles are present. The preferred console will show Smart Shield boot script output. All consoles display OS boot messages, console messages, and the console menu.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Console Options</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="console_menu">Console menu</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="console_menu" name="console_menu">
-                    <label class="form-check-label" for="console_menu">
-                        Password protect the console menu
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label></label>
-            <div class="form-group-content">
-                <button type="submit" class="btn-save" style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
-                    </svg>
-                    Save
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-</form>
 
 {% endblock %}

@@ -2,74 +2,103 @@
 
 {% block main %}
 
-<!-- Breadcrumb -->
-<div class="breadcrumb">
-    Wizard / Smart Shield Setup / General Information
+<div class="container">
+<!-- Page Header -->
+<div class="page-header">
+<nav aria-label="breadcrumb">
+<ol class="breadcrumb mb-2">
+<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+<li class="breadcrumb-item active" aria-current="page">General Information</li>
+</ol>
+</nav>
+<h1>Smart Shield Setup</h1>
 </div>
 
-<div class="mb-3">
-    <div class="progress" style="height:6px;">
-        <div class="progress-bar bg-danger" role="progressbar" style="width:22%;" aria-valuenow="22" aria-valuemin="0" aria-valuemax="100"></div>
-    </div>
-    <div class="mt-2">
-        <span class="badge bg-danger">Step 2 of 9</span>
-    </div>
+<!-- Progress -->
+<div class="mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
+<span class="badge bg-primary">Step 2 of 9</span>
+<small class="text-muted">22% Complete</small>
+</div>
+<div class="progress" style="height: 8px; border-radius: 4px;">
+<div class="progress-bar" role="progressbar" style="width: 22%; background: var(--primary);" aria-valuenow="22" aria-valuemin="0" aria-valuemax="100"></div>
+</div>
 </div>
 
 <form method="post" action="#">
-    <div class="settings-section">
-        <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">
-            General Information
-        </div>
-                <p>On this screen the general Smart Shield parameters will be set.</p>
+<!-- Content Card -->
+<div class="section">
+<div class="section-header">
+<h2>General Information</h2>
+</div>
+<div class="section-body" style="padding: 24px;">
+<p class="text-muted mb-4">Configure the general Smart Shield parameters including hostname, domain, and DNS settings.</p>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Hostname</label>
-                    <div class="col-sm-8">
-                        <input type="text" class="form-control" name="hostname" value="Smart Shield">
-                        <div class="form-text">Name of the firewall host, without domain part.</div>
-                        <div class="form-text">Examples: firewall, gateway, edgefw</div>
-                    </div>
-                </div>
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Hostname</label>
+<div class="col-sm-6">
+<input type="text" class="form-control" name="hostname" value="SmartShield">
+<div class="form-text">Name of the firewall host, without domain part.</div>
+<div class="form-text text-muted">Examples: firewall, gateway, edgefw</div>
+</div>
+</div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Domain</label>
-                    <div class="col-sm-8">
-                        <input type="text" class="form-control" name="domain" value="home.arpa">
-                        <div class="form-text">Domain name for the firewall.</div>
-                        <div class="form-text">Examples: home.arpa, example.com</div>
-                    </div>
-                </div>
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Domain</label>
+<div class="col-sm-6">
+<input type="text" class="form-control" name="domain" value="home.arpa">
+<div class="form-text">Domain name for the firewall.</div>
+<div class="form-text text-muted">Examples: home.arpa, example.com</div>
+</div>
+</div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Primary DNS Server</label>
-                    <div class="col-sm-4">
-                        <input type="text" class="form-control" name="primary_dns" value="">
-                    </div>
-                </div>
+<hr class="my-4">
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Secondary DNS Server</label>
-                    <div class="col-sm-4">
-                        <input type="text" class="form-control" name="secondary_dns" value="">
-                    </div>
-                </div>
+<h6 class="text-muted mb-3">DNS Configuration</h6>
 
-                <div class="row mb-3 align-items-center">
-                    <label class="col-sm-2 col-form-label">Override DNS</label>
-                    <div class="col-sm-8">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="override_dns" name="override_dns" checked>
-                            <label class="form-check-label" for="override_dns">Allow DNS servers to be overridden by DHCP/PPP on WAN</label>
-                        </div>
-                    </div>
-            </div>
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Primary DNS Server</label>
+<div class="col-sm-5">
+<input type="text" class="form-control" name="primary_dns" placeholder="e.g., 8.8.8.8">
+</div>
+</div>
 
-    </div>
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Secondary DNS Server</label>
+<div class="col-sm-5">
+<input type="text" class="form-control" name="secondary_dns" placeholder="e.g., 8.8.4.4">
+</div>
+</div>
 
-    <div class="d-flex justify-content-start mt-3">
-        <a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
-    </div>
+<div class="row mb-3 align-items-center">
+<label class="col-sm-3 col-form-label fw-semibold">Override DNS</label>
+<div class="col-sm-8">
+<div class="form-check form-switch">
+<input class="form-check-input" type="checkbox" id="override_dns" name="override_dns" checked>
+<label class="form-check-label" for="override_dns">Allow DNS servers to be overridden by DHCP/PPP on WAN</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Navigation Buttons -->
+<div class="d-flex justify-content-between align-items-center mt-4">
+<a href="{{ url_for('system.setup_wizard_step', step=2) }}" class="btn btn-outline-secondary">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+</svg>
+Back
+</a>
+<a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-primary">
+Continue
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="ms-1" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+</svg>
+</a>
+</div>
 </form>
+</div>
 
 {% endblock %}

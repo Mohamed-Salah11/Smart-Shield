@@ -1,214 +1,158 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">Wizard / Smart Shield Setup / Configure WAN Interface</div>
+
+<div class="container">
+<!-- Page Header -->
+<div class="page-header">
+<nav aria-label="breadcrumb">
+<ol class="breadcrumb mb-2">
+<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+<li class="breadcrumb-item active" aria-current="page">WAN Interface</li>
+</ol>
+</nav>
+<h1>Smart Shield Setup</h1>
+</div>
+
+<!-- Progress -->
+<div class="mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
+<span class="badge bg-primary">Step 4 of 9</span>
+<small class="text-muted">44% Complete</small>
+</div>
+<div class="progress" style="height: 8px; border-radius: 4px;">
+<div class="progress-bar" role="progressbar" style="width: 44%; background: var(--primary);" aria-valuenow="44" aria-valuemin="0" aria-valuemax="100"></div>
+</div>
+</div>
+
+<form method="post" action="#">
+<!-- Configuration Type -->
+<div class="section">
+<div class="section-header">
+<h2>Configure WAN Interface</h2>
+</div>
+<div class="section-body" style="padding: 24px;">
+<p class="text-muted mb-4">Configure the Wide Area Network (WAN) interface settings for your internet connection.</p>
+
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Configuration Type</label>
+<div class="col-sm-4">
+<select class="form-select" name="config_type" id="config_type">
+<option value="static" selected>Static</option>
+<option value="dhcp">DHCP</option>
+<option value="pppoe">PPPoE</option>
+<option value="pptp">PPTP</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+
+<!-- General Configuration -->
+<div class="section">
+<div class="section-header">
+<h2>General Configuration</h2>
+</div>
+<div class="section-body" style="padding: 24px;">
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">MAC Address</label>
+<div class="col-sm-6">
+<input class="form-control" name="mac_address" placeholder="xx:xx:xx:xx:xx:xx">
+<div class="form-text">Spoof the MAC address of the WAN interface if required by your ISP.</div>
+</div>
+</div>
+
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">MTU</label>
+<div class="col-sm-3">
+<input class="form-control" name="mtu" placeholder="1500">
+<div class="form-text">Leave blank for default.</div>
+</div>
+</div>
+
+<div class="row mb-3">
+<label class="col-sm-3 col-form-label fw-semibold">MSS</label>
+<div class="col-sm-3">
+<input class="form-control" name="mss" placeholder="Auto">
+</div>
+</div>
+</div>
+</div>
+
+<!-- Static IP Configuration -->
+<div class="section">
+<div class="section-header">
+<h2>Static IP Configuration</h2>
+</div>
+<div class="section-body" style="padding: 24px;">
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">IP Address</label>
+<div class="col-sm-4">
+<input class="form-control" name="ip_address" value="192.168.1.200">
+</div>
+</div>
+
+<div class="row mb-4">
+<label class="col-sm-3 col-form-label fw-semibold">Subnet Mask</label>
+<div class="col-sm-2">
+<select class="form-select" name="subnet_mask">
+{% for n in range(1,33) %}
+<option value="{{n}}" {% if n==24 %}selected{% endif %}>/{{n}}</option>
+{% endfor %}
+</select>
+</div>
+</div>
+
+<div class="row mb-3">
+<label class="col-sm-3 col-form-label fw-semibold">Upstream Gateway</label>
+<div class="col-sm-4">
+<input class="form-control" name="upstream_gateway" placeholder="e.g., 192.168.1.1">
+</div>
+</div>
+</div>
+</div>
+
+<!-- Security Settings -->
+<div class="section">
+<div class="section-header">
+<h2>Security Settings</h2>
+</div>
+<div class="section-body" style="padding: 24px;">
+<div class="mb-4">
+<div class="form-check form-switch">
+<input class="form-check-input" type="checkbox" id="block_rfc1918" checked>
+<label class="form-check-label fw-semibold" for="block_rfc1918">Block RFC1918 Private Networks</label>
+</div>
+<div class="form-text ms-4">Block private network traffic from entering via WAN.</div>
+</div>
 
 <div class="mb-3">
-        <div class="progress" style="height:6px;">
-            <div class="progress-bar bg-danger" role="progressbar" style="width:44%;" aria-valuenow="44" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-2">
-            <span class="badge bg-danger">Step 4 of 9</span>
-        </div>
-    </div>
+<div class="form-check form-switch">
+<input class="form-check-input" type="checkbox" id="block_bogon" checked>
+<label class="form-check-label fw-semibold" for="block_bogon">Block Bogon Networks</label>
+</div>
+<div class="form-text ms-4">Block non-Internet routed networks from entering via WAN.</div>
+</div>
+</div>
+</div>
 
-    <form method="post" action="#">
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 20px 25px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0; font-size: 18px; font-weight: 500;">Configure WAN Interface</div>
-                <p>On this screen the Wide Area Network information will be configured.</p>
+<!-- Navigation Buttons -->
+<div class="d-flex justify-content-between align-items-center mt-4">
+<a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-outline-secondary">
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+</svg>
+Back
+</a>
+<a href="{{ url_for('system.setup_wizard_step', step=6) }}" class="btn btn-primary">
+Continue
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="ms-1" viewBox="0 0 16 16">
+<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+</svg>
+</a>
+</div>
+</form>
+</div>
 
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Configuration Type</label>
-                    <div class="col-sm-4">
-                        <select class="form-select" name="config_type">
-                            <option selected>Static</option>
-                            <option>DHCP</option>
-                            <option>PPPoE</option>
-                            <option>PPTP</option>
-                        </select>
-                    </div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">General configuration</div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">MAC Address</label>
-                    <div class="col-sm-6">
-                        <input class="form-control" name="mac_address" value="">
-                        <div class="form-text">This field can be used to modify ("spoof") the MAC address of the WAN interface (may be required with some cable connections). Enter a MAC address in the following format: xx:xx:xx:xx:xx:xx or leave blank.</div>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">MTU</label>
-                    <div class="col-sm-4">
-                        <input class="form-control" name="mtu" value="">
-                        <div class="form-text">Set the MTU of the WAN interface. If this field is left blank, an MTU of 1492 bytes for PPPoE and 1500 bytes for all other connection types will be assumed.</div>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">MSS</label>
-                    <div class="col-sm-4">
-                        <input class="form-control" name="mss" value="">
-                        <div class="form-text">If a value is entered in this field, then MSS clamping for TCP connections to the value entered above minus 40 (TCP/IP header size) will be in effect.</div>
-                    </div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">Static IP Configuration</div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">IP Address</label>
-                    <div class="col-sm-4">
-                        <input class="form-control" name="ip_address" value="192.168.1.200">
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Subnet Mask</label>
-                    <div class="col-sm-2">
-                        <select class="form-select" name="subnet_mask">
-                            {% for n in range(1,33) %}
-                            <option value="{{n}}" {% if n==24 %}selected{% endif %}>{{n}}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Upstream Gateway</label>
-                    <div class="col-sm-4">
-                        <input class="form-control" name="upstream_gateway" value="">
-                    </div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">DHCP client configuration</div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">DHCP Hostname</label>
-                    <div class="col-sm-6">
-                        <input class="form-control" name="dhcp_hostname" value="">
-                        <div class="form-text">The value in this field is sent as the DHCP client identifier and hostname when requesting a DHCP lease. Some ISPs may require this (for client identification).</div>
-                    </div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">PPPoE configuration</div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPPoE Username</label>
-                    <div class="col-sm-6"><input class="form-control" name="pppoe_user"></div>
-                </div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPPoE Password</label>
-                    <div class="col-sm-6"><input type="password" class="form-control" name="pppoe_pass"></div>
-                </div>
-                <div class="row mb-3 align-items-center">
-                    <label class="col-sm-2 col-form-label">Show PPPoE password</label>
-                    <div class="col-sm-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="show_pppoe_pass">
-                            <label class="form-check-label" for="show_pppoe_pass">Reveal password characters</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPPoE Service name</label>
-                    <div class="col-sm-6"><input class="form-control" name="pppoe_service"></div>
-                </div>
-                <div class="row mb-3 align-items-start">
-                    <label class="col-sm-2 col-form-label">PPPoE Dial on demand</label>
-                    <div class="col-sm-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="pppoe_dial">
-                            <label class="form-check-label">Enable Dial-On-Demand mode</label>
-                            <div class="form-text">This option causes the interface to operate in dial-on-demand mode, allowing a virtual full time connection. The interface is configured, but the actual connection of the link is delayed until qualifying outgoing traffic is detected.</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPPoE Idle timeout</label>
-                    <div class="col-sm-4"><input class="form-control" name="pppoe_idle"></div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">PPTP configuration</div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPTP Username</label>
-                    <div class="col-sm-6"><input class="form-control" name="pptp_user"></div>
-                </div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPTP Password</label>
-                    <div class="col-sm-6"><input type="password" class="form-control" name="pptp_pass"></div>
-                </div>
-                <div class="row mb-3 align-items-center">
-                    <label class="col-sm-2 col-form-label">Show PPTP password</label>
-                    <div class="col-sm-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="show_pptp_pass">
-                            <label class="form-check-label" for="show_pptp_pass">Reveal password characters</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPTP Local IP Address</label>
-                    <div class="col-sm-4"><input class="form-control" name="pptp_local_ip" value=""></div>
-                    <label class="col-sm-2 col-form-label">pptplocalsubnet</label>
-                    <div class="col-sm-2">
-                        <select class="form-select" name="pptp_local_subnet">
-                            {% for n in range(1,33) %}
-                            <option value="{{n}}" {% if n==32 %}selected{% endif %}>{{n}}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPTP Remote IP Address</label>
-                    <div class="col-sm-6"><input class="form-control" name="pptp_remote_ip"></div>
-                </div>
-
-                <div class="row mb-3 align-items-start">
-                    <label class="col-sm-2 col-form-label">PPTP Dial on demand</label>
-                    <div class="col-sm-6">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="pptp_dial">
-                            <label class="form-check-label">Enable Dial-On-Demand mode</label>
-                            <div class="form-text">This option causes the interface to operate in dial-on-demand mode, allowing a virtual full time connection. The interface is configured, but the actual connection of the link is delayed until qualifying outgoing traffic is detected.</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">PPTP Idle timeout</label>
-                    <div class="col-sm-4"><input class="form-control" name="pptp_idle"></div>
-                </div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">RFC1918 Networks</div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="block_rfc1918" checked>
-                    <label class="form-check-label" for="block_rfc1918">Block private networks from entering via WAN</label>
-                </div>
-                <div class="form-text">When set, this option blocks traffic from IP addresses that are reserved for private networks as per RFC 1918 (10/8, 172.16/12, 192.168/16) as well as loopback addresses (127/8). This option should generally be left turned on, unless the WAN network lies in such a private address space, too.</div>
-        </div>
-
-        <div class="settings-section">
-            <div style="background: #333; color: white; padding: 12px 15px; margin: -20px -20px 20px -20px; border-radius: 4px 4px 0 0;">Block bogon networks</div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="block_bogon" checked>
-                    <label class="form-check-label" for="block_bogon">Block non-Internet routed networks from entering via WAN</label>
-                </div>
-                <div class="form-text">When set, this option blocks traffic from IP addresses that are reserved (but not RFC 1918) or not yet assigned by IANA. Bogons are prefixes that should never appear in the Internet routing table, and obviously should not appear as the source address in any packets received.</div>
-        </div>
-
-        <div class="d-flex justify-content-start mt-3">
-            <a href="{{ url_for('system.setup_wizard_step', step=6) }}" class="btn btn-primary">&raquo;&raquo; Next</a>
-        </div>
-    </form>
 {% endblock %}
