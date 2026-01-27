@@ -1,209 +1,317 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="container-fluid mt-4">
-    <h2>Firewall Rules</h2>
+{% block main %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Rules</li>
+            </ol>
+        </nav>
+        <h1>Firewall Rules</h1>
+    </div>
 
-    <ul class="nav nav-tabs mb-3">
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
-            <a class="nav-link active" data-tab="floating" href="#">Floating</a>
+            <a class="nav-link active" data-tab="floating" href="#" onclick="openTab(event, 'floating')">Floating</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" data-tab="wan" href="#">WAN</a>
+            <a class="nav-link" data-tab="wan" href="#" onclick="openTab(event, 'wan')">WAN</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" data-tab="lan" href="#">LAN</a>
+            <a class="nav-link" data-tab="lan" href="#" onclick="openTab(event, 'lan')">LAN</a>
         </li>
     </ul>
 
     <!-- Floating Rules Tab -->
-    <div id="tab-floating" class="tab-content">
-        <h4>Floating Rules</h4>
-        <div class="mb-3">
-            <button id="floating-add-top-btn" class="btn btn-success btn-sm">Add Rule (Top)</button>
-            <button id="floating-add-bottom-btn" class="btn btn-success btn-sm">Add Rule (Bottom)</button>
-        </div>
-
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Select</th>
-                    <th>Enabled</th>
-                    <th>Interface</th>
-                    <th>Protocol</th>
-                    <th>Source</th>
-                    <th>Port</th>
-                    <th>Destination</th>
-                    <th>Port</th>
-                    <th>Gateway</th>
-                    <th>Queue</th>
-                    <th>Schedule</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="floating-tbody">
-                <!-- Rules will be added here dynamically -->
-            </tbody>
-        </table>
-
-        <!-- Floating Rule Add Form -->
-        <div id="floatingAddForm" class="card mt-3" style="display: none;">
-            <div class="card-body">
-                <h5>Add Floating Rule</h5>
-                <form>
-                    <div class="mb-3">
-                        <label class="form-label">Disabled</label>
-                        <input type="checkbox" id="floating_disabled" class="form-check-input">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Interface</label>
-                        <select id="floating_interface" class="form-select">
-                            <option value="WAN">WAN</option>
-                            <option value="LAN">LAN</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Protocol</label>
-                        <select id="floating_protocol" class="form-select">
-                            <option value="any">Any</option>
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                            <option value="icmp">ICMP</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" id="floating_description" class="form-control">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Redirect IP</label>
-                        <input type="text" id="floating_redirect_ip" class="form-control">
-                    </div>
-                    <button type="button" id="floatingRuleSaveBtn" class="btn btn-primary">Save</button>
-                    <button type="button" id="floatingRuleCancelBtn" class="btn btn-secondary">Cancel</button>
-                </form>
+    <div id="tab-floating" class="tab-content active">
+        <div class="section">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>Floating Rules</h2>
+                <div>
+                    <button id="floating-add-top-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#floatingModal">
+                        <i class="fas fa-plus"></i> Add Rule (Top)
+                    </button>
+                    <button id="floating-add-bottom-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#floatingModal">
+                        <i class="fas fa-plus"></i> Add Rule (Bottom)
+                    </button>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Enabled</th>
+                                <th>Interface</th>
+                                <th>Protocol</th>
+                                <th>Source</th>
+                                <th>Port</th>
+                                <th>Destination</th>
+                                <th>Port</th>
+                                <th>Gateway</th>
+                                <th>Queue</th>
+                                <th>Schedule</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="floating-tbody">
+                            <!-- Rules will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- WAN Rules Tab -->
-    <div id="tab-wan" class="tab-content" style="display: none;">
-        <h4>WAN Rules</h4>
-        <button id="wanAddBtn" class="btn btn-success btn-sm mb-3">Add Rule</button>
-
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Select</th>
-                    <th>Action</th>
-                    <th>Disabled</th>
-                    <th>Protocol</th>
-                    <th>Source</th>
-                    <th>Destination</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="wan-tbody">
-                <!-- WAN rules will be added here -->
-            </tbody>
-        </table>
-
-        <!-- WAN Rule Add Form -->
-        <div id="wanAddForm" class="card mt-3" style="display: none;">
-            <div class="card-body">
-                <h5>Add WAN Rule</h5>
-                <form>
-                    <div class="mb-3">
-                        <label class="form-label">Action</label>
-                        <select id="wan_rule_action" class="form-select">
-                            <option value="pass">Pass</option>
-                            <option value="block">Block</option>
-                            <option value="reject">Reject</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Disabled</label>
-                        <input type="checkbox" id="wan_rule_disabled" class="form-check-input">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Protocol</label>
-                        <select id="wan_rule_protocol" class="form-select">
-                            <option value="any">Any</option>
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                            <option value="icmp">ICMP</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" id="rule_desc" class="form-control">
-                    </div>
-                    <button type="button" id="ruleEditSaveBtn" class="btn btn-primary">Save</button>
-                    <button type="button" id="ruleEditCancelBtn" class="btn btn-secondary">Cancel</button>
-                </form>
+    <div id="tab-wan" class="tab-content">
+        <div class="section">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>WAN Rules</h2>
+                <button id="wanAddBtn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#wanModal">
+                    <i class="fas fa-plus"></i> Add Rule
+                </button>
+            </div>
+            <div class="section-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Action</th>
+                                <th>Disabled</th>
+                                <th>Protocol</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wan-tbody">
+                            <!-- WAN rules will be added here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- LAN Rules Tab -->
-    <div id="tab-lan" class="tab-content" style="display: none;">
-        <h4>LAN Rules</h4>
-        <button id="lan-add-btn" class="btn btn-success btn-sm mb-3">Add Rule</button>
+    <div id="tab-lan" class="tab-content">
+        <div class="section">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>LAN Rules</h2>
+                <button id="lan-add-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#lanModal">
+                    <i class="fas fa-plus"></i> Add Rule
+                </button>
+            </div>
+            <div class="section-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Select</th>
+                                <th>Interface</th>
+                                <th>Protocol</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lan-tbody">
+                            <!-- LAN rules will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Select</th>
-                    <th>Interface</th>
-                    <th>Protocol</th>
-                    <th>Source</th>
-                    <th>Destination</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="lan-tbody">
-                <!-- LAN rules will be added here -->
-            </tbody>
-        </table>
-
-        <!-- LAN Rule Add Form -->
-        <div id="lanAddForm" class="card mt-3" style="display: none;">
-            <div class="card-body">
-                <h5>Add LAN Rule</h5>
-                <form>
-                    <div class="mb-3">
-                        <label class="form-label">Interface</label>
-                        <select id="lan_interface" class="form-select">
-                            <option value="LAN">LAN</option>
-                        </select>
+<!-- Floating Rule Modal -->
+<div class="modal fade" id="floatingModal" tabindex="-1" aria-labelledby="floatingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="floatingModalLabel">Add Floating Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="floatingRuleForm">
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Disabled</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input type="checkbox" id="floating_disabled" class="form-check-input">
+                                <label class="form-check-label" for="floating_disabled">Disable this rule</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Protocol</label>
-                        <select id="lan_protocol" class="form-select">
-                            <option value="any">Any</option>
-                            <option value="tcp">TCP</option>
-                            <option value="udp">UDP</option>
-                            <option value="icmp">ICMP</option>
-                        </select>
+                    <div class="mb-3 row">
+                        <label for="floating_interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
+                        <div class="col-sm-9">
+                            <select id="floating_interface" class="form-select">
+                                <option value="WAN">WAN</option>
+                                <option value="LAN">LAN</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" id="lan_description" class="form-control">
+                    <div class="mb-3 row">
+                        <label for="floating_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
+                        <div class="col-sm-9">
+                            <select id="floating_protocol" class="form-select">
+                                <option value="any">Any</option>
+                                <option value="tcp">TCP</option>
+                                <option value="udp">UDP</option>
+                                <option value="icmp">ICMP</option>
+                            </select>
+                        </div>
                     </div>
-                    <button type="button" id="lanRuleSaveBtn" class="btn btn-primary">Save</button>
-                    <button type="button" id="lanRuleCancelBtn" class="btn btn-secondary">Cancel</button>
+                    <div class="mb-3 row">
+                        <label for="floating_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_description" class="form-control" placeholder="Enter rule description">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_redirect_ip" class="col-sm-3 col-form-label fw-semibold">Redirect IP</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_redirect_ip" class="form-control" placeholder="e.g., 192.168.1.100">
+                        </div>
+                    </div>
                 </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="floatingRuleCancelBtn">Cancel</button>
+                <button type="button" id="floatingRuleSaveBtn" class="btn btn-primary">Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WAN Rule Modal -->
+<div class="modal fade" id="wanModal" tabindex="-1" aria-labelledby="wanModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="wanModalLabel">Add WAN Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="wanRuleForm">
+                    <div class="mb-3 row">
+                        <label for="wan_rule_action" class="col-sm-3 col-form-label fw-semibold">Action</label>
+                        <div class="col-sm-9">
+                            <select id="wan_rule_action" class="form-select">
+                                <option value="pass">Pass</option>
+                                <option value="block">Block</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Disabled</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input type="checkbox" id="wan_rule_disabled" class="form-check-input">
+                                <label class="form-check-label" for="wan_rule_disabled">Disable this rule</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="wan_rule_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
+                        <div class="col-sm-9">
+                            <select id="wan_rule_protocol" class="form-select">
+                                <option value="any">Any</option>
+                                <option value="tcp">TCP</option>
+                                <option value="udp">UDP</option>
+                                <option value="icmp">ICMP</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="rule_desc" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="rule_desc" class="form-control" placeholder="Enter rule description">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="ruleEditCancelBtn">Cancel</button>
+                <button type="button" id="ruleEditSaveBtn" class="btn btn-primary">Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LAN Rule Modal -->
+<div class="modal fade" id="lanModal" tabindex="-1" aria-labelledby="lanModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="lanModalLabel">Add LAN Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="lanRuleForm">
+                    <div class="mb-3 row">
+                        <label for="lan_interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
+                        <div class="col-sm-9">
+                            <select id="lan_interface" class="form-select">
+                                <option value="LAN">LAN</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
+                        <div class="col-sm-9">
+                            <select id="lan_protocol" class="form-select">
+                                <option value="any">Any</option>
+                                <option value="tcp">TCP</option>
+                                <option value="udp">UDP</option>
+                                <option value="icmp">ICMP</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="lan_description" class="form-control" placeholder="Enter rule description">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="lanRuleCancelBtn">Cancel</button>
+                <button type="button" id="lanRuleSaveBtn" class="btn btn-primary">Save Rule</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // --- TAB SWITCHING FUNCTION ---
+    function openTab(evt, tabName) {
+        evt.preventDefault();
+        // Remove active class from all tab content
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        // Remove active class from all tabs
+        document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+        // Add active class to selected tab content
+        document.getElementById('tab-' + tabName).classList.add('active');
+        // Add active class to clicked tab
+        evt.currentTarget.classList.add('active');
+    }
+
     // --- UTILITY FUNCTION: SEND TO BACKEND ---
-    // This connects your frontend to the Flask server
     async function saveRuleToBackend(ruleData, type) {
         try {
             let endpoint = '';
@@ -236,33 +344,20 @@
         }
     }
 
-    // Handle tab switching
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const tab = link.dataset.tab;
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-            document.getElementById('tab-' + tab).style.display = 'block';
-        });
-    });
-
     // --- FLOATING RULES LOGIC ---
     const floatingAddTopBtn = document.getElementById('floating-add-top-btn');
     const floatingAddBottomBtn = document.getElementById('floating-add-bottom-btn');
     const floatingTbody = document.getElementById('floating-tbody');
-    const floatingAddForm = document.getElementById('floatingAddForm');
     const floatingRuleSaveBtn = document.getElementById('floatingRuleSaveBtn');
+    const floatingModal = document.getElementById('floatingModal');
 
     let addPosition = 'bottom';
 
-    if (floatingAddTopBtn) floatingAddTopBtn.addEventListener('click', () => { addPosition = 'top'; floatingAddForm.style.display = 'block'; });
-    if (floatingAddBottomBtn) floatingAddBottomBtn.addEventListener('click', () => { addPosition = 'bottom'; floatingAddForm.style.display = 'block'; });
+    if (floatingAddTopBtn) floatingAddTopBtn.addEventListener('click', () => { addPosition = 'top'; });
+    if (floatingAddBottomBtn) floatingAddBottomBtn.addEventListener('click', () => { addPosition = 'bottom'; });
 
     if (floatingRuleSaveBtn) {
         floatingRuleSaveBtn.addEventListener('click', async () => {
-            // 1. Collect Data from Form
             const ruleData = {
                 disabled: document.getElementById('floating_disabled').checked ? 1 : 0,
                 interface: document.getElementById('floating_interface').value,
@@ -277,32 +372,28 @@
                 description: document.getElementById('floating_description').value || 'New floating rule'
             };
 
-            // 2. Send to Backend
             const result = await saveRuleToBackend(ruleData, 'floating');
 
             if (result) {
-                // 3. Update UI only if backend call succeeded
                 const row = document.createElement('tr');
                 row.dataset.ruleId = result.id;
-                row.innerHTML = `<td><input type="checkbox"></td><td>${ruleData.disabled ? '✗' : '✓'}</td><td>${ruleData.interface}</td><td>${ruleData.protocol}</td><td>${ruleData.source}</td><td>*</td><td>${ruleData.destination}</td><td>*</td><td>-</td><td>none</td><td>-</td><td>${ruleData.description}</td><td><button class="btn btn-sm btn-primary">Edit</button><button class="btn btn-sm btn-danger">Delete</button></td>`;
+                row.innerHTML = `<td><input type="checkbox"></td><td>${ruleData.disabled ? '✗' : '✓'}</td><td>${ruleData.interface}</td><td>${ruleData.protocol}</td><td>${ruleData.source}</td><td>*</td><td>${ruleData.destination}</td><td>*</td><td>-</td><td>none</td><td>-</td><td>${ruleData.description}</td><td><button class="btn btn-sm btn-primary" onclick="editRule('floating', ${result.id})">Edit</button><button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${result.id})">Delete</button></td>`;
                 if (addPosition === 'top') floatingTbody.insertBefore(row, floatingTbody.firstChild);
                 else floatingTbody.appendChild(row);
 
-                floatingAddForm.style.display = 'none';
-                // Clear form
+                // Close modal and reset form
+                bootstrap.Modal.getInstance(floatingModal).hide();
                 document.getElementById('floating_disabled').checked = false;
                 document.getElementById('floating_description').value = '';
+                document.getElementById('floating_redirect_ip').value = '';
                 alert('Rule saved successfully!');
             }
         });
     }
 
     // --- WAN RULES LOGIC ---
-    const wanAddBtn = document.getElementById('wanAddBtn');
-    const wanAddForm = document.getElementById('wanAddForm');
+    const wanModal = document.getElementById('wanModal');
     const ruleEditSaveBtn = document.getElementById('ruleEditSaveBtn');
-
-    if (wanAddBtn) wanAddBtn.addEventListener('click', () => { wanAddForm.style.display = 'block'; });
 
     if (ruleEditSaveBtn) {
         ruleEditSaveBtn.addEventListener('click', async () => {
@@ -318,22 +409,18 @@
             const result = await saveRuleToBackend(ruleData, 'wan');
             if (result) {
                 alert('WAN Rule saved successfully!');
-                wanAddForm.style.display = 'none';
-                // Clear form
+                // Close modal and reset form
+                bootstrap.Modal.getInstance(wanModal).hide();
                 document.getElementById('wan_rule_disabled').checked = false;
                 document.getElementById('rule_desc').value = '';
-                // Reload the page or add to table
                 location.reload();
             }
         });
     }
 
     // --- LAN RULES LOGIC ---
-    const lanAddBtn = document.getElementById('lan-add-btn');
-    const lanAddForm = document.getElementById('lanAddForm');
+    const lanModal = document.getElementById('lanModal');
     const lanRuleSaveBtn = document.getElementById('lanRuleSaveBtn');
-
-    if (lanAddBtn) lanAddBtn.addEventListener('click', () => { lanAddForm.style.display = 'block'; });
 
     if (lanRuleSaveBtn) {
         lanRuleSaveBtn.addEventListener('click', async () => {
@@ -349,19 +436,13 @@
             const result = await saveRuleToBackend(ruleData, 'lan');
             if (result) {
                 alert('LAN Rule saved successfully!');
-                lanAddForm.style.display = 'none';
-                // Clear form
+                // Close modal and reset form
+                bootstrap.Modal.getInstance(lanModal).hide();
                 document.getElementById('lan_description').value = '';
-                // Reload the page or add to table
                 location.reload();
             }
         });
     }
-
-    // Cancel Buttons
-    document.getElementById('floatingRuleCancelBtn').addEventListener('click', () => { floatingAddForm.style.display = 'none'; });
-    document.getElementById('ruleEditCancelBtn').addEventListener('click', () => { wanAddForm.style.display = 'none'; });
-    document.getElementById('lanRuleCancelBtn').addEventListener('click', () => { lanAddForm.style.display = 'none'; });
 
     // --- LOAD EXISTING RULES FROM DATABASE ---
     async function loadFloatingRules() {

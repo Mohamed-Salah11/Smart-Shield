@@ -1,432 +1,426 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<!-- Breadcrumb -->
-<div class="breadcrumb">
-	<a href="{{ url_for('firewall.firewall_home') }}">Firewall</a>
-	<span>/</span>
-	<span>Virtual IPs</span>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Virtual IPs</li>
+            </ol>
+        </nav>
+        <h1>Virtual IPs</h1>
+    </div>
+
+    <!-- Virtual IPs Section -->
+    <div class="section">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>Virtual IP Addresses</h2>
+            <button type="button" class="btn btn-success btn-sm" id="virtualIpsAdd" data-bs-toggle="modal" data-bs-target="#viModal">
+                <i class="fas fa-plus"></i> Add Virtual IP
+            </button>
+        </div>
+        <div class="section-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width:20%">Interface</th>
+                            <th style="width:15%">Type</th>
+                            <th style="width:25%">Address</th>
+                            <th style="width:25%">Description</th>
+                            <th style="width:15%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="virtual-ips-tbody">
+                        <!-- Virtual IPs will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="settings-section">
-	<h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Virtual IPs</h5>
-	
-	<table class="table table-bordered">
-		<thead>
-			<tr>
-				<th>Interface</th>
-				<th>Type</th>
-				<th>Address</th>
-				<th>Description</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody id="virtual-ips-tbody">
-		</tbody>
-	</table>
-
-	<div class="d-flex gap-2" style="padding: 12px; background: #fff; border-top: 1px solid #ddd;">
-		<button type="button" class="btn btn-success" id="virtualIpsAdd">Add</button>
-		<button type="button" class="btn btn-danger" id="virtualIpsDelete">Delete</button>
-	</div>
-</div>
-
-<!-- Edit Virtual IP Modal -->
-<div class="modal fade" id="viModal" tabindex="-1">
-	<div class="modal-dialog modal-lg">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title">Edit Virtual IP</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-			</div>
-			<div class="modal-body">
-				<div class="form-group">
-					<label>Type</label>
-					<div class="form-group-content">
-						<div class="form-check">
-							<input class="form-check-input" type="radio" name="vi_type" id="vi_type_alias" value="ip_alias" checked>
-							<label class="form-check-label" for="vi_type_alias">IP Alias</label>
-						</div>
-						<div class="form-check">
-							<input class="form-check-input" type="radio" name="vi_type" id="vi_type_carp" value="carp">
-							<label class="form-check-label" for="vi_type_carp">CARP</label>
-						</div>
-						<div class="form-check">
-							<input class="form-check-input" type="radio" name="vi_type" id="vi_type_proxy" value="proxy_arp">
-							<label class="form-check-label" for="vi_type_proxy">Proxy ARP</label>
-						</div>
-						<div class="form-check">
-							<input class="form-check-input" type="radio" name="vi_type" id="vi_type_other" value="other">
-							<label class="form-check-label" for="vi_type_other">Other</label>
-						</div>
-					</div>
-				</div>
-				
-				<div class="form-group">
-					<label>Interface</label>
-					<div class="form-group-content">
-						<select class="form-control" id="vi_interface" style="max-width: 400px;">
-							<option value="">-- Select Interface --</option>
-							<option value="wan">WAN</option>
-							<option value="lan">LAN</option>
-							<option value="localhost">Localhost</option>
-						</select>
-					</div>
-				</div>
-				
-				<div class="form-group">
-					<label>Address type</label>
-					<div class="form-group-content">
-						<select class="form-control" id="vi_addr_type" style="max-width: 400px;">
-							<option value="single">Single address</option>
-							<option value="network">Network</option>
-						</select>
-					</div>
-				</div>
-				
-				<div class="form-group">
-					<label>Address(es)</label>
-					<div class="form-group-content">
-						<div class="d-flex align-items-center gap-2" style="max-width: 400px;">
-							<input type="text" class="form-control" id="vi_address">
-							<span>/</span>
-							<select class="form-control" id="vi_mask_bits" style="width: 80px;">
-								<option value="32">128</option>
-							</select>
-						</div>
-					</div>
-				</div>
-				
-				<div class="form-group">
-					<label>Expansion</label>
-					<div class="form-group-content">
-						<div class="form-check">
-							<input class="form-check-input" type="checkbox" id="vi_expansion">
-							<label class="form-check-label" for="vi_expansion">
-								Disable expansion of this entry into IPs on NAT lists (e.g. 192.168.1.0/24 expands to 256 entries.)
-							</label>
-						</div>
-					</div>
-				</div>
-				
-				<div class="form-group" id="vi_password_row" style="display: none;">
-					<label>Virtual IP Password</label>
-					<div class="form-group-content">
-						<div class="row">
-							<div class="col-md-6">
-								<input type="password" class="form-control" id="vi_password" placeholder="Virtual IP Password">
-								<div class="help-text">Enter the VHID group password.</div>
-							</div>
-							<div class="col-md-6">
-								<input type="password" class="form-control" id="vi_password_confirm" placeholder="Confirm Password">
-								<div class="help-text">Confirm</div>
-							</div>
-						</div>
-					</div>
-				</div>
-				
-				<div class="form-group" id="vi_vhid_row" style="display: none;">
-					<label>VHID Group</label>
-					<div class="form-group-content">
-						<select class="form-control" id="vi_vhid" style="max-width: 300px;">
-							<option value="1">1</option>
-							<option value="2">2</option>
-							<option value="3">3</option>
-						</select>
-						<div class="help-text">Enter the VHID group that the machines will share.</div>
-					</div>
-				</div>
-				
-				<div class="form-group" id="vi_adv_freq_row" style="display: none;">
-					<label>Advertising Frequency</label>
-					<div class="form-group-content">
-						<div class="row">
-							<div class="col-md-6">
-								<select class="form-control" id="vi_adv_base">
-									<option value="1">1</option>
-									<option value="2">2</option>
-								</select>
-								<div class="help-text">Base</div>
-							</div>
-							<div class="col-md-6">
-								<select class="form-control" id="vi_adv_skew">
-									<option value="0">0</option>
-									<option value="1">1</option>
-									<option value="2">2</option>
-								</select>
-								<div class="help-text">Skew</div>
-							</div>
-						</div>
-						<div class="help-text">The frequency that this machine will advertise. 0 means usually master. Otherwise the lowest combination of both values in the cluster determines the master.</div>
-					</div>
-				</div>
-				
-				<div class="form-group">
-					<label>Description</label>
-					<div class="form-group-content">
-						<input type="text" class="form-control" id="vi_description" style="max-width: 400px;">
-						<div class="help-text">A description may be entered here for administrative reference (not parsed).</div>
-					</div>
-				</div>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-				<button type="button" class="btn btn-primary" id="viModalSave">Save</button>
-			</div>
-		</div>
-	</div>
+<!-- Virtual IP Modal -->
+<div class="modal fade" id="viModal" tabindex="-1" aria-labelledby="viModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viModalLabel">Add / Edit Virtual IP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="viForm">
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Type</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="vi_type" id="vi_type_alias" value="ip_alias" checked>
+                                <label class="form-check-label" for="vi_type_alias">IP Alias</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="vi_type" id="vi_type_carp" value="carp">
+                                <label class="form-check-label" for="vi_type_carp">CARP</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="vi_type" id="vi_type_proxy" value="proxy_arp">
+                                <label class="form-check-label" for="vi_type_proxy">Proxy ARP</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="vi_type" id="vi_type_other" value="other">
+                                <label class="form-check-label" for="vi_type_other">Other</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="vi_interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="vi_interface">
+                                <option value="">-- Select Interface --</option>
+                                <option value="wan">WAN</option>
+                                <option value="lan">LAN</option>
+                                <option value="localhost">Localhost</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="vi_addr_type" class="col-sm-3 col-form-label fw-semibold">Address Type</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="vi_addr_type">
+                                <option value="single">Single address</option>
+                                <option value="network">Network</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="vi_address" class="col-sm-3 col-form-label fw-semibold">Address(es)</label>
+                        <div class="col-sm-9">
+                            <div class="row g-2">
+                                <div class="col-8">
+                                    <input type="text" class="form-control" id="vi_address" placeholder="IP Address">
+                                </div>
+                                <div class="col-1 d-flex align-items-center justify-content-center">
+                                    <span>/</span>
+                                </div>
+                                <div class="col-3">
+                                    <select class="form-select" id="vi_mask_bits">
+                                        <option value="32">32</option>
+                                        <option value="31">31</option>
+                                        <option value="30">30</option>
+                                        <option value="29">29</option>
+                                        <option value="28">28</option>
+                                        <option value="27">27</option>
+                                        <option value="26">26</option>
+                                        <option value="25">25</option>
+                                        <option value="24">24</option>
+                                        <option value="23">23</option>
+                                        <option value="22">22</option>
+                                        <option value="21">21</option>
+                                        <option value="20">20</option>
+                                        <option value="16">16</option>
+                                        <option value="8">8</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Expansion</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="vi_expansion">
+                                <label class="form-check-label" for="vi_expansion">
+                                    Disable expansion of this entry into IPs on NAT lists
+                                </label>
+                            </div>
+                            <small class="text-muted">E.g. 192.168.1.0/24 expands to 256 entries</small>
+                        </div>
+                    </div>
+                    
+                    <!-- CARP Fields -->
+                    <div id="vi_password_row" class="mb-3 row" style="display: none;">
+                        <label class="col-sm-3 col-form-label fw-semibold">Virtual IP Password</label>
+                        <div class="col-sm-9">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="password" class="form-control" id="vi_password" placeholder="Password">
+                                </div>
+                                <div class="col-6">
+                                    <input type="password" class="form-control" id="vi_password_confirm" placeholder="Confirm Password">
+                                </div>
+                            </div>
+                            <small class="text-muted">Enter the VHID group password</small>
+                        </div>
+                    </div>
+                    
+                    <div id="vi_vhid_row" class="mb-3 row" style="display: none;">
+                        <label for="vi_vhid" class="col-sm-3 col-form-label fw-semibold">VHID Group</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="vi_vhid" style="max-width: 150px;">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                            <small class="text-muted">VHID group that machines will share</small>
+                        </div>
+                    </div>
+                    
+                    <div id="vi_adv_freq_row" class="mb-3 row" style="display: none;">
+                        <label class="col-sm-3 col-form-label fw-semibold">Advertising Frequency</label>
+                        <div class="col-sm-9">
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <select class="form-select" id="vi_adv_base">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                    </select>
+                                    <small class="text-muted d-block text-center">Base</small>
+                                </div>
+                                <div class="col-4">
+                                    <select class="form-select" id="vi_adv_skew">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                    </select>
+                                    <small class="text-muted d-block text-center">Skew</small>
+                                </div>
+                            </div>
+                            <small class="text-muted">0 means usually master. Lowest combination determines master.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="vi_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="vi_description" placeholder="Optional description">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="viModalSave">Save</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const viModal = document.getElementById('viModal');
+    const virtualIpsAdd = document.getElementById('virtualIpsAdd');
+    const viModalSave = document.getElementById('viModalSave');
+    const viTypeRadios = document.querySelectorAll('input[name="vi_type"]');
+    
+    loadVirtualIPsConfigs();
+    
+    if (virtualIpsAdd) {
+        virtualIpsAdd.addEventListener('click', function(e) { 
+            openNewVirtualIPForm();
+        });
+    }
+    
+    if (viModalSave) {
+        viModalSave.addEventListener('click', function(e) {
+            e.preventDefault();
+            saveVirtualIP();
+        });
+    }
+    
+    viTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const isCarp = this.value === 'carp';
+            document.getElementById('vi_password_row').style.display = isCarp ? '' : 'none';
+            document.getElementById('vi_vhid_row').style.display = isCarp ? '' : 'none';
+            document.getElementById('vi_adv_freq_row').style.display = isCarp ? '' : 'none';
+        });
+    });
+});
+
 function loadVirtualIPsConfigs() {
-	fetch('/firewall/get-virtual-ips-configs')
-		.then(response => {
-			if(!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-			return response.json();
-		})
-		.then(data => {
-			if(data.status === 'success' && data.data) {
-				displayVirtualIPsConfigs(data.data);
-			}
-		})
-		.catch(error => console.error('Error loading Virtual IPs configs:', error));
+    fetch('/firewall/get-virtual-ips-configs')
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success' && data.data) {
+                displayVirtualIPsConfigs(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading Virtual IPs:', error));
 }
 
 function displayVirtualIPsConfigs(configs) {
-	const tbody = document.getElementById('virtual-ips-tbody');
-	tbody.innerHTML = '';
-	
-	configs.forEach(config => {
-		const row = document.createElement('tr');
-		row.innerHTML = `
-			<td>${escapeHtml(config.interface || '')}</td>
-			<td>${escapeHtml(config.type || '')}</td>
-			<td>${escapeHtml(config.address || '')}${config.prefix ? '/' + escapeHtml(config.prefix.toString()) : ''}</td>
-			<td>${escapeHtml(config.description || '')}</td>
-			<td>
-				<button class="btn btn-sm btn-primary" onclick="editVirtualIP(${config.id})">
-					<i class="fas fa-edit"></i>
-				</button>
-				<button class="btn btn-sm btn-danger" onclick="deleteVirtualIP(${config.id})">
-					<i class="fas fa-trash-alt"></i>
-				</button>
-			</td>
-		`;
-		tbody.appendChild(row);
-	});
+    const tbody = document.getElementById('virtual-ips-tbody');
+    
+    if (configs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No virtual IPs configured</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    configs.forEach(config => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${escapeHtml(config.interface || '')}</td>
+            <td><span class="badge bg-info">${escapeHtml(config.type || '')}</span></td>
+            <td>${escapeHtml(config.address || '')}${config.prefix ? '/' + escapeHtml(config.prefix.toString()) : ''}</td>
+            <td>${escapeHtml(config.description || '-')}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editVirtualIP(${config.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteVirtualIP(${config.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
 function openNewVirtualIPForm() {
-	const modal = document.getElementById('viModal');
-	const form = document.querySelector('#viModal .modal-body');
-	
-	modal.dataset.configId = null;
-	
-	// Reset all form fields
-	document.getElementById('vi_type_alias').checked = true;
-	document.getElementById('vi_interface').value = '';
-	document.getElementById('vi_addr_type').value = 'single';
-	document.getElementById('vi_address').value = '';
-	document.getElementById('vi_mask_bits').value = '128';
-	document.getElementById('vi_expansion').checked = false;
-	document.getElementById('vi_description').value = '';
-	
-	// Clear CARP fields
-	document.getElementById('vi_password').value = '';
-	document.getElementById('vi_password_confirm').value = '';
-	document.getElementById('vi_vhid').value = '1';
-	document.getElementById('vi_adv_base').value = '1';
-	document.getElementById('vi_adv_skew').value = '0';
-	
-	// Hide CARP fields by default
-	document.getElementById('vi_password_row').style.display = 'none';
-	document.getElementById('vi_vhid_row').style.display = 'none';
-	document.getElementById('vi_adv_freq_row').style.display = 'none';
-	
-	const viModal = new bootstrap.Modal(modal);
-	viModal.show();
-}
-
-function closeVirtualIPForm() {
-	const modal = document.getElementById('viModal');
-	const viModal = bootstrap.Modal.getInstance(modal);
-	if(viModal) viModal.hide();
+    const modal = document.getElementById('viModal');
+    modal.dataset.configId = '';
+    
+    document.getElementById('viModalLabel').textContent = 'Add Virtual IP';
+    document.getElementById('vi_type_alias').checked = true;
+    document.getElementById('vi_interface').value = '';
+    document.getElementById('vi_addr_type').value = 'single';
+    document.getElementById('vi_address').value = '';
+    document.getElementById('vi_mask_bits').value = '32';
+    document.getElementById('vi_expansion').checked = false;
+    document.getElementById('vi_description').value = '';
+    document.getElementById('vi_password').value = '';
+    document.getElementById('vi_password_confirm').value = '';
+    document.getElementById('vi_vhid').value = '1';
+    document.getElementById('vi_adv_base').value = '1';
+    document.getElementById('vi_adv_skew').value = '0';
+    
+    document.getElementById('vi_password_row').style.display = 'none';
+    document.getElementById('vi_vhid_row').style.display = 'none';
+    document.getElementById('vi_adv_freq_row').style.display = 'none';
 }
 
 function editVirtualIP(id) {
-	fetch(`/firewall/get-virtual-ips-config/${id}`)
-		.then(response => {
-			if(!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-			return response.json();
-		})
-		.then(data => {
-			if(data.status === 'success' && data.data) {
-				const config = data.data;
-				const modal = document.getElementById('viModal');
-				modal.dataset.configId = id;
-				
-				// Set form fields
-				const typeRadio = document.querySelector(`input[name="vi_type"][value="${config.type}"]`);
-				if(typeRadio) typeRadio.checked = true;
-				
-				document.getElementById('vi_interface').value = config.interface || '';
-				document.getElementById('vi_addr_type').value = config.address_type || 'single';
-				document.getElementById('vi_address').value = config.address || '';
-				document.getElementById('vi_mask_bits').value = config.prefix || '128';
-				document.getElementById('vi_expansion').checked = config.expansion === true || config.expansion === 1;
-				document.getElementById('vi_description').value = config.description || '';
-				
-				// Show/hide CARP fields if needed
-				const passwordRow = document.getElementById('vi_password_row');
-				const vhidRow = document.getElementById('vi_vhid_row');
-				const advFreqRow = document.getElementById('vi_adv_freq_row');
-				
-				if(config.type === 'carp') {
-					passwordRow.style.display = '';
-					vhidRow.style.display = '';
-					advFreqRow.style.display = '';
-				} else {
-					passwordRow.style.display = 'none';
-					vhidRow.style.display = 'none';
-					advFreqRow.style.display = 'none';
-				}
-				
-				const viModal = new bootstrap.Modal(modal);
-				viModal.show();
-			}
-		})
-		.catch(error => console.error('Error loading Virtual IP config:', error));
+    fetch(`/firewall/get-virtual-ips-config/${id}`)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success' && data.data) {
+                const config = data.data;
+                const modal = document.getElementById('viModal');
+                modal.dataset.configId = id;
+                
+                document.getElementById('viModalLabel').textContent = 'Edit Virtual IP';
+                
+                const typeRadio = document.querySelector(`input[name="vi_type"][value="${config.type}"]`);
+                if (typeRadio) typeRadio.checked = true;
+                
+                document.getElementById('vi_interface').value = config.interface || '';
+                document.getElementById('vi_addr_type').value = config.address_type || 'single';
+                document.getElementById('vi_address').value = config.address || '';
+                document.getElementById('vi_mask_bits').value = config.prefix || '32';
+                document.getElementById('vi_expansion').checked = config.expansion === true || config.expansion === 1;
+                document.getElementById('vi_description').value = config.description || '';
+                
+                const isCarp = config.type === 'carp';
+                document.getElementById('vi_password_row').style.display = isCarp ? '' : 'none';
+                document.getElementById('vi_vhid_row').style.display = isCarp ? '' : 'none';
+                document.getElementById('vi_adv_freq_row').style.display = isCarp ? '' : 'none';
+                
+                new bootstrap.Modal(modal).show();
+            }
+        })
+        .catch(error => console.error('Error loading Virtual IP:', error));
 }
 
 function saveVirtualIP() {
-	const modal = document.getElementById('viModal');
-	const configId = modal.dataset.configId;
-	
-	const formData = {
-		type: document.querySelector('input[name="vi_type"]:checked').value,
-		interface: document.getElementById('vi_interface').value,
-		address_type: document.getElementById('vi_addr_type').value,
-		address: document.getElementById('vi_address').value,
-		prefix: parseInt(document.getElementById('vi_mask_bits').value),
-		expansion: document.getElementById('vi_expansion').checked,
-		description: document.getElementById('vi_description').value
-	};
-	
-	if(!formData.type || !formData.interface || !formData.address) {
-		alert('Please fill in all required fields');
-		return;
-	}
-	
-	const isUpdate = configId && configId !== "undefined" && configId !== "null";
-
-	const url = isUpdate 
-    ? `/firewall/update-virtual-ips-config/${configId}` 
-    : '/firewall/save-virtual-ips-config';
-
-	const method = isUpdate ? 'PUT' : 'POST';
-	
-	fetch(url, {
-		method: method,
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(formData)
-	})
-	.then(response => {
-		if(!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-		return response.json();
-	})
-	.then(data => {
-		if(data.status === 'success') {
-			closeVirtualIPForm();
-			loadVirtualIPsConfigs();
-		} else {
-			alert('Error saving Virtual IP: ' + (data.message || 'Unknown error'));
-		}
-	})
-	.catch(error => {
-		console.error('Error saving Virtual IP:', error);
-		alert('Error saving Virtual IP: ' + error.message);
-	});
+    const modal = document.getElementById('viModal');
+    const configId = modal.dataset.configId;
+    
+    const formData = {
+        type: document.querySelector('input[name="vi_type"]:checked').value,
+        interface: document.getElementById('vi_interface').value,
+        address_type: document.getElementById('vi_addr_type').value,
+        address: document.getElementById('vi_address').value,
+        prefix: parseInt(document.getElementById('vi_mask_bits').value),
+        expansion: document.getElementById('vi_expansion').checked,
+        description: document.getElementById('vi_description').value
+    };
+    
+    if (!formData.type || !formData.interface || !formData.address) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    const isUpdate = configId && configId !== "undefined" && configId !== "null" && configId !== "";
+    const url = isUpdate ? `/firewall/update-virtual-ips-config/${configId}` : '/firewall/save-virtual-ips-config';
+    const method = isUpdate ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            bootstrap.Modal.getInstance(modal).hide();
+            loadVirtualIPsConfigs();
+            alert(isUpdate ? 'Virtual IP updated!' : 'Virtual IP added!');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving Virtual IP: ' + error.message);
+    });
 }
 
 function deleteVirtualIP(id) {
-	if(!confirm('Are you sure you want to delete this Virtual IP?')) return;
-	
-	fetch(`/firewall/delete-virtual-ips-config/${id}`, { method: 'DELETE' })
-		.then(response => {
-			if(!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-			return response.json();
-		})
-		.then(data => {
-			if(data.status === 'success') {
-				loadVirtualIPsConfigs();
-			} else {
-				alert('Error deleting Virtual IP: ' + (data.message || 'Unknown error'));
-			}
-		})
-		.catch(error => {
-			console.error('Error deleting Virtual IP:', error);
-			alert('Error deleting Virtual IP: ' + error.message);
-		});
+    if (!confirm('Are you sure you want to delete this Virtual IP?')) return;
+    
+    fetch(`/firewall/delete-virtual-ips-config/${id}`, { method: 'DELETE' })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                loadVirtualIPsConfigs();
+                alert('Virtual IP deleted!');
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting Virtual IP: ' + error.message);
+        });
 }
 
 function escapeHtml(text) {
-	const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-	return text.replace(/[&<>"']/g, m => map[m]);
+    if (!text) return '';
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-	const viModal = document.getElementById('viModal');
-	const virtualIpsAdd = document.getElementById('virtualIpsAdd');
-	const viModalSave = document.getElementById('viModalSave');
-	const viTypeRadios = document.querySelectorAll('input[name="vi_type"]');
-	
-	// Load configurations on page load
-	loadVirtualIPsConfigs();
-	
-	// Open modal on Add button
-	if(virtualIpsAdd) {
-		virtualIpsAdd.addEventListener('click', function(e) { 
-			e.preventDefault(); 
-			openNewVirtualIPForm();
-		});
-	}
-	
-	// Save button
-	if(viModalSave) {
-		viModalSave.addEventListener('click', function(e) {
-			e.preventDefault();
-			saveVirtualIP();
-		});
-	}
-	
-	// Show/hide CARP-specific fields based on type
-	viTypeRadios.forEach(radio => {
-		radio.addEventListener('change', function() {
-			const passwordRow = document.getElementById('vi_password_row');
-			const vhidRow = document.getElementById('vi_vhid_row');
-			const advFreqRow = document.getElementById('vi_adv_freq_row');
-			
-			if(this.value === 'carp') {
-				passwordRow.style.display = '';
-				vhidRow.style.display = '';
-				advFreqRow.style.display = '';
-			} else {
-				passwordRow.style.display = 'none';
-				vhidRow.style.display = 'none';
-				advFreqRow.style.display = 'none';
-			}
-		});
-	});
-
-	// Delete button (for future use with checkboxes if needed)
-	const virtualIpsDelete = document.getElementById('virtualIpsDelete');
-	if(virtualIpsDelete) {
-		virtualIpsDelete.addEventListener('click', function(e) { 
-			e.preventDefault(); 
-			console.log('Delete Virtual IP clicked');
-		});
-	}
-});
 </script>
 
 {% endblock %}
