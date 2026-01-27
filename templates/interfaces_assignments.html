@@ -2,799 +2,918 @@
 
 {% block main %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interface Assignments</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-<style>
-    /* Basic reset and styles */
-    body { font-family: sans-serif; margin: 0; background-color: #f0f0f0; color: #333; }
-    .container { max-width: 1200px; margin: 20px auto; background-color: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-
-    /* Tabs */
-    .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; background-color: #f8f8f8; flex-wrap: wrap;}
-    .tab-link { padding: 10px 20px; cursor: pointer; text-decoration: none; color: #555; border-bottom: 3px solid transparent; font-weight: bold; }
-    .tab-link.active { border-bottom-color: #d9534f; color: #d9534f; background-color: #fff; }
-    .tab-link:hover:not(.active) { background-color: #eee; }
-
-    /* Tab Content */
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* Tables */
-    .table-container { border: 1px solid #ddd; }
-    .table-header { background-color: #333; color: #fff; padding: 10px; font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background-color: #f9f9f9; }
-    tr:hover { background-color: #f5f5f5; }
-
-    /* Buttons */
-    .btn { padding: 8px 12px; border: none; cursor: pointer; color: #fff; border-radius: 4px; font-size: 14px; font-weight: bold; display: inline-flex; align-items: center; }
-    .btn-blue { background-color: #007bff; }
-    .btn-green { background-color: #28a745; }
-    .btn-red { background-color: #dc3545; }
-    .btn-cyan { background-color: #5bc0de; }
-    .btn-blue:hover { background-color: #0069d9; }
-    .btn-green:hover { background-color: #218838; }
-    .btn-red:hover { background-color: #c82333; }
-    .btn-cyan:hover { background-color: #31b0d5; }
-    .btn i { margin-right: 5px; }
-    
-    /* Form elements */
-    .form-group { margin-bottom: 15px; display: flex; align-items: flex-start; } 
-    .form-label { width: 180px; font-weight: bold; text-align: right; margin-right: 20px; padding-top: 8px; font-size: 13px; }
-    .form-input, .form-select, .form-textarea { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    .form-textarea { resize: vertical; }
-    .form-help { font-size: 12px; color: #777; margin-top: 5px; margin-left: 200px; margin-bottom: 10px;}
-    .form-help a { color: #007bff; text-decoration: none; }
-    
-    .input-group { display: flex; gap: 5px; flex: 1; }
-    .input-cidr { width: 60px; flex: none; }
-
-    /* Modals */
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 70%; max-width: 900px; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .modal-header { background-color: #333; color: #fff; padding: 10px 15px; font-weight: bold; margin: -20px -20px 20px -20px; border-top-left-radius: 5px; border-top-right-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
-    .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
-    .close:hover, .close:focus { color: #fff; text-decoration: none; cursor: pointer; }
-    
-    /* Advanced Configuration Section */
-    .advanced-section { display: none; margin-top: 20px; border: 1px solid #ddd; }
-    .advanced-header { background-color: #444; color: #fff; padding: 10px; font-weight: bold; }
-    .advanced-body { padding: 15px; }
-
-    /* Utility classes */
-    .text-right { text-align: right; }
-    .mt-20 { margin-top: 20px; }
-    .info-icon { color: #007bff; margin-top: 20px; font-size: 20px; }
-</style>
-</head>
-<body>
-
 <div class="container">
-    <nav class="tabs">
-        <a href="#" class="tab-link active" onclick="openTab(event, 'interface-assignments')">Interface Assignments</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'interface-groups')">Interface Groups</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'wireless')">Wireless</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'vlans')">VLANs</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'qinqs')">QinQs</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'ppps')">PPPs</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'gres')">GREs</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'gifs')">GIFs</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'bridges')">Bridges</a>
-        <a href="#" class="tab-link" onclick="openTab(event, 'laggs')">LAGGs</a>
-    </nav>
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('interfaces.interfaces') }}">Interfaces</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Assignments</li>
+            </ol>
+        </nav>
+        <h1>Interface Assignments</h1>
+    </div>
 
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a href="#" class="nav-link active" onclick="openTab(event, 'interface-assignments')">Interface Assignments</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'interface-groups')">Interface Groups</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'wireless')">Wireless</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'vlans')">VLANs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'qinqs')">QinQs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'ppps')">PPPs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'gres')">GREs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'gifs')">GIFs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'bridges')">Bridges</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'laggs')">LAGGs</a></li>
+    </ul>
+
+    <!-- Interface Assignments Tab -->
     <div id="interface-assignments" class="tab-content active">
-        <table style="border: none;">
-            <thead>
-                <tr>
-                    <th style="background-color: transparent; border-bottom: 1px solid #ddd;">Interface</th>
-                    <th style="background-color: transparent; border-bottom: 1px solid #ddd;">Network port</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="font-weight: bold; color: #007bff;">WAN</td>
-                    <td>
-                        <select class="form-select" id="wanSelect">
-                            <option>em0 (00:0c:29:ed:cb:ae)</option>
-                            <option>em1 (00:0c:29:ed:cb:b8)</option>
+        <div class="section">
+            <div class="section-header">
+                <h2>Interface Assignments</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Network Port</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong class="text-primary">WAN</strong></td>
+                            <td>
+                                <select class="form-select" id="wanSelect" style="max-width: 350px;">
+                                    <option>em0 (00:0c:29:ed:cb:ae)</option>
+                                    <option>em1 (00:0c:29:ed:cb:b8)</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr id="lanRow">
+                            <td><strong class="text-primary">LAN</strong></td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <select class="form-select" id="lanSelect" style="max-width: 350px;">
+                                        <option>em1 (00:0c:29:ed:cb:b8)</option>
+                                        <option>em0 (00:0c:29:ed:cb:ae)</option>
+                                    </select>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteLANAssignment()"><i class="fas fa-trash-alt"></i> Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" onclick="saveWANAssignment(); saveLANAssignment();"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-success" id="addLanBtn" style="display: none;" onclick="addLANAssignment()"><i class="fas fa-plus"></i> Add LAN</button>
+        </div>
+    </div>
+
+    <!-- Interface Groups Tab -->
+    <div id="interface-groups" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>Interface Groups</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="interface-groups-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Group Name</th>
+                            <th>Description</th>
+                            <th>Members</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('interface-group-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- Wireless Tab -->
+    <div id="wireless" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>Wireless Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="wireless-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Mode</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('wireless-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- VLANs Tab -->
+    <div id="vlans" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>VLAN Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="vlan-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>VLAN Tag</th>
+                            <th>Priority</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('vlan-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- QinQs Tab -->
+    <div id="qinqs" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>QinQ Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="qinq-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Tag</th>
+                            <th>QinQ Members</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('qinq-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- PPPs Tab -->
+    <div id="ppps" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>PPP Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="ppp-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Link Type</th>
+                            <th>Link Interface(s)</th>
+                            <th>Description</th>
+                            <th>Username</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('ppp-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- GREs Tab -->
+    <div id="gres" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>GRE Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="gre-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parent Interface</th>
+                            <th>GRE Remote Address</th>
+                            <th>GRE Local Address</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('gre-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- GIFs Tab -->
+    <div id="gifs" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>GIF Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="gif-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parent Interface</th>
+                            <th>GIF Remote Address</th>
+                            <th>GIF Tunnel Local Address</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('gif-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- Bridges Tab -->
+    <div id="bridges" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>Bridge Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="bridge-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Member Interface(s)</th>
+                            <th>Cache Size</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openModal('bridge-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <!-- LAGGs Tab -->
+    <div id="laggs" class="tab-content" style="display: none;">
+        <div class="section">
+            <div class="section-header">
+                <h2>LAGG Interfaces</h2>
+            </div>
+            <div class="section-body" style="padding: 0;">
+                <table id="lagg-table" class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parent Interface(s)</th>
+                            <th>Aggregation Protocol</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-success" onclick="openLAGGModal()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- Interface Group Modal -->
+<div id="interface-group-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Interface Group Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('interface-group-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Group Name</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="groupName" placeholder="Group Name">
+                        <small class="text-muted">Only letters (A-Z), digits (0-9) and '_' are allowed. The group name cannot start or end with a digit.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Group Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="groupDescription" placeholder="Group Description">
+                        <small class="text-muted">A group description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Group Members</label>
+                    <div class="col-sm-9">
+                        <select multiple class="form-select" id="groupMembers" style="height: 100px;">
+                            <option>WAN</option>
+                            <option>LAN</option>
                         </select>
-                    </td>
-                </tr>
-                <tr id="lanRow">
-                    <td style="font-weight: bold; color: #007bff;">LAN</td>
-                    <td>
-                        <div style="display: flex; align-items: center;">
-                            <select class="form-select" id="lanSelect" style="margin-right: 10px;">
-                                <option>em1 (00:0c:29:ed:cb:b8)</option>
-                                <option>em0 (00:0c:29:ed:cb:ae)</option>
-                            </select>
-                            <button class="btn btn-red" onclick="deleteLANAssignment()"><i class="fas fa-trash-alt"></i> Delete</button>
+                        <small class="text-muted">NOTE: Rules for WAN type interfaces in groups do not contain the reply-to mechanism upon which Multi-WAN typically relies.</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveInterfaceGroup()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('interface-group-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Wireless Modal -->
+<div id="wireless-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Wireless Interface Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('wireless-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="wirelessParentInterface">
+                            <option>None available</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Mode</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="wirelessMode">
+                            <option>Infrastructure (BSS)</option>
+                            <option>Ad-hoc (IBSS)</option>
+                            <option>Access point</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="wirelessDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveWirelessConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('wireless-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VLAN Modal -->
+<div id="vlan-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">VLAN Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('vlan-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="vlanParentInterface">
+                            <option>em0 (00:0c:29:ed:cb:ae) - wan</option>
+                        </select>
+                        <small class="text-muted">Only VLAN capable interfaces will be shown.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">VLAN Tag</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="vlanTag" value="1" style="max-width: 150px;">
+                        <small class="text-muted">802.1Q VLAN tag (between 1 and 4094).</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">VLAN Priority</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="vlanPriority" value="0" style="max-width: 150px;">
+                        <small class="text-muted">802.1Q VLAN Priority (between 0 and 7).</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="vlanDescription" placeholder="Description">
+                        <small class="text-muted">A group description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveVLANConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('vlan-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QinQ Modal -->
+<div id="qinq-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">QinQ Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('qinq-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="qinqParentInterface">
+                            <option>em0 (00:0c:29:ed:cb:ae)</option>
+                        </select>
+                        <small class="text-muted">Only QinQ capable interfaces will be shown.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">First Level Tag</label>
+                    <div class="col-sm-9">
+                        <input type="number" class="form-control" id="qinqFirstLevelTag" style="max-width: 150px;">
+                        <small class="text-muted">This is the first level VLAN tag. On top of this are stacked the member VLANs defined below.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Option(s)</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="qinqAddToGroups">
+                            <label class="form-check-label" for="qinqAddToGroups">Adds interface to QinQ interface groups</label>
                         </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveWANAssignment(); saveLANAssignment();"><i class="fas fa-save"></i> Save</button>
-            <button class="btn btn-green" id="addLanBtn" style="display: none;" onclick="addLANAssignment()"><i class="fas fa-plus"></i> Add LAN</button>
-        </div>
-    </div>
-
-    <div id="interface-groups" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">Interface Groups</div>
-            <table id="interface-groups-table" class="table table-striped">
-        <thead>
-            <tr>
-                <th>Group Name</th>
-                <th>Description</th>
-                <th>Members</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('interface-group-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
-    </div>
-
-    <div id="wireless" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">Wireless Interfaces</div>
-            <table id="wireless-table" class="table">
-                <thead>
-                    <tr>
-                        <th>Interface</th>
-                        <th>Mode</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('wireless-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-    <div id="vlans" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">VLAN Interfaces</div>
-            <table id="vlan-table" class="table">
-                <thead>
-                    <tr>
-                        <th>Interface</th>
-                        <th>VLAN tag</th>
-                        <th>Priority</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('vlan-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
-    </div>
-
-    <div id="qinqs" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">QinQ Interfaces</div>
-            <table id="qinq-table" class="table">
-                <thead>
-                    <tr>
-                        <th>Interface</th>
-                        <th>Tag</th>
-                        <th>QinQ members</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('qinq-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
-    </div>
-
-    <div id="ppps" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">PPP Interfaces</div>
-            <table id="ppp-table">
-                <thead>
-                    <tr>
-                        <th>Link Type</th>
-                        <th>Link Interface(s)</th>
-                        <th>Description</th>
-                        <th>Username</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('ppp-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-    <div id="gres" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">GRE Interfaces</div>
-            <table id="gre-table">
-                <thead>
-                    <tr>
-                        <th>Parent Interface</th>
-                        <th>GRE Remote Address</th>
-                        <th>GRE Local Address</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('gre-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-    <div id="gifs" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">GIF Interfaces</div>
-            <table id="gif-table">
-                <thead>
-                    <tr>
-                        <th>Parent Interface</th>
-                        <th>GIF Remote Address</th>
-                        <th>GIF Tunnel Local Address</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('gif-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-    <div id="bridges" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">Bridge Interfaces</div>
-            <table id="bridge-table">
-                <thead>
-                    <tr>
-                        <th>Member Interface(s)</th>
-                        <th>Cache Size</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openModal('bridge-modal')"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-    <div id="laggs" class="tab-content">
-        <div class="table-container">
-            <div class="table-header">LAGG Interfaces</div>
-            <table id="lagg-table">
-                <thead>
-                    <tr>
-                        <th>Parent Interface(s)</th>
-                        <th>Aggregation Protocol</th>
-                        <th>Description</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </div>
-        <div class="text-right mt-20">
-            <button class="btn btn-green" onclick="openLAGGModal()"><i class="fas fa-plus"></i> Add</button>
-        </div>
-    </div>
-
-</div>
-
-<div id="interface-group-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>Interface Group Configuration</span>
-            <span class="close" onclick="closeModal('interface-group-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Group Name</label>
-            <input type="text" class="form-input" id="groupName" placeholder="Group Name">
-        </div>
-        <div class="form-help">Only letters (A-Z), digits (0-9) and '_' are allowed. The group name cannot start or end with a digit.</div>
-        <div class="form-group">
-            <label class="form-label">Group Description</label>
-            <input type="text" class="form-input" id="groupDescription" placeholder="Group Description">
-        </div>
-        <div class="form-help">A group description may be entered here for administrative reference (not parsed).</div>
-        <div class="form-group">
-            <label class="form-label">Group Members</label>
-            <select multiple class="form-select" id="groupMembers" style="height: 100px;">
-                <option>WAN</option>
-                <option>LAN</option>
-            </select>
-        </div>
-        <div class="form-help">NOTE: Rules for WAN type interfaces in groups do not contain the reply-to mechanism upon which Multi-WAN typically relies.</div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveInterfaceGroup()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="wireless-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>Wireless Interface Configuration</span>
-            <span class="close" onclick="closeModal('wireless-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Parent Interface</label>
-            <select class="form-select" id="wirelessParentInterface">
-                <option>None available</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Mode</label>
-            <select class="form-select" id="wirelessMode">
-                <option>Infrastructure (BSS)</option>
-                <option>Ad-hoc (IBSS)</option>
-                <option>Access point</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="wirelessDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveWirelessConfig()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="vlan-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>VLAN Configuration</span>
-            <span class="close" onclick="closeModal('vlan-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Parent Interface</label>
-            <select class="form-select" id="vlanParentInterface">
-                <option>em0 (00:0c:29:ed:cb:ae) - wan</option>
-            </select>
-        </div>
-        <div class="form-help">Only VLAN capable interfaces will be shown.</div>
-        <div class="form-group">
-            <label class="form-label">VLAN Tag</label>
-            <input type="text" class="form-input" id="vlanTag" value="1">
-        </div>
-        <div class="form-help">802.1Q VLAN tag (between 1 and 4094).</div>
-        <div class="form-group">
-            <label class="form-label">VLAN Priority</label>
-            <input type="text" class="form-input" id="vlanPriority" value="0">
-        </div>
-        <div class="form-help">802.1Q VLAN Priority (between 0 and 7).</div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="vlanDescription" placeholder="Description">
-        </div>
-        <div class="form-help">A group description may be entered here for administrative reference (not parsed).</div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveVLANConfig()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="qinq-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>QinQ Configuration</span>
-            <span class="close" onclick="closeModal('qinq-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Parent interface</label>
-            <select class="form-select" id="qinqParentInterface">
-                <option>em0 (00:0c:29:ed:cb:ae)</option>
-            </select>
-        </div>
-        <div class="form-help">Only QinQ capable interfaces will be shown.</div>
-        <div class="form-group">
-            <label class="form-label">First level tag</label>
-            <input type="number" class="form-input" id="qinqFirstLevelTag" style="width: 60px;">
-        </div>
-        <div class="form-help">This is the first level VLAN tag. On top of this are stacked the member VLANs defined below.</div>
-        <div class="form-group">
-            <label class="form-label">Option(s)</label>
-            <div style="flex: 1; display: flex; align-items: center; padding-top: 8px;">
-                <input type="checkbox" id="qinqAddToGroups" style="margin-right: 10px;">
-                <label for="qinqAddToGroups" style="font-weight: normal;">Adds interface to QinQ interface groups</label>
-            </div>
-        </div>
-        <div class="form-help">Allows rules to be written more easily.</div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="qinqDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
-        <div class="form-group">
-            <label class="form-label">Member(s)</label>
-            <div style="flex: 1; font-size: 14px; padding-top: 8px;">
-                Ranges can be specified in the inputs below. Enter a range (2-3) or individual numbers. Click "Add Tag" as many times as needed to add new inputs.
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Tag(s)</label>
-            <div id="qinqTagsContainer">
-                <input type="text" class="form-input qinq-tag-input">
-            </div>
-        </div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveQinQConfig()"><i class="fas fa-save"></i> Save</button>
-            <button class="btn btn-green" onclick="addQinQTagInput()"><i class="fas fa-plus"></i> Add Tag</button>
-        </div>
-    </div>
-</div>
-
-<div id="ppp-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>PPP Configuration</span>
-            <span class="close" onclick="closeModal('ppp-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Link Type</label>
-            <select class="form-select" id="pppLinkType">
-                <option>PPP</option>
-                <option>PPPoE</option>
-                <option>PPTP</option>
-                <option>L2TP</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Link Interface(s)</label>
-            <select class="form-select" id="pppLinkInterfaces" multiple style="height: 80px;">
-                <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
-                <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
-            </select>
-        </div>
-        <div class="form-help">Select the interface for the PPP connection.</div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="pppDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference.</div>
-        <div class="form-group">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-input" id="pppUsername">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Password</label>
-            <div style="flex: 1; display: flex; gap: 10px;">
-                <input type="password" class="form-input" id="pppPassword" placeholder="*Password">
-                <input type="password" class="form-input" id="pppPasswordConfirm" placeholder="*Password Confirm">
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Advanced options</label>
-            <button class="btn btn-cyan" onclick="toggleAdvanced('ppp-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
-        </div>
-        <div id="ppp-advanced-fields" class="advanced-section">
-            <div class="advanced-header">Advanced Configuration</div>
-            <div class="advanced-body">
-                <div class="form-group">
-                    <label class="form-label">Dial On Demand</label>
-                    <div style="flex: 1; padding-top: 8px;">
-                        <input type="checkbox" id="pppDialOnDemand">
-                        <label for="pppDialOnDemand">Enable Dial-on-Demand mode.</label>
+                        <small class="text-muted">Allows rules to be written more easily.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="qinqDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Tag(s)</label>
+                    <div class="col-sm-9">
+                        <div id="qinqTagsContainer">
+                            <input type="text" class="form-control qinq-tag-input mb-2">
+                        </div>
+                        <button class="btn btn-success btn-sm" onclick="addQinQTagInput()"><i class="fas fa-plus"></i> Add Tag</button>
+                        <small class="text-muted d-block mt-2">Ranges can be specified (e.g., 2-3) or individual numbers.</small>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="savePPPConfig()"><i class="fas fa-save"></i> Save</button>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveQinQConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('qinq-modal')">Cancel</button>
+            </div>
         </div>
     </div>
 </div>
 
-<div id="gre-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>GRE Configuration</span>
-            <span class="close" onclick="closeModal('gre-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Parent interface</label>
-            <select class="form-select" id="greParentInterface">
-                <option>WAN</option>
-                <option>LAN</option>
-            </select>
-        </div>
-        <div class="form-help">The interface here serves as the local address to be used for the GRE tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">GRE remote address</label>
-            <input type="text" class="form-input" id="greRemoteAddress">
-        </div>
-        <div class="form-help">Peer address where encapsulated GRE packets will be sent.</div>
-        <div class="form-group">
-            <label class="form-label">GRE local address</label>
-            <input type="text" class="form-input" id="greLocalAddress">
-        </div>
-        <div class="form-help">Local address where encapsulated GRE packets will be received.</div>
-        <div class="form-group">
-            <label class="form-label">IPv4 Tunnel remote address</label>
-            <div class="input-group">
-                <input type="text" class="form-input" id="ipv4TunnelRemoteAddress">
-                <select class="form-select input-cidr" id="ipv4TunnelRemotePrefix">
-                    <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-                </select>
+<!-- PPP Modal -->
+<div id="ppp-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">PPP Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('ppp-modal')"></button>
             </div>
-        </div>
-        <div class="form-help">IPv4 address assigned to the remote side of the tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">IPv4 Tunnel local address</label>
-            <div class="input-group">
-                <input type="text" class="form-input" id="ipv4TunnelLocalAddress">
-                <select class="form-select input-cidr" id="ipv4TunnelLocalPrefix">
-                    <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-help">IPv4 address assigned to the local side of the tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">IPv6 Tunnel remote address</label>
-            <div class="input-group">
-                <input type="text" class="form-input" id="ipv6TunnelRemoteAddress">
-                <select class="form-select input-cidr" id="ipv6TunnelRemotePrefix">
-                    <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-help">IPv6 address assigned to the remote side of the tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">IPv6 Tunnel local address</label>
-            <div class="input-group">
-                <input type="text" class="form-input" id="ipv6TunnelLocalAddress">
-                <select class="form-select input-cidr" id="ipv6TunnelLocalPrefix">
-                    <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-help">IPv6 address assigned to the local side of the tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="greDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveGREConfig()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="gif-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>GIF Configuration</span>
-            <span class="close" onclick="closeModal('gif-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Parent Interface</label>
-            <select class="form-select" id="gifParentInterface">
-                <option>WAN</option>
-                <option>LAN</option>
-            </select>
-        </div>
-        <div class="form-help">This interface serves as the local address to be used for the GIF tunnel.</div>
-        <div class="form-group">
-            <label class="form-label">GIF Remote Address</label>
-            <input type="text" class="form-input" id="gifRemoteAddress">
-        </div>
-        <div class="form-help">Peer address where encapsulated gif packets will be sent.</div>
-        <div class="form-group">
-            <label class="form-label">GIF tunnel local address</label>
-            <input type="text" class="form-input" id="gifTunnelLocalAddress">
-        </div>
-        <div class="form-help">Local gif tunnel endpoint.</div>
-        <div class="form-group">
-            <label class="form-label">GIF tunnel remote address</label>
-            <input type="text" class="form-input" id="gifTunnelRemoteAddress">
-        </div>
-        <div class="form-help">Remote GIF address endpoint.</div>
-        <div class="form-group">
-            <label class="form-label">GIF tunnel subnet</label>
-            <select class="form-select" id="gifTunnelSubnet">
-                <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-            </select>
-        </div>
-        <div class="form-help">The subnet is used for determining the network that is tunnelled.</div>
-        <div class="form-group">
-            <label class="form-label">ECN friendly behavior</label>
-            <div style="flex: 1; padding-top: 8px;">
-                <input type="checkbox" id="gifECNFriendly">
-                <label for="gifECNFriendly" style="font-weight: normal;">ECN friendly behavior violates RFC2893. This should be used in mutual agreement with the peer.</label>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Outer Source Filtering</label>
-            <div style="flex: 1; padding-top: 8px;">
-                <input type="checkbox" id="gifOuterSourceFiltering">
-                <label for="gifOuterSourceFiltering" style="font-weight: normal;">Disable automatic filtering of the outer GIF source which ensures a match with the configured remote peer. When disabled, martian and inbound filtering is not performed which allows asymmetric routing of the outer traffic.</label>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="gifDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveGIFConfig()"><i class="fas fa-save"></i> Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="bridge-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>Bridge Configuration</span>
-            <span class="close" onclick="closeModal('bridge-modal')">&times;</span>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Member Interface(s)</label>
-            <select multiple class="form-select" id="bridgeMemberInterfaces" style="height: 100px;">
-                <option>WAN</option>
-                <option>LAN</option>
-            </select>
-        </div>
-        <div class="form-help">Interfaces participating in the bridge.</div>
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="bridgeDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
-        
-        <div class="form-group">
-            <label class="form-label">Advanced options</label>
-            <button class="btn btn-cyan" onclick="toggleAdvanced('bridge-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
-        </div>
-
-        <div id="bridge-advanced-fields" class="advanced-section">
-            <div class="advanced-header">Advanced Configuration</div>
-            <div class="advanced-body">
-                <div class="form-group">
-                    <label class="form-label">Cache size</label>
-                    <input type="text" class="form-input" id="bridgeCacheSize" placeholder="100">
-                </div>
-                <div class="form-help">Maximum number of addresses in the cache (default 100).</div>
-
-                <div class="form-group">
-                    <label class="form-label">Cache max age</label>
-                    <input type="text" class="form-input" id="bridgeCacheMaxAge" placeholder="1200">
-                </div>
-                <div class="form-help">Maximum time (in seconds) that an address is stored in the cache (default 1200).</div>
-
-                <div class="form-group">
-                    <label class="form-label">Span Interface(s)</label>
-                    <select multiple class="form-select" id="bridgeSpanInterfaces" style="height: 100px;">
-                        <option>WAN</option>
-                        <option>LAN</option>
-                    </select>
-                </div>
-                <div class="form-help">Interfaces where a copy of every frame is sent (span port).</div>
-
-                <div class="form-group">
-                    <label class="form-label">Edge Interface(s)</label>
-                    <select multiple class="form-select" id="bridgeEdgeInterfaces" style="height: 100px;">
-                        <option>WAN</option>
-                        <option>LAN</option>
-                    </select>
-                </div>
-                <div class="form-help">Set these interfaces as edge ports for RSTP/STP.</div>
-
-                <div class="form-group">
-                    <label class="form-label">Auto Edge Interface(s)</label>
-                    <select multiple class="form-select" id="bridgeAutoEdgeInterfaces" style="height: 100px;">
-                        <option>WAN</option>
-                        <option>LAN</option>
-                    </select>
-                </div>
-                <div class="form-help">Set these interfaces to auto-detect edge status.</div>
-
-                <div class="form-group">
-                    <label class="form-label">PTP Interface(s)</label>
-                    <select multiple class="form-select" id="bridgePTPInterfaces" style="height: 100px;">
-                        <option>WAN</option>
-                        <option>LAN</option>
-                    </select>
-                </div>
-                <div class="form-help">Set these interfaces as point-to-point links.</div>
-
-                <div class="form-group">
-                    <label class="form-label">Sticky ports</label>
-                    <div style="flex: 1; padding-top: 8px;">
-                        <input type="checkbox" id="bridgeStickyPorts">
-                        <label for="bridgeStickyPorts" style="font-weight: normal;">Enable sticky ports</label>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Link Type</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="pppLinkType">
+                            <option>PPP</option>
+                            <option>PPPoE</option>
+                            <option>PPTP</option>
+                            <option>L2TP</option>
+                        </select>
                     </div>
                 </div>
-                <div class="form-help">If enabled, addresses learned on the bridge are treated as static and not forgotten.</div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Link Interface(s)</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="pppLinkInterfaces" multiple style="height: 80px;">
+                            <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
+                            <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+                        </select>
+                        <small class="text-muted">Select the interface for the PPP connection.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="pppDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Username</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="pppUsername">
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Password</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-2">
+                            <input type="password" class="form-control" id="pppPassword" placeholder="Password">
+                            <input type="password" class="form-control" id="pppPasswordConfirm" placeholder="Confirm Password">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Advanced Options</label>
+                    <div class="col-sm-9">
+                        <button class="btn btn-info btn-sm" onclick="toggleAdvanced('ppp-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+                    </div>
+                </div>
+                <div id="ppp-advanced-fields" class="section" style="display: none;">
+                    <div class="section-header">
+                        <h2>Advanced Configuration</h2>
+                    </div>
+                    <div class="section-body" style="padding: 20px;">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="pppDialOnDemand">
+                            <label class="form-check-label" for="pppDialOnDemand">Enable Dial-on-Demand mode</label>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveBridgeConfig()"><i class="fas fa-save"></i> Save</button>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="savePPPConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('ppp-modal')">Cancel</button>
+            </div>
         </div>
     </div>
 </div>
 
-<div id="lagg-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span>LAGG Configuration</span>
-            <span class="close" onclick="closeModal('lagg-modal')">&times;</span>
+<!-- GRE Modal -->
+<div id="gre-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">GRE Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('gre-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="greParentInterface">
+                            <option>WAN</option>
+                            <option>LAN</option>
+                        </select>
+                        <small class="text-muted">The interface here serves as the local address to be used for the GRE tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GRE Remote Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="greRemoteAddress">
+                        <small class="text-muted">Peer address where encapsulated GRE packets will be sent.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GRE Local Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="greLocalAddress">
+                        <small class="text-muted">Local address where encapsulated GRE packets will be received.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">IPv4 Tunnel Remote Address</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" id="ipv4TunnelRemoteAddress">
+                            <select class="form-select" id="ipv4TunnelRemotePrefix" style="max-width: 100px;">
+                                <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                            </select>
+                        </div>
+                        <small class="text-muted">IPv4 address assigned to the remote side of the tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">IPv4 Tunnel Local Address</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" id="ipv4TunnelLocalAddress">
+                            <select class="form-select" id="ipv4TunnelLocalPrefix" style="max-width: 100px;">
+                                <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                            </select>
+                        </div>
+                        <small class="text-muted">IPv4 address assigned to the local side of the tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">IPv6 Tunnel Remote Address</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" id="ipv6TunnelRemoteAddress">
+                            <select class="form-select" id="ipv6TunnelRemotePrefix" style="max-width: 100px;">
+                                <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
+                            </select>
+                        </div>
+                        <small class="text-muted">IPv6 address assigned to the remote side of the tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">IPv6 Tunnel Local Address</label>
+                    <div class="col-sm-9">
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" id="ipv6TunnelLocalAddress">
+                            <select class="form-select" id="ipv6TunnelLocalPrefix" style="max-width: 100px;">
+                                <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
+                            </select>
+                        </div>
+                        <small class="text-muted">IPv6 address assigned to the local side of the tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="greDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveGREConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('gre-modal')">Cancel</button>
+            </div>
         </div>
-        <div class="form-group">
-            <label class="form-label">Parent Interface(s)</label>
-            <select multiple class="form-select" id="laggParentInterfaces" style="height: 100px;">
-                <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
-                <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
-            </select>
-        </div>
-        <div class="form-help">Choose the members that will be used for the link aggregation.</div>
-        
-        <div class="form-group">
-            <label class="form-label">Aggregation Protocol</label>
-            <select class="form-select" id="laggAggregationProtocol">
-                <option>Failover</option>
-                <option>LACP</option>
-                <option>Load Balance</option>
-                <option>Round Robin</option>
-                <option>None</option>
-            </select>
-        </div>
-        <div class="form-help">Failover: Sends and receives traffic through the master port. If the master port becomes unavailable, the next active port is used.</div>
-        
-        <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-input" id="laggDescription">
-        </div>
-        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+    </div>
+</div>
 
-        <div class="mt-20">
-            <button class="btn btn-blue" onclick="saveLAGGConfig()"><i class="fas fa-save"></i> Save</button>
+<!-- GIF Modal -->
+<div id="gif-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">GIF Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('gif-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="gifParentInterface">
+                            <option>WAN</option>
+                            <option>LAN</option>
+                        </select>
+                        <small class="text-muted">This interface serves as the local address to be used for the GIF tunnel.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GIF Remote Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="gifRemoteAddress">
+                        <small class="text-muted">Peer address where encapsulated gif packets will be sent.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GIF Tunnel Local Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="gifTunnelLocalAddress">
+                        <small class="text-muted">Local gif tunnel endpoint.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GIF Tunnel Remote Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="gifTunnelRemoteAddress">
+                        <small class="text-muted">Remote GIF address endpoint.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">GIF Tunnel Subnet</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="gifTunnelSubnet" style="max-width: 150px;">
+                            <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
+                        </select>
+                        <small class="text-muted">The subnet is used for determining the network that is tunnelled.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">ECN Friendly Behavior</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="gifECNFriendly">
+                            <label class="form-check-label" for="gifECNFriendly">ECN friendly behavior violates RFC2893. This should be used in mutual agreement with the peer.</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Outer Source Filtering</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="gifOuterSourceFiltering">
+                            <label class="form-check-label" for="gifOuterSourceFiltering">Disable automatic filtering of the outer GIF source.</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="gifDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveGIFConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('gif-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bridge Modal -->
+<div id="bridge-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bridge Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('bridge-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Member Interface(s)</label>
+                    <div class="col-sm-9">
+                        <select multiple class="form-select" id="bridgeMemberInterfaces" style="height: 100px;">
+                            <option>WAN</option>
+                            <option>LAN</option>
+                        </select>
+                        <small class="text-muted">Interfaces participating in the bridge.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="bridgeDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Advanced Options</label>
+                    <div class="col-sm-9">
+                        <button class="btn btn-info btn-sm" onclick="toggleAdvanced('bridge-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+                    </div>
+                </div>
+                <div id="bridge-advanced-fields" class="section" style="display: none;">
+                    <div class="section-header">
+                        <h2>Advanced Configuration</h2>
+                    </div>
+                    <div class="section-body" style="padding: 20px;">
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Cache Size</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="bridgeCacheSize" placeholder="100" style="max-width: 150px;">
+                                <small class="text-muted">Maximum number of addresses in the cache (default 100).</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Cache Max Age</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="bridgeCacheMaxAge" placeholder="1200" style="max-width: 150px;">
+                                <small class="text-muted">Maximum time (in seconds) that an address is stored in the cache (default 1200).</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Span Interface(s)</label>
+                            <div class="col-sm-9">
+                                <select multiple class="form-select" id="bridgeSpanInterfaces" style="height: 80px;">
+                                    <option>WAN</option>
+                                    <option>LAN</option>
+                                </select>
+                                <small class="text-muted">Interfaces where a copy of every frame is sent (span port).</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Edge Interface(s)</label>
+                            <div class="col-sm-9">
+                                <select multiple class="form-select" id="bridgeEdgeInterfaces" style="height: 80px;">
+                                    <option>WAN</option>
+                                    <option>LAN</option>
+                                </select>
+                                <small class="text-muted">Set these interfaces as edge ports for RSTP/STP.</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Auto Edge Interface(s)</label>
+                            <div class="col-sm-9">
+                                <select multiple class="form-select" id="bridgeAutoEdgeInterfaces" style="height: 80px;">
+                                    <option>WAN</option>
+                                    <option>LAN</option>
+                                </select>
+                                <small class="text-muted">Set these interfaces to auto-detect edge status.</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">PTP Interface(s)</label>
+                            <div class="col-sm-9">
+                                <select multiple class="form-select" id="bridgePTPInterfaces" style="height: 80px;">
+                                    <option>WAN</option>
+                                    <option>LAN</option>
+                                </select>
+                                <small class="text-muted">Set these interfaces as point-to-point links.</small>
+                            </div>
+                        </div>
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label fw-semibold">Sticky Ports</label>
+                            <div class="col-sm-9">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="bridgeStickyPorts">
+                                    <label class="form-check-label" for="bridgeStickyPorts">Enable sticky ports</label>
+                                </div>
+                                <small class="text-muted">If enabled, addresses learned on the bridge are treated as static and not forgotten.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveBridgeConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('bridge-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LAGG Modal -->
+<div id="lagg-modal" class="modal" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">LAGG Configuration</h5>
+                <button type="button" class="btn-close" onclick="closeModal('lagg-modal')"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Parent Interface(s)</label>
+                    <div class="col-sm-9">
+                        <select multiple class="form-select" id="laggParentInterfaces" style="height: 100px;">
+                            <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
+                            <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+                        </select>
+                        <small class="text-muted">Choose the members that will be used for the link aggregation.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Aggregation Protocol</label>
+                    <div class="col-sm-9">
+                        <select class="form-select" id="laggAggregationProtocol">
+                            <option>Failover</option>
+                            <option>LACP</option>
+                            <option>Load Balance</option>
+                            <option>Round Robin</option>
+                            <option>None</option>
+                        </select>
+                        <small class="text-muted">Failover: Sends and receives traffic through the master port. If the master port becomes unavailable, the next active port is used.</small>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="laggDescription">
+                        <small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="saveLAGGConfig()"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" onclick="closeModal('lagg-modal')">Cancel</button>
+            </div>
         </div>
     </div>
 </div>
@@ -2249,16 +2368,22 @@ function saveInterfaceGroup() {
 
     function openTab(evt, tabName) {
         var i, tabContent, tabLinks;
+        // Hide all tab content
         tabContent = document.getElementsByClassName("tab-content");
         for (i = 0; i < tabContent.length; i++) {
             tabContent[i].style.display = "none";
+            tabContent[i].classList.remove("active");
         }
-        tabLinks = document.getElementsByClassName("tab-link");
+        // Remove active class from all nav-links
+        tabLinks = document.querySelectorAll(".nav-tabs .nav-link");
         for (i = 0; i < tabLinks.length; i++) {
-            tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+            tabLinks[i].classList.remove("active");
         }
+        // Show the selected tab content and add active class to the clicked link
         document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+        evt.preventDefault();
     }
 
     function openModal(modalId) {
@@ -2286,6 +2411,81 @@ function saveInterfaceGroup() {
     }
 </script>
 
-</body>
-</html>
+<style>
+/* Modal backdrop styling */
+.modal {
+    position: fixed;
+    z-index: 1050;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-dialog {
+    position: relative;
+    margin: 1.75rem auto;
+    max-width: 800px;
+}
+
+.modal-content {
+    position: relative;
+    background-color: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: #4a4a4a;
+    color: #fff;
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+}
+
+.modal-header .modal-title {
+    margin: 0;
+    font-weight: 600;
+}
+
+.modal-header .btn-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.modal-header .btn-close:hover {
+    opacity: 1;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* Tab content visibility */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+</style>
+
 {% endblock %}
