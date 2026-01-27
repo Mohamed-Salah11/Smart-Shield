@@ -2,327 +2,2290 @@
 
 {% block main %}
 
-<div class="breadcrumb">
-    Interfaces / Assignments
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interface Assignments</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    /* Basic reset and styles */
+    body { font-family: sans-serif; margin: 0; background-color: #f0f0f0; color: #333; }
+    .container { max-width: 1200px; margin: 20px auto; background-color: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link active" href="#" data-tab="assignments">Interface Assignments</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="groups">Interface Groups</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="wireless">Wireless</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="vlans">VLANs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="qinqs">QinQs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="ppps">PPPs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="gres">GREs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="gifs">GIFs</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="bridges">Bridges</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="laggs">LAGGs</a>
-    </li>
-</ul>
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; background-color: #f8f8f8; flex-wrap: wrap;}
+    .tab-link { padding: 10px 20px; cursor: pointer; text-decoration: none; color: #555; border-bottom: 3px solid transparent; font-weight: bold; }
+    .tab-link.active { border-bottom-color: #d9534f; color: #d9534f; background-color: #fff; }
+    .tab-link:hover:not(.active) { background-color: #eee; }
 
-<!-- Interface Assignments -->
-<div class="tab-content active" id="assignments">
-    <div class="settings-section">
-        <h5>Interface Assignments</h5>
-        
-        <div style="padding: 20px;">
-            <table class="table table-bordered">
+    /* Tab Content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Tables */
+    .table-container { border: 1px solid #ddd; }
+    .table-header { background-color: #333; color: #fff; padding: 10px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f9f9f9; }
+    tr:hover { background-color: #f5f5f5; }
+
+    /* Buttons */
+    .btn { padding: 8px 12px; border: none; cursor: pointer; color: #fff; border-radius: 4px; font-size: 14px; font-weight: bold; display: inline-flex; align-items: center; }
+    .btn-blue { background-color: #007bff; }
+    .btn-green { background-color: #28a745; }
+    .btn-red { background-color: #dc3545; }
+    .btn-cyan { background-color: #5bc0de; }
+    .btn-blue:hover { background-color: #0069d9; }
+    .btn-green:hover { background-color: #218838; }
+    .btn-red:hover { background-color: #c82333; }
+    .btn-cyan:hover { background-color: #31b0d5; }
+    .btn i { margin-right: 5px; }
+    
+    /* Form elements */
+    .form-group { margin-bottom: 15px; display: flex; align-items: flex-start; } 
+    .form-label { width: 180px; font-weight: bold; text-align: right; margin-right: 20px; padding-top: 8px; font-size: 13px; }
+    .form-input, .form-select, .form-textarea { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .form-textarea { resize: vertical; }
+    .form-help { font-size: 12px; color: #777; margin-top: 5px; margin-left: 200px; margin-bottom: 10px;}
+    .form-help a { color: #007bff; text-decoration: none; }
+    
+    .input-group { display: flex; gap: 5px; flex: 1; }
+    .input-cidr { width: 60px; flex: none; }
+
+    /* Modals */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 70%; max-width: 900px; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .modal-header { background-color: #333; color: #fff; padding: 10px 15px; font-weight: bold; margin: -20px -20px 20px -20px; border-top-left-radius: 5px; border-top-right-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+    .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+    .close:hover, .close:focus { color: #fff; text-decoration: none; cursor: pointer; }
+    
+    /* Advanced Configuration Section */
+    .advanced-section { display: none; margin-top: 20px; border: 1px solid #ddd; }
+    .advanced-header { background-color: #444; color: #fff; padding: 10px; font-weight: bold; }
+    .advanced-body { padding: 15px; }
+
+    /* Utility classes */
+    .text-right { text-align: right; }
+    .mt-20 { margin-top: 20px; }
+    .info-icon { color: #007bff; margin-top: 20px; font-size: 20px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <nav class="tabs">
+        <a href="#" class="tab-link active" onclick="openTab(event, 'interface-assignments')">Interface Assignments</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'interface-groups')">Interface Groups</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'wireless')">Wireless</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'vlans')">VLANs</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'qinqs')">QinQs</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'ppps')">PPPs</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'gres')">GREs</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'gifs')">GIFs</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'bridges')">Bridges</a>
+        <a href="#" class="tab-link" onclick="openTab(event, 'laggs')">LAGGs</a>
+    </nav>
+
+    <div id="interface-assignments" class="tab-content active">
+        <table style="border: none;">
+            <thead>
+                <tr>
+                    <th style="background-color: transparent; border-bottom: 1px solid #ddd;">Interface</th>
+                    <th style="background-color: transparent; border-bottom: 1px solid #ddd;">Network port</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight: bold; color: #007bff;">WAN</td>
+                    <td>
+                        <select class="form-select" id="wanSelect">
+                            <option>em0 (00:0c:29:ed:cb:ae)</option>
+                            <option>em1 (00:0c:29:ed:cb:b8)</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr id="lanRow">
+                    <td style="font-weight: bold; color: #007bff;">LAN</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <select class="form-select" id="lanSelect" style="margin-right: 10px;">
+                                <option>em1 (00:0c:29:ed:cb:b8)</option>
+                                <option>em0 (00:0c:29:ed:cb:ae)</option>
+                            </select>
+                            <button class="btn btn-red" onclick="deleteLANAssignment()"><i class="fas fa-trash-alt"></i> Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveWANAssignment(); saveLANAssignment();"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-green" id="addLanBtn" style="display: none;" onclick="addLANAssignment()"><i class="fas fa-plus"></i> Add LAN</button>
+        </div>
+    </div>
+
+    <div id="interface-groups" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">Interface Groups</div>
+            <table id="interface-groups-table" class="table table-striped">
+        <thead>
+            <tr>
+                <th>Group Name</th>
+                <th>Description</th>
+                <th>Members</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('interface-group-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
+    </div>
+
+    <div id="wireless" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">Wireless Interfaces</div>
+            <table id="wireless-table" class="table">
                 <thead>
                     <tr>
                         <th>Interface</th>
-                        <th>Network Port</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="assignments-table">
-                    <tr>
-                        <td>WAN</td>
-                        <td>em0</td>
-                        <td><button class="btn btn-sm btn-primary">Edit</button></td>
-                    </tr>
-                    <tr>
-                        <td>LAN</td>
-                        <td>em1</td>
-                        <td><button class="btn btn-sm btn-primary">Edit</button></td>
-                    </tr>
-                </tbody>
-            </table>
-            <button class="btn btn-primary add-btn" data-target="assignments">Add Interface</button>
-        </div>
-    </div>
-</div>
-
-<!-- VLANs -->
-<div class="tab-content" id="vlans" style="display: none;">
-    <div class="settings-section">
-        <h5>VLANs</h5>
-        
-        <div style="padding: 20px;">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Parent Interface</th>
-                        <th>VLAN Tag</th>
+                        <th>Mode</th>
                         <th>Description</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="vlans-table">
-                    <tr>
-                        <td>em0</td>
-                        <td>10</td>
-                        <td>Guest VLAN</td>
-                        <td><button class="btn btn-sm btn-primary">Edit</button></td>
-                    </tr>
-                </tbody>
+                <tbody>
+                    </tbody>
             </table>
-            <button class="btn btn-primary add-btn" data-target="vlans">Add VLAN</button>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('wireless-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div id="vlans" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">VLAN Interfaces</div>
+            <table id="vlan-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Interface</th>
+                        <th>VLAN tag</th>
+                        <th>Priority</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('vlan-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
+    </div>
+
+    <div id="qinqs" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">QinQ Interfaces</div>
+            <table id="qinq-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Interface</th>
+                        <th>Tag</th>
+                        <th>QinQ members</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('qinq-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <div class="info-icon"><i class="fas fa-info-circle"></i></div>
+    </div>
+
+    <div id="ppps" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">PPP Interfaces</div>
+            <table id="ppp-table">
+                <thead>
+                    <tr>
+                        <th>Link Type</th>
+                        <th>Link Interface(s)</th>
+                        <th>Description</th>
+                        <th>Username</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('ppp-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div id="gres" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">GRE Interfaces</div>
+            <table id="gre-table">
+                <thead>
+                    <tr>
+                        <th>Parent Interface</th>
+                        <th>GRE Remote Address</th>
+                        <th>GRE Local Address</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('gre-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div id="gifs" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">GIF Interfaces</div>
+            <table id="gif-table">
+                <thead>
+                    <tr>
+                        <th>Parent Interface</th>
+                        <th>GIF Remote Address</th>
+                        <th>GIF Tunnel Local Address</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('gif-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div id="bridges" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">Bridge Interfaces</div>
+            <table id="bridge-table">
+                <thead>
+                    <tr>
+                        <th>Member Interface(s)</th>
+                        <th>Cache Size</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openModal('bridge-modal')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div id="laggs" class="tab-content">
+        <div class="table-container">
+            <div class="table-header">LAGG Interfaces</div>
+            <table id="lagg-table">
+                <thead>
+                    <tr>
+                        <th>Parent Interface(s)</th>
+                        <th>Aggregation Protocol</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+        <div class="text-right mt-20">
+            <button class="btn btn-green" onclick="openLAGGModal()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+</div>
+
+<div id="interface-group-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Interface Group Configuration</span>
+            <span class="close" onclick="closeModal('interface-group-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Group Name</label>
+            <input type="text" class="form-input" id="groupName" placeholder="Group Name">
+        </div>
+        <div class="form-help">Only letters (A-Z), digits (0-9) and '_' are allowed. The group name cannot start or end with a digit.</div>
+        <div class="form-group">
+            <label class="form-label">Group Description</label>
+            <input type="text" class="form-input" id="groupDescription" placeholder="Group Description">
+        </div>
+        <div class="form-help">A group description may be entered here for administrative reference (not parsed).</div>
+        <div class="form-group">
+            <label class="form-label">Group Members</label>
+            <select multiple class="form-select" id="groupMembers" style="height: 100px;">
+                <option>WAN</option>
+                <option>LAN</option>
+            </select>
+        </div>
+        <div class="form-help">NOTE: Rules for WAN type interfaces in groups do not contain the reply-to mechanism upon which Multi-WAN typically relies.</div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveInterfaceGroup()"><i class="fas fa-save"></i> Save</button>
         </div>
     </div>
 </div>
 
-<!-- Interface Groups -->
-<div class="tab-content" id="groups" style="display: none;">
-    <div class="settings-section">
-        <h5>Interface Groups</h5>
-        
-        <div style="padding: 20px;">
-            <p>No groups defined.</p>
-            <button class="btn btn-primary add-btn" data-target="groups">Add Group</button>
+<div id="wireless-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Wireless Interface Configuration</span>
+            <span class="close" onclick="closeModal('wireless-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parent Interface</label>
+            <select class="form-select" id="wirelessParentInterface">
+                <option>None available</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Mode</label>
+            <select class="form-select" id="wirelessMode">
+                <option>Infrastructure (BSS)</option>
+                <option>Ad-hoc (IBSS)</option>
+                <option>Access point</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="wirelessDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveWirelessConfig()"><i class="fas fa-save"></i> Save</button>
         </div>
     </div>
 </div>
 
-<!-- Wireless -->
-<div class="tab-content" id="wireless" style="display: none;">
-    <div class="settings-section">
-        <h5>Wireless</h5>
-        
-        <div style="padding: 20px;">
-            <p>No wireless interfaces.</p>
-            <button class="btn btn-primary add-btn" data-target="wireless">Add Wireless Interface</button>
+<div id="vlan-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>VLAN Configuration</span>
+            <span class="close" onclick="closeModal('vlan-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parent Interface</label>
+            <select class="form-select" id="vlanParentInterface">
+                <option>em0 (00:0c:29:ed:cb:ae) - wan</option>
+            </select>
+        </div>
+        <div class="form-help">Only VLAN capable interfaces will be shown.</div>
+        <div class="form-group">
+            <label class="form-label">VLAN Tag</label>
+            <input type="text" class="form-input" id="vlanTag" value="1">
+        </div>
+        <div class="form-help">802.1Q VLAN tag (between 1 and 4094).</div>
+        <div class="form-group">
+            <label class="form-label">VLAN Priority</label>
+            <input type="text" class="form-input" id="vlanPriority" value="0">
+        </div>
+        <div class="form-help">802.1Q VLAN Priority (between 0 and 7).</div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="vlanDescription" placeholder="Description">
+        </div>
+        <div class="form-help">A group description may be entered here for administrative reference (not parsed).</div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveVLANConfig()"><i class="fas fa-save"></i> Save</button>
         </div>
     </div>
 </div>
 
-<!-- QinQs -->
-<div class="tab-content" id="qinqs" style="display: none;">
-    <div class="settings-section">
-        <h5>QinQs</h5>
-        
-        <div style="padding: 20px;">
-            <p>No QinQ interfaces defined.</p>
-            <button class="btn btn-primary add-btn" data-target="qinqs">Add QinQ</button>
+<div id="qinq-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>QinQ Configuration</span>
+            <span class="close" onclick="closeModal('qinq-modal')">&times;</span>
         </div>
-    </div>
-</div>
-
-<!-- PPPs -->
-<div class="tab-content" id="ppps" style="display: none;">
-    <div class="settings-section">
-        <h5>PPPs</h5>
-        
-        <div style="padding: 20px;">
-            <p>No PPP interfaces defined.</p>
-            <button class="btn btn-primary add-btn" data-target="ppps">Add PPP</button>
+        <div class="form-group">
+            <label class="form-label">Parent interface</label>
+            <select class="form-select" id="qinqParentInterface">
+                <option>em0 (00:0c:29:ed:cb:ae)</option>
+            </select>
         </div>
-    </div>
-</div>
-
-<!-- GREs -->
-<div class="tab-content" id="gres" style="display: none;">
-    <div class="settings-section">
-        <h5>GREs</h5>
-        
-        <div style="padding: 20px;">
-            <p>No GRE tunnels defined.</p>
-            <button class="btn btn-primary add-btn" data-target="gres">Add GRE</button>
+        <div class="form-help">Only QinQ capable interfaces will be shown.</div>
+        <div class="form-group">
+            <label class="form-label">First level tag</label>
+            <input type="number" class="form-input" id="qinqFirstLevelTag" style="width: 60px;">
         </div>
-    </div>
-</div>
-
-<!-- GIFs -->
-<div class="tab-content" id="gifs" style="display: none;">
-    <div class="settings-section">
-        <h5>GIFs</h5>
-        
-        <div style="padding: 20px;">
-            <p>No GIF tunnels defined.</p>
-            <button class="btn btn-primary add-btn" data-target="gifs">Add GIF</button>
-        </div>
-    </div>
-</div>
-
-<!-- Bridges -->
-<div class="tab-content" id="bridges" style="display: none;">
-    <div class="settings-section">
-        <h5>Bridges</h5>
-        
-        <div style="padding: 20px;">
-            <p>No bridges configured.</p>
-            <button class="btn btn-primary add-btn" data-target="bridges">Add Bridge</button>
-        </div>
-    </div>
-</div>
-
-<!-- LAGGs -->
-<div class="tab-content" id="laggs" style="display: none;">
-    <div class="settings-section">
-        <h5>LAGGs</h5>
-        
-        <div style="padding: 20px;">
-            <p>No LAGG interfaces defined.</p>
-            <button class="btn btn-primary add-btn" data-target="laggs">Add LAGG</button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="modal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modal-title">Add Item</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="form-help">This is the first level VLAN tag. On top of this are stacked the member VLANs defined below.</div>
+        <div class="form-group">
+            <label class="form-label">Option(s)</label>
+            <div style="flex: 1; display: flex; align-items: center; padding-top: 8px;">
+                <input type="checkbox" id="qinqAddToGroups" style="margin-right: 10px;">
+                <label for="qinqAddToGroups" style="font-weight: normal;">Adds interface to QinQ interface groups</label>
             </div>
-            <div class="modal-body">
-                <form id="modal-form">
-                    <div id="modal-fields"></div>
-                </form>
+        </div>
+        <div class="form-help">Allows rules to be written more easily.</div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="qinqDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+        <div class="form-group">
+            <label class="form-label">Member(s)</label>
+            <div style="flex: 1; font-size: 14px; padding-top: 8px;">
+                Ranges can be specified in the inputs below. Enter a range (2-3) or individual numbers. Click "Add Tag" as many times as needed to add new inputs.
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary cancel-btn" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" form="modal-form">Add</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Tag(s)</label>
+            <div id="qinqTagsContainer">
+                <input type="text" class="form-input qinq-tag-input">
             </div>
+        </div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveQinQConfig()"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-green" onclick="addQinQTagInput()"><i class="fas fa-plus"></i> Add Tag</button>
+        </div>
+    </div>
+</div>
+
+<div id="ppp-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>PPP Configuration</span>
+            <span class="close" onclick="closeModal('ppp-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Link Type</label>
+            <select class="form-select" id="pppLinkType">
+                <option>PPP</option>
+                <option>PPPoE</option>
+                <option>PPTP</option>
+                <option>L2TP</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Link Interface(s)</label>
+            <select class="form-select" id="pppLinkInterfaces" multiple style="height: 80px;">
+                <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
+                <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+            </select>
+        </div>
+        <div class="form-help">Select the interface for the PPP connection.</div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="pppDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference.</div>
+        <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="pppUsername">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <div style="flex: 1; display: flex; gap: 10px;">
+                <input type="password" class="form-input" id="pppPassword" placeholder="*Password">
+                <input type="password" class="form-input" id="pppPasswordConfirm" placeholder="*Password Confirm">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Advanced options</label>
+            <button class="btn btn-cyan" onclick="toggleAdvanced('ppp-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+        </div>
+        <div id="ppp-advanced-fields" class="advanced-section">
+            <div class="advanced-header">Advanced Configuration</div>
+            <div class="advanced-body">
+                <div class="form-group">
+                    <label class="form-label">Dial On Demand</label>
+                    <div style="flex: 1; padding-top: 8px;">
+                        <input type="checkbox" id="pppDialOnDemand">
+                        <label for="pppDialOnDemand">Enable Dial-on-Demand mode.</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="savePPPConfig()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="gre-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>GRE Configuration</span>
+            <span class="close" onclick="closeModal('gre-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parent interface</label>
+            <select class="form-select" id="greParentInterface">
+                <option>WAN</option>
+                <option>LAN</option>
+            </select>
+        </div>
+        <div class="form-help">The interface here serves as the local address to be used for the GRE tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">GRE remote address</label>
+            <input type="text" class="form-input" id="greRemoteAddress">
+        </div>
+        <div class="form-help">Peer address where encapsulated GRE packets will be sent.</div>
+        <div class="form-group">
+            <label class="form-label">GRE local address</label>
+            <input type="text" class="form-input" id="greLocalAddress">
+        </div>
+        <div class="form-help">Local address where encapsulated GRE packets will be received.</div>
+        <div class="form-group">
+            <label class="form-label">IPv4 Tunnel remote address</label>
+            <div class="input-group">
+                <input type="text" class="form-input" id="ipv4TunnelRemoteAddress">
+                <select class="form-select input-cidr" id="ipv4TunnelRemotePrefix">
+                    <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-help">IPv4 address assigned to the remote side of the tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">IPv4 Tunnel local address</label>
+            <div class="input-group">
+                <input type="text" class="form-input" id="ipv4TunnelLocalAddress">
+                <select class="form-select input-cidr" id="ipv4TunnelLocalPrefix">
+                    <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-help">IPv4 address assigned to the local side of the tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">IPv6 Tunnel remote address</label>
+            <div class="input-group">
+                <input type="text" class="form-input" id="ipv6TunnelRemoteAddress">
+                <select class="form-select input-cidr" id="ipv6TunnelRemotePrefix">
+                    <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-help">IPv6 address assigned to the remote side of the tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">IPv6 Tunnel local address</label>
+            <div class="input-group">
+                <input type="text" class="form-input" id="ipv6TunnelLocalAddress">
+                <select class="form-select input-cidr" id="ipv6TunnelLocalPrefix">
+                    <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-help">IPv6 address assigned to the local side of the tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="greDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveGREConfig()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="gif-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>GIF Configuration</span>
+            <span class="close" onclick="closeModal('gif-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parent Interface</label>
+            <select class="form-select" id="gifParentInterface">
+                <option>WAN</option>
+                <option>LAN</option>
+            </select>
+        </div>
+        <div class="form-help">This interface serves as the local address to be used for the GIF tunnel.</div>
+        <div class="form-group">
+            <label class="form-label">GIF Remote Address</label>
+            <input type="text" class="form-input" id="gifRemoteAddress">
+        </div>
+        <div class="form-help">Peer address where encapsulated gif packets will be sent.</div>
+        <div class="form-group">
+            <label class="form-label">GIF tunnel local address</label>
+            <input type="text" class="form-input" id="gifTunnelLocalAddress">
+        </div>
+        <div class="form-help">Local gif tunnel endpoint.</div>
+        <div class="form-group">
+            <label class="form-label">GIF tunnel remote address</label>
+            <input type="text" class="form-input" id="gifTunnelRemoteAddress">
+        </div>
+        <div class="form-help">Remote GIF address endpoint.</div>
+        <div class="form-group">
+            <label class="form-label">GIF tunnel subnet</label>
+            <select class="form-select" id="gifTunnelSubnet">
+                <option>128</option><option>127</option><option>126</option><option>125</option><option>124</option><option>123</option><option>122</option><option>121</option><option>120</option><option>119</option><option>118</option><option>117</option><option>116</option><option>115</option><option>114</option><option>113</option><option>112</option><option>111</option><option>110</option><option>109</option><option>108</option><option>107</option><option>106</option><option>105</option><option>104</option><option>103</option><option>102</option><option>101</option><option>100</option><option>99</option><option>98</option><option>97</option><option>96</option><option>95</option><option>94</option><option>93</option><option>92</option><option>91</option><option>90</option><option>89</option><option>88</option><option>87</option><option>86</option><option>85</option><option>84</option><option>83</option><option>82</option><option>81</option><option>80</option><option>79</option><option>78</option><option>77</option><option>76</option><option>75</option><option>74</option><option>73</option><option>72</option><option>71</option><option>70</option><option>69</option><option>68</option><option>67</option><option>66</option><option>65</option><option>64</option><option>63</option><option>62</option><option>61</option><option>60</option><option>59</option><option>58</option><option>57</option><option>56</option><option>55</option><option>54</option><option>53</option><option>52</option><option>51</option><option>50</option><option>49</option><option>48</option><option>47</option><option>46</option><option>45</option><option>44</option><option>43</option><option>42</option><option>41</option><option>40</option><option>39</option><option>38</option><option>37</option><option>36</option><option>35</option><option>34</option><option>33</option><option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+            </select>
+        </div>
+        <div class="form-help">The subnet is used for determining the network that is tunnelled.</div>
+        <div class="form-group">
+            <label class="form-label">ECN friendly behavior</label>
+            <div style="flex: 1; padding-top: 8px;">
+                <input type="checkbox" id="gifECNFriendly">
+                <label for="gifECNFriendly" style="font-weight: normal;">ECN friendly behavior violates RFC2893. This should be used in mutual agreement with the peer.</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Outer Source Filtering</label>
+            <div style="flex: 1; padding-top: 8px;">
+                <input type="checkbox" id="gifOuterSourceFiltering">
+                <label for="gifOuterSourceFiltering" style="font-weight: normal;">Disable automatic filtering of the outer GIF source which ensures a match with the configured remote peer. When disabled, martian and inbound filtering is not performed which allows asymmetric routing of the outer traffic.</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="gifDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveGIFConfig()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="bridge-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>Bridge Configuration</span>
+            <span class="close" onclick="closeModal('bridge-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Member Interface(s)</label>
+            <select multiple class="form-select" id="bridgeMemberInterfaces" style="height: 100px;">
+                <option>WAN</option>
+                <option>LAN</option>
+            </select>
+        </div>
+        <div class="form-help">Interfaces participating in the bridge.</div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="bridgeDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+        
+        <div class="form-group">
+            <label class="form-label">Advanced options</label>
+            <button class="btn btn-cyan" onclick="toggleAdvanced('bridge-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+        </div>
+
+        <div id="bridge-advanced-fields" class="advanced-section">
+            <div class="advanced-header">Advanced Configuration</div>
+            <div class="advanced-body">
+                <div class="form-group">
+                    <label class="form-label">Cache size</label>
+                    <input type="text" class="form-input" id="bridgeCacheSize" placeholder="100">
+                </div>
+                <div class="form-help">Maximum number of addresses in the cache (default 100).</div>
+
+                <div class="form-group">
+                    <label class="form-label">Cache max age</label>
+                    <input type="text" class="form-input" id="bridgeCacheMaxAge" placeholder="1200">
+                </div>
+                <div class="form-help">Maximum time (in seconds) that an address is stored in the cache (default 1200).</div>
+
+                <div class="form-group">
+                    <label class="form-label">Span Interface(s)</label>
+                    <select multiple class="form-select" id="bridgeSpanInterfaces" style="height: 100px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                    </select>
+                </div>
+                <div class="form-help">Interfaces where a copy of every frame is sent (span port).</div>
+
+                <div class="form-group">
+                    <label class="form-label">Edge Interface(s)</label>
+                    <select multiple class="form-select" id="bridgeEdgeInterfaces" style="height: 100px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                    </select>
+                </div>
+                <div class="form-help">Set these interfaces as edge ports for RSTP/STP.</div>
+
+                <div class="form-group">
+                    <label class="form-label">Auto Edge Interface(s)</label>
+                    <select multiple class="form-select" id="bridgeAutoEdgeInterfaces" style="height: 100px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                    </select>
+                </div>
+                <div class="form-help">Set these interfaces to auto-detect edge status.</div>
+
+                <div class="form-group">
+                    <label class="form-label">PTP Interface(s)</label>
+                    <select multiple class="form-select" id="bridgePTPInterfaces" style="height: 100px;">
+                        <option>WAN</option>
+                        <option>LAN</option>
+                    </select>
+                </div>
+                <div class="form-help">Set these interfaces as point-to-point links.</div>
+
+                <div class="form-group">
+                    <label class="form-label">Sticky ports</label>
+                    <div style="flex: 1; padding-top: 8px;">
+                        <input type="checkbox" id="bridgeStickyPorts">
+                        <label for="bridgeStickyPorts" style="font-weight: normal;">Enable sticky ports</label>
+                    </div>
+                </div>
+                <div class="form-help">If enabled, addresses learned on the bridge are treated as static and not forgotten.</div>
+            </div>
+        </div>
+
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveBridgeConfig()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="lagg-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>LAGG Configuration</span>
+            <span class="close" onclick="closeModal('lagg-modal')">&times;</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Parent Interface(s)</label>
+            <select multiple class="form-select" id="laggParentInterfaces" style="height: 100px;">
+                <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
+                <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+            </select>
+        </div>
+        <div class="form-help">Choose the members that will be used for the link aggregation.</div>
+        
+        <div class="form-group">
+            <label class="form-label">Aggregation Protocol</label>
+            <select class="form-select" id="laggAggregationProtocol">
+                <option>Failover</option>
+                <option>LACP</option>
+                <option>Load Balance</option>
+                <option>Round Robin</option>
+                <option>None</option>
+            </select>
+        </div>
+        <div class="form-help">Failover: Sends and receives traffic through the master port. If the master port becomes unavailable, the next active port is used.</div>
+        
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-input" id="laggDescription">
+        </div>
+        <div class="form-help">A description may be entered here for administrative reference (not parsed).</div>
+
+        <div class="mt-20">
+            <button class="btn btn-blue" onclick="saveLAGGConfig()"><i class="fas fa-save"></i> Save</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Handle tab switching
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-            link.classList.add('active');
-            document.getElementById(link.dataset.tab).style.display = 'block';
-        });
-    });
 
-    // Modal behavior
-    const modal = document.getElementById('modal');
-    const modalTitle = document.getElementById('modal-title');
-    const modalFields = document.getElementById('modal-fields');
-    const modalForm = document.getElementById('modal-form');
-    let currentTarget = null;
+// ----------------------------
+// INTERFACE ASSIGNMENTS FUNCTIONS
+// ----------------------------
 
-    document.querySelectorAll('.add-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            currentTarget = btn.dataset.target;
-            openModal(currentTarget);
-        });
-    });
+function loadInterfaceAssignments() {
+    fetch('/interfaces/get-interface-assignments')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayInterfaceAssignments(data.data);
+            } else {
+                console.error('Error loading assignments:', data.message);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
 
-    document.querySelectorAll('.cancel-btn').forEach(btn => {
-        btn.addEventListener('click', closeModal);
-    });
-
-    function openModal(target) {
-        modal.style.display = 'block';
-        modal.classList.add('show');
-        modalFields.innerHTML = '';
-
-        switch (target) {
-            case 'assignments':
-                modalTitle.textContent = 'Add Interface';
-                modalFields.innerHTML = `
-                    <div class="mb-3">
-                        <label class="form-label">Interface Name</label>
-                        <input class="form-control" name="ifname" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Network Port</label>
-                        <input class="form-control" name="port" required>
-                    </div>`;
-                break;
-            case 'vlans':
-                modalTitle.textContent = 'Add VLAN';
-                modalFields.innerHTML = `
-                    <div class="mb-3">
-                        <label class="form-label">Parent Interface</label>
-                        <input class="form-control" name="parent" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">VLAN Tag</label>
-                        <input class="form-control" name="tag" required type="number">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input class="form-control" name="desc">
-                    </div>`;
-                break;
-            default:
-                modalTitle.textContent = 'Add Item';
-                modalFields.innerHTML = `
-                    <div class="mb-3">
-                        <label class="form-label">Name</label>
-                        <input class="form-control" name="name" required>
-                    </div>`;
+function displayInterfaceAssignments(assignments) {
+    // Find WAN and LAN assignments
+    const wanAssignment = assignments.find(a => a.interface_type === 'WAN');
+    const lanAssignment = assignments.find(a => a.interface_type === 'LAN');
+    
+    // Update WAN select
+    const wanSelect = document.querySelector('td:has(> select) select');
+    if (wanSelect && wanAssignment) {
+        wanSelect.value = wanAssignment.network_port;
+    }
+    
+    // Update LAN select
+    const lanRow = Array.from(document.querySelectorAll('tr')).find(tr => 
+        tr.textContent.includes('LAN')
+    );
+    if (lanRow) {
+        const lanSelect = lanRow.querySelector('select');
+        if (lanSelect && lanAssignment) {
+            lanSelect.value = lanAssignment.network_port;
         }
     }
+}
 
-    function closeModal() {
-        modal.style.display = 'none';
-        modal.classList.remove('show');
-        modalForm.reset();
-    }
-
-    modalForm.addEventListener('submit', e => {
-        e.preventDefault();
-        const formData = Object.fromEntries(new FormData(modalForm).entries());
-        addItem(currentTarget, formData);
-        closeModal();
-    });
-
-    function addItem(target, data) {
-        if (target === 'assignments') {
-            const table = document.querySelector('#assignments-table');
-            table.insertAdjacentHTML('beforeend',
-                `<tr><td>${data.ifname}</td><td>${data.port}</td><td><button class="btn btn-sm btn-primary">Edit</button></td></tr>`);
-        } else if (target === 'vlans') {
-            const table = document.querySelector('#vlans-table');
-            table.insertAdjacentHTML('beforeend',
-                `<tr><td>${data.parent}</td><td>${data.tag}</td><td>${data.desc || ''}</td><td><button class="btn btn-sm btn-primary">Edit</button></td></tr>`);
+function saveWANAssignment() {
+    const wanSelect = document.getElementById('wanSelect');
+    
+    const formData = {
+        interfaceType: 'WAN',
+        networkPort: wanSelect.value
+    };
+    
+    fetch('/interfaces/save-interface-assignment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('WAN assignment saved successfully!');
         } else {
-            const section = document.getElementById(target);
-            const p = document.createElement('p');
-            p.textContent = `Added: ${data.name}`;
-            section.querySelector('div[style*="padding"]').appendChild(p);
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving WAN assignment');
+    });
+}
+
+function saveLANAssignment() {
+    const lanSelect = document.getElementById('lanSelect');
+    if (!lanSelect || !lanSelect.offsetParent) {
+        // LAN row is hidden, skip saving
+        return;
+    }
+    
+    const formData = {
+        interfaceType: 'LAN',
+        networkPort: lanSelect.value
+    };
+    
+    fetch('/interfaces/save-interface-assignment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('LAN assignment saved successfully!');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving LAN assignment');
+    });
+}
+
+function deleteLANAssignment() {
+    if (confirm('Are you sure you want to delete the LAN assignment?')) {
+        fetch('/interfaces/delete-interface-assignment/LAN', {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Hide the LAN row
+                document.getElementById('lanRow').style.display = 'none';
+                // Show the Add LAN button
+                document.getElementById('addLanBtn').style.display = 'inline-block';
+                alert('LAN assignment deleted successfully!');
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting LAN assignment');
+        });
+    }
+}
+
+function addLANAssignment() {
+    // Show the LAN row
+    document.getElementById('lanRow').style.display = 'table-row';
+    // Hide the Add LAN button
+    document.getElementById('addLanBtn').style.display = 'none';
+    // Reset the select value
+    document.getElementById('lanSelect').selectedIndex = 0;
+}
+
+// ----------------------------
+// WIRELESS CONFIGURATION FUNCTIONS
+// ----------------------------
+
+function loadWirelessConfigs() {
+    fetch('/interfaces/get-wireless-configs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayWirelessConfigs(data.data);
+            } else {
+                console.error('Error loading wireless configs:', data.message);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function displayWirelessConfigs(configs) {
+    const tableBody = document.querySelector('#wireless-table tbody');
+    tableBody.innerHTML = '';
+    
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.parent_interface}</td>
+                <td>${config.mode}</td>
+                <td>${config.description}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editWirelessConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteWirelessConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function saveWirelessConfig() {
+    const modal = document.getElementById('wireless-modal');
+    const configId = modal.dataset.configId;
+    
+    const formData = {
+        parentInterface: document.getElementById('wirelessParentInterface').value,
+        mode: document.getElementById('wirelessMode').value,
+        description: document.getElementById('wirelessDescription').value
+    };
+
+    const url = configId ? `/interfaces/update-wireless-config/${configId}` : '/interfaces/save-wireless-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'Wireless config updated successfully!' : 'Wireless config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('wirelessParentInterface').value = 'None available';
+            document.getElementById('wirelessMode').selectedIndex = 0;
+            document.getElementById('wirelessDescription').value = '';
+            loadWirelessConfigs();
+            closeModal('wireless-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving wireless config');
+    });
+}
+
+function editWirelessConfig(configId) {
+    fetch(`/interfaces/get-wireless-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('wirelessParentInterface').value = config.parent_interface;
+                document.getElementById('wirelessMode').value = config.mode;
+                document.getElementById('wirelessDescription').value = config.description;
+                
+                document.getElementById('wireless-modal').dataset.configId = configId;
+                openModal('wireless-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching wireless config');
+        });
+}
+
+function deleteWirelessConfig(configId) {
+    if (confirm('Are you sure you want to delete this wireless configuration?')) {
+        fetch(`/interfaces/delete-wireless-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Wireless config deleted successfully!');
+                loadWirelessConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting wireless config');
+        });
+    }
+}
+
+// ----------------------------
+// VLAN CONFIGURATION FUNCTIONS
+// ----------------------------
+
+function loadVLANConfigs() {
+    fetch('/interfaces/get-vlan-configs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayVLANConfigs(data.data);
+            } else {
+                console.error('Error loading VLAN configs:', data.message);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function displayVLANConfigs(configs) {
+    const tableBody = document.querySelector('#vlan-table tbody');
+    tableBody.innerHTML = '';
+    
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.parent_interface}</td>
+                <td>${config.vlan_tag}</td>
+                <td>${config.vlan_priority}</td>
+                <td>${config.description}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editVLANConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteVLANConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function saveVLANConfig() {
+    const modal = document.getElementById('vlan-modal');
+    const configId = modal.dataset.configId;
+    
+    const formData = {
+        parentInterface: document.getElementById('vlanParentInterface').value,
+        vlanTag: document.getElementById('vlanTag').value,
+        vlanPriority: document.getElementById('vlanPriority').value,
+        description: document.getElementById('vlanDescription').value
+    };
+
+    if (!formData.vlanTag || !formData.vlanPriority) {
+        alert('VLAN Tag and Priority are required');
+        return;
+    }
+
+    const vlanTag = parseInt(formData.vlanTag);
+    const vlanPriority = parseInt(formData.vlanPriority);
+
+    if (vlanTag < 1 || vlanTag > 4094) {
+        alert('VLAN Tag must be between 1 and 4094');
+        return;
+    }
+
+    if (vlanPriority < 0 || vlanPriority > 7) {
+        alert('VLAN Priority must be between 0 and 7');
+        return;
+    }
+
+    const url = configId ? `/interfaces/update-vlan-config/${configId}` : '/interfaces/save-vlan-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'VLAN config updated successfully!' : 'VLAN config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('vlanParentInterface').value = 'em0 (00:0c:29:ed:cb:ae) - wan';
+            document.getElementById('vlanTag').value = '1';
+            document.getElementById('vlanPriority').value = '0';
+            document.getElementById('vlanDescription').value = '';
+            loadVLANConfigs();
+            closeModal('vlan-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving VLAN config');
+    });
+}
+
+function editVLANConfig(configId) {
+    fetch(`/interfaces/get-vlan-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('vlanParentInterface').value = config.parent_interface;
+                document.getElementById('vlanTag').value = config.vlan_tag;
+                document.getElementById('vlanPriority').value = config.vlan_priority;
+                document.getElementById('vlanDescription').value = config.description;
+                
+                document.getElementById('vlan-modal').dataset.configId = configId;
+                openModal('vlan-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching VLAN config');
+        });
+}
+
+function deleteVLANConfig(configId) {
+    if (confirm('Are you sure you want to delete this VLAN configuration?')) {
+        fetch(`/interfaces/delete-vlan-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('VLAN config deleted successfully!');
+                loadVLANConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting VLAN config');
+        });
+    }
+}
+
+// ----------------------------
+// QINQ CONFIGURATION FUNCTIONS
+// ----------------------------
+
+function loadQinQConfigs() {
+    fetch('/interfaces/get-qinq-configs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayQinQConfigs(data.data);
+            } else {
+                console.error('Error loading QinQ configs:', data.message);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function displayQinQConfigs(configs) {
+    const tableBody = document.querySelector('#qinq-table tbody');
+    tableBody.innerHTML = '';
+    
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.parent_interface}</td>
+                <td>${config.first_level_tag}</td>
+                <td>${config.member_tags.join(', ')}</td>
+                <td>${config.description}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editQinQConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteQinQConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function addQinQTagInput() {
+    const container = document.getElementById('qinqTagsContainer');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-input qinq-tag-input';
+    input.style.marginTop = '10px';
+    container.appendChild(input);
+}
+
+function saveQinQConfig() {
+    const modal = document.getElementById('qinq-modal');
+    const configId = modal.dataset.configId;
+    
+    const tagInputs = document.querySelectorAll('.qinq-tag-input');
+    const memberTags = Array.from(tagInputs).map(input => input.value).filter(val => val.trim());
+    
+    const formData = {
+        parentInterface: document.getElementById('qinqParentInterface').value,
+        firstLevelTag: document.getElementById('qinqFirstLevelTag').value,
+        addToGroups: document.getElementById('qinqAddToGroups').checked,
+        description: document.getElementById('qinqDescription').value,
+        memberTags: memberTags
+    };
+
+    if (!formData.firstLevelTag) {
+        alert('First Level Tag is required');
+        return;
+    }
+
+    if (memberTags.length === 0) {
+        alert('At least one member tag is required');
+        return;
+    }
+
+    const url = configId ? `/interfaces/update-qinq-config/${configId}` : '/interfaces/save-qinq-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'QinQ config updated successfully!' : 'QinQ config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('qinqParentInterface').value = 'em0 (00:0c:29:ed:cb:ae)';
+            document.getElementById('qinqFirstLevelTag').value = '';
+            document.getElementById('qinqAddToGroups').checked = false;
+            document.getElementById('qinqDescription').value = '';
+            document.getElementById('qinqTagsContainer').innerHTML = '<input type="text" class="form-input qinq-tag-input">';
+            loadQinQConfigs();
+            closeModal('qinq-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving QinQ config');
+    });
+}
+
+function editQinQConfig(configId) {
+    fetch(`/interfaces/get-qinq-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('qinqParentInterface').value = config.parent_interface;
+                document.getElementById('qinqFirstLevelTag').value = config.first_level_tag;
+                document.getElementById('qinqAddToGroups').checked = config.add_to_groups;
+                document.getElementById('qinqDescription').value = config.description;
+                
+                // Populate member tags
+                const container = document.getElementById('qinqTagsContainer');
+                container.innerHTML = '';
+                config.member_tags.forEach(tag => {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-input qinq-tag-input';
+                    input.value = tag;
+                    input.style.marginTop = '10px';
+                    container.appendChild(input);
+                });
+                
+                document.getElementById('qinq-modal').dataset.configId = configId;
+                openModal('qinq-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching QinQ config');
+        });
+}
+
+function deleteQinQConfig(configId) {
+    if (confirm('Are you sure you want to delete this QinQ configuration?')) {
+        fetch(`/interfaces/delete-qinq-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('QinQ config deleted successfully!');
+                loadQinQConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting QinQ config');
+        });
+    }
+}
+
+function deleteGroup(groupId) {
+    if (confirm('Are you sure you want to delete this group?')) {
+        fetch(`/interfaces/delete-interface-group/${groupId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Group deleted successfully!');
+                loadInterfaceGroups();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting group');
+        });
+    }
+}
+
+function editGroup(groupId) {
+    // Fetch the group data
+    fetch(`/interfaces/get-interface-group/${groupId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const group = data.data;
+                // Populate modal with group data
+                document.getElementById('groupName').value = group.name;
+                document.getElementById('groupDescription').value = group.description;
+                
+                // Set selected members
+                const select = document.getElementById('groupMembers');
+                Array.from(select.options).forEach(option => {
+                    option.selected = group.members.includes(option.value);
+                });
+                
+                // Store the groupId for update
+                document.getElementById('interface-group-modal').dataset.groupId = groupId;
+                openModal('interface-group-modal');
+            } else {
+                alert('Error fetching group: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching group data');
+        });
+}
+
+function loadInterfaceGroups() {
+    fetch('/interfaces/get-interface-groups')
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.status === 'success') {
+                displayInterfaceGroups(data.data);
+            } else {
+                console.error('Error from server:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+        });
+}
+
+function displayInterfaceGroups(groups) {
+    const tableBody = document.querySelector('#interface-groups-table tbody');
+    tableBody.innerHTML = '';
+    
+    groups.forEach(group => {
+        const row = `
+            <tr>
+                <td>${group.name}</td>
+                <td>${group.description}</td>
+                <td>${group.members.join(', ')}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editGroup(${group.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+// PPP Configuration Functions
+
+function loadPPPConfigs() {
+    fetch('/interfaces/get-ppp-configs')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayPPPConfigs(data.data);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayPPPConfigs(configs) {
+    const tableBody = document.querySelector('#ppp-table tbody');
+    tableBody.innerHTML = '';
+
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.link_type || ''}</td>
+                <td>${config.link_interfaces.join(', ')}</td>
+                <td>${config.description || ''}</td>
+                <td>${config.username || ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editPPPConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deletePPPConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function savePPPConfig() {
+    const modal = document.getElementById('ppp-modal');
+    const configId = modal.dataset.configId;
+    
+    const linkInterfacesSelect = document.getElementById('pppLinkInterfaces');
+    const linkInterfaces = Array.from(linkInterfacesSelect.selectedOptions).map(opt => opt.value);
+    
+    const formData = {
+        linkType: document.getElementById('pppLinkType').value,
+        linkInterfaces: linkInterfaces,
+        description: document.getElementById('pppDescription').value,
+        username: document.getElementById('pppUsername').value,
+        password: document.getElementById('pppPassword').value,
+        dialOnDemand: document.getElementById('pppDialOnDemand').checked
+    };
+
+    if (formData.linkInterfaces.length === 0) {
+        alert('At least one Link Interface is required');
+        return;
+    }
+
+    if (!formData.username) {
+        alert('Username is required');
+        return;
+    }
+
+    if (!formData.password) {
+        alert('Password is required');
+        return;
+    }
+
+    const url = configId ? `/interfaces/update-ppp-config/${configId}` : '/interfaces/save-ppp-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'PPP config updated successfully!' : 'PPP config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('pppLinkType').value = 'Select';
+            document.getElementById('pppLinkInterfaces').selectedIndex = -1;
+            document.getElementById('pppDescription').value = '';
+            document.getElementById('pppUsername').value = '';
+            document.getElementById('pppPassword').value = '';
+            document.getElementById('pppPasswordConfirm').value = '';
+            document.getElementById('pppDialOnDemand').checked = false;
+            document.getElementById('ppp-advanced-fields').style.display = 'none';
+            loadPPPConfigs();
+            closeModal('ppp-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving PPP config');
+    });
+}
+
+function editPPPConfig(configId) {
+    fetch(`/interfaces/get-ppp-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('pppLinkType').value = config.link_type;
+                
+                // Set selected interfaces
+                const interfacesSelect = document.getElementById('pppLinkInterfaces');
+                Array.from(interfacesSelect.options).forEach(option => {
+                    option.selected = config.link_interfaces.includes(option.value);
+                });
+                
+                document.getElementById('pppDescription').value = config.description;
+                document.getElementById('pppUsername').value = config.username;
+                document.getElementById('pppPassword').value = config.password;
+                document.getElementById('pppPasswordConfirm').value = config.password;
+                document.getElementById('pppDialOnDemand').checked = config.dial_on_demand;
+                document.getElementById('ppp-modal').dataset.configId = configId;
+                openModal('ppp-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching PPP config');
+        });
+}
+
+function deletePPPConfig(configId) {
+    if (confirm('Are you sure you want to delete this PPP configuration?')) {
+        fetch(`/interfaces/delete-ppp-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('PPP config deleted successfully!');
+                loadPPPConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting PPP config');
+        });
+    }
+}
+
+// GRE Configuration Functions
+
+function loadGREConfigs() {
+    fetch('/interfaces/get-gre-configs')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayGREConfigs(data.data);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayGREConfigs(configs) {
+    const tableBody = document.querySelector('#gre-table tbody');
+    tableBody.innerHTML = '';
+
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.parent_interface || ''}</td>
+                <td>${config.gre_remote_address || ''}</td>
+                <td>${config.gre_local_address || ''}</td>
+                <td>${config.description || ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editGREConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGREConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function saveGREConfig() {
+    const modal = document.getElementById('gre-modal');
+    const configId = modal.dataset.configId;
+    
+    const formData = {
+        parentInterface: document.getElementById('greParentInterface').value,
+        greRemoteAddress: document.getElementById('greRemoteAddress').value,
+        greLocalAddress: document.getElementById('greLocalAddress').value,
+        ipv4TunnelRemoteAddress: document.getElementById('ipv4TunnelRemoteAddress').value,
+        ipv4TunnelRemotePrefix: document.getElementById('ipv4TunnelRemotePrefix').value,
+        ipv4TunnelLocalAddress: document.getElementById('ipv4TunnelLocalAddress').value,
+        ipv4TunnelLocalPrefix: document.getElementById('ipv4TunnelLocalPrefix').value,
+        ipv6TunnelRemoteAddress: document.getElementById('ipv6TunnelRemoteAddress').value,
+        ipv6TunnelRemotePrefix: document.getElementById('ipv6TunnelRemotePrefix').value,
+        ipv6TunnelLocalAddress: document.getElementById('ipv6TunnelLocalAddress').value,
+        ipv6TunnelLocalPrefix: document.getElementById('ipv6TunnelLocalPrefix').value,
+        description: document.getElementById('greDescription').value
+    };
+
+    const url = configId ? `/interfaces/update-gre-config/${configId}` : '/interfaces/save-gre-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'GRE config updated successfully!' : 'GRE config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('greParentInterface').value = 'WAN';
+            document.getElementById('greRemoteAddress').value = '';
+            document.getElementById('greLocalAddress').value = '';
+            document.getElementById('ipv4TunnelRemoteAddress').value = '';
+            document.getElementById('ipv4TunnelRemotePrefix').value = '32';
+            document.getElementById('ipv4TunnelLocalAddress').value = '';
+            document.getElementById('ipv4TunnelLocalPrefix').value = '32';
+            document.getElementById('ipv6TunnelRemoteAddress').value = '';
+            document.getElementById('ipv6TunnelRemotePrefix').value = '128';
+            document.getElementById('ipv6TunnelLocalAddress').value = '';
+            document.getElementById('ipv6TunnelLocalPrefix').value = '128';
+            document.getElementById('greDescription').value = '';
+            loadGREConfigs();
+            closeModal('gre-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving GRE config');
+    });
+}
+
+function editGREConfig(configId) {
+    fetch(`/interfaces/get-gre-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('greParentInterface').value = config.parent_interface;
+                document.getElementById('greRemoteAddress').value = config.gre_remote_address;
+                document.getElementById('greLocalAddress').value = config.gre_local_address;
+                document.getElementById('ipv4TunnelRemoteAddress').value = config.ipv4_tunnel_remote_address;
+                document.getElementById('ipv4TunnelRemotePrefix').value = config.ipv4_tunnel_remote_prefix;
+                document.getElementById('ipv4TunnelLocalAddress').value = config.ipv4_tunnel_local_address;
+                document.getElementById('ipv4TunnelLocalPrefix').value = config.ipv4_tunnel_local_prefix;
+                document.getElementById('ipv6TunnelRemoteAddress').value = config.ipv6_tunnel_remote_address;
+                document.getElementById('ipv6TunnelRemotePrefix').value = config.ipv6_tunnel_remote_prefix;
+                document.getElementById('ipv6TunnelLocalAddress').value = config.ipv6_tunnel_local_address;
+                document.getElementById('ipv6TunnelLocalPrefix').value = config.ipv6_tunnel_local_prefix;
+                document.getElementById('greDescription').value = config.description;
+                document.getElementById('gre-modal').dataset.configId = configId;
+                openModal('gre-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching GRE config');
+        });
+}
+
+function deleteGREConfig(configId) {
+    if (confirm('Are you sure you want to delete this GRE configuration?')) {
+        fetch(`/interfaces/delete-gre-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('GRE config deleted successfully!');
+                loadGREConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting GRE config');
+        });
+    }
+}
+
+// GIF Configuration Functions
+
+function loadGIFConfigs() {
+    fetch('/interfaces/get-gif-configs')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayGIFConfigs(data.data);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayGIFConfigs(configs) {
+    const tableBody = document.querySelector('#gif-table tbody');
+    tableBody.innerHTML = '';
+
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.parent_interface || ''}</td>
+                <td>${config.gif_remote_address || ''}</td>
+                <td>${config.gif_tunnel_local_address || ''}</td>
+                <td>${config.description || ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editGIFConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGIFConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function saveGIFConfig() {
+    const modal = document.getElementById('gif-modal');
+    const configId = modal.dataset.configId;
+    
+    const formData = {
+        parentInterface: document.getElementById('gifParentInterface').value,
+        gifRemoteAddress: document.getElementById('gifRemoteAddress').value,
+        gifTunnelLocalAddress: document.getElementById('gifTunnelLocalAddress').value,
+        gifTunnelRemoteAddress: document.getElementById('gifTunnelRemoteAddress').value,
+        gifTunnelSubnet: document.getElementById('gifTunnelSubnet').value,
+        ecnFriendlyBehavior: document.getElementById('gifECNFriendly').checked,
+        outerSourceFiltering: document.getElementById('gifOuterSourceFiltering').checked,
+        description: document.getElementById('gifDescription').value
+    };
+
+    const url = configId ? `/interfaces/update-gif-config/${configId}` : '/interfaces/save-gif-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'GIF config updated successfully!' : 'GIF config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('gifParentInterface').value = 'WAN';
+            document.getElementById('gifRemoteAddress').value = '';
+            document.getElementById('gifTunnelLocalAddress').value = '';
+            document.getElementById('gifTunnelRemoteAddress').value = '';
+            document.getElementById('gifTunnelSubnet').value = '128';
+            document.getElementById('gifECNFriendly').checked = false;
+            document.getElementById('gifOuterSourceFiltering').checked = false;
+            document.getElementById('gifDescription').value = '';
+            loadGIFConfigs();
+            closeModal('gif-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving GIF config');
+    });
+}
+
+function editGIFConfig(configId) {
+    fetch(`/interfaces/get-gif-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('gifParentInterface').value = config.parent_interface;
+                document.getElementById('gifRemoteAddress').value = config.gif_remote_address;
+                document.getElementById('gifTunnelLocalAddress').value = config.gif_tunnel_local_address;
+                document.getElementById('gifTunnelRemoteAddress').value = config.gif_tunnel_remote_address;
+                document.getElementById('gifTunnelSubnet').value = config.gif_tunnel_subnet;
+                document.getElementById('gifECNFriendly').checked = config.ecn_friendly_behavior;
+                document.getElementById('gifOuterSourceFiltering').checked = config.outer_source_filtering;
+                document.getElementById('gifDescription').value = config.description;
+                document.getElementById('gif-modal').dataset.configId = configId;
+                openModal('gif-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching GIF config');
+        });
+}
+
+function deleteGIFConfig(configId) {
+    if (confirm('Are you sure you want to delete this GIF configuration?')) {
+        fetch(`/interfaces/delete-gif-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('GIF config deleted successfully!');
+                loadGIFConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting GIF config');
+        });
+    }
+}
+
+// Bridge Configuration Functions
+
+function loadBridgeConfigs() {
+    fetch('/interfaces/get-bridge-configs')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayBridgeConfigs(data.data);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayBridgeConfigs(configs) {
+    const tableBody = document.querySelector('#bridge-table tbody');
+    tableBody.innerHTML = '';
+
+    configs.forEach(config => {
+        const row = `
+            <tr>
+                <td>${config.member_interfaces.join(', ')}</td>
+                <td>${config.cache_size || '100'}</td>
+                <td>${config.description || ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editBridgeConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBridgeConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                </td>
+            </tr>
+        `;
+        tableBody.innerHTML += row;
+    });
+}
+
+function saveBridgeConfig() {
+    const modal = document.getElementById('bridge-modal');
+    const configId = modal.dataset.configId;
+    
+    const memberSelect = document.getElementById('bridgeMemberInterfaces');
+    const memberInterfaces = Array.from(memberSelect.selectedOptions).map(opt => opt.value);
+    
+    const spanSelect = document.getElementById('bridgeSpanInterfaces');
+    const spanInterfaces = Array.from(spanSelect.selectedOptions).map(opt => opt.value);
+    
+    const edgeSelect = document.getElementById('bridgeEdgeInterfaces');
+    const edgeInterfaces = Array.from(edgeSelect.selectedOptions).map(opt => opt.value);
+    
+    const autoEdgeSelect = document.getElementById('bridgeAutoEdgeInterfaces');
+    const autoEdgeInterfaces = Array.from(autoEdgeSelect.selectedOptions).map(opt => opt.value);
+    
+    const ptpSelect = document.getElementById('bridgePTPInterfaces');
+    const ptpInterfaces = Array.from(ptpSelect.selectedOptions).map(opt => opt.value);
+    
+    const formData = {
+        memberInterfaces: memberInterfaces,
+        description: document.getElementById('bridgeDescription').value,
+        cacheSize: document.getElementById('bridgeCacheSize').value || '100',
+        cacheMaxAge: document.getElementById('bridgeCacheMaxAge').value || '1200',
+        spanInterfaces: spanInterfaces,
+        edgeInterfaces: edgeInterfaces,
+        autoEdgeInterfaces: autoEdgeInterfaces,
+        ptpInterfaces: ptpInterfaces,
+        stickyPorts: document.getElementById('bridgeStickyPorts').checked
+    };
+
+    if (formData.memberInterfaces.length === 0) {
+        alert('At least one Member Interface is required');
+        return;
+    }
+
+    const url = configId ? `/interfaces/update-bridge-config/${configId}` : '/interfaces/save-bridge-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'Bridge config updated successfully!' : 'Bridge config saved successfully!');
+            delete modal.dataset.configId;
+            document.getElementById('bridgeMemberInterfaces').selectedIndex = -1;
+            document.getElementById('bridgeDescription').value = '';
+            document.getElementById('bridgeCacheSize').value = '100';
+            document.getElementById('bridgeCacheMaxAge').value = '1200';
+            document.getElementById('bridgeSpanInterfaces').selectedIndex = -1;
+            document.getElementById('bridgeEdgeInterfaces').selectedIndex = -1;
+            document.getElementById('bridgeAutoEdgeInterfaces').selectedIndex = -1;
+            document.getElementById('bridgePTPInterfaces').selectedIndex = -1;
+            document.getElementById('bridgeStickyPorts').checked = false;
+            document.getElementById('bridge-advanced-fields').style.display = 'none';
+            loadBridgeConfigs();
+            closeModal('bridge-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving Bridge config');
+    });
+}
+
+function editBridgeConfig(configId) {
+    fetch(`/interfaces/get-bridge-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                
+                // Set member interfaces
+                let select = document.getElementById('bridgeMemberInterfaces');
+                Array.from(select.options).forEach(option => {
+                    option.selected = config.member_interfaces.includes(option.value);
+                });
+                
+                document.getElementById('bridgeDescription').value = config.description;
+                document.getElementById('bridgeCacheSize').value = config.cache_size;
+                document.getElementById('bridgeCacheMaxAge').value = config.cache_max_age;
+                
+                // Set span interfaces
+                select = document.getElementById('bridgeSpanInterfaces');
+                Array.from(select.options).forEach(option => {
+                    option.selected = config.span_interfaces.includes(option.value);
+                });
+                
+                // Set edge interfaces
+                select = document.getElementById('bridgeEdgeInterfaces');
+                Array.from(select.options).forEach(option => {
+                    option.selected = config.edge_interfaces.includes(option.value);
+                });
+                
+                // Set auto edge interfaces
+                select = document.getElementById('bridgeAutoEdgeInterfaces');
+                Array.from(select.options).forEach(option => {
+                    option.selected = config.auto_edge_interfaces.includes(option.value);
+                });
+                
+                // Set ptp interfaces
+                select = document.getElementById('bridgePTPInterfaces');
+                Array.from(select.options).forEach(option => {
+                    option.selected = config.ptp_interfaces.includes(option.value);
+                });
+                
+                document.getElementById('bridgeStickyPorts').checked = config.sticky_ports;
+                document.getElementById('bridge-modal').dataset.configId = configId;
+                openModal('bridge-modal');
+            } else {
+                alert('Error fetching config: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching Bridge config');
+        });
+}
+
+function deleteBridgeConfig(configId) {
+    if (confirm('Are you sure you want to delete this Bridge configuration?')) {
+        fetch(`/interfaces/delete-bridge-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Bridge config deleted successfully!');
+                loadBridgeConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting Bridge config');
+        });
+    }
+}
+
+// ----------------------------
+// LAGG CONFIGURATION FUNCTIONS
+// ----------------------------
+
+function loadLAGGConfigs() {
+    fetch('/interfaces/get-lagg-configs')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayLAGGConfigs(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading LAGG configs:', error));
+}
+
+function displayLAGGConfigs(configs) {
+    const tbody = document.getElementById('lagg-table').getElementsByTagName('tbody')[0];
+    tbody.innerHTML = '';
+    
+    configs.forEach(config => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>${config.parent_interfaces}</td>
+            <td>${config.aggregation_protocol}</td>
+            <td>${config.description || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editLAGGConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteLAGGConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+            </td>
+        `;
+    });
+}
+
+function openLAGGModal() {
+    const modal = document.getElementById('lagg-modal');
+    delete modal.dataset.configId;
+    document.getElementById('laggParentInterfaces').selectedIndex = -1;
+    document.getElementById('laggAggregationProtocol').value = 'Failover';
+    document.getElementById('laggDescription').value = '';
+    openModal('lagg-modal');
+}
+
+function saveLAGGConfig() {
+    const modal = document.getElementById('lagg-modal');
+    const configId = modal.dataset.configId;
+    
+    const parentInterfaces = Array.from(document.getElementById('laggParentInterfaces').selectedOptions).map(opt => opt.value);
+    const formData = {
+        parentInterfaces: parentInterfaces,
+        aggregationProtocol: document.getElementById('laggAggregationProtocol').value,
+        description: document.getElementById('laggDescription').value
+    };
+
+    if (!formData.parentInterfaces || formData.parentInterfaces.length === 0) {
+        alert('Please select at least one parent interface');
+        return;
+    }
+
+    const url = configId ? `/interfaces/update-lagg-config/${configId}` : '/interfaces/save-lagg-config';
+    const method = configId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(configId ? 'LAGG config updated successfully!' : 'LAGG config saved successfully!');
+            closeModal('lagg-modal');
+            loadLAGGConfigs();
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving LAGG config');
+    });
+}
+
+function editLAGGConfig(configId) {
+    fetch(`/interfaces/get-lagg-config/${configId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const modal = document.getElementById('lagg-modal');
+                modal.dataset.configId = configId;
+                
+                const parentInterfacesSelect = document.getElementById('laggParentInterfaces');
+                Array.from(parentInterfacesSelect.options).forEach(option => {
+                    option.selected = data.data.parent_interfaces.includes(option.value);
+                });
+                
+                document.getElementById('laggAggregationProtocol').value = data.data.aggregation_protocol;
+                document.getElementById('laggDescription').value = data.data.description;
+                
+                openModal('lagg-modal');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading LAGG config');
+        });
+}
+
+function deleteLAGGConfig(configId) {
+    if (confirm('Are you sure you want to delete this LAGG configuration?')) {
+        fetch(`/interfaces/delete-lagg-config/${configId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('LAGG config deleted successfully!');
+                loadLAGGConfigs();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting LAGG config');
+        });
+    }
+}
+
+// Load groups when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadInterfaceGroups();
+    loadInterfaceAssignments();
+    loadWirelessConfigs();
+    loadVLANConfigs();
+    loadQinQConfigs();
+    loadPPPConfigs();
+    loadGREConfigs();
+    loadGIFConfigs();
+    loadBridgeConfigs();
+    loadLAGGConfigs();
+});
+
+
+function saveInterfaceGroup() {
+    const modal = document.getElementById('interface-group-modal');
+    const groupId = modal.dataset.groupId;
+    
+    const formData = {
+        groupName: document.getElementById('groupName').value,
+        groupDescription: document.getElementById('groupDescription').value,
+        groupMembers: Array.from(document.getElementById('groupMembers').selectedOptions).map(opt => opt.value)
+    };
+
+    if (!formData.groupName.trim()) {
+        alert('Group Name is required');
+        return;
+    }
+
+    const url = groupId ? `/interfaces/update-interface-group/${groupId}` : '/interfaces/save-interface-group';
+    const method = groupId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(groupId ? 'Group updated successfully!' : 'Group saved successfully!');
+            delete modal.dataset.groupId;
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDescription').value = '';
+            document.getElementById('groupMembers').selectedIndex = -1;
+            loadInterfaceGroups();
+            closeModal('interface-group-modal');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving group');
+    });
+}
+
+// front end 
+
+    function openTab(evt, tabName) {
+        var i, tabContent, tabLinks;
+        tabContent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabContent.length; i++) {
+            tabContent[i].style.display = "none";
+        }
+        tabLinks = document.getElementsByClassName("tab-link");
+        for (i = 0; i < tabLinks.length; i++) {
+            tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = "block";
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = "none";
+    }
+
+    function toggleAdvanced(id) {
+        var x = document.getElementById(id);
+        if (x.style.display === "block") {
+            x.style.display = "none";
+        } else {
+            x.style.display = "block";
         }
     }
 
-    // Close modal if user clicks outside of it
-    window.onclick = e => { if (e.target === modal) closeModal(); };
+    // Close the modal if the user clicks outside of it
+    window.onclick = function(event) {
+        if (event.target.className === 'modal') {
+            event.target.style.display = "none";
+        }
+    }
 </script>
 
+</body>
+</html>
 {% endblock %}

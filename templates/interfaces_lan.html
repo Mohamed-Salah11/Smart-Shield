@@ -164,10 +164,83 @@
 </div>
 
 <div class="d-flex gap-2" style="margin-top: 20px;">
-    <button type="submit" class="btn btn-primary">Save</button>
-    <button type="button" class="btn btn-secondary">Cancel</button>
+    <button type="button" class="btn btn-primary" onclick="saveLANConfig()">Save</button>
+    <button type="button" class="btn btn-secondary" onclick="resetLANConfig()">Cancel</button>
 </div>
 
 </form>
+
+<script>
+// Load LAN configuration when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadLANConfig();
+});
+
+function loadLANConfig() {
+    fetch('/interfaces/get-lan-config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                document.getElementById('enable').checked = config.enable_interface;
+                document.getElementById('description').value = config.description;
+                document.getElementById('ipv4type').value = config.ipv4_config_type;
+                document.getElementById('ipv6type').value = config.ipv6_config_type;
+                document.getElementById('mac').value = config.mac_address;
+                document.getElementById('mtu').value = config.mtu;
+                document.getElementById('mss').value = config.mss;
+                document.getElementById('speed').value = config.speed_and_duplex;
+                document.getElementById('ipv4addr').value = config.ipv4_address;
+                document.getElementById('ipv4gw').value = config.ipv4_upstream_gateway;
+                document.getElementById('blockprivate').checked = config.block_private_networks;
+                document.getElementById('blockbogons').checked = config.block_bogon_networks;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading LAN config:', error);
+        });
+}
+
+function saveLANConfig() {
+    const formData = {
+        enableInterface: document.getElementById('enable').checked,
+        description: document.getElementById('description').value,
+        ipv4ConfigType: document.getElementById('ipv4type').value,
+        ipv6ConfigType: document.getElementById('ipv6type').value,
+        macAddress: document.getElementById('mac').value,
+        mtu: document.getElementById('mtu').value,
+        mss: document.getElementById('mss').value,
+        speedAndDuplex: document.getElementById('speed').value,
+        ipv4Address: document.getElementById('ipv4addr').value,
+        ipv4UpstreamGateway: document.getElementById('ipv4gw').value,
+        blockPrivateNetworks: document.getElementById('blockprivate').checked,
+        blockBogonNetworks: document.getElementById('blockbogons').checked
+    };
+
+    fetch('/interfaces/save-lan-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('LAN configuration saved successfully!');
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error saving LAN configuration');
+    });
+}
+
+function resetLANConfig() {
+    loadLANConfig();
+}
+</script>
 
 {% endblock %}
