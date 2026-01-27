@@ -683,15 +683,15 @@ def delete_nat_npt(rule_id):
 
 @firewall_bp.route("/aliases")
 def aliases():
-    # Default tab = 'ip'
-    return render_template("aliases.html", tab="ip")
+    # Default tab = 'all'
+    return render_template("aliases.html", tab="all")
 
 
 @firewall_bp.route("/aliases/<tab>")
 def firewall_aliases_tab(tab):
     valid_tabs = ["ip", "ports", "urls", "all"]
     if tab not in valid_tabs:
-        tab = "ip"
+        tab = "all"
     return render_template("aliases.html", tab=tab)
 
 

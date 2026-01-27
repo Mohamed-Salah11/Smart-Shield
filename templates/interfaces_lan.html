@@ -2,173 +2,166 @@
 
 {% block main %}
 
-<div class="breadcrumb">
-    Interfaces / LAN
-</div>
-
-<form method="POST">
-
-<div class="settings-section">
-    <h5>General Configuration</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="enable">Enable Interface</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="enable" name="enable" checked>
-                    <label class="form-check-label" for="enable">
-                        Enable Interface
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="description">Description</label>
-            <div class="form-group-content">
-                <input type="text" id="description" name="description" class="form-control" style="max-width: 400px;" value="LAN">
-                <div class="help-text">
-                    Description of the interface (optional)
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ipv4type">IPv4 Configuration Type</label>
-            <div class="form-group-content">
-                <select id="ipv4type" name="ipv4type" class="form-control" style="max-width: 400px;">
-                    <option value="static" selected>Static IPv4</option>
-                    <option value="dhcp">DHCP</option>
-                    <option value="none">None</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ipv6type">IPv6 Configuration Type</label>
-            <div class="form-group-content">
-                <select id="ipv6type" name="ipv6type" class="form-control" style="max-width: 400px;">
-                    <option value="none" selected>None</option>
-                    <option value="static">Static IPv6</option>
-                    <option value="dhcp6">DHCP6</option>
-                    <option value="slaac">SLAAC</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="mac">MAC Address</label>
-            <div class="form-group-content">
-                <input type="text" id="mac" name="mac" class="form-control" style="max-width: 400px;" placeholder="00:11:22:33:44:55">
-                <div class="help-text">
-                    This field can be used to modify (spoof) the MAC address of this interface
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="mtu">MTU</label>
-            <div class="form-group-content">
-                <input type="text" id="mtu" name="mtu" class="form-control" style="max-width: 200px;" placeholder="1500">
-                <div class="help-text">
-                    Maximum Transmission Unit (bytes). Leave blank for default (1500)
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="mss">MSS</label>
-            <div class="form-group-content">
-                <input type="text" id="mss" name="mss" class="form-control" style="max-width: 200px;" placeholder="">
-                <div class="help-text">
-                    Maximum Segment Size (bytes). Leave blank for default
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="speed">Speed and Duplex</label>
-            <div class="form-group-content">
-                <select id="speed" name="speed" class="form-control" style="max-width: 400px;">
-                    <option value="default" selected>Default (negotiated)</option>
-                    <option value="10baseTFD">10baseT full-duplex</option>
-                    <option value="100baseTXFD">100baseTX full-duplex</option>
-                    <option value="1000baseTFD">1000baseT full-duplex</option>
-                </select>
-            </div>
-        </div>
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('interfaces.interfaces') }}">Interfaces</a></li>
+                <li class="breadcrumb-item active" aria-current="page">LAN</li>
+            </ol>
+        </nav>
+        <h1>LAN Interface</h1>
     </div>
-</div>
 
-<div class="settings-section">
-    <h5>Static IPv4 Configuration</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="ipv4addr">IPv4 Address</label>
-            <div class="form-group-content">
-                <input type="text" id="ipv4addr" name="ipv4addr" class="form-control" style="max-width: 400px;" placeholder="192.168.1.1/24">
-                <div class="help-text">
-                    IPv4 address in CIDR format (e.g., 192.168.1.1/24)
+    <form method="POST">
+
+        <!-- General Configuration Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>General Configuration</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label for="enable" class="col-sm-3 col-form-label fw-semibold">Enable Interface</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="enable" name="enable" checked>
+                            <label class="form-check-label" for="enable">Enable Interface</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="description" name="description" class="form-control" value="LAN">
+                        <small class="text-muted">Description of the interface (optional)</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ipv4type" class="col-sm-3 col-form-label fw-semibold">IPv4 Configuration Type</label>
+                    <div class="col-sm-9">
+                        <select id="ipv4type" name="ipv4type" class="form-select">
+                            <option value="static" selected>Static IPv4</option>
+                            <option value="dhcp">DHCP</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ipv6type" class="col-sm-3 col-form-label fw-semibold">IPv6 Configuration Type</label>
+                    <div class="col-sm-9">
+                        <select id="ipv6type" name="ipv6type" class="form-select">
+                            <option value="none" selected>None</option>
+                            <option value="static">Static IPv6</option>
+                            <option value="dhcp6">DHCP6</option>
+                            <option value="slaac">SLAAC</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="mac" class="col-sm-3 col-form-label fw-semibold">MAC Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="mac" name="mac" class="form-control" placeholder="00:11:22:33:44:55">
+                        <small class="text-muted">This field can be used to modify (spoof) the MAC address of this interface</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="mtu" class="col-sm-3 col-form-label fw-semibold">MTU</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="mtu" name="mtu" class="form-control" placeholder="1500" style="max-width: 200px;">
+                        <small class="text-muted">Maximum Transmission Unit (bytes). Leave blank for default (1500)</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="mss" class="col-sm-3 col-form-label fw-semibold">MSS</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="mss" name="mss" class="form-control" placeholder="" style="max-width: 200px;">
+                        <small class="text-muted">Maximum Segment Size (bytes). Leave blank for default</small>
+                    </div>
+                </div>
+
+                <div class="mb-3 row align-items-center">
+                    <label for="speed" class="col-sm-3 col-form-label fw-semibold">Speed and Duplex</label>
+                    <div class="col-sm-9">
+                        <select id="speed" name="speed" class="form-select">
+                            <option value="default" selected>Default (negotiated)</option>
+                            <option value="10baseTFD">10baseT full-duplex</option>
+                            <option value="100baseTXFD">100baseTX full-duplex</option>
+                            <option value="1000baseTFD">1000baseT full-duplex</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="ipv4gw">IPv4 Upstream Gateway</label>
-            <div class="form-group-content">
-                <input type="text" id="ipv4gw" name="ipv4gw" class="form-control" style="max-width: 400px;" placeholder="192.168.1.254">
-                <div class="help-text">
-                    Enter the upstream gateway IPv4 address (usually not required for LAN)
-                </div>
+        <!-- Static IPv4 Configuration Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Static IPv4 Configuration</h2>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Reserved Networks</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="blockprivate">Block private networks</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="blockprivate" name="blockprivate">
-                    <label class="form-check-label" for="blockprivate">
-                        Block private networks and loopback addresses
-                    </label>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label for="ipv4addr" class="col-sm-3 col-form-label fw-semibold">IPv4 Address</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="ipv4addr" name="ipv4addr" class="form-control" placeholder="192.168.1.1/24">
+                        <small class="text-muted">IPv4 address in CIDR format (e.g., 192.168.1.1/24)</small>
+                    </div>
                 </div>
-                <div class="help-text">
-                    Blocks traffic from IP addresses that are reserved for private networks per RFC 1918 and loopback addresses
+
+                <div class="mb-3 row align-items-center">
+                    <label for="ipv4gw" class="col-sm-3 col-form-label fw-semibold">IPv4 Upstream Gateway</label>
+                    <div class="col-sm-9">
+                        <input type="text" id="ipv4gw" name="ipv4gw" class="form-control" placeholder="192.168.1.254">
+                        <small class="text-muted">Enter the upstream gateway IPv4 address (usually not required for LAN)</small>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="blockbogons">Block bogon networks</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="blockbogons" name="blockbogons">
-                    <label class="form-check-label" for="blockbogons">
-                        Block bogon networks
-                    </label>
+        <!-- Reserved Networks Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Reserved Networks</h2>
+            </div>
+            <div class="section-body" style="padding: 20px;">
+                <div class="mb-3 row align-items-center">
+                    <label for="blockprivate" class="col-sm-3 col-form-label fw-semibold">Block Private Networks</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="blockprivate" name="blockprivate">
+                            <label class="form-check-label" for="blockprivate">Block private networks and loopback addresses</label>
+                        </div>
+                        <small class="text-muted">Blocks traffic from IP addresses that are reserved for private networks per RFC 1918 and loopback addresses</small>
+                    </div>
                 </div>
-                <div class="help-text">
-                    Blocks traffic from reserved IP addresses (but not RFC 1918) or not yet assigned by IANA
+
+                <div class="mb-3 row align-items-center">
+                    <label for="blockbogons" class="col-sm-3 col-form-label fw-semibold">Block Bogon Networks</label>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="blockbogons" name="blockbogons">
+                            <label class="form-check-label" for="blockbogons">Block bogon networks</label>
+                        </div>
+                        <small class="text-muted">Blocks traffic from reserved IP addresses (but not RFC 1918) or not yet assigned by IANA</small>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="d-flex gap-2" style="margin-top: 20px;">
-    <button type="button" class="btn btn-primary" onclick="saveLANConfig()">Save</button>
-    <button type="button" class="btn btn-secondary" onclick="resetLANConfig()">Cancel</button>
-</div>
+        <div class="d-flex gap-2" style="margin-top: 20px; margin-bottom: 20px;">
+            <button type="button" class="btn btn-primary" onclick="saveLANConfig()">Save</button>
+            <button type="button" class="btn btn-secondary" onclick="resetLANConfig()">Cancel</button>
+        </div>
 
-</form>
+    </form>
+</div>
 
 <script>
 // Load LAN configuration when page loads

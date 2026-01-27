@@ -1,297 +1,411 @@
 {% extends 'base.html' %}
 
 {% block main %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Traffic Shaper</li>
+            </ol>
+        </nav>
+        <h1>Traffic Shaper</h1>
+    </div>
 
-<div class="breadcrumb">
-    Firewall / Traffic Shaper / By Interface
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="#" data-tab="byInterface">By Interface</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="byQueue">By Queue</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="limiters">Limiters</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#" data-tab="wizards">Wizards</a>
+        </li>
+    </ul>
+
+    <!-- By Interface Tab Content -->
+    <div class="tab-content active" id="byInterface">
+        <!-- WAN Section -->
+        <div class="section mb-4">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>WAN Configuration</h2>
+                <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('wan')">
+                    <i class="fas fa-plus"></i> Add Queue
+                </button>
+            </div>
+            <div class="section-body" id="wanConfig">
+                <div class="config-entries">
+                    <!-- WAN configs will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- LAN Section -->
+        <div class="section">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>LAN Configuration</h2>
+                <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('lan')">
+                    <i class="fas fa-plus"></i> Add Queue
+                </button>
+            </div>
+            <div class="section-body" id="lanConfig">
+                <div class="config-entries">
+                    <!-- LAN configs will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- By Queue Tab Content -->
+    <div class="tab-content" id="byQueue">
+        <div class="section">
+            <div class="section-header">
+                <h2>Queue Overview</h2>
+            </div>
+            <div class="section-body">
+                <p class="text-muted text-center py-4">No data available for By Queue view</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Limiters Tab Content -->
+    <div class="tab-content" id="limiters">
+        <div class="section">
+            <div class="section-header d-flex justify-content-between align-items-center">
+                <h2>Limiters</h2>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
+                    <i class="fas fa-plus"></i> New Limiter
+                </button>
+            </div>
+            <div class="section-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:20%">Name</th>
+                                <th style="width:15%">Bandwidth</th>
+                                <th style="width:15%">Mask</th>
+                                <th style="width:15%">Scheduler</th>
+                                <th style="width:20%">Description</th>
+                                <th style="width:15%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="limitersList">
+                            <!-- Limiters will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wizards Tab Content -->
+    <div class="tab-content" id="wizards">
+        <div class="section">
+            <div class="section-header">
+                <h2>Traffic Shaper Wizards</h2>
+            </div>
+            <div class="section-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width:30%">Wizard</th>
+                                <th style="width:70%">Configuration File</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-semibold">Multiple LAN/WAN</td>
+                                <td><a href="#" class="text-primary">traffic_shaper_wizard_multi_all.xml</a></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-semibold">Dedicated Links</td>
+                                <td><a href="#" class="text-primary">traffic_shaper_wizard_dedicated.xml</a></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link active" href="#" data-tab="byInterface">By Interface</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="byQueue">By Queue</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="limiters">Limiters</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="#" data-tab="wizards">Wizards</a>
-    </li>
-</ul>
-
-<!-- By Interface Tab Content -->
-<div class="tab-content active" id="byInterface">
-    <div class="row">
-        <!-- Content - Configuration -->
-        <div class="col-md-12">
-            <!-- WAN Configuration -->
-            <div id="wanConfig">
-                <div class="settings-section">
-                    <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">WAN Configuration</h5>
+<!-- Limiter Modal -->
+<div class="modal fade" id="limiterModal" tabindex="-1" aria-labelledby="limiterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="limiterModalLabel">Add / Edit Limiter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="limiterForm">
+                    <input type="hidden" id="limiterEditId" value="">
                     
-                    <div style="padding: 20px;">
-                        <!-- WAN configs will be inserted here by JavaScript -->
-                        <div class="d-flex gap-2" style="margin-top: 15px;">
-                            <button type="button" class="btn btn-success" onclick="addNewQueue('wan')">Add new Queue</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- LAN Configuration -->
-            <div id="lanConfig">
-                <div class="settings-section">
-                    <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">LAN Configuration</h5>
+                    <!-- General Settings -->
+                    <h6 class="fw-semibold mb-3">General Settings</h6>
                     
-                    <div style="padding: 20px;">
-                        <!-- LAN configs will be inserted here by JavaScript -->
-                        <div class="d-flex gap-2" style="margin-top: 15px;">
-                            <button type="button" class="btn btn-success" onclick="addNewQueue('lan')">Add new Queue</button>
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Enable</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="limiterEnable" checked>
+                                <label class="form-check-label" for="limiterEnable">Enable limiter and its children</label>
+                            </div>
                         </div>
                     </div>
-                </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterName" class="col-sm-3 col-form-label fw-semibold">Name</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterName" placeholder="Enter limiter name">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Bandwidth</label>
+                        <div class="col-sm-9">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control" id="limiterBandwidth" placeholder="Bandwidth">
+                                </div>
+                                <div class="col-6">
+                                    <select class="form-select" id="limiterBandwidthUnit">
+                                        <option value="Mbit/s">Mbit/s</option>
+                                        <option value="Kbit/s">Kbit/s</option>
+                                        <option value="bit/s">bit/s</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterMaskType" class="col-sm-3 col-form-label fw-semibold">Mask</label>
+                        <div class="col-sm-9">
+                            <select class="form-select mb-2" id="limiterMaskType">
+                                <option value="None">None</option>
+                                <option value="Source addresses">Source addresses</option>
+                                <option value="Destination addresses">Destination addresses</option>
+                            </select>
+                            <small class="text-muted">Creates dynamic pipe per source/destination IP for per-host limits.</small>
+                            <div class="row g-2 mt-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control" id="limiterIPv4MaskBits" placeholder="32">
+                                    <small class="text-muted">IPv4 mask bits</small>
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control" id="limiterIPv6MaskBits" placeholder="128">
+                                    <small class="text-muted">IPv6 mask bits</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterDescription" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterDescription" placeholder="Optional description">
+                        </div>
+                    </div>
+                    
+                    <!-- Queue Settings -->
+                    <h6 class="fw-semibold mb-3 mt-4">Queue Settings</h6>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterQueueManagementAlgorithm" class="col-sm-3 col-form-label fw-semibold">Queue Algorithm</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="limiterQueueManagementAlgorithm">
+                                <option value="Tail Drop">Tail Drop</option>
+                                <option value="CoDel">CoDel</option>
+                                <option value="PIE">PIE</option>
+                                <option value="Random Early Detection (RED)">Random Early Detection (RED)</option>
+                                <option value="Gentle Random Early Detection (GRED)">Gentle Random Early Detection (GRED)</option>
+                            </select>
+                            <small class="text-muted">Active queue management algorithm.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterScheduler" class="col-sm-3 col-form-label fw-semibold">Scheduler</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="limiterScheduler">
+                                <option value="Worst-case Weighted fair Queuing (default)">WF2Q+ (default)</option>
+                                <option value="FIFO">FIFO</option>
+                                <option value="Quick Fair Queuing">Quick Fair Queuing</option>
+                                <option value="Round Robin">Round Robin</option>
+                                <option value="PRIO">PRIO</option>
+                                <option value="FQ_CODEL">FQ_CODEL</option>
+                                <option value="FQ_PIE">FQ_PIE</option>
+                            </select>
+                            <small class="text-muted">Manages the sequence of packets in the queue.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterQueueLength" class="col-sm-3 col-form-label fw-semibold">Queue Length</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterQueueLength" placeholder="Leave empty for default">
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Options -->
+                    <h6 class="fw-semibold mb-3 mt-4">Advanced Options</h6>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterDelayMs" class="col-sm-3 col-form-label fw-semibold">Delay (ms)</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterDelayMs" placeholder="0">
+                            <small class="text-muted">In most cases, use zero or leave empty.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterPacketLossRate" class="col-sm-3 col-form-label fw-semibold">Packet Loss Rate</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterPacketLossRate" placeholder="0">
+                            <small class="text-muted">Value of 0.001 means 1 packet in 1000 gets dropped.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="limiterBucketSizeSlots" class="col-sm-3 col-form-label fw-semibold">Bucket Size (slots)</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="limiterBucketSizeSlots" placeholder="Leave empty for default">
+                            <small class="text-muted">Increases the hash size set.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveLimiterBtn">Save Limiter</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- By Queue Tab Content -->
-<div class="tab-content" id="byQueue" style="display:none;">
-    <div class="settings-section">
-        <p style="text-align:center;color:#777;padding:40px;">No data available for By Queue view</p>
-    </div>
-</div>
-
-<!-- Limiters Tab Content -->
-<div class="tab-content" id="limiters" style="display:none;">
-    <div class="d-flex gap-2" style="margin-bottom: 20px;">
-        <button type="button" class="btn btn-success" onclick="openNewLimiterForm()">New Limiter</button>
-    </div>
-
-    <!-- Limiters List -->
-    <div id="limitersList" style="margin-bottom: 30px;">
-        <!-- Limiters will be inserted here by JavaScript -->
-    </div>
-
-    <!-- New/Edit Limiter Form -->
-    <div id="limiterForm" style="display:none;">
-        <div class="settings-section">
-            <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Limiters</h5>
-            
-            <div style="padding: 20px;">
-                <div class="form-group">
-                    <label>Enable</label>
-                    <div class="form-group-content">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="limiterEnable">
-                            <label class="form-check-label" for="limiterEnable">Enable limiter and its children</label>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Name</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterName" style="max-width: 400px;">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Bandwidth</label>
-                    <div class="form-group-content">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Bandwidth</label>
-                                <input type="text" class="form-control" id="limiterBandwidth">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Bw type</label>
-                                <select class="form-control" id="limiterBandwidthUnit">
-                                    <option>Mbit/s</option>
-                                    <option>Kbit/s</option>
-                                    <option>bit/s</option>
-                                </select>
+<!-- Queue Modal -->
+<div class="modal fade" id="queueModal" tabindex="-1" aria-labelledby="queueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="queueModalLabel">Edit Queue</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="queueForm">
+                    <input type="hidden" id="queueEditId" value="">
+                    <input type="hidden" id="queueInterface" value="">
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Enable</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="queueEnable" checked>
+                                <label class="form-check-label" for="queueEnable">Enable discipline and its children</label>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Mask</label>
-                    <div class="form-group-content">
-                        <select class="form-control mb-2" id="limiterMaskType">
-                            <option>None</option>
-                            <option>Source addresses</option>
-                            <option>Destination addresses</option>
-                        </select>
-                        <div class="help-text mb-3">If "source" or "destination" slots is chosen a dynamic pipe with the bandwidth, delay, packet loss and queue size given above will be created for each source/destination IP address encountered, respectively. This makes it possible to easily specify bandwidth limits per host or subnet.</div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <input type="text" class="form-control mb-2" id="limiterIPv4MaskBits" placeholder="32">
-                                <small>IPv4 mask bits<br>255.255.255.255/?</small>
-                            </div>
-                            <div class="col-md-6">
-                                <input type="text" class="form-control mb-2" id="limiterIPv6MaskBits" placeholder="128">
-                                <small>IPv6 mask bits<br>ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/?</small>
+                    
+                    <div class="mb-3 row">
+                        <label for="queueName" class="col-sm-3 col-form-label fw-semibold">Name</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="queueName" placeholder="Queue name">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="queueSchedulerType" class="col-sm-3 col-form-label fw-semibold">Scheduler Type</label>
+                        <div class="col-sm-9">
+                            <select class="form-select" id="queueSchedulerType">
+                                <option value="HFSC">HFSC</option>
+                                <option value="CBQ">CBQ</option>
+                                <option value="PRIQ">PRIQ</option>
+                            </select>
+                            <small class="text-muted">Changing this changes all child queues!</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Bandwidth</label>
+                        <div class="col-sm-9">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control" id="queueBandwidth" placeholder="Bandwidth">
+                                </div>
+                                <div class="col-6">
+                                    <select class="form-select" id="queueBandwidthUnit">
+                                        <option value="Mbit/s">Mbit/s</option>
+                                        <option value="Kbit/s">Kbit/s</option>
+                                        <option value="bit/s">bit/s</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Description</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterDescription" style="max-width: 400px;">
-                        <div class="help-text">A description may be entered here for administrative reference (not parsed).</div>
+                    
+                    <div class="mb-3 row">
+                        <label for="queueLimit" class="col-sm-3 col-form-label fw-semibold">Queue Limit</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="queueLimit" placeholder="Queue limit">
+                        </div>
                     </div>
-                </div>
+                    
+                    <div class="mb-3 row">
+                        <label for="queueTbrSize" class="col-sm-3 col-form-label fw-semibold">TBR Size</label>
+                        <div class="col-sm-9">
+                            <input type="text" class="form-control" id="queueTbrSize" placeholder="Leave empty for default">
+                            <small class="text-muted">Token bucket regulator size in bytes.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveQueueBtn">Save Queue</button>
             </div>
         </div>
-        
-        <div class="settings-section" style="margin-top: 20px;">
-            <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Queue</h5>
-            
-            <div style="padding: 20px;">
-                <div class="form-group">
-                    <label>Queue Management Algorithm</label>
-                    <div class="form-group-content">
-                        <select class="form-control mb-2" id="limiterQueueManagementAlgorithm">
-                            <option>Tail Drop</option>
-                            <option>CoDel</option>
-                            <option>PIE</option>
-                            <option>Random Early Detection (RED)</option>
-                            <option>Gentle Random Early Detection (GRED)</option>
-                        </select>
-                        <div class="help-text">Active queue management (AQM) is the intelligent drop of network packets inside the limiter, when it becomes full or gets close to becoming full, with the goal of reducing network congestion.</div>
-                        <div class="help-text">No parameters for selected algorithm.</div>
-                        <small class="text-muted">Specifies the queue management algorithm parameters.</small>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Scheduler</label>
-                    <div class="form-group-content">
-                        <select class="form-control mb-2" id="limiterScheduler">
-                            <option>Worst-case Weighted fair Queuing (default)</option>
-                            <option>FIFO</option>
-                            <option>Quick Fair Queuing</option>
-                            <option>Round Robin</option>
-                            <option>PRIO</option>
-                            <option>FQ_CODEL</option>
-                            <option>FQ_PIE</option>
-                        </select>
-                        <div class="help-text">The scheduler manages the sequence of network packets in the limiter's queue.</div>
-                        <div class="help-text">No parameters for selected algorithm.</div>
-                        <small class="text-muted">Specifies the scheduler parameters.</small>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Queue length</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterQueueLength" style="max-width: 400px;">
-                        <div class="help-text">Specifies the length of the limiter's queue, which the scheduler and AQM are responsible for. This field may be left empty.</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="settings-section" style="margin-top: 20px;">
-            <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Advanced Options</h5>
-            
-            <div style="padding: 20px;">
-                <div class="form-group">
-                    <label>Delay (ms)</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterDelayMs" style="max-width: 400px;">
-                        <div class="help-text">In most cases, zero (0) should specified here (or leave the field empty).</div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Packet Loss Rate</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterPacketLossRate" style="max-width: 400px;">
-                        <div class="help-text">In most cases, zero (0) should be specified here (or leave the field empty). A value of 0.001 means one packet in 1000 gets dropped.</div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Bucket size (slots)</label>
-                    <div class="form-group-content">
-                        <input type="text" class="form-control" id="limiterBucketSizeSlots" style="max-width: 400px;">
-                        <div class="help-text">In most cases, this field should be left empty. It increases the hash size set.</div>
-                    </div>
-                </div>
-                
-                <div class="d-flex gap-2" style="margin-top: 15px;">
-                    <button type="button" class="btn btn-primary" onclick="saveLimiter()">Save</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeLimiterForm()">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Wizards Tab Content -->
-<div class="tab-content" id="wizards" style="display:none;">
-    <div class="settings-section">
-        <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Traffic Shaper Wizards</h5>
-        
-        <table class="table table-bordered">
-            <tbody>
-                <tr>
-                    <td style="font-weight:700;width:30%;">Multiple Lan/Wan</td>
-                    <td><a href="#" style="color:#0275d8;">traffic_shaper_wizard_multi_all.xml</a></td>
-                </tr>
-                <tr>
-                    <td style="font-weight:700;width:30%;">Dedicated Links</td>
-                    <td><a href="#" style="color:#0275d8;">traffic_shaper_wizard_dedicated.xml</a></td>
-                </tr>
-            </tbody>
-        </table>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle tab switching
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
+    // Tab switching
+    function openTab(tabId) {
+        document.querySelectorAll('.nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
-            const tab = link.dataset.tab;
-            
-            // Update active tab
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-            
-            // Update active content
-            document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-            document.getElementById(tab).style.display = 'block';
+            openTab(this.dataset.tab);
         });
     });
-});
 
-function toggleLimiterForm() {
-    const limiterForm = document.getElementById('limiterForm');
-    if (limiterForm) {
-        if (limiterForm.style.display === 'none' || limiterForm.style.display === '') {
-            limiterForm.style.display = 'block';
-        } else {
-            limiterForm.style.display = 'none';
-        }
-    }
-}
-
-// Traffic Shaper CRUD Functions
-document.addEventListener('DOMContentLoaded', function() {
+    // Load data
     loadTrafficShaperConfigs();
     loadLimitersConfigs();
+
+    // Save limiter button
+    document.getElementById('saveLimiterBtn').addEventListener('click', saveLimiter);
+
+    // Save queue button
+    document.getElementById('saveQueueBtn').addEventListener('click', saveQueue);
 });
 
+// Traffic Shaper Functions
 function loadTrafficShaperConfigs() {
     fetch('/firewall/get-traffic-shaper-configs')
         .then(response => response.json())
@@ -307,131 +421,97 @@ function displayTrafficShaperConfigs(configs) {
     const wanConfigs = configs.filter(c => c.interface_type === 'WAN');
     const lanConfigs = configs.filter(c => c.interface_type === 'LAN');
     
-    // Always call displayConfigsForInterface to properly clear entries even if empty
     displayConfigsForInterface('wan', wanConfigs);
     displayConfigsForInterface('lan', lanConfigs);
 }
 
 function displayConfigsForInterface(interfaceType, configs) {
-    const configContainer = document.getElementById(interfaceType + 'Config');
-    if (!configContainer) return;
+    const container = document.querySelector(`#${interfaceType}Config .config-entries`);
+    if (!container) return;
     
-    // Get existing form or create container for entries
-    let entriesContainer = configContainer.querySelector('.config-entries');
-    if (!entriesContainer) {
-        entriesContainer = document.createElement('div');
-        entriesContainer.className = 'config-entries';
-        configContainer.appendChild(entriesContainer);
+    if (configs.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-3">No queues configured</p>';
+        return;
     }
     
-    entriesContainer.innerHTML = '';
-    
+    container.innerHTML = '';
     configs.forEach(config => {
-        const entryDiv = createConfigEntryDiv(config, interfaceType);
-        entriesContainer.appendChild(entryDiv);
+        const card = document.createElement('div');
+        card.className = 'card mb-3';
+        card.innerHTML = `
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">${config.name}</span>
+                <span class="badge ${config.enable_disable ? 'bg-success' : 'bg-secondary'}">${config.enable_disable ? 'Enabled' : 'Disabled'}</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3"><strong>Scheduler:</strong> ${config.scheduler_type || '-'}</div>
+                    <div class="col-md-3"><strong>Bandwidth:</strong> ${config.bandwidth || '-'} ${config.bandwidth_unit || ''}</div>
+                    <div class="col-md-3"><strong>Queue Limit:</strong> ${config.queue_limit || '-'}</div>
+                    <div class="col-md-3"><strong>TBR Size:</strong> ${config.tbr_size || '-'}</div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-sm btn-primary" onclick="editQueue(${config.id}, '${interfaceType}')">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteTrafficShaperConfig(${config.id})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        `;
+        container.appendChild(card);
     });
 }
 
-function createConfigEntryDiv(config, interfaceType) {
-    const entryDiv = document.createElement('div');
-    entryDiv.className = 'settings-section config-entry';
-    entryDiv.id = 'config-' + config.id;
-    entryDiv.innerHTML = `
-        <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Queue: ${config.name}</h5>
-        
-        <div style="padding: 20px;">
-            <div class="form-group">
-                <label>Enable/Disable</label>
-                <div class="form-group-content">
-                    <div class="form-check">
-                        <input class="form-check-input enable-toggle" type="checkbox" id="enable-${config.id}" ${config.enable_disable ? 'checked' : ''}>
-                        <label class="form-check-label" for="enable-${config.id}">Enable/disable discipline and its children</label>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Name</label>
-                <div class="form-group-content">
-                    <input type="text" class="form-control queue-name" style="max-width: 300px;" value="${config.name}">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Scheduler Type</label>
-                <div class="form-group-content">
-                    <select class="form-control scheduler-type" style="max-width: 300px;">
-                        <option ${config.scheduler_type === 'HFSC' ? 'selected' : ''}>HFSC</option>
-                        <option ${config.scheduler_type === 'CBQ' ? 'selected' : ''}>CBQ</option>
-                        <option ${config.scheduler_type === 'PRIQ' ? 'selected' : ''}>PRIQ</option>
-                    </select>
-                    <div class="help-text">Changing this changes all child queues! Beware information can be lost.</div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Bandwidth</label>
-                <div class="form-group-content">
-                    <div class="d-flex gap-2">
-                        <input type="text" class="form-control bandwidth" style="max-width: 200px;" value="${config.bandwidth || ''}">
-                        <select class="form-control bandwidth-unit" style="max-width: 120px;">
-                            <option ${config.bandwidth_unit === 'Mbit/s' ? 'selected' : ''}>Mbit/s</option>
-                            <option ${config.bandwidth_unit === 'Kbit/s' ? 'selected' : ''}>Kbit/s</option>
-                            <option ${config.bandwidth_unit === 'bit/s' ? 'selected' : ''}>bit/s</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Queue Limit</label>
-                <div class="form-group-content">
-                    <input type="text" class="form-control queue-limit" style="max-width: 300px;" value="${config.queue_limit || ''}">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>TBR Size</label>
-                <div class="form-group-content">
-                    <input type="text" class="form-control tbr-size" style="max-width: 300px;" value="${config.tbr_size || ''}">
-                    <div class="help-text">Adjusts the size, in bytes, of the token bucket regulator. If not specified, heuristics based on the interface bandwidth are used to determine the size.</div>
-                </div>
-            </div>
-            
-            <div class="d-flex gap-2" style="margin-top: 15px;">
-                <button type="button" class="btn btn-primary" onclick="updateTrafficShaperConfig(${config.id}, '${interfaceType}')">Save</button>
-                <button type="button" class="btn btn-danger" onclick="deleteTrafficShaperConfig(${config.id}, '${interfaceType}')">Delete</button>
-            </div>
-        </div>
-    `;
-    
-    return entryDiv;
+function editQueue(configId, interfaceType) {
+    fetch(`/firewall/get-traffic-shaper-configs`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data.find(c => c.id === configId);
+                if (config) {
+                    document.getElementById('queueEditId').value = configId;
+                    document.getElementById('queueInterface').value = interfaceType;
+                    document.getElementById('queueEnable').checked = config.enable_disable;
+                    document.getElementById('queueName').value = config.name || '';
+                    document.getElementById('queueSchedulerType').value = config.scheduler_type || 'HFSC';
+                    document.getElementById('queueBandwidth').value = config.bandwidth || '';
+                    document.getElementById('queueBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
+                    document.getElementById('queueLimit').value = config.queue_limit || '';
+                    document.getElementById('queueTbrSize').value = config.tbr_size || '';
+                    
+                    new bootstrap.Modal(document.getElementById('queueModal')).show();
+                }
+            }
+        });
 }
 
-function updateTrafficShaperConfig(configId, interfaceType) {
-    const entryDiv = document.getElementById('config-' + configId);
+function saveQueue() {
+    const configId = document.getElementById('queueEditId').value;
+    const interfaceType = document.getElementById('queueInterface').value;
+    
     const formData = {
         interfaceType: interfaceType.toUpperCase(),
-        enableDisable: entryDiv.querySelector('.enable-toggle').checked,
-        name: entryDiv.querySelector('.queue-name').value,
-        schedulerType: entryDiv.querySelector('.scheduler-type').value,
-        bandwidth: parseInt(entryDiv.querySelector('.bandwidth').value) || null,
-        bandwidthUnit: entryDiv.querySelector('.bandwidth-unit').value,
-        queueLimit: parseInt(entryDiv.querySelector('.queue-limit').value) || null,
-        tbrSize: parseInt(entryDiv.querySelector('.tbr-size').value) || null
+        enableDisable: document.getElementById('queueEnable').checked,
+        name: document.getElementById('queueName').value,
+        schedulerType: document.getElementById('queueSchedulerType').value,
+        bandwidth: parseInt(document.getElementById('queueBandwidth').value) || null,
+        bandwidthUnit: document.getElementById('queueBandwidthUnit').value,
+        queueLimit: parseInt(document.getElementById('queueLimit').value) || null,
+        tbrSize: parseInt(document.getElementById('queueTbrSize').value) || null
     };
 
     fetch(`/firewall/update-traffic-shaper-config/${configId}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert('Traffic shaper config updated successfully!');
+            alert('Queue updated successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('queueModal')).hide();
             loadTrafficShaperConfigs();
         } else {
             alert('Error: ' + (data.message || 'Unknown error'));
@@ -439,28 +519,26 @@ function updateTrafficShaperConfig(configId, interfaceType) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error updating traffic shaper config');
+        alert('Error updating queue');
     });
 }
 
-function deleteTrafficShaperConfig(configId, interfaceType) {
+function deleteTrafficShaperConfig(configId) {
     if (confirm('Are you sure you want to delete this queue?')) {
-        fetch(`/firewall/delete-traffic-shaper-config/${configId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Traffic shaper config deleted successfully!');
-                loadTrafficShaperConfigs();
-            } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error deleting traffic shaper config');
-        });
+        fetch(`/firewall/delete-traffic-shaper-config/${configId}`, { method: 'DELETE' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Queue deleted successfully!');
+                    loadTrafficShaperConfigs();
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting queue');
+            });
     }
 }
 
@@ -478,9 +556,7 @@ function addNewQueue(interfaceType) {
 
     fetch('/firewall/save-traffic-shaper-config', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
     })
     .then(response => response.json())
@@ -498,7 +574,7 @@ function addNewQueue(interfaceType) {
     });
 }
 
-// Limiters CRUD Functions
+// Limiters Functions
 function loadLimitersConfigs() {
     fetch('/firewall/get-limiters-configs')
         .then(response => response.json())
@@ -507,42 +583,41 @@ function loadLimitersConfigs() {
                 displayLimitersConfigs(data.data);
             }
         })
-        .catch(error => console.error('Error loading limiters configs:', error));
+        .catch(error => console.error('Error loading limiters:', error));
 }
 
 function displayLimitersConfigs(configs) {
-    const limitersList = document.getElementById('limitersList');
-    limitersList.innerHTML = '';
+    const tbody = document.getElementById('limitersList');
     
+    if (configs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No limiters configured</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = '';
     configs.forEach(config => {
-        const limiterDiv = createLimiterEntryDiv(config);
-        limitersList.appendChild(limiterDiv);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${config.name}</td>
+            <td>${config.bandwidth || '-'} ${config.bandwidth_unit || ''}</td>
+            <td>${config.mask_type}</td>
+            <td>${config.scheduler}</td>
+            <td>${config.description || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editLimiter(${config.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteLimiter(${config.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
     });
 }
 
-function createLimiterEntryDiv(config) {
-    const limiterDiv = document.createElement('div');
-    limiterDiv.className = 'settings-section limiter-entry';
-    limiterDiv.id = 'limiter-' + config.id;
-    limiterDiv.innerHTML = `
-        <h5 style="padding: 15px 20px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #dee2e6;">Limiter: ${config.name}</h5>
-        <div style="padding: 20px;">
-            <p><strong>Bandwidth:</strong> ${config.bandwidth || '-'} ${config.bandwidth_unit}</p>
-            <p><strong>Mask:</strong> ${config.mask_type}</p>
-            <p><strong>Queue Algorithm:</strong> ${config.queue_management_algorithm}</p>
-            <p><strong>Scheduler:</strong> ${config.scheduler}</p>
-            <p><strong>Description:</strong> ${config.description || '-'}</p>
-            <div class="d-flex gap-2" style="margin-top: 15px;">
-                <button class="btn btn-primary" onclick="editLimiter(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                <button class="btn btn-danger" onclick="deleteLimiter(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
-            </div>
-        </div>
-    `;
-    return limiterDiv;
-}
-
-function openNewLimiterForm() {
-    document.getElementById('limiterForm').dataset.limiterId = '';
+function openNewLimiterModal() {
+    document.getElementById('limiterEditId').value = '';
     document.getElementById('limiterEnable').checked = true;
     document.getElementById('limiterName').value = '';
     document.getElementById('limiterBandwidth').value = '';
@@ -557,11 +632,7 @@ function openNewLimiterForm() {
     document.getElementById('limiterDelayMs').value = '';
     document.getElementById('limiterPacketLossRate').value = '';
     document.getElementById('limiterBucketSizeSlots').value = '';
-    document.getElementById('limiterForm').style.display = 'block';
-}
-
-function closeLimiterForm() {
-    document.getElementById('limiterForm').style.display = 'none';
+    document.getElementById('limiterModalLabel').textContent = 'Add Limiter';
 }
 
 function editLimiter(limiterId) {
@@ -570,25 +641,24 @@ function editLimiter(limiterId) {
         .then(data => {
             if (data.status === 'success') {
                 const config = data.data;
-                const form = document.getElementById('limiterForm');
-                form.dataset.limiterId = limiterId;
-                
+                document.getElementById('limiterEditId').value = limiterId;
                 document.getElementById('limiterEnable').checked = config.enable_disable;
-                document.getElementById('limiterName').value = config.name;
+                document.getElementById('limiterName').value = config.name || '';
                 document.getElementById('limiterBandwidth').value = config.bandwidth || '';
-                document.getElementById('limiterBandwidthUnit').value = config.bandwidth_unit;
-                document.getElementById('limiterMaskType').value = config.mask_type;
+                document.getElementById('limiterBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
+                document.getElementById('limiterMaskType').value = config.mask_type || 'None';
                 document.getElementById('limiterIPv4MaskBits').value = config.ipv4_mask_bits || '32';
                 document.getElementById('limiterIPv6MaskBits').value = config.ipv6_mask_bits || '128';
                 document.getElementById('limiterDescription').value = config.description || '';
-                document.getElementById('limiterQueueManagementAlgorithm').value = config.queue_management_algorithm;
-                document.getElementById('limiterScheduler').value = config.scheduler;
+                document.getElementById('limiterQueueManagementAlgorithm').value = config.queue_management_algorithm || 'Tail Drop';
+                document.getElementById('limiterScheduler').value = config.scheduler || 'Worst-case Weighted fair Queuing (default)';
                 document.getElementById('limiterQueueLength').value = config.queue_length || '';
                 document.getElementById('limiterDelayMs').value = config.delay_ms || '';
                 document.getElementById('limiterPacketLossRate').value = config.packet_loss_rate || '';
                 document.getElementById('limiterBucketSizeSlots').value = config.bucket_size_slots || '';
+                document.getElementById('limiterModalLabel').textContent = 'Edit Limiter';
                 
-                document.getElementById('limiterForm').style.display = 'block';
+                new bootstrap.Modal(document.getElementById('limiterModal')).show();
             }
         })
         .catch(error => {
@@ -598,8 +668,7 @@ function editLimiter(limiterId) {
 }
 
 function saveLimiter() {
-    const form = document.getElementById('limiterForm');
-    const limiterId = form.dataset.limiterId;
+    const limiterId = document.getElementById('limiterEditId').value;
     
     const formData = {
         enableDisable: document.getElementById('limiterEnable').checked,
@@ -628,16 +697,14 @@ function saveLimiter() {
 
     fetch(url, {
         method: method,
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert(limiterId ? 'Limiter updated successfully!' : 'Limiter saved successfully!');
-            closeLimiterForm();
+            alert(limiterId ? 'Limiter updated!' : 'Limiter saved!');
+            bootstrap.Modal.getInstance(document.getElementById('limiterModal')).hide();
             loadLimitersConfigs();
         } else {
             alert('Error: ' + (data.message || 'Unknown error'));
@@ -651,26 +718,22 @@ function saveLimiter() {
 
 function deleteLimiter(limiterId) {
     if (confirm('Are you sure you want to delete this limiter?')) {
-        fetch(`/firewall/delete-limiters-config/${limiterId}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Limiter deleted successfully!');
-                loadLimitersConfigs();
-            } else {
-                alert('Error: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error deleting limiter');
-        });
+        fetch(`/firewall/delete-limiters-config/${limiterId}`, { method: 'DELETE' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Limiter deleted!');
+                    loadLimitersConfigs();
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting limiter');
+            });
     }
 }
-
-
 </script>
 
 {% endblock %}
