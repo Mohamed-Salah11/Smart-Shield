@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+    Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+    </li>
+</ul>
+
+<div class="settings-section openvpn-section">
+    <h5 class="openvpn-section-title">OpenVPN Wizards</h5>
+
+    <div class="openvpn-section-body">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="card">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3">Certificate Authority Created Successfully</h4>
+                        <p class="mb-2">Your Certificate Authority has been created. You can now create certificates or add additional CAs if needed.</p>
+                        <p class="mb-0">Click Next to continue with the OpenVPN Remote Access Server Setup.</p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a class="btn btn-primary me-2" href="{{ url_for('vpn.openvpn_wizards_step2') }}">Add Another CA</a>
+                    <a class="btn btn-primary" href="#">Next</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
