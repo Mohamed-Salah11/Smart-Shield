@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+	Dashboard / VPN / L2TP
+</div>
+
+<ul class="nav nav-tabs">
+	<li class="nav-item">
+		<a class="nav-link" href="{{ url_for('vpn.l2tp') }}">Configuration</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link active" href="{{ url_for('vpn.l2tp_users') }}">Users</a>
+	</li>
+</ul>
+
+<div class="settings-section">
+	<h5 class="openvpn-section-title">L2TP Users</h5>
+
+	<div class="openvpn-section-body">
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>Username</th>
+					<th>IP address</th>
+					<th style="width: 18%">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td colspan="3" class="text-center text-muted py-4">No L2TP users configured.</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="d-flex justify-content-start mt-3">
+			<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addL2tpUserModal">Add</button>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="addL2tpUserModal" tabindex="-1" aria-labelledby="addL2tpUserModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg modal-dialog-scrollable">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addL2tpUserModalLabel">Add L2TP User</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<div class="openvpn-form-section">
+					<div class="openvpn-form-section-title">User</div>
+
+					<div class="row align-items-center mb-3">
+						<div class="col-md-3 fw-semibold">Username</div>
+						<div class="col-md-9">
+							<input type="text" class="form-control" id="l2tpUsername" name="username" />
+						</div>
+					</div>
+
+					<div class="row align-items-start mb-3">
+						<div class="col-md-3 fw-semibold">Password</div>
+						<div class="col-md-9">
+							<div class="row g-2">
+								<div class="col-md-6">
+									<input type="password" class="form-control" id="l2tpPassword" name="password" placeholder="*Password" />
+								</div>
+								<div class="col-md-6">
+									<input type="password" class="form-control" id="l2tpPasswordConfirm" name="password_confirm" placeholder="*Password" />
+									<div class="small text-muted mt-1">Confirm</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="row align-items-start mb-0">
+						<div class="col-md-3 fw-semibold">IP Address</div>
+						<div class="col-md-9">
+							<input type="text" class="form-control" id="l2tpIpAddress" name="ip_address" />
+							<div class="small text-muted mt-2">To assign the user a specific IP address, enter it here.</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="modal-footer justify-content-start">
+				<button type="button" class="btn btn-primary">Save</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

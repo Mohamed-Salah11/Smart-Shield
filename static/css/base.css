@@ -72,6 +72,19 @@ h3 {
   font-size: 1rem;
 }
 
+/* ========================================
+   IPsec pages helpers
+======================================== */
+
+.ipsec-log-label {
+  width: 35%;
+  font-weight: 600;
+}
+
+.ipsec-logging-help {
+  margin: 14px 2px 18px;
+}
+
 small {
   display: block;
   margin-top: 0.25rem;
@@ -273,6 +286,49 @@ small {
 
 .dropdown-item.text-danger:hover svg {
   fill: white;
+}
+
+/* ========================================
+   OPENVPN PAGES
+======================================== */
+
+.openvpn-section {
+  margin-top: 15px;
+}
+
+.openvpn-section-title {
+  padding: 15px 20px;
+  margin: 0;
+  background: #212529;
+  color: #fff;
+}
+
+.openvpn-section-body {
+  padding: 20px;
+}
+
+.openvpn-actions-col {
+  width: 140px;
+}
+
+/* OpenVPN modal form sections */
+.openvpn-form-section-title {
+  font-weight: 700;
+  color: #111827;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.openvpn-form-section {
+  background: #ffffff;
+  border: 1px solid var(--border-color-soft);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.openvpn-form-divider {
+  margin: 14px 0;
+  opacity: 0.18;
 }
 
 /* ========================================
