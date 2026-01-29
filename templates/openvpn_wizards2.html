@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+	Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+	<li class="nav-item">
+	<a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+	</li>
+</ul>
+
+<div class="settings-section openvpn-section">
+	<h5 class="openvpn-section-title">OpenVPN Wizards</h5>
+
+	<div class="openvpn-section-body">
+		<div class="card">
+			<div class="card-body">
+				<div class="p-3 bg-dark text-white rounded mb-3">Certificate Authority Selection</div>
+
+				<div class="border rounded p-3 text-center mb-4">OpenVPN Remote Access Server Setup Wizard</div>
+
+				<div class="border rounded p-3">
+					<div class="p-2 bg-dark text-white rounded mb-4">Create a New Certificate Authority (CA) Certificate</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaDescriptiveName" class="form-label fw-semibold">Descriptive name</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaDescriptiveName" name="descriptive_name" type="text" />
+							<small class="text-muted">A name for administrative reference, to identify this certificate.</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaRandomizeSerial" class="form-label fw-semibold">Randomize Serial</label>
+						</div>
+						<div class="col-md-9">
+							<div class="form-check">
+								<input class="form-check-input" id="wizCaRandomizeSerial" name="randomize_serial" type="checkbox" checked />
+								<label class="form-check-label" for="wizCaRandomizeSerial">Use random serial numbers when signing certificates.</label>
+							</div>
+							<small class="text-muted">
+								When enabled, serial numbers for certificates signed by this CA will be automatically randomized and checked for uniqueness instead of using sequential values.
+							</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaKeyLength" class="form-label fw-semibold">Key length</label>
+						</div>
+						<div class="col-md-9">
+							<select class="form-select" id="wizCaKeyLength" name="key_length">
+								<option value="2048" selected>2048 bit</option>
+								<option value="4096">4096 bit</option>
+							</select>
+							<small class="text-muted">
+								Size of the key which will be generated. The larger the key, the more security it offers, but larger keys take considerably more time to generate, and take slightly longer to validate leading to a slight slowdown in setting up new sessions (not always noticeable).
+								As of 2016, 2048 bit is the minimum and most common selection and 4096 is the maximum in common use.
+								For more information see <a href="#" class="link-primary">keylength.com</a>
+							</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaLifetime" class="form-label fw-semibold">Lifetime</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaLifetime" name="lifetime" type="text" value="3650" />
+							<small class="text-muted">Lifetime in days. This is commonly set to 3650 (Approximately 10 years.)</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-0">
+						<div class="col-md-3">
+							<label for="wizCaCommonName" class="form-label fw-semibold">Common Name</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaCommonName" name="common_name" type="text" />
+							<small class="text-muted">The internal name of the CA, used as a part of the CA subject. If left blank, the descriptive name will be used instead.</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mt-3 mb-2">
+						<div class="col-md-3">
+							<label for="wizCaCountryCode" class="form-label fw-semibold">Country Code</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaCountryCode" name="country_code" type="text" />
+							<small class="text-muted">Two-letter ISO country code (e.g. US, AU, CA)</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaStateProvince" class="form-label fw-semibold">State or Province</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaStateProvince" name="state_or_province" type="text" />
+							<small class="text-muted">Full State or Province name, not abbreviated (e.g. Texas, Indiana, Ontario).</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaCity" class="form-label fw-semibold">City</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaCity" name="city" type="text" />
+							<small class="text-muted">City or other Locality name (e.g. Austin, Indianapolis, Toronto).</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-2">
+						<div class="col-md-3">
+							<label for="wizCaOrganization" class="form-label fw-semibold">Organization</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaOrganization" name="organization" type="text" />
+							<small class="text-muted">Organization name, often the company or group name.</small>
+						</div>
+					</div>
+
+					<div class="row g-3 align-items-start mb-0">
+						<div class="col-md-3">
+							<label for="wizCaOrganizationalUnit" class="form-label fw-semibold">Organizational Unit</label>
+						</div>
+						<div class="col-md-9">
+							<input class="form-control" id="wizCaOrganizationalUnit" name="organizational_unit" type="text" />
+							<small class="text-muted">Organizational Unit name, often a department or team name.</small>
+						</div>
+					</div>
+
+					<div class="mt-4">
+						<a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step3') }}">Add new CA</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+

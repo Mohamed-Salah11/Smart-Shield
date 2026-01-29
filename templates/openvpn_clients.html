@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+    Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+    </li>
+</ul>
+
+<div class="settings-section openvpn-section">
+    <h5 class="openvpn-section-title">OpenVPN Clients</h5>
+
+    <div class="openvpn-section-body">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Protocol / Port</th>
+                    <th>Interface</th>
+                    <th>Tunnel Network</th>
+                    <th>Mode / Crypto</th>
+                    <th>Description</th>
+                    <th class="openvpn-actions-col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6" class="text-muted py-5 text-center">No OpenVPN clients configured.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-start">
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#openvpnAddClientModal">+ Add Client</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="openvpnAddClientModal" tabindex="-1" aria-labelledby="openvpnAddClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="openvpnAddClientModalLabel">Add OpenVPN Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">General Information</div>
+
+                        <div class="mb-3">
+                            <label for="clientDescription" class="form-label">Description</label>
+                            <input type="text" class="form-control" id="clientDescription" name="description" />
+                            <small>A description of this VPN for administrative reference.</small>
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="clientDisabled" name="disabled" />
+                                <label class="form-check-label" for="clientDisabled">Disable this client</label>
+                            </div>
+                            <small>Set this option to disable this client without removing it from the list.</small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Mode Configuration</div>
+
+                        <div class="mb-3">
+                            <label for="clientServerMode" class="form-label">Server Mode</label>
+                            <select class="form-select" id="clientServerMode" name="server_mode">
+                                <option value="peer2peer" selected>Peer to Peer (SSL/TLS)</option>
+                                <option value="peer2peer_shared">Peer to Peer (Shared Key)</option>
+                                <option value="remote_access_ssltls">Remote Access (SSL/TLS)</option>
+                                <option value="remote_access_userauth">Remote Access (User Auth)</option>
+                                <option value="remote_access_hybrid">Remote Access (SSL/TLS + User Auth)</option>
+                                <option value="static">Static Key</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Endpoint Configuration</div>
+
+                        <div class="mb-3">
+                            <label for="clientProtocol" class="form-label">Protocol</label>
+                            <select class="form-select" id="clientProtocol" name="protocol">
+                                <option value="udp4" selected>UDP on IPv4 only</option>
+                                <option value="udp6">UDP on IPv6 only</option>
+                                <option value="tcp4">TCP on IPv4 only</option>
+                                <option value="tcp6">TCP on IPv6 only</option>
+                                <option value="udpboth">UDP IPv4 + IPv6</option>
+                                <option value="tcpboth">TCP IPv4 + IPv6</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientInterface" class="form-label">Interface</label>
+                            <select class="form-select" id="clientInterface" name="interface">
+                                <option value="wan" selected>WAN</option>
+                                <option value="lan">LAN</option>
+                                <option value="localhost">Localhost</option>
+                                <option value="any">Any</option>
+                            </select>
+                            <small>The interface or Virtual IP address where OpenVPN will connect.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientServerHostname" class="form-label">Server Hostname</label>
+                            <input type="text" class="form-control" id="clientServerHostname" name="server_hostname" />
+                            <small>The hostname or IP address of the OpenVPN server.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientServerPort" class="form-label">Server Port</label>
+                            <input type="text" class="form-control" id="clientServerPort" name="server_port" value="1194" />
+                            <small>The port number on which the OpenVPN server is listening.</small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Cryptographic Settings</div>
+
+                        <div class="openvpn-form-section">
+                            <div class="openvpn-form-section-title">TLS Configuration</div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="clientUseTlsKey" name="use_tls_key" />
+                                    <label class="form-check-label" for="clientUseTlsKey">Use a TLS Key</label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientTlsKey" class="form-label">TLS Key</label>
+                                <textarea class="form-control" id="clientTlsKey" name="tls_key" rows="5"></textarea>
+                                <small>Paste the TLS key content here.</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="clientUseCertificateAuth" name="use_certificate_auth" />
+                                    <label class="form-check-label" for="clientUseCertificateAuth">Use certificate authentication</label>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientClientCertificate" class="form-label">Client Certificate</label>
+                                <input type="text" class="form-control" id="clientClientCertificate" name="client_certificate" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientCaCertificate" class="form-label">CA Certificate</label>
+                                <input type="text" class="form-control" id="clientCaCertificate" name="ca_certificate" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientCaChain" class="form-label">CA Chain</label>
+                                <textarea class="form-control" id="clientCaChain" name="ca_chain" rows="4"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientCertValidFrom" class="form-label">Certificate Valid From</label>
+                                <input type="text" class="form-control" id="clientCertValidFrom" name="certificate_valid_from" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientCertValidTo" class="form-label">Certificate Valid To</label>
+                                <input type="text" class="form-control" id="clientCertValidTo" name="certificate_valid_to" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientDataEncryption" class="form-label">Data Encryption Algorithms</label>
+                                <select class="form-select" id="clientDataEncryption" name="data_encryption_algorithms">
+                                    <option value="" selected>Select an algorithm...</option>
+                                    <option value="AES-128-CBC">AES-128-CBC</option>
+                                    <option value="AES-128-GCM">AES-128-GCM</option>
+                                    <option value="AES-256-CBC">AES-256-CBC</option>
+                                    <option value="AES-256-GCM">AES-256-GCM</option>
+                                    <option value="CHACHA20-POLY1305">CHACHA20-POLY1305</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientAuthDigestAlgorithm" class="form-label">Auth Digest Algorithm</label>
+                                <input type="text" class="form-control" id="clientAuthDigestAlgorithm" name="auth_digest_algorithm" value="SHA256" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientEngine" class="form-label">Engine</label>
+                                <input type="text" class="form-control" id="clientEngine" name="engine" value="none" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="clientCryptoHardware" class="form-label">Crypto Hardware</label>
+                                <input type="text" class="form-control" id="clientCryptoHardware" name="crypto_hardware" value="none" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Tunnel Settings</div>
+
+                        <div class="mb-3">
+                            <label for="clientIpv4TunnelNetwork" class="form-label">IPv4 Tunnel Network</label>
+                            <input type="text" class="form-control" id="clientIpv4TunnelNetwork" name="ipv4_tunnel_network" value="10.0.8.0/24" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientIpv6TunnelNetwork" class="form-label">IPv6 Tunnel Network</label>
+                            <input type="text" class="form-control" id="clientIpv6TunnelNetwork" name="ipv6_tunnel_network" value="fe80::/64" />
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Connection Settings</div>
+
+                        <div class="mb-3">
+                            <label for="clientAllowCompression" class="form-label">Allow Compression</label>
+                            <select class="form-select" id="clientAllowCompression" name="allow_compression">
+                                <option value="no" selected>No</option>
+                                <option value="yes">Yes</option>
+                                <option value="asym">Asymmetric</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientTopology" class="form-label">Topology</label>
+                            <select class="form-select" id="clientTopology" name="topology">
+                                <option value="subnet" selected>Subnet</option>
+                                <option value="p2p">Point to Point</option>
+                                <option value="net30">Net30</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Ping Settings</div>
+
+                        <div class="mb-3">
+                            <label for="clientInactivityTimeout" class="form-label">Inactivity Timeout</label>
+                            <input type="text" class="form-control" id="clientInactivityTimeout" name="inactivity_timeout" value="300" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientPingMethod" class="form-label">Ping Method</label>
+                            <select class="form-select" id="clientPingMethod" name="ping_method">
+                                <option value="keepalive" selected>Keepalive</option>
+                                <option value="ping">Ping</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientPingInterval" class="form-label">Ping Interval</label>
+                            <input type="text" class="form-control" id="clientPingInterval" name="ping_interval" value="10" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientPingTimeout" class="form-label">Ping Timeout</label>
+                            <input type="text" class="form-control" id="clientPingTimeout" name="ping_timeout" value="60" />
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Advanced Settings</div>
+
+                        <div class="mb-3">
+                            <label for="clientCustomOptions" class="form-label">Custom Options</label>
+                            <textarea class="form-control" id="clientCustomOptions" name="custom_options" rows="4"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="clientUdpFastIo" name="udp_fast_io" />
+                                <label class="form-check-label" for="clientUdpFastIo">Enable UDP Fast I/O</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientSendReceiveBuffer" class="form-label">Send/Receive Buffer</label>
+                            <input type="text" class="form-control" id="clientSendReceiveBuffer" name="send_receive_buffer" value="default" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientVerbosityLevel" class="form-label">Verbosity Level</label>
+                            <select class="form-select" id="clientVerbosityLevel" name="verbosity_level">
+                                <option value="0">0</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3" selected>3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                                <option value="7">7</option>
+                                <option value="8">8</option>
+                                <option value="9">9</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary">Save Client</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
