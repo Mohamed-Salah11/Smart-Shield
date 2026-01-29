@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+    Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+    </li>
+</ul>
+
+<div class="settings-section openvpn-section">
+    <h5 class="openvpn-section-title">Client Specific Overrides</h5>
+
+    <div class="openvpn-section-body">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Disabled</th>
+                    <th>Common Name</th>
+                    <th>Description</th>
+                    <th class="openvpn-actions-col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="4" class="text-muted py-5 text-center">No Client Specific Overrides configured.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-start">
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#openvpnAddCsoModal">+ Add</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="openvpnAddCsoModal" tabindex="-1" aria-labelledby="openvpnAddCsoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="openvpnAddCsoModalLabel">Add Client Specific Override</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">General Information</div>
+
+                        <div class="mb-3">
+                            <label for="csoDescription" class="form-label">Description</label>
+                            <input type="text" class="form-control" id="csoDescription" name="description" placeholder="Enter description" />
+                            <small>A description of this override for administrative reference.</small>
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoDisable" name="disabled" />
+                                <label class="form-check-label" for="csoDisable">Disable</label>
+                            </div>
+                            <small>Set this option to disable this client-specific override without removing it from the list.</small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Override Configuration</div>
+
+                        <div class="mb-3">
+                            <label for="csoCommonName" class="form-label">Common Name</label>
+                            <input type="text" class="form-control" id="csoCommonName" name="common_name" placeholder="Enter common name" />
+                            <small>
+                                Enter the X.509 common name for the client certificate, or the username for VPNs utilizing password authentication. This match is case sensitive. Enter &quot;DEFAULT&quot; to override default client behavior.
+                            </small>
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoConnectionBlocking" name="connection_blocking" />
+                                <label class="form-check-label" for="csoConnectionBlocking">Connection blocking</label>
+                            </div>
+                            <small>
+                                Block this client connection based on its common name. Prevents the client from connecting to this server. Do not use this option to permanently disable a client due to a compromised key or password. Use a CRL (certificate revocation list) instead.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoServerList" class="form-label">Server List</label>
+                            <textarea class="form-control" id="csoServerList" name="server_list" rows="4" placeholder="Select the servers..."></textarea>
+                            <small>
+                                Select the servers that will utilize this override. When no servers are selected, the override will apply to all servers.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoResetServerOptions" class="form-label">Reset Server Options</label>
+                            <select class="form-select" id="csoResetServerOptions" name="reset_server_options">
+                                <option value="keep" selected>Keep all server options (default)</option>
+                                <option value="reset">Reset server options</option>
+                            </select>
+                            <small>
+                                Prevent this client from receiving server-defined client settings. Other client-specific options on this page will supersede these options.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Tunnel Settings</div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv4TunnelNetwork" class="form-label">IPv4 Tunnel Network</label>
+                            <input type="text" class="form-control" id="csoIpv4TunnelNetwork" name="ipv4_tunnel_network" placeholder="e.g. 10.0.8.5/24" />
+                            <small>
+                                The virtual IPv4 network or network type alias with a single entry used for private communications between this client and the server expressed using CIDR (e.g. 10.0.8.5/24).
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv6TunnelNetwork" class="form-label">IPv6 Tunnel Network</label>
+                            <input type="text" class="form-control" id="csoIpv6TunnelNetwork" name="ipv6_tunnel_network" placeholder="e.g. 2001:db9:1:1::100/64" />
+                            <small>
+                                The virtual IPv6 network or network type alias with a single entry used for private communications between this client and the server expressed using prefix (e.g. 2001:db9:1:1::100/64).
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv4Gateway" class="form-label">IPv4 Gateway</label>
+                            <input type="text" class="form-control" id="csoIpv4Gateway" name="ipv4_gateway" placeholder="Enter IPv4 Gateway" />
+                            <small>
+                                This is the IPv4 Gateway to push to the client. Normally it is left blank and determined automatically.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv6Gateway" class="form-label">IPv6 Gateway</label>
+                            <input type="text" class="form-control" id="csoIpv6Gateway" name="ipv6_gateway" placeholder="Enter IPv6 Gateway" />
+                            <small>
+                                This is the IPv6 Gateway to push to the client. Normally it is left blank and determined automatically.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoRedirectIpv4Gateway" name="redirect_ipv4_gateway" />
+                                <label class="form-check-label" for="csoRedirectIpv4Gateway">Redirect IPv4 Gateway</label>
+                            </div>
+                            <small>Force all client generated IPv4 traffic through the tunnel.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoRedirectIpv6Gateway" name="redirect_ipv6_gateway" />
+                                <label class="form-check-label" for="csoRedirectIpv6Gateway">Redirect IPv6 Gateway</label>
+                            </div>
+                            <small>Force all client-generated IPv6 traffic through the tunnel.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv4LocalNetworks" class="form-label">IPv4 Local Network/s</label>
+                            <input type="text" class="form-control" id="csoIpv4LocalNetworks" name="ipv4_local_networks" placeholder="e.g. 192.168.1.0/24" />
+                            <small>
+                                These are the IPv4 server-side networks that will be accessible from this particular client. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv6LocalNetworks" class="form-label">IPv6 Local Network/s</label>
+                            <input type="text" class="form-control" id="csoIpv6LocalNetworks" name="ipv6_local_networks" placeholder="e.g. 2001:db9:1::/64" />
+                            <small>
+                                These are the IPv6 server-side networks that will be accessible from this particular client. Expressed as a comma-separated list of one or more IP/PREFIX networks.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv4RemoteNetworks" class="form-label">IPv4 Remote Network/s</label>
+                            <input type="text" class="form-control" id="csoIpv4RemoteNetworks" name="ipv4_remote_networks" placeholder="e.g. 10.0.0.0/24" />
+                            <small>
+                                These are the IPv4 client-side networks that will be routed to this client specifically using route, so that a site-to-site VPN can be established.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoIpv6RemoteNetworks" class="form-label">IPv6 Remote Network/s</label>
+                            <input type="text" class="form-control" id="csoIpv6RemoteNetworks" name="ipv6_remote_networks" placeholder="e.g. 2001:db9:2::/64" />
+                            <small>
+                                These are the IPv6 client-side networks that will be routed to this client specifically using route, so that a site-to-site VPN can be established.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="openvpn-form-section-title">Other Client Settings</div>
+
+                        <div class="mb-3">
+                            <label for="csoInactivityTimeout" class="form-label">Inactivity Timeout</label>
+                            <input type="text" class="form-control" id="csoInactivityTimeout" name="inactivity_timeout" value="300" />
+                            <small>Causes OpenVPN to close a client connection after n seconds of inactivity on the TUN/TAP device.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoPingInterval" class="form-label">Ping Interval</label>
+                            <input type="text" class="form-control" id="csoPingInterval" name="ping_interval" value="10" />
+                            <small>Set peer ping interval.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoPingAction" class="form-label">Ping Action</label>
+                            <select class="form-select" id="csoPingAction" name="ping_action">
+                                <option value="none" selected>Don't override option (default)</option>
+                                <option value="exit">Exit or restart OpenVPN client after server timeout</option>
+                            </select>
+                            <small>Exit or restart OpenVPN client after server timeout.</small>
+                        </div>
+                    </div>
+
+                    <div class="openvpn-form-section">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoDnsDefaultDomain" name="dns_default_domain" />
+                                <label class="form-check-label" for="csoDnsDefaultDomain">DNS Default Domain</label>
+                            </div>
+                            <small>Provide a default domain name to clients.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoDnsServers" name="dns_servers" />
+                                <label class="form-check-label" for="csoDnsServers">DNS Servers</label>
+                            </div>
+                            <small>Provide a DNS server list to clients.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoBlockOutsideDns" name="block_outside_dns" />
+                                <label class="form-check-label" for="csoBlockOutsideDns">Block Outside DNS</label>
+                            </div>
+                            <small>
+                                Make Windows 10 Clients Block access to DNS servers except across OpenVPN while connected, forcing clients to use only VPN DNS servers.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoForceDnsCacheUpdate" name="force_dns_cache_update" />
+                                <label class="form-check-label" for="csoForceDnsCacheUpdate">Force DNS cache update</label>
+                            </div>
+                            <small>
+                                Run &quot;net stop dnscache&quot;, &quot;net start dnscache&quot;, &quot;ipconfig /flushdns&quot; and &quot;ipconfig /registerdns&quot; on connection initiation.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoNtpServers" name="ntp_servers" />
+                                <label class="form-check-label" for="csoNtpServers">NTP Servers</label>
+                            </div>
+                            <small>Provide an NTP server list to clients.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="csoNetbiosOptions" name="netbios_options" />
+                                <label class="form-check-label" for="csoNetbiosOptions">NetBIOS Options</label>
+                            </div>
+                            <small>
+                                Enable NetBIOS over TCP/IP. If this option is not set, all NetBIOS-over-TCP/IP options (including WINS) will be disabled.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="csoAdvanced" class="form-label">Advanced</label>
+                            <textarea class="form-control" id="csoAdvanced" name="advanced" rows="4" placeholder="Enter advanced configuration options..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

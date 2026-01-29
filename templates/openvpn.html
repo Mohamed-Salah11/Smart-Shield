@@ -1,0 +1,782 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+	Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+	</li>
+</ul>
+
+<div class="settings-section openvpn-section">
+	<h5 class="openvpn-section-title">OpenVPN Servers</h5>
+
+	<div class="openvpn-section-body">
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>Interface</th>
+					<th>Protocol / Port</th>
+					<th>Tunnel Network</th>
+					<th>Mode / Crypto</th>
+					<th>Description</th>
+					<th class="openvpn-actions-col">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td colspan="6" class="text-muted py-5 text-center">No OpenVPN servers configured.</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="d-flex justify-content-start">
+			<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#openvpnAddServerModal">+ Add Server</button>
+		</div>
+	</div>
+</div>
+
+<!-- Add OpenVPN Server Modal (step 1) -->
+<div class="modal fade" id="openvpnAddServerModal" tabindex="-1" aria-hidden="true">
+	<div class="modal-dialog modal-xl">
+		<div class="modal-content">
+			<div class="modal-header bg-dark text-white">
+				<h5 class="modal-title">Add OpenVPN Server</h5>
+				<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+
+			<form method="post" action="#">
+				<div class="modal-body">
+					<h6 class="openvpn-form-section-title">General Information</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="ovpn_description" class="form-label fw-semibold">Description</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_description" name="description" type="text" class="form-control" />
+								<div class="form-text">A description of this VPN for administrative reference.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Disabled</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_disabled" name="disabled" value="1">
+									<label class="form-check-label" for="ovpn_disabled">Disable this server</label>
+								</div>
+								<div class="form-text">Set this option to disable this server without removing it from the list.</div>
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Mode Configuration</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="serverMode" class="form-label fw-semibold">Server mode</label>
+							</div>
+							<div class="col-md-9">
+								<select id="serverMode" name="server_mode" class="form-select">
+									<option value="peer2peer" selected>Peer to Peer (SSL/TLS)</option>
+									<option value="peer2peer_shared">Peer to Peer (Shared Key)</option>
+									<option value="remote_access_ssltls">Remote Access (SSL/TLS)</option>
+									<option value="remote_access_userauth">Remote Access (User Auth)</option>
+									<option value="remote_access_hybrid">Remote Access (SSL/TLS + User Auth)</option>
+									<option value="static">Static Key</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="deviceMode" class="form-label fw-semibold">Device mode</label>
+							</div>
+							<div class="col-md-9">
+								<select id="deviceMode" name="device_mode" class="form-select">
+									<option value="tun" selected>tun - Layer 3 Tunnel Mode</option>
+									<option value="tap">tap - Layer 2 Tap Mode</option>
+								</select>
+								<div class="form-text">
+									&quot;tun&quot; mode carries IPv4 and IPv6 (OSI layer 3) and is the most common and compatible mode across all platforms.
+									&quot;tap&quot; mode is capable of carrying 802.3 (OSI Layer 2.)
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Endpoint Configuration</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="protocol" class="form-label fw-semibold">Protocol</label>
+							</div>
+							<div class="col-md-9">
+								<select id="protocol" name="protocol" class="form-select">
+									<option value="udp4" selected>UDP on IPv4 only</option>
+									<option value="udp6">UDP on IPv6 only</option>
+									<option value="tcp4">TCP on IPv4 only</option>
+									<option value="tcp6">TCP on IPv6 only</option>
+									<option value="udpboth">UDP IPv4 + IPv6 (multihome)</option>
+									<option value="tcpboth">TCP IPv4 + IPv6 (multihome)</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="interface" class="form-label fw-semibold">Interface</label>
+							</div>
+							<div class="col-md-9">
+								<select id="interface" name="interface" class="form-select">
+									<option value="wan" selected>WAN</option>
+									<option value="lan">LAN</option>
+									<option value="localhost">Localhost</option>
+									<option value="any">Any</option>
+								</select>
+								<div class="form-text">The interface or Virtual IP address where OpenVPN will receive client connections.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_local_port" class="form-label fw-semibold">Local port</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_local_port" name="local_port" type="number" class="form-control" value="1194" />
+								<div class="form-text">The port used by OpenVPN to receive client connections.</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Next screenshot will continue from here: Cryptographic Settings -->
+					<h6 class="openvpn-form-section-title">Cryptographic Settings</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">TLS Configuration</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_tls_key" name="tls_key" value="1" checked>
+									<label class="form-check-label" for="ovpn_tls_key">Use a TLS Key</label>
+								</div>
+								<div class="form-text">
+									A TLS key enhances security of an OpenVPN connection by requiring both parties to have a common key before a peer can perform a TLS handshake.
+									This layer of HMAC authentication allows control channel packets without the proper key to be dropped, protecting the peers from attack or unauthorized connections.
+									The TLS key does not have an effect on tunnel data.
+								</div>
+								<div class="form-check mt-2">
+									<input class="form-check-input" type="checkbox" id="ovpn_tls_key_auto" name="tls_key_auto" value="1" checked>
+									<label class="form-check-label" for="ovpn_tls_key_auto">Automatically generate a TLS Key.</label>
+								</div>
+							</div>
+						</div>
+
+						<hr class="openvpn-form-divider" />
+
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="ovpn_peer_ca" class="form-label fw-semibold">Peer Certificate Authority</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_peer_ca" name="peer_ca" type="text" class="form-control" />
+								<div class="form-text">Certificate authority for peer verification.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_peer_crl" class="form-label fw-semibold">Peer Certificate Revocation list</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_peer_crl" name="peer_crl" type="text" class="form-control" />
+								<div class="form-text">Certificate revocation list for peer verification.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">OCSP Check</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_ocsp" name="ocsp" value="1">
+									<label class="form-check-label" for="ovpn_ocsp">Check client certificates with OCSP</label>
+								</div>
+							</div>
+						</div>
+
+						<hr class="openvpn-form-divider" />
+
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="serverCert" class="form-label fw-semibold">Server certificate</label>
+							</div>
+							<div class="col-md-9">
+								<select id="serverCert" name="server_certificate" class="form-select">
+									<option value="" selected disabled>===== Server Certificates =====</option>
+									<option value="">GUI default (68e626ba9a349) (Server: Yes, In Use)</option>
+									<option value="" disabled>===== Non-Server Certificates =====</option>
+								</select>
+								<div class="form-text">
+									Certificates known to be incompatible with use for OpenVPN are not included in this list, such as certificates using incompatible ECDSA curves or weak digest algorithms.
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="dhLength" class="form-label fw-semibold">DH Parameter Length</label>
+							</div>
+							<div class="col-md-9">
+								<select id="dhLength" name="dh_parameter_length" class="form-select">
+									<option value="2048" selected>2048 bit</option>
+									<option value="1024">1024 bit</option>
+									<option value="3072">3072 bit</option>
+									<option value="4096">4096 bit</option>
+									<option value="6144">6144 bit</option>
+									<option value="8192">8192 bit</option>
+									<option value="ecdh">ECDH Only</option>
+								</select>
+								<div class="form-text">Diffie-Hellman (DH) parameter set used for key exchange.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ecdhCurve" class="form-label fw-semibold">ECDH Curve</label>
+							</div>
+							<div class="col-md-9">
+								<select id="ecdhCurve" name="ecdh_curve" class="form-select">
+									<option value="default" selected>Use Default</option>
+									<option value="prime256v1">prime256v1</option>
+									<option value="secp384r1">secp384r1</option>
+									<option value="secp521r1">secp521r1</option>
+								</select>
+								<div class="form-text">
+									The Elliptic Curve to use for key exchange.
+									The curve from the server certificate is used by default when the server uses an ECDSA certificate. Otherwise, secp384r1 is used as a fallback.
+								</div>
+							</div>
+						</div>
+
+						<hr class="openvpn-form-divider" />
+
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="dataEncryption" class="form-label fw-semibold">Data Encryption Algorithms</label>
+							</div>
+							<div class="col-md-9">
+								<select id="dataEncryption" name="data_encryption_algorithms" class="form-select">
+									<option value="" selected>(empty) - Select an algorithm...</option>
+									<option value="AES-128-CBC">AES-128-CBC</option>
+									<option value="AES-128-CFB">AES-128-CFB</option>
+									<option value="AES-128-CFB1">AES-128-CFB1</option>
+									<option value="AES-128-CFB8">AES-128-CFB8</option>
+									<option value="AES-128-GCM">AES-128-GCM</option>
+									<option value="AES-128-OFB">AES-128-OFB</option>
+									<option value="AES-192-CBC">AES-192-CBC</option>
+									<option value="AES-192-CFB">AES-192-CFB</option>
+									<option value="AES-192-CFB1">AES-192-CFB1</option>
+									<option value="AES-192-CFB8">AES-192-CFB8</option>
+									<option value="AES-192-OFB">AES-192-OFB</option>
+									<option value="AES-256-CBC">AES-256-CBC</option>
+									<option value="AES-256-CFB">AES-256-CFB</option>
+									<option value="AES-256-CFB1">AES-256-CFB1</option>
+									<option value="AES-256-CFB8">AES-256-CFB8</option>
+									<option value="AES-256-GCM">AES-256-GCM</option>
+									<option value="AES-256-OFB">AES-256-OFB</option>
+									<option value="CAMELLIA-128-CBC">CAMELLIA-128-CBC</option>
+									<option value="CAMELLIA-256-CBC">CAMELLIA-256-CBC</option>
+									<option value="CHACHA20-POLY1305">CHACHA20-POLY1305</option>
+									<option value="DES-EDE3-CBC">DES-EDE3-CBC</option>
+								</select>
+								<div class="form-text">The encryption algorithm used for the data channel. The order of the selected Data Encryption Algorithms is respected by OpenVPN. This list is ignored in Shared Key mode.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="fallbackEncryption" class="form-label fw-semibold">Fallback Data Encryption Algorithm</label>
+							</div>
+							<div class="col-md-9">
+								<select id="fallbackEncryption" name="fallback_data_encryption_algorithm" class="form-select">
+									<option value="aes-256-cbc" selected>aes-256-cbc</option>
+									<option value="aes-128-cbc">aes-128-cbc</option>
+									<option value="aes-128-cfb">aes-128-cfb</option>
+									<option value="aes-128-cfb1">aes-128-cfb1</option>
+									<option value="aes-128-cfb8">aes-128-cfb8</option>
+									<option value="aes-128-ofb">aes-128-ofb</option>
+									<option value="aes-192-cbc">aes-192-cbc</option>
+									<option value="aes-192-cfb">aes-192-cfb</option>
+									<option value="aes-192-cfb1">aes-192-cfb1</option>
+									<option value="aes-192-cfb8">aes-192-cfb8</option>
+									<option value="aes-192-ofb">aes-192-ofb</option>
+									<option value="aes-256-cfb">aes-256-cfb</option>
+									<option value="aes-256-cfb1">aes-256-cfb1</option>
+									<option value="aes-256-cfb8">aes-256-cfb8</option>
+									<option value="aes-256-gcm">aes-256-gcm</option>
+									<option value="aes-256-ofb">aes-256-ofb</option>
+									<option value="camellia-128-cbc">camellia-128-cbc</option>
+									<option value="camellia-128-cfb">camellia-128-cfb</option>
+									<option value="camellia-128-cfb1">camellia-128-cfb1</option>
+									<option value="camellia-128-cfb8">camellia-128-cfb8</option>
+									<option value="camellia-128-ofb">camellia-128-ofb</option>
+									<option value="camellia-192-cbc">camellia-192-cbc</option>
+									<option value="camellia-192-cfb">camellia-192-cfb</option>
+									<option value="camellia-192-cfb1">camellia-192-cfb1</option>
+									<option value="camellia-192-cfb8">camellia-192-cfb8</option>
+									<option value="camellia-192-ofb">camellia-192-ofb</option>
+									<option value="camellia-256-cbc">camellia-256-cbc</option>
+									<option value="camellia-256-cfb">camellia-256-cfb</option>
+									<option value="camellia-256-cfb1">camellia-256-cfb1</option>
+									<option value="camellia-256-cfb8">camellia-256-cfb8</option>
+									<option value="camellia-256-ofb">camellia-256-ofb</option>
+									<option value="chacha20-poly1305">chacha20-poly1305</option>
+									<option value="des-ede-cbc">des-ede-cbc</option>
+									<option value="des-ede-cfb">des-ede-cfb</option>
+									<option value="des-ede3-cbc">des-ede3-cbc</option>
+									<option value="des-ede3-cfb">des-ede3-cfb</option>
+									<option value="des-ede3-cfb1">des-ede3-cfb1</option>
+									<option value="des-ede3-cfb8">des-ede3-cfb8</option>
+									<option value="des-ede3-ofb">des-ede3-ofb</option>
+									<option value="none">No Encryption</option>
+								</select>
+								<div class="form-text">The Fallback Data Encryption Algorithm used for data channel packets when communicating with clients that do not support data encryption algorithm negotiation (e.g. Shared Key). This algorithm is automatically included in the Data Encryption Algorithms list.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="authDigest" class="form-label fw-semibold">Auth digest algorithm</label>
+							</div>
+							<div class="col-md-9">
+								<select id="authDigest" name="auth_digest_algorithm" class="form-select">
+									<option value="sha256" selected>sha256</option>
+									<option value="blake2b512">blake2b512</option>
+									<option value="blake2s256">blake2s256</option>
+									<option value="keccak-kmac-128">keccak-kmac-128</option>
+									<option value="keccak-kmac-256">keccak-kmac-256</option>
+									<option value="md5">md5</option>
+									<option value="md5-sha1">md5-sha1</option>
+									<option value="null">null</option>
+									<option value="ripemd160">ripemd160</option>
+									<option value="sha1">sha1</option>
+									<option value="sha224">sha224</option>
+									<option value="sha3-224">sha3-224</option>
+									<option value="sha3-256">sha3-256</option>
+									<option value="sha3-384">sha3-384</option>
+									<option value="sha3-512">sha3-512</option>
+									<option value="sha384">sha384</option>
+									<option value="sha512">sha512</option>
+									<option value="sha512-224">sha512-224</option>
+									<option value="sha512-256">sha512-256</option>
+									<option value="shake128">shake128</option>
+									<option value="shake256">shake256</option>
+									<option value="none">No Authentication</option>
+								</select>
+								<div class="form-text">
+									The algorithm used to authenticate data channel packets, and control channel packets if a TLS Key is present.
+									When an AEAD Encryption Algorithm mode is used, such as AES-GCM, this digest is used for the control channel only, not the data channel.
+									The server and all clients must have the same setting. While SHA1 is the default for OpenVPN, this algorithm is insecure.
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="certDepth" class="form-label fw-semibold">Certificate Depth</label>
+							</div>
+							<div class="col-md-9">
+								<select id="certDepth" name="certificate_depth" class="form-select">
+									<option value="one" selected>Client + Server</option>
+									<option value="no_check">Do Not Check</option>
+									<option value="two">Client + Intermediate + Server</option>
+									<option value="three">Client + 2 Intermediate + Server</option>
+									<option value="four">Client + 3 Intermediate + Server</option>
+									<option value="five">Client + 4 Intermediate + Server</option>
+								</select>
+								<div class="form-text">When a certificate-based client logs in, do not accept certificates below this depth. Useful for denying certificates made with intermediate CAs generated from the same CA as the server.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Client Certificate Key Usage Validation</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_key_usage" name="key_usage" value="1" checked>
+									<label class="form-check-label" for="ovpn_key_usage">Enforce key usage</label>
+								</div>
+								<div class="form-text">Verify that only hosts with a client certificate can connect (EKU: "TLS Web Client Authentication").</div>
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Tunnel Settings</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="ovpn_ipv4_tunnel_net" class="form-label fw-semibold">IPv4 Tunnel Network</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv4_tunnel_net" name="ipv4_tunnel_network" type="text" class="form-control" />
+								<div class="form-text">
+									This is the IPv4 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed in CIDR notation (e.g. 10.0.8.0/24).
+									The first usable address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.
+								</div>
+								<div class="form-text">
+									A tunnel network of /30 or smaller puts OpenVPN into a special peer-to-peer mode which cannot push settings to clients.
+									This mode is not compatible with several options, including Exit Notify, and Inactive.
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ipv6_tunnel_net" class="form-label fw-semibold">IPv6 Tunnel Network</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv6_tunnel_net" name="ipv6_tunnel_network" type="text" class="form-control" />
+								<div class="form-text">
+									This is the IPv6 virtual network or network type alias with a single entry used for private communications between this server and client hosts expressed in CIDR notation (e.g. fe80::/64).
+									The ::1 address in the network will be assigned to the server virtual interface. The remaining usable addresses will be assigned to connecting clients.
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Redirect IPv4 Gateway</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_redirect_ipv4" name="redirect_ipv4" value="1">
+									<label class="form-check-label" for="ovpn_redirect_ipv4">Force all client-generated IPv4 traffic through the tunnel.</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Redirect IPv6 Gateway</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_redirect_ipv6" name="redirect_ipv6" value="1">
+									<label class="form-check-label" for="ovpn_redirect_ipv6">Force all client-generated IPv6 traffic through the tunnel.</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ipv4_local_nets" class="form-label fw-semibold">IPv4 Local network(s)</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv4_local_nets" name="ipv4_local_networks" type="text" class="form-control" />
+								<div class="form-text">IPv4 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ipv6_local_nets" class="form-label fw-semibold">IPv6 Local network(s)</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv6_local_nets" name="ipv6_local_networks" type="text" class="form-control" />
+								<div class="form-text">IPv6 networks that will be accessible from the remote endpoint. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. This may be left blank if not adding a route to the local network through this tunnel on the remote machine. This is generally set to the LAN network.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ipv4_remote_nets" class="form-label fw-semibold">IPv4 Remote network(s)</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv4_remote_nets" name="ipv4_remote_networks" type="text" class="form-control" />
+								<div class="form-text">IPv4 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more CIDR ranges or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ipv6_remote_nets" class="form-label fw-semibold">IPv6 Remote network(s)</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ipv6_remote_nets" name="ipv6_remote_networks" type="text" class="form-control" />
+								<div class="form-text">These are the IPv6 networks that will be routed through the tunnel, so that a site-to-site VPN can be established without manually changing the routing tables. Expressed as a comma-separated list of one or more IP/PREFIX or host/network type aliases. If this is a site-to-site VPN, enter the remote LAN/s here. May be left blank for non site-to-site VPN.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_concurrent" class="form-label fw-semibold">Concurrent connections</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_concurrent" name="concurrent_connections" type="number" class="form-control" />
+								<div class="form-text">Specify the maximum number of clients allowed to concurrently connect to this server.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="allowCompression" class="form-label fw-semibold">Allow Compression</label>
+							</div>
+							<div class="col-md-9">
+								<select id="allowCompression" name="allow_compression" class="form-select">
+									<option value="refuse" selected>Refuse any non-stub compression</option>
+									<option value="asymmetric">Decompress incoming only</option>
+									<option value="allow">Compress packets (WARNING)</option>
+								</select>
+								<div class="form-text">Allow compression to be used with this VPN instance. Compression can potentially increase throughput but may allow an attacker to extract secrets if they can control compressed plaintext traversing the VPN (e.g. HTTP). Before enabling compression, consult information about the VORACLE, CRIME, TIME, and BREACH attacks against TLS to decide if the use case for this specific VPN is vulnerable to attack.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Type-of-Service</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_tos" name="tos" value="1">
+									<label class="form-check-label" for="ovpn_tos">Set the TOS IP header value of tunnel packets to match the encapsulated packet value.</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Inter-client communication</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_interclient" name="interclient" value="1">
+									<label class="form-check-label" for="ovpn_interclient">Allow communication between clients connected to this server</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Duplicate Connection</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_duplicate" name="duplicate" value="1">
+									<label class="form-check-label" for="ovpn_duplicate">Allow multiple concurrent connections from the same user</label>
+								</div>
+								<div class="form-text">When set, the same user may connect multiple times. When unset, a new connection from a user will disconnect the previous session.</div>
+								<div class="form-text">Users are identified by their username or certificate properties, depending on VPN configuration. This practice is discouraged for security reasons, but may be necessary in some environments.</div>
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Client Settings</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Dynamic IP</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_dynamic_ip" name="dynamic_ip" value="1">
+									<label class="form-check-label" for="ovpn_dynamic_ip">Allow connected clients to retain their connections if their IP address changes.</label>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="topology" class="form-label fw-semibold">Topology</label>
+							</div>
+							<div class="col-md-9">
+								<select id="topology" name="topology" class="form-select">
+									<option value="subnet" selected>One IP per client (common subnet)</option>
+									<option value="net30">Isolated /30 per client</option>
+								</select>
+								<div class="form-text">Specifies the method used to supply a virtual adapter IP address to clients when using TUN mode on IPv4. Some clients may require this be set to "subnet" even for IPv6, such as OpenVPN Connect (iOS/Android). Older versions of OpenVPN (before 2.0.9) or clients such as Yealink phones may require "net30".</div>
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Ping settings</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="ovpn_inactivity" class="form-label fw-semibold">Inactivity Timeout</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_inactivity" name="inactivity_timeout" type="number" class="form-control" value="300" />
+								<div class="form-text">Causes OpenVPN to close a client connection after n seconds of inactivity on the TUN/TAP device. Activity is based on the last incoming or outgoing tunnel packet. A value of 0 disables this feature. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="pingMethod" class="form-label fw-semibold">Ping method</label>
+							</div>
+							<div class="col-md-9">
+								<select id="pingMethod" name="ping_method" class="form-select">
+									<option value="keepalive" selected>Use keepalive helper</option>
+									<option value="ping">Manual ping / ping-exit / ping-restart</option>
+								</select>
+								<div class="form-text">
+									keepalive helper uses interval and timeout parameters to define ping and ping-restart values as follows:
+									<div>ping = interval</div>
+									<div>ping-restart = timeout*2</div>
+									<div>push ping = interval</div>
+									<div>push ping-restart = timeout</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ping_interval" class="form-label fw-semibold">Interval</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ping_interval" name="ping_interval" type="number" class="form-control" value="10" />
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="ovpn_ping_timeout" class="form-label fw-semibold">Timeout</label>
+							</div>
+							<div class="col-md-9">
+								<input id="ovpn_ping_timeout" name="ping_timeout" type="number" class="form-control" value="60" />
+							</div>
+						</div>
+					</div>
+
+					<h6 class="openvpn-form-section-title">Advanced Configuration</h6>
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="ovpn_custom_options" class="form-label fw-semibold">Custom options</label>
+							</div>
+							<div class="col-md-9">
+								<textarea id="ovpn_custom_options" name="custom_options" class="form-control" rows="4"></textarea>
+								<div class="form-text">Enter any additional options to add to the OpenVPN server configuration here, separated by semicolon. EXAMPLE: push "route 10.0.0.0 255.255.255.0"</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">UDP Fast I/O</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="ovpn_udp_fast" name="udp_fast_io" value="1">
+									<label class="form-check-label" for="ovpn_udp_fast">Use fast I/O operations with UDP writes to tun/tap. Experimental.</label>
+								</div>
+								<div class="form-text">Optimizes the packet write event loop, improving CPU efficiency by 5% to 10%. Not compatible with all platforms, and not compatible with OpenVPN bandwidth limiting.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="exitNotify" class="form-label fw-semibold">Exit Notify</label>
+							</div>
+							<div class="col-md-9">
+								<select id="exitNotify" name="exit_notify" class="form-select">
+									<option value="reconnect" selected>Retry once</option>
+									<option value="disabled">Disabled</option>
+									<option value="next_server">Retry twice (next server)</option>
+								</select>
+								<div class="form-text">Send an explicit exit notification to connected clients/peers when restarting or shutting down, so they may immediately disconnect rather than waiting for a timeout. In SSL/TLS Server modes, clients are directed to reconnect or use the next server. This option is ignored in Peer-to-Peer Shared Key mode and in SSL/TLS mode with a blank or /30 tunnel network as it will cause the server to exit and not restart.</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="row g-3 align-items-start">
+							<div class="col-md-3">
+								<label for="sendReceiveBuffer" class="form-label fw-semibold">Send/Receive Buffer</label>
+							</div>
+							<div class="col-md-9">
+								<select id="sendReceiveBuffer" name="send_receive_buffer" class="form-select">
+									<option value="default" selected>Default</option>
+									<option value="64kib">64kib</option>
+									<option value="128kib">128kib</option>
+									<option value="256kib">256kib</option>
+									<option value="512kib">512kib</option>
+									<option value="1mib">1mib</option>
+									<option value="2mib">2mib</option>
+								</select>
+								<div class="form-text">Configure a Send and Receive Buffer size for OpenVPN. The default buffer size can be too small in many cases, depending on hardware and network uplink speeds. Finding the best buffer size can take some experimentation. To test the best value for a site, start at 512KiB and test higher and lower values.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label class="form-label fw-semibold">Gateway creation</label>
+							</div>
+							<div class="col-md-9">
+								<div class="form-check">
+									<input class="form-check-input" type="radio" name="gateway_creation" id="ovpn_gateway_both" value="both" checked>
+									<label class="form-check-label" for="ovpn_gateway_both">Both</label>
+								</div>
+								<div class="form-check">
+									<input class="form-check-input" type="radio" name="gateway_creation" id="ovpn_gateway_ipv4" value="ipv4">
+									<label class="form-check-label" for="ovpn_gateway_ipv4">IPv4 only</label>
+								</div>
+								<div class="form-check">
+									<input class="form-check-input" type="radio" name="gateway_creation" id="ovpn_gateway_ipv6" value="ipv6">
+									<label class="form-check-label" for="ovpn_gateway_ipv6">IPv6 only</label>
+								</div>
+								<div class="form-text">If you assign a virtual interface to this OpenVPN server, this setting controls which gateway types will be created. The default setting is 'both'.</div>
+							</div>
+						</div>
+
+						<div class="row g-3 align-items-start mt-1">
+							<div class="col-md-3">
+								<label for="verbosityLevel" class="form-label fw-semibold">Verbosity level</label>
+							</div>
+							<div class="col-md-9">
+								<select id="verbosityLevel" name="verbosity_level" class="form-select">
+									<option value="default" selected>default</option>
+									<option value="none">none</option>
+									<option value="2">2</option>
+									<option value="3">3 4 recommended</option>
+									<option value="4">4</option>
+									<option value="5">5</option>
+									<option value="6">6</option>
+									<option value="7">7</option>
+									<option value="8">8</option>
+									<option value="9">9</option>
+									<option value="10">10</option>
+									<option value="11">11</option>
+								</select>
+								<div class="form-text">Each level shows all info from the previous levels. Level 3 is recommended for a good summary of what's happening without being swamped by output.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary">Save Server</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+{% endblock %}
