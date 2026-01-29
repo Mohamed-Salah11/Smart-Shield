@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+	Dashboard / VPN / IPsec / Tunnels
+</div>
+
+<ul class="nav nav-tabs">
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
+	</li>
+</ul>
+
+<div class="container">
+	<h1>Advanced Settings</h1>
+
+	<div class="settings-section">
+		<div class="section-header">
+			<h2>IPsec Logging Controls</h2>
+		</div>
+		<div class="p-0">
+			<table class="table mb-0">
+				<tbody>
+					{% set logging_rows = [
+						'Daemon',
+						'SA Manager',
+						'IKE SA',
+						'IKE Child SA',
+						'Job Processing',
+						'Configuration backend',
+						'Kernel Interface',
+						'Networking',
+						'ASN encoding',
+						'Message encoding',
+						'Integrity checker',
+						'Integrity Verifier',
+						'Platform Trust Service',
+						'TLS handler',
+						'IPsec traffic',
+						'StrongSwan Lib'
+					] %}
+
+					{% for label in logging_rows %}
+					<tr>
+						<th class="align-middle ipsec-log-label">{{ label }}</th>
+						<td>
+							<select class="form-select" aria-label="{{ label }} logging level">
+								<option selected>Control</option>
+								<option>Silent</option>
+								<option>Audit</option>
+								<option>Diag</option>
+								<option>Raw</option>
+								<option>Highest</option>
+							</select>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="text-muted ipsec-logging-help">
+		Changes the log verbosity for the IPsec daemon, so that more detail will be generated to aid in troubleshooting.
+	</div>
+
+	<div class="settings-section">
+		<div class="section-header">
+			<h2>Advanced IPsec Settings</h2>
+		</div>
+		<div class="p-3">
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Configure Unique IDs as</div>
+				</div>
+				<div class="col-md-8">
+					<select class="form-select" aria-label="Configure Unique IDs as">
+						<option selected>Yes (Replace)</option>
+						<option>No</option>
+						<option>Never</option>
+						<option>Keep</option>
+					</select>
+					<div class="form-text">
+						Whether a particular participant ID should be kept unique, with any new IKE_SA using an ID deemed to replace all old ones using that ID. Participant IDs normally are unique, so a new IKE_SA using the same ID is almost invariably intended to replace an old one. The difference between <strong>no</strong> and <strong>never</strong> is that the old IKE_SAs will be replaced when receiving an INITIAL_CONTACT notify if the option is not set. The daemon also accepts the value <strong>keep</strong> to reject new IKE_SA setups and keep the duplicate established earlier. Defaults to Yes.
+					</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start">
+				<div class="col-md-4">
+					<div class="fw-semibold">IPsec Filter Mode</div>
+				</div>
+				<div class="col-md-8">
+					<select class="form-select" aria-label="IPsec Filter Mode">
+						<option selected>Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)</option>
+						<option>Filter [IPsec VTI and Transport on assigned interfaces, block all tunnel mode traffic]</option>
+					</select>
+					<div class="form-text">
+						Experimental. Controls how the firewall will filter IPsec traffic. By default, rules on the IPsec tab filter all IPsec traffic, including tunnel mode, transport mode, and VTI mode.
+						<br /><br />
+						This is limited in that it does not allow for filtering on assigned VTI or transport mode interfaces (e.g. GRF), and it does not support features such as NAT rules and reply-to for return routing. When set to filter on assigned VTI and transport interfaces, <strong>all tunnel mode traffic is blocked</strong>. Do not set this option unless <strong>all IPsec tunnels are using VTI or transport mode</strong>.
+					</div>
+				</div>
+			</div>
+
+			<hr class="my-4" />
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">IKEv2 Retransmission Parameters</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="ikev2Retransmission" name="ikev2_retransmission" />
+						<label class="form-check-label" for="ikev2Retransmission">Set IKEv2 Retransmission parameters</label>
+					</div>
+					<div class="form-text">Retransmission timeout parameters for IKEv2.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">IP Compression</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="ipCompression" name="ip_compression" />
+						<label class="form-check-label" for="ipCompression">Enable IPCompression</label>
+					</div>
+					<div class="form-text">IPComp compression of content is proposed on the connection.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">PKCS#11 Support</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="pkcs11Support" name="pkcs11_support" />
+						<label class="form-check-label" for="pkcs11Support">Enable PKCS#11</label>
+					</div>
+					<div class="form-text">Allow use of PKCS#11 tokens for Phase 1 authentication. Note that restarting the PS/SC Smart Card service will restart IPsec and vice versa.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Strict interface binding</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="strictInterfaceBinding" name="strict_interface_binding" />
+						<label class="form-check-label" for="strictInterfaceBinding">Enable strict interface binding</label>
+					</div>
+					<div class="form-text">Enable strongSwan's interfaces_use option to bind specific interfaces only. This option is known to break IPsec with dynamic IP interfaces. This is not recommended at this time.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Unencrypted payloads in IKEv1 Main Mode</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="ikev1Unencrypted" name="ikev1_unencrypted_payloads" />
+						<label class="form-check-label" for="ikev1Unencrypted">Accept unencrypted ID and HASH payloads in IKEv1 Main Mode</label>
+					</div>
+					<div class="form-text">Some implementations send the third Main Mode message unencrypted, probably to find the PSKs for the specified ID for authentication. This is very similar to Aggressive Mode, and has the same security implications: A passive attacker can sniff the negotiated identity, and start brute forcing the PSK using the HASH payload. It is recommended to keep this option to no, unless the exact implications are known and compatibility is required for such devices (for example, some SonicWall boxes).</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start">
+				<div class="col-md-4">
+					<div class="fw-semibold">Maximum IKEv1 Phase 2 Exchanges</div>
+				</div>
+				<div class="col-md-8">
+					<input type="number" class="form-control" value="3" min="1" name="max_ikev1_phase2_exchanges" />
+					<div class="form-text">IKEv1 phase 2 rekeying for one VPN gateway can be initiated in parallel. By default only 3 parallel rekeys are allowed. Undersized values can break VPN connections with many phase 2 definitions. If unsure, set this value to match the largest number of phase 2 entries on any phase 1.</div>
+				</div>
+			</div>
+
+			<hr class="my-4" />
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Enable Cisco Extensions</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="enableCiscoExtensions" name="enable_cisco_extensions" />
+						<label class="form-check-label" for="enableCiscoExtensions">Enable Unity Plugin</label>
+					</div>
+					<div class="form-text">Enable Unity Plugin which provides Cisco Extension support such as Split-Include, Split-Exclude and Split-Dns.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Strict CRL Checking</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="strictCrlChecking" name="strict_crl_checking" />
+						<label class="form-check-label" for="strictCrlChecking">Enable strict Certificate Revocation List checking</label>
+					</div>
+					<div class="form-text">Check this to require availability of a fresh CRL for peer authentication based on certificate signatures to succeed.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">FQDN Endpoints Resolve Interval</div>
+				</div>
+				<div class="col-md-8">
+					<input type="number" class="form-control" value="60" min="1" name="fqdn_endpoints_resolve_interval" />
+					<div class="form-text">Interval, in seconds, that will be used to resolve FQDN remote gateways.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Make before Break</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="makeBeforeBreak" name="make_before_break" />
+						<label class="form-check-label" for="makeBeforeBreak">Initiate IKEv2 reauthentication with a make-before-break</label>
+					</div>
+					<div class="form-text">Instead of a break-before-make scheme. Make-before-break uses overlapping IKE and CHILD_SA during reauthentication by first recreating all new SAs before deleting the old ones. This behavior can be beneficial to avoid connectivity gaps during reauthentication, but requires support for overlapping SAs by the peer.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Asynchronous Cryptography</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="asyncCryptography" name="asynchronous_cryptography" />
+						<label class="form-check-label" for="asyncCryptography">Use asynchronous mode to parallelize multiple cryptography jobs</label>
+					</div>
+					<div class="form-text">Allow crypto(9) jobs to be dispatched multi-threaded to increase performance. Jobs are handled in the order they are received so that packets will be reinjected in the correct order.</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Custom ports</div>
+				</div>
+				<div class="col-md-8">
+					<div class="row g-3">
+						<div class="col-md-6">
+							<input type="text" class="form-control" placeholder="IKE port" name="custom_ike_port" />
+						</div>
+						<div class="col-md-6">
+							<input type="text" class="form-control" placeholder="NAT-T port" name="custom_nat_t_port" />
+						</div>
+					</div>
+					<div class="form-text"><strong>IKE port</strong> - Local UDP port for IKE (Default: 500)<br /><strong>NAT-T port</strong> - Local UDP port for NAT-T (Default: 4500)</div>
+				</div>
+			</div>
+
+			<div class="row align-items-start">
+				<div class="col-md-4">
+					<div class="fw-semibold">Auto-exclude LAN address</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="autoExcludeLan" name="auto_exclude_lan_address" />
+						<label class="form-check-label" for="autoExcludeLan">Enable bypass for LAN interface IP</label>
+					</div>
+					<div class="form-text">Exclude traffic from LAN subnet to LAN IP address from IPsec.</div>
+				</div>
+			</div>
+
+			<hr class="my-4" />
+
+			<div class="row align-items-start mb-4">
+				<div class="col-md-4">
+					<div class="fw-semibold">Additional IPsec bypass</div>
+				</div>
+				<div class="col-md-8">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="additionalIpsecBypass" name="additional_ipsec_bypass" />
+						<label class="form-check-label" for="additionalIpsecBypass">Enable extra IPsec bypass rules</label>
+					</div>
+					<div class="form-text">Create extra rules to exclude specific traffic from IPsec.</div>
+				</div>
+			</div>
+
+			<div class="mt-3">
+				<button type="button" class="btn btn-primary">Save</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

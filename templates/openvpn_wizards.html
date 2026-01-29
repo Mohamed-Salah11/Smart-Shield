@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+    Dashboard / VPN / OpenVPN
+</div>
+
+<ul class="nav nav-tabs">
+    <li class="nav-item">
+    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+    </li>
+</ul>
+
+<div class="settings-section openvpn-section">
+    <h5 class="openvpn-section-title">OpenVPN Wizards</h5>
+
+    <div class="openvpn-section-body">
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <h4 class="mb-3">OpenVPN Remote Access Server Setup</h4>
+                <p class="mb-2">This wizard will provide guidance through an OpenVPN Remote Access Server Setup.</p>
+                <p class="mb-0">The wizard may be stopped at any time by clicking the logo image at the top of the screen.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-4">
+                <h6 class="mb-4">Select an Authentication Backend Type</h6>
+
+                <div class="row align-items-center g-3">
+                    <div class="col-md-4">
+                        <label for="wizTypeOfServer" class="form-label mb-0">Type of Server</label>
+                    </div>
+                    <div class="col-md-8">
+                        <select class="form-select" id="wizTypeOfServer" name="type_of_server">
+                            <option value="local" selected>Local User Access</option>
+                            <option value="ldap">LDAP</option>
+                            <option value="radius">RADIUS</option>
+                        </select>
+                        <small class="text-muted">NOTE: If unsure, leave this set to &quot;Local User Access.&quot;</small>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step2') }}">Next</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

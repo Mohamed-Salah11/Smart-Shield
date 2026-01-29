@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="breadcrumb">
+	Dashboard / VPN / IPsec / Tunnels
+</div>
+
+<ul class="nav nav-tabs">
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
+	</li>
+	<li class="nav-item">
+		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
+	</li>
+</ul>
+
+<div class="settings-section">
+	<h5 class="openvpn-section-title">IPsec Tunnels</h5>
+
+	<div class="openvpn-section-body">
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>ID</th>
+					<th>IKE</th>
+					<th>Remote Gateway</th>
+					<th>Auth/Mode</th>
+					<th>P1 Protocol</th>
+					<th>P1 Transforms</th>
+					<th>P1 DH-Group</th>
+					<th>P1 Description</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td colspan="9" class="text-center text-muted py-5">No IPsec tunnels configured.</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="d-flex justify-content-start">
+			<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">Add P1</button>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="ipsecAddP1Modal" tabindex="-1" aria-labelledby="ipsecAddP1ModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg modal-dialog-scrollable">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="ipsecAddP1ModalLabel">Add Phase 1 (P1) Configuration</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<form>
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">General Information</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1Description" class="form-label">Description</label>
+							<input type="text" class="form-control" id="ipsecP1Description" name="description" />
+							<small class="text-muted">A description may be entered here for administrative reference (not parsed).</small>
+						</div>
+
+						<div class="mb-2">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="ipsecP1Disabled" name="disabled" />
+								<label class="form-check-label" for="ipsecP1Disabled"><strong>Disabled</strong> - Set this option to disable this phase1 without removing it from the list.</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">IKE Endpoint Configuration</div>
+
+						<div class="mb-3">
+							<label for="keyExchange" class="form-label">Key Exchange version</label>
+							<select class="form-select" id="keyExchange" name="keyExchange">
+								<option value="auto">Auto</option>
+								<option value="ikev1">IKEv1</option>
+								<option value="ikev2" selected>IKEv2</option>
+							</select>
+							<small class="text-muted">
+								Select the Internet Key Exchange protocol version to be used. Auto uses IKEv2 when initiator, and accepts either IKEv1 or IKEv2 as responder.
+							</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="protocol" class="form-label">Internet Protocol</label>
+							<select class="form-select" id="protocol" name="protocol">
+								<option value="ipv4" selected>IPv4</option>
+								<option value="ipv6">IPv6</option>
+								<option value="both">Both</option>
+							</select>
+							<small class="text-muted">Select the Internet Protocol family.</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="interface" class="form-label">Interface</label>
+							<select class="form-select" id="interface" name="interface">
+								<option value="wan" selected>WAN</option>
+								<option value="lan">LAN</option>
+							</select>
+							<small class="text-muted">Select the interface for the local endpoint of this phase1 entry.</small>
+						</div>
+
+						<div class="mb-0">
+							<label for="ipsecP1RemoteGateway" class="form-label">Remote Gateway</label>
+							<input type="text" class="form-control" id="ipsecP1RemoteGateway" name="remote_gateway" />
+							<small class="text-muted">Enter the public IP address or host name of the remote gateway.</small>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">Phase 1 Proposal (Authentication)</div>
+
+						<div class="mb-3">
+							<label for="authMethod" class="form-label">Authentication Method</label>
+							<select class="form-select" id="authMethod" name="authMethod">
+								<option value="mutual-psk" selected>Mutual PSK</option>
+								<option value="mutual-rsa">Mutual RSA</option>
+							</select>
+							<small class="text-muted">Must match the setting chosen on the remote side.</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="myIdentifier" class="form-label">My identifier</label>
+							<select class="form-select" id="myIdentifier" name="myIdentifier">
+								<option value="my-ip" selected>My IP address</option>
+								<option value="ip-address">IP address</option>
+								<option value="fqdn">Fully qualified domain name</option>
+								<option value="user-fqdn">User FQDN / E-mail</option>
+								<option value="asn1-dn">ASN.1 Distinguished Name</option>
+								<option value="keyid">KeyID tag</option>
+								<option value="ddns">Dynamic DNS</option>
+								<option value="auto">Automatic (based on content)</option>
+							</select>
+						</div>
+
+						<div class="mb-3">
+							<label for="peerIdentifier" class="form-label">Peer identifier</label>
+							<select class="form-select" id="peerIdentifier" name="peerIdentifier">
+								<option value="peer-ip" selected>Peer IP address</option>
+								<option value="ip-address">IP address</option>
+								<option value="fqdn">Fully qualified domain name</option>
+								<option value="user-fqdn">User FQDN / E-mail</option>
+								<option value="asn1-dn">ASN.1 Distinguished Name</option>
+								<option value="keyid">KeyID tag</option>
+								<option value="ddns">Dynamic DNS</option>
+								<option value="auto">Automatic (based on content)</option>
+							</select>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1PreSharedKey" class="form-label">Pre-Shared Key</label>
+							<textarea class="form-control" id="ipsecP1PreSharedKey" name="pre_shared_key" rows="3"></textarea>
+							<small class="text-muted">
+								Enter the Pre-Shared Key string. This key must match on both peers. This key should be long and random to protect the tunnel and its contents. A weak Pre-Shared Key can lead to a tunnel compromise.
+							</small>
+						</div>
+
+						<div>
+							<button type="button" class="btn btn-warning">Generate new Pre-Shared Key</button>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">Phase 1 Proposal (Encryption Algorithm)</div>
+
+						<div id="algorithmsContainer">
+							<div class="row g-3 align-items-center">
+								<div class="col-md-3">
+									<select class="form-select algorithm-encryption" name="algorithms_encryption[]">
+										<option value="aes" selected>AES</option>
+										<option value="aes128-gcm">AES128-GCM</option>
+										<option value="aes192-gcm">AES192-GCM</option>
+										<option value="aes256-gcm">AES256-GCM</option>
+										<option value="chacha20-poly1305">CHACHA20-POLY1305</option>
+									</select>
+									<small class="text-muted">Algorithm</small>
+								</div>
+								<div class="col-md-3">
+									<select class="form-select algorithm-keylength" name="algorithms_keylength[]">
+										<option value="128" selected>128 bits</option>
+										<option value="192">192 bits</option>
+										<option value="256">256 bits</option>
+									</select>
+									<small class="text-muted">Key length</small>
+								</div>
+								<div class="col-md-3">
+									<select class="form-select algorithm-hash" name="algorithms_hash[]">
+										<option value="sha256" selected>SHA256</option>
+										<option value="sha1">SHA1</option>
+										<option value="sha384">SHA384</option>
+										<option value="sha512">SHA512</option>
+										<option value="aes-xcbc">AES-XCBC</option>
+									</select>
+									<small class="text-muted">Hash</small>
+								</div>
+								<div class="col-md-3">
+									<select class="form-select algorithm-dhgroup" name="algorithms_dhgroup[]">
+										<option value="1">768 bit</option>
+										<option value="2">1024 bit</option>
+										<option value="5">1536 bit</option>
+										<option value="14" selected>2048 bit</option>
+										<option value="15">3072 bit</option>
+										<option value="16">4096 bit</option>
+										<option value="17">6144 bit</option>
+										<option value="18">8192 bit</option>
+										<option value="19">nist ecp256</option>
+										<option value="20">nist ecp384</option>
+										<option value="21">nist ecp521</option>
+										<option value="22">1024 (sub 160)</option>
+										<option value="23">2048 (sub 224)</option>
+									</select>
+									<small class="text-muted">DH Group</small>
+								</div>
+							</div>
+						</div>
+
+						<div class="mt-2">
+							<small class="text-muted">Note: SHA1 and DH groups 1, 2, 22, 23, and 24 provide weak security and should be avoided.</small>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="d-flex align-items-center justify-content-between openvpn-form-section-title">
+							<span>Expiration and Replacement</span>
+							<button type="button" class="btn btn-success btn-sm">Add Algorithm</button>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1LifeTime" class="form-label">Life Time</label>
+							<input type="number" class="form-control" id="ipsecP1LifeTime" name="life_time" value="28800" />
+							<small class="text-muted">
+								Hard IKE SA life time, in seconds, after which the IKE SA will be expired. Must be larger than Rekey Time and Reauth Time. Cannot be set to the same value as Rekey Time or Reauth Time. If left empty, defaults to 110% of whichever timer is higher (reauth or rekey)
+							</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1RekeyTime" class="form-label">Rekey Time</label>
+							<input type="number" class="form-control" id="ipsecP1RekeyTime" name="rekey_time" value="25920" />
+							<small class="text-muted">
+								Time, in seconds, before an IKE SA establishes new keys. This works without interruption. Cannot be set to the same value as Life Time. Only supported by IKEv2, and is recommended for use with IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv2. Enter a value of 0 to disable.
+							</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1ReauthTime" class="form-label">Reauth Time</label>
+							<input type="number" class="form-control" id="ipsecP1ReauthTime" name="reauth_time" value="0" />
+							<small class="text-muted">
+								Time, in seconds, before an IKE SA is torn down and recreated from scratch, including authentication. This can be disruptive unless both sides support make-before-break and overlapping IKE SA entries. Cannot be set to the same value as Life Time. Supported by IKEv1 and IKEv2. Leave blank to use a default value of 90% Life Time when using IKEv1. Enter a value of 0 to disable.
+							</small>
+						</div>
+
+						<div class="mb-0">
+							<label for="ipsecP1RandTime" class="form-label">Rand Time</label>
+							<input type="number" class="form-control" id="ipsecP1RandTime" name="rand_time" value="2880" />
+							<small class="text-muted">
+								A random value up to this amount will be subtracted from Rekey Time/Reauth Time to avoid simultaneous renegotiation. If left empty, defaults to 10% of Life Time. Enter 0 to disable randomness, but be aware that simultaneous renegotiation can lead to duplicate security associations.
+							</small>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">Advanced Options</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1ChildSaStartAction" class="form-label">Child SA Start Action</label>
+							<select class="form-select" id="ipsecP1ChildSaStartAction" name="child_sa_start_action">
+								<option value="default" selected>Default</option>
+							</select>
+							<small class="text-muted">Set this option to force specific initiation/responder behavior for child SA (P2) entries</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1ChildSaCloseAction" class="form-label">Child SA Close Action</label>
+							<select class="form-select" id="ipsecP1ChildSaCloseAction" name="child_sa_close_action">
+								<option value="default" selected>Default</option>
+							</select>
+							<small class="text-muted">Set this option to control the behavior when the remote peer unexpectedly closes a child SA (P2)</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1NatTraversal" class="form-label">NAT Traversal</label>
+							<select class="form-select" id="ipsecP1NatTraversal" name="nat_traversal">
+								<option value="auto" selected>Auto</option>
+							</select>
+							<small class="text-muted">
+								Set this option to enable the use of NAT-T (i.e. the encapsulation of ESP in UDP packets) if needed, which can help with clients that are behind restrictive firewalls.
+							</small>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1Mobike" class="form-label">MOBIKE</label>
+							<select class="form-select" id="ipsecP1Mobike" name="mobike">
+								<option value="disable" selected>Disable</option>
+							</select>
+							<small class="text-muted">Set this option to control the use of MOBIKE</small>
+						</div>
+
+						<div class="mb-2">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="ipsecP1GatewayDuplicates" name="gateway_duplicates" />
+								<label class="form-check-label" for="ipsecP1GatewayDuplicates"><strong>Gateway duplicates</strong> - Enable this to allow multiple phase 1 configurations with the same endpoint.</label>
+							</div>
+							<div class="text-muted ms-4">
+								When enabled, ZGate does not manage routing to the remote gateway and traffic will follow the default route without regard for the chosen interface. Static routes can override this behavior.
+							</div>
+						</div>
+
+						<div class="mb-2">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="ipsecP1SplitConnections" name="split_connections" />
+								<label class="form-check-label" for="ipsecP1SplitConnections"><strong>Split connections</strong> - Enable this to split connection entries with multiple phase 2 configuration. Required for remote endpoints that support only a single traffic selector per child SA.</label>
+							</div>
+						</div>
+
+						<div class="mb-0">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="ipsecP1PrfSelection" name="prf_selection" />
+								<label class="form-check-label" for="ipsecP1PrfSelection"><strong>PRF Selection</strong> - Enable manual Pseudo-Random Function (PRF) selection</label>
+							</div>
+							<div class="text-muted ms-4">Manual PRF selection is typically not required, but can be useful in combination with AEAD Encryption Algorithms such as AES-</div>
+						</div>
+					</div>
+
+					<div class="openvpn-form-section">
+						<div class="openvpn-form-section-title">Custom IKE/NAT-T Ports</div>
+
+						<div class="row g-3">
+							<div class="col-md-6">
+								<label for="ipsecP1RemoteIkePort" class="form-label">Remote IKE Port</label>
+								<input type="text" class="form-control" id="ipsecP1RemoteIkePort" name="remote_ike_port" placeholder="Remote IKE Port" />
+								<small class="text-muted">UDP port for IKE on the remote gateway. Leave empty for default automatic behavior (500/4500).</small>
+							</div>
+							<div class="col-md-6">
+								<label for="ipsecP1RemoteNatTPort" class="form-label">Remote NAT-T Port</label>
+								<input type="text" class="form-control" id="ipsecP1RemoteNatTPort" name="remote_nat_t_port" placeholder="Remote NAT-T Port" />
+								<small class="text-muted">UDP port for NAT-T on the remote gateway.</small>
+							</div>
+						</div>
+
+						<div class="mt-3 mb-3">
+							<div class="form-check">
+								<input class="form-check-input" type="checkbox" id="ipsecP1DpdEnable" name="dpd_enable" checked />
+								<label class="form-check-label" for="ipsecP1DpdEnable"><strong>Dead Peer Detection</strong> - Enable DPD</label>
+							</div>
+							<div class="text-muted">
+								Check the liveness of a peer by using IKEv2 INFORMATIONAL exchanges or IKEv1 R_U_THERE messages. Active DPD checking is only enforced if no IKE or ESP/AH packet has been received for the configured DPD delay.
+							</div>
+						</div>
+
+						<div class="mb-3">
+							<label for="ipsecP1DpdDelay" class="form-label">Delay</label>
+							<input type="number" class="form-control" id="ipsecP1DpdDelay" name="dpd_delay" value="10" />
+							<small class="text-muted">
+								Delay between sending peer acknowledgement messages. In IKEv2, a value of 0 sends no additional messages and only standard messages (such as those to rekey) are used to detect dead peers.
+							</small>
+						</div>
+
+						<div class="mb-0">
+							<label for="ipsecP1DpdMaxFailures" class="form-label">Max failures</label>
+							<input type="number" class="form-control" id="ipsecP1DpdMaxFailures" name="dpd_max_failures" value="5" />
+							<small class="text-muted">
+								Number of consecutive failures allowed before disconnecting. This only applies to IKEv1; in IKEv2 the <a href="#" class="link-primary">retransmission timeout</a> is used instead.
+							</small>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-primary">Save P1 Configuration</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
