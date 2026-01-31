@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, jsonify
+from app.database import get_db
 
 firewall_bp = Blueprint("firewall", __name__, url_prefix="/firewall")
 
@@ -47,12 +48,22 @@ def add_floating_rule():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            # Shift all existing rules down
+            cursor.execute("UPDATE firewall_rules_floating SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            # Add at bottom
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_floating")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO firewall_rules_floating 
             (disabled, interface, protocol, source, source_port, destination, 
              dest_port, gateway, queue, schedule, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                   (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_floating))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
@@ -64,11 +75,56 @@ def add_floating_rule():
             data.get('gateway', ''),
             data.get('queue', ''),
             data.get('schedule', ''),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/rules/floating/<int:rule_id>/move", methods=["POST"])
+def move_floating_rule(rule_id):
+    """Move a floating rule up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        # Get current rule order
+        cursor.execute("SELECT rule_order FROM firewall_rules_floating WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            # Find the rule above
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_floating 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+            swap_row = cursor.fetchone()
+        else:
+            # Find the rule below
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_floating 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+            swap_row = cursor.fetchone()
+        
+        if swap_row:
+            swap_id, swap_order = swap_row
+            # Swap the orders
+            cursor.execute("UPDATE firewall_rules_floating SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE firewall_rules_floating SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -146,22 +202,70 @@ def add_wan_rule():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE firewall_rules_wan SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_wan")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO firewall_rules_wan 
             (action, disabled, protocol, source, destination, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, 
-                   (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_wan))
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('action', 'pass'),
             data.get('disabled', 0),
             data.get('protocol', 'any'),
             data.get('source', 'any'),
             data.get('destination', 'any'),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/rules/wan/<int:rule_id>/move", methods=["POST"])
+def move_wan_rule(rule_id):
+    """Move a WAN rule up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM firewall_rules_wan WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_wan 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_wan 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE firewall_rules_wan SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE firewall_rules_wan SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -233,22 +337,70 @@ def add_lan_rule():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE firewall_rules_lan SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_lan")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO firewall_rules_lan 
             (disabled, interface, protocol, source, destination, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, 
-                   (SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_lan))
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'LAN'),
             data.get('protocol', 'any'),
             data.get('source', 'any'),
             data.get('destination', 'any'),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/rules/lan/<int:rule_id>/move", methods=["POST"])
+def move_lan_rule(rule_id):
+    """Move a LAN rule up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM firewall_rules_lan WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_lan 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM firewall_rules_lan 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE firewall_rules_lan SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE firewall_rules_lan SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -314,7 +466,7 @@ def get_nat_pf():
             SELECT id, disabled, interface, protocol, src_type, src_address, 
                    dst_type, dst_address, redirect_ip, description, nat_reflection
             FROM nat_pf
-            ORDER BY id
+            ORDER BY rule_order
         """)
         rules = [dict(row) for row in cursor.fetchall()]
         return jsonify({"success": True, "rules": rules})
@@ -330,11 +482,20 @@ def add_nat_pf():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE nat_pf SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_pf")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO nat_pf 
             (disabled, interface, protocol, src_type, src_address, dst_type, 
-             dst_address, redirect_ip, description, nat_reflection)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             dst_address, redirect_ip, description, nat_reflection, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
@@ -345,11 +506,51 @@ def add_nat_pf():
             data.get('dst_address', ''),
             data.get('redirect_ip', ''),
             data.get('description', ''),
-            data.get('nat_reflection', 'default')
+            data.get('nat_reflection', 'default'),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/pf/<int:rule_id>/move", methods=["POST"])
+def move_nat_pf(rule_id):
+    """Move a port forward rule up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM nat_pf WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_pf 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_pf 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE nat_pf SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE nat_pf SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -411,7 +612,7 @@ def get_nat_1to1():
             SELECT id, disabled, interface, external_address, internal_address, 
                    destination_address, description
             FROM nat_1to1
-            ORDER BY id
+            ORDER BY rule_order
         """)
         rules = [dict(row) for row in cursor.fetchall()]
         return jsonify({"success": True, "rules": rules})
@@ -427,22 +628,71 @@ def add_nat_1to1():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE nat_1to1 SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_1to1")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO nat_1to1 
             (disabled, interface, external_address, internal_address, 
-             destination_address, description)
-            VALUES (?, ?, ?, ?, ?, ?)
+             destination_address, description, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
             data.get('external_address', ''),
             data.get('internal_address', ''),
             data.get('destination_address', 'any'),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/1to1/<int:rule_id>/move", methods=["POST"])
+def move_nat_1to1(rule_id):
+    """Move a 1:1 NAT mapping up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM nat_1to1 WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_1to1 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_1to1 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE nat_1to1 SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE nat_1to1 SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -500,7 +750,7 @@ def get_nat_outbound():
             SELECT id, disabled, interface, src_address, dst_address, 
                    nat_address, static_port, description
             FROM nat_outbound
-            ORDER BY id
+            ORDER BY rule_order
         """)
         rules = [dict(row) for row in cursor.fetchall()]
         return jsonify({"success": True, "rules": rules})
@@ -516,11 +766,20 @@ def add_nat_outbound():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE nat_outbound SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_outbound")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO nat_outbound 
             (disabled, interface, src_address, dst_address, nat_address, 
-             static_port, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+             static_port, description, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
@@ -528,11 +787,51 @@ def add_nat_outbound():
             data.get('dst_address', 'any'),
             data.get('nat_address', ''),
             data.get('static_port', 0),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/outbound/<int:rule_id>/move", methods=["POST"])
+def move_nat_outbound(rule_id):
+    """Move an outbound NAT rule up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM nat_outbound WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_outbound 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_outbound 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE nat_outbound SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE nat_outbound SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -591,7 +890,7 @@ def get_nat_npt():
             SELECT id, disabled, interface, src_not, src_prefix, src_prefix_length,
                    dst_not, dst_type, dst_prefix, dst_prefix_length, description
             FROM nat_npt
-            ORDER BY id
+            ORDER BY rule_order
         """)
         rules = [dict(row) for row in cursor.fetchall()]
         return jsonify({"success": True, "rules": rules})
@@ -607,11 +906,20 @@ def add_nat_npt():
         db = get_db()
         cursor = db.cursor()
         
+        position = data.get('position', 'bottom')
+        
+        if position == 'top':
+            cursor.execute("UPDATE nat_npt SET rule_order = rule_order + 1")
+            new_order = 1
+        else:
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_npt")
+            new_order = cursor.fetchone()[0]
+        
         cursor.execute("""
             INSERT INTO nat_npt 
             (disabled, interface, src_not, src_prefix, src_prefix_length,
-             dst_not, dst_type, dst_prefix, dst_prefix_length, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             dst_not, dst_type, dst_prefix, dst_prefix_length, description, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
@@ -622,11 +930,51 @@ def add_nat_npt():
             data.get('dst_type', 'Prefix'),
             data.get('dst_prefix', ''),
             data.get('dst_prefix_length', 128),
-            data.get('description', '')
+            data.get('description', ''),
+            new_order
         ))
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/npt/<int:rule_id>/move", methods=["POST"])
+def move_nat_npt(rule_id):
+    """Move an NPt mapping up or down"""
+    try:
+        data = request.get_json()
+        direction = data.get('direction', 'up')
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("SELECT rule_order FROM nat_npt WHERE id=?", (rule_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        
+        current_order = row[0]
+        
+        if direction == 'up':
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_npt 
+                WHERE rule_order < ? ORDER BY rule_order DESC LIMIT 1
+            """, (current_order,))
+        else:
+            cursor.execute("""
+                SELECT id, rule_order FROM nat_npt 
+                WHERE rule_order > ? ORDER BY rule_order ASC LIMIT 1
+            """, (current_order,))
+        
+        swap_row = cursor.fetchone()
+        if swap_row:
+            swap_id, swap_order = swap_row
+            cursor.execute("UPDATE nat_npt SET rule_order=? WHERE id=?", (swap_order, rule_id))
+            cursor.execute("UPDATE nat_npt SET rule_order=? WHERE id=?", (current_order, swap_id))
+            db.commit()
+        
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
