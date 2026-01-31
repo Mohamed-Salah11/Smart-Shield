@@ -45,12 +45,179 @@ def init_db():
     )
     """)
 
+    # LAN INTERFACE CONFIGURATION TABLE
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS lan_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enable_interface INTEGER DEFAULT 1,
+        description TEXT DEFAULT 'LAN',
+        ipv4_config_type TEXT DEFAULT 'static',
+        ipv6_config_type TEXT DEFAULT 'none',
+        mac_address TEXT DEFAULT '',
+        mtu TEXT DEFAULT '',
+        mss TEXT DEFAULT '',
+        speed_and_duplex TEXT DEFAULT 'default',
+        ipv4_address TEXT DEFAULT '192.168.1.1/24',
+        ipv4_upstream_gateway TEXT DEFAULT '',
+        block_private_networks INTEGER DEFAULT 0,
+        block_bogon_networks INTEGER DEFAULT 0
+    )
+    """)
+
+    # WAN INTERFACE CONFIGURATION TABLE
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS wan_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enable_interface INTEGER DEFAULT 1,
+        description TEXT DEFAULT 'WAN',
+        ipv4_config_type TEXT DEFAULT 'dhcp',
+        ipv6_config_type TEXT DEFAULT 'none',
+        mac_address TEXT DEFAULT '',
+        mtu TEXT DEFAULT '',
+        mss TEXT DEFAULT '',
+        speed_and_duplex TEXT DEFAULT 'default',
+        ipv4_address TEXT DEFAULT '',
+        ipv4_upstream_gateway TEXT DEFAULT '',
+        username TEXT DEFAULT '',
+        password TEXT DEFAULT '',
+        dial_on_demand INTEGER DEFAULT 0,
+        idle_timeout INTEGER DEFAULT 0,
+        block_private_networks INTEGER DEFAULT 1,
+        block_bogon_networks INTEGER DEFAULT 1
+    )
+    """)
+
     # PORT ASSIGNMENTS TABLE
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS port_assignments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             interface_label TEXT, -- e.g., 'WAN' or 'LAN'
             network_port TEXT     -- e.g., 'em0 (00:0c...)'
+        )
+    ''')
+
+    # INTERFACE ASSIGNMENTS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS interface_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interface_type TEXT NOT NULL,
+            network_port TEXT
+        )
+    ''')
+
+    # INTERFACE GROUPS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS interface_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_name TEXT NOT NULL,
+            description TEXT,
+            members TEXT
+        )
+    ''')
+
+    # WIRELESS CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS wireless_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interface TEXT,
+            mode TEXT,
+            description TEXT
+        )
+    ''')
+
+    # VLAN CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vlan_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interface TEXT,
+            vlan_tag INTEGER,
+            vlan_priority INTEGER DEFAULT 0,
+            description TEXT
+        )
+    ''')
+
+    # QINQ CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS qinq_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interface TEXT,
+            first_level_tag INTEGER,
+            add_to_groups INTEGER DEFAULT 0,
+            description TEXT,
+            member_tags TEXT
+        )
+    ''')
+
+    # PPP CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ppp_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            link_type TEXT,
+            link_interfaces TEXT,
+            description TEXT,
+            username TEXT,
+            password TEXT,
+            dial_on_demand INTEGER DEFAULT 0
+        )
+    ''')
+
+    # GRE CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS gre_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interface TEXT,
+            gre_remote_address TEXT,
+            gre_local_address TEXT,
+            ipv4_tunnel_remote_address TEXT,
+            ipv4_tunnel_remote_prefix INTEGER,
+            ipv4_tunnel_local_address TEXT,
+            ipv4_tunnel_local_prefix INTEGER,
+            ipv6_tunnel_remote_address TEXT,
+            ipv6_tunnel_remote_prefix INTEGER,
+            ipv6_tunnel_local_address TEXT,
+            ipv6_tunnel_local_prefix INTEGER,
+            description TEXT
+        )
+    ''')
+
+    # GIF CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS gif_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interface TEXT,
+            gif_remote_address TEXT,
+            gif_tunnel_local_address TEXT,
+            gif_tunnel_remote_address TEXT,
+            gif_tunnel_subnet INTEGER,
+            ecn_friendly_behavior INTEGER DEFAULT 0,
+            outer_source_filtering INTEGER DEFAULT 0,
+            description TEXT
+        )
+    ''')
+
+    # BRIDGE CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bridge_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            member_interfaces TEXT,
+            description TEXT,
+            cache_size INTEGER DEFAULT 100,
+            cache_max_age INTEGER DEFAULT 240,
+            span_interfaces TEXT,
+            edge_interfaces TEXT,
+            auto_edge_interfaces TEXT,
+            ptp_interfaces TEXT,
+            sticky_ports INTEGER DEFAULT 0
+        )
+    ''')
+
+    # LAGG CONFIGS TABLE
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS lagg_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_interfaces TEXT,
+            aggregation_protocol TEXT,
+            description TEXT
         )
     ''')
 
@@ -259,6 +426,16 @@ def init_db():
             VALUES ('net.inet.ip.portrange.first', 'First port in the ephemeral port range', '1024')
         """)
 
+    # Create default LAN config if not exists
+    cursor.execute("SELECT COUNT(*) AS c FROM lan_config")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute("INSERT INTO lan_config DEFAULT VALUES")
+
+    # Create default WAN config if not exists
+    cursor.execute("SELECT COUNT(*) AS c FROM wan_config")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute("INSERT INTO wan_config DEFAULT VALUES")
+
     conn.commit()
 
 
@@ -277,7 +454,8 @@ def init_db():
         dst_address TEXT,
         redirect_ip TEXT,
         description TEXT,
-        nat_reflection TEXT
+        nat_reflection TEXT,
+        rule_order INTEGER DEFAULT 0
     )
     """)
 
@@ -290,7 +468,8 @@ def init_db():
         external_address TEXT,
         internal_address TEXT,
         destination_address TEXT,
-        description TEXT
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
     )
     """)
 
@@ -304,7 +483,8 @@ def init_db():
         dst_address TEXT,
         nat_address TEXT,
         static_port INTEGER DEFAULT 0,
-        description TEXT
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
     )
     """)
 
@@ -321,7 +501,8 @@ def init_db():
         dst_type TEXT,
         dst_prefix TEXT,
         dst_prefix_length INTEGER,
-        description TEXT
+        description TEXT,
+        rule_order INTEGER DEFAULT 0
     )
     """)
 

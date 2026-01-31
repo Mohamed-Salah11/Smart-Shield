@@ -537,12 +537,19 @@ def advanced_system_tunables_delete(index):
 def certificates():
     return render_template("certificates.html")
 
-@system_bp.route("/add_ca")
+@system_bp.route("/add_ca", methods=["GET", "POST"])
 def add_ca():
+    if request.method == "POST":
+        # Handle form submission - currently just redirect back
+        # CA data would be saved to database here when implemented
+        return redirect(url_for("system.certificates"))
     return render_template("add_ca.html")
 
-@system_bp.route("/add_certificate")
+@system_bp.route("/add_certificate", methods=["GET", "POST"])
 def add_certificate():
+    if request.method == "POST":
+        # Handle form submission - currently just redirect back
+        return redirect(url_for("system.certificates"))
     return render_template("add_certificate.html")
 
 
