@@ -311,6 +311,27 @@ small {
   width: 140px;
 }
 
+/* Modal scrolling fix */
+.modal-dialog-scrollable {
+  max-height: calc(100vh - 1rem);
+}
+
+.modal-dialog-scrollable .modal-content {
+  max-height: calc(100vh - 1rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-dialog-scrollable .modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.modal-dialog-scrollable .modal-header,
+.modal-dialog-scrollable .modal-footer {
+  flex-shrink: 0;
+}
+
 /* OpenVPN modal form sections */
 .openvpn-form-section-title {
   font-weight: 700;

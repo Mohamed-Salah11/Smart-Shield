@@ -177,18 +177,30 @@ def dns_resolver_access_lists_edit():
 # DYNAMIC DNS
 # ----------------------------
 
-@services_bp.route("/dynamic-dns")
+@services_bp.route("/dynamic-dns", methods=["GET", "POST"])
 def dynamic_dns():
+    if request.method == "POST":
+        clients = session.get("dynamic_dns_clients", [])
+        client = {
+            "disabled": bool(request.form.get("disabled")),
+            "service_type": request.form.get("service_type"),
+            "interface": request.form.get("interface"),
+            "check_ip_mode": request.form.get("check_ip_mode"),
+            "hostname": request.form.get("hostname"),
+            "mx": request.form.get("mx"),
+            "wildcards": bool(request.form.get("wildcards")),
+            "verbose": bool(request.form.get("verbose")),
+            "username": request.form.get("username"),
+            "description": request.form.get("description", "")
+        }
+        clients.append(client)
+        session["dynamic_dns_clients"] = clients
+        return redirect(url_for("services.dynamic_dns"))
     return render_template("dynamic_dns.html")
 
 
-@services_bp.route("/dynamic-dns/rfc2136")
+@services_bp.route("/dynamic-dns/rfc2136", methods=["GET", "POST"])
 def dynamic_dns_rfc2136():
-    return render_template("dynamic_dns_rfc2136.html")
-
-
-@services_bp.route("/dynamic-dns/rfc2136/edit", methods=["GET", "POST"])
-def dynamic_dns_rfc2136_edit():
     if request.method == "POST":
         clients = session.get("rfc2136_clients", [])
         client = {
@@ -211,21 +223,16 @@ def dynamic_dns_rfc2136_edit():
         clients.append(client)
         session["rfc2136_clients"] = clients
         return redirect(url_for("services.dynamic_dns_rfc2136"))
-    return render_template("dynamic_dns_rfc2136_edit.html")
+    return render_template("dynamic_dns_rfc2136.html")
 
 
-@services_bp.route("/dynamic-dns/checkip")
+@services_bp.route("/dynamic-dns/checkip", methods=["GET", "POST"])
 def dynamic_dns_checkip():
     if "checkip_services" not in session:
         session["checkip_services"] = [
             {"name": "Default", "url": "http://checkip.dyndns.org", "verify_ssl": False,
              "description": "Default Check IP Service"}
         ]
-    return render_template("dynamic_dns_checkip.html")
-
-
-@services_bp.route("/dynamic-dns/checkip/edit", methods=["GET", "POST"])
-def dynamic_dns_checkip_edit():
     if request.method == "POST":
         services = session.get("checkip_services", [])
         svc = {
@@ -240,29 +247,7 @@ def dynamic_dns_checkip_edit():
         services.append(svc)
         session["checkip_services"] = services
         return redirect(url_for("services.dynamic_dns_checkip"))
-    return render_template("dynamic_dns_checkip_edit.html")
-
-
-@services_bp.route("/dynamic-dns/edit", methods=["GET", "POST"])
-def dynamic_dns_edit():
-    if request.method == "POST":
-        clients = session.get("dynamic_dns_clients", [])
-        client = {
-            "disabled": bool(request.form.get("disabled")),
-            "service_type": request.form.get("service_type"),
-            "interface": request.form.get("interface"),
-            "check_ip_mode": request.form.get("check_ip_mode"),
-            "hostname": request.form.get("hostname"),
-            "mx": request.form.get("mx"),
-            "wildcards": bool(request.form.get("wildcards")),
-            "verbose": bool(request.form.get("verbose")),
-            "username": request.form.get("username"),
-            "description": request.form.get("description", "")
-        }
-        clients.append(client)
-        session["dynamic_dns_clients"] = clients
-        return redirect(url_for("services.dynamic_dns"))
-    return render_template("dynamic_dns_edit.html")
+    return render_template("dynamic_dns_checkip.html")
 
 
 # ----------------------------
