@@ -14,7 +14,7 @@
 <div class="settings-section">
 	<div class="d-flex justify-content-between align-items-center mb-3">
 		<h5>Check IP Services</h5>
-		<a class="btn btn-success" href="{{ url_for('services.dynamic_dns_checkip_edit') }}">+ Add</a>
+		<button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCheckIPModal">+ Add</button>
 	</div>
 	
 	<table class="table-bordered">
@@ -35,11 +35,85 @@
 				<td>{{ s.url }}</td>
 				<td>{% if s.verify_ssl %}Yes{% else %}&nbsp;{% endif %}</td>
 				<td>{{ s.description }}</td>
-				<td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
+				<td><button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#addCheckIPModal">Edit</button></td>
 			</tr>
 			{% endfor %}
 		</tbody>
 	</table>
+</div>
+
+<!-- Add/Edit Check IP Service Modal -->
+<div class="modal fade" id="addCheckIPModal" tabindex="-1" aria-labelledby="addCheckIPModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg modal-dialog-scrollable">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="addCheckIPModalLabel">Check IP Service</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<form id="checkIPForm" method="post" action="{{ url_for('services.dynamic_dns_checkip') }}">
+					<div class="mb-3 form-check">
+						<input type="checkbox" class="form-check-input" id="enable" name="enable">
+						<label class="form-check-label" for="enable">Enable</label>
+					</div>
+
+					<div class="mb-3 row">
+						<label class="col-sm-3 col-form-label">Name</label>
+						<div class="col-sm-9">
+							<input class="form-control" name="name">
+							<div class="option-desc">The name of the service may only consist of the characters "a-z, A-Z, 0-9 and _".</div>
+						</div>
+					</div>
+
+					<div class="mb-3 row">
+						<label class="col-sm-3 col-form-label">URL</label>
+						<div class="col-sm-9">
+							<input class="form-control" name="url">
+						</div>
+					</div>
+
+					<div class="mb-3 row">
+						<label class="col-sm-3 col-form-label">User name</label>
+						<div class="col-sm-9">
+							<input class="form-control" name="username">
+						</div>
+					</div>
+
+					<div class="mb-3 row">
+						<label class="col-sm-3 col-form-label">Password</label>
+						<div class="col-sm-9">
+							<div class="d-flex">
+								<input type="password" class="form-control me-2" name="password" placeholder="Password">
+								<input type="password" class="form-control" name="password_confirm" placeholder="Confirm">
+							</div>
+						</div>
+					</div>
+
+					<div class="row mb-3">
+						<label class="col-sm-3 col-form-label">Verify SSL/TLS Peer</label>
+						<div class="col-sm-9">
+							<div class="form-check">
+								<input type="checkbox" class="form-check-input" id="verify_ssl" name="verify_ssl">
+								<label class="form-check-label" for="verify_ssl">Verify SSL/TLS Peer</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="mb-3 row">
+						<label class="col-sm-3 col-form-label">Description</label>
+						<div class="col-sm-9">
+							<input class="form-control" name="description">
+							<div class="option-desc">A description may be entered here for administrative reference (not parsed).</div>
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+				<button type="submit" form="checkIPForm" class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+			</div>
+		</div>
+	</div>
 </div>
 
 {% endblock %}
