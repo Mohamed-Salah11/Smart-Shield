@@ -7,16 +7,20 @@
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
-    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+        <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}"
+            href="{{ url_for('vpn.openvpn') }}">Servers</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}"
+            href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client
+            Specific Overrides</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}"
+            href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
     </li>
 </ul>
 
@@ -35,20 +39,22 @@
                     <th class="openvpn-actions-col">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="openvpnClientsTable">
                 <tr>
-                    <td colspan="6" class="text-muted py-5 text-center">No OpenVPN clients configured.</td>
+                    <td colspan="6" class="text-muted py-5 text-center">Loading...</td>
                 </tr>
             </tbody>
         </table>
 
         <div class="d-flex justify-content-start">
-            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#openvpnAddClientModal">+ Add Client</button>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal"
+                data-bs-target="#openvpnAddClientModal">+ Add Client</button>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="openvpnAddClientModal" tabindex="-1" aria-labelledby="openvpnAddClientModalLabel" aria-hidden="true">
+<div class="modal fade" id="openvpnAddClientModal" tabindex="-1" aria-labelledby="openvpnAddClientModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -125,7 +131,8 @@
 
                         <div class="mb-3">
                             <label for="clientServerPort" class="form-label">Server Port</label>
-                            <input type="text" class="form-control" id="clientServerPort" name="server_port" value="1194" />
+                            <input type="text" class="form-control" id="clientServerPort" name="server_port"
+                                value="1194" />
                             <small>The port number on which the OpenVPN server is listening.</small>
                         </div>
                     </div>
@@ -138,7 +145,8 @@
 
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="clientUseTlsKey" name="use_tls_key" />
+                                    <input class="form-check-input" type="checkbox" id="clientUseTlsKey"
+                                        name="use_tls_key" />
                                     <label class="form-check-label" for="clientUseTlsKey">Use a TLS Key</label>
                                 </div>
                             </div>
@@ -151,19 +159,23 @@
 
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="clientUseCertificateAuth" name="use_certificate_auth" />
-                                    <label class="form-check-label" for="clientUseCertificateAuth">Use certificate authentication</label>
+                                    <input class="form-check-input" type="checkbox" id="clientUseCertificateAuth"
+                                        name="use_certificate_auth" />
+                                    <label class="form-check-label" for="clientUseCertificateAuth">Use certificate
+                                        authentication</label>
                                 </div>
                             </div>
 
                             <div class="mb-3">
                                 <label for="clientClientCertificate" class="form-label">Client Certificate</label>
-                                <input type="text" class="form-control" id="clientClientCertificate" name="client_certificate" />
+                                <input type="text" class="form-control" id="clientClientCertificate"
+                                    name="client_certificate" />
                             </div>
 
                             <div class="mb-3">
                                 <label for="clientCaCertificate" class="form-label">CA Certificate</label>
-                                <input type="text" class="form-control" id="clientCaCertificate" name="ca_certificate" />
+                                <input type="text" class="form-control" id="clientCaCertificate"
+                                    name="ca_certificate" />
                             </div>
 
                             <div class="mb-3">
@@ -173,12 +185,14 @@
 
                             <div class="mb-3">
                                 <label for="clientCertValidFrom" class="form-label">Certificate Valid From</label>
-                                <input type="text" class="form-control" id="clientCertValidFrom" name="certificate_valid_from" />
+                                <input type="text" class="form-control" id="clientCertValidFrom"
+                                    name="certificate_valid_from" />
                             </div>
 
                             <div class="mb-3">
                                 <label for="clientCertValidTo" class="form-label">Certificate Valid To</label>
-                                <input type="text" class="form-control" id="clientCertValidTo" name="certificate_valid_to" />
+                                <input type="text" class="form-control" id="clientCertValidTo"
+                                    name="certificate_valid_to" />
                             </div>
 
                             <div class="mb-3">
@@ -195,7 +209,8 @@
 
                             <div class="mb-3">
                                 <label for="clientAuthDigestAlgorithm" class="form-label">Auth Digest Algorithm</label>
-                                <input type="text" class="form-control" id="clientAuthDigestAlgorithm" name="auth_digest_algorithm" value="SHA256" />
+                                <input type="text" class="form-control" id="clientAuthDigestAlgorithm"
+                                    name="auth_digest_algorithm" value="SHA256" />
                             </div>
 
                             <div class="mb-3">
@@ -205,7 +220,8 @@
 
                             <div class="mb-3">
                                 <label for="clientCryptoHardware" class="form-label">Crypto Hardware</label>
-                                <input type="text" class="form-control" id="clientCryptoHardware" name="crypto_hardware" value="none" />
+                                <input type="text" class="form-control" id="clientCryptoHardware" name="crypto_hardware"
+                                    value="none" />
                             </div>
                         </div>
                     </div>
@@ -215,12 +231,14 @@
 
                         <div class="mb-3">
                             <label for="clientIpv4TunnelNetwork" class="form-label">IPv4 Tunnel Network</label>
-                            <input type="text" class="form-control" id="clientIpv4TunnelNetwork" name="ipv4_tunnel_network" value="10.0.8.0/24" />
+                            <input type="text" class="form-control" id="clientIpv4TunnelNetwork"
+                                name="ipv4_tunnel_network" value="10.0.8.0/24" />
                         </div>
 
                         <div class="mb-3">
                             <label for="clientIpv6TunnelNetwork" class="form-label">IPv6 Tunnel Network</label>
-                            <input type="text" class="form-control" id="clientIpv6TunnelNetwork" name="ipv6_tunnel_network" value="fe80::/64" />
+                            <input type="text" class="form-control" id="clientIpv6TunnelNetwork"
+                                name="ipv6_tunnel_network" value="fe80::/64" />
                         </div>
                     </div>
 
@@ -251,7 +269,8 @@
 
                         <div class="mb-3">
                             <label for="clientInactivityTimeout" class="form-label">Inactivity Timeout</label>
-                            <input type="text" class="form-control" id="clientInactivityTimeout" name="inactivity_timeout" value="300" />
+                            <input type="text" class="form-control" id="clientInactivityTimeout"
+                                name="inactivity_timeout" value="300" />
                         </div>
 
                         <div class="mb-3">
@@ -264,12 +283,14 @@
 
                         <div class="mb-3">
                             <label for="clientPingInterval" class="form-label">Ping Interval</label>
-                            <input type="text" class="form-control" id="clientPingInterval" name="ping_interval" value="10" />
+                            <input type="text" class="form-control" id="clientPingInterval" name="ping_interval"
+                                value="10" />
                         </div>
 
                         <div class="mb-3">
                             <label for="clientPingTimeout" class="form-label">Ping Timeout</label>
-                            <input type="text" class="form-control" id="clientPingTimeout" name="ping_timeout" value="60" />
+                            <input type="text" class="form-control" id="clientPingTimeout" name="ping_timeout"
+                                value="60" />
                         </div>
                     </div>
 
@@ -278,19 +299,22 @@
 
                         <div class="mb-3">
                             <label for="clientCustomOptions" class="form-label">Custom Options</label>
-                            <textarea class="form-control" id="clientCustomOptions" name="custom_options" rows="4"></textarea>
+                            <textarea class="form-control" id="clientCustomOptions" name="custom_options"
+                                rows="4"></textarea>
                         </div>
 
                         <div class="mb-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="clientUdpFastIo" name="udp_fast_io" />
+                                <input class="form-check-input" type="checkbox" id="clientUdpFastIo"
+                                    name="udp_fast_io" />
                                 <label class="form-check-label" for="clientUdpFastIo">Enable UDP Fast I/O</label>
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label for="clientSendReceiveBuffer" class="form-label">Send/Receive Buffer</label>
-                            <input type="text" class="form-control" id="clientSendReceiveBuffer" name="send_receive_buffer" value="default" />
+                            <input type="text" class="form-control" id="clientSendReceiveBuffer"
+                                name="send_receive_buffer" value="default" />
                         </div>
 
                         <div class="mb-3">
@@ -312,10 +336,143 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary">Save Client</button>
+                <button type="button" class="btn btn-primary" id="saveClientBtn">Save Client</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Load clients on page load
+        loadOpenVPNClients();
+
+        // Handle Save Client button
+        document.getElementById('saveClientBtn').addEventListener('click', function () {
+            const formData = {
+                description: document.getElementById('clientDescription').value,
+                disabled: document.getElementById('clientDisabled').checked,
+                server_mode: document.getElementById('clientServerMode').value,
+                protocol: document.getElementById('clientProtocol').value,
+                interface: document.getElementById('clientInterface').value,
+                server_hostname: document.getElementById('clientServerHostname').value,
+                server_port: parseInt(document.getElementById('clientServerPort').value) || 1194,
+                use_tls_key: document.getElementById('clientUseTlsKey').checked,
+                tls_key: document.getElementById('clientTlsKey').value,
+                inactivity_timeout: parseInt(document.getElementById('clientInactivityTimeout').value) || 300,
+                ping_method: document.getElementById('clientPingMethod').value,
+                ping_interval: parseInt(document.getElementById('clientPingInterval').value) || 10,
+                ping_timeout: parseInt(document.getElementById('clientPingTimeout').value) || 60,
+                custom_options: document.getElementById('clientCustomOptions').value,
+                udp_fast_io: document.getElementById('clientUdpFastIo').checked,
+                send_receive_buffer: document.getElementById('clientSendReceiveBuffer').value,
+                verbosity_level: parseInt(document.getElementById('clientVerbosityLevel').value) || 3
+            };
+
+            fetch('/vpn/api/openvpn/save-client', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('OpenVPN client saved successfully!');
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('openvpnAddClientModal'));
+                        modal.hide();
+                        loadOpenVPNClients();
+                        // Clear form
+                        document.querySelector('#openvpnAddClientModal form').reset();
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving OpenVPN client');
+                });
+        });
+    });
+
+    function loadOpenVPNClients() {
+        fetch('/vpn/api/openvpn/get-clients')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    displayOpenVPNClients(data.clients);
+                } else {
+                    console.error('Error loading clients:', data.message);
+                    document.getElementById('openvpnClientsTable').innerHTML =
+                        '<tr><td colspan="6" class="text-muted py-5 text-center">Error loading clients</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('openvpnClientsTable').innerHTML =
+                    '<tr><td colspan="6" class="text-muted py-5 text-center">Error loading clients</td></tr>';
+            });
+    }
+
+    function displayOpenVPNClients(clients) {
+        const tbody = document.getElementById('openvpnClientsTable');
+
+        if (!clients || clients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted py-5 text-center">No OpenVPN clients configured.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        clients.forEach(client => {
+            const row = document.createElement('tr');
+            const statusClass = client.disabled ? 'text-muted' : '';
+            const statusBadge = client.disabled ? '<span class="badge bg-secondary ms-2">Disabled</span>' : '';
+
+            row.innerHTML = `
+            <td class="${statusClass}">${client.protocol.toUpperCase()} / ${client.server_port}</td>
+            <td class="${statusClass}">${client.interface.toUpperCase()}</td>
+            <td class="${statusClass}">${client.server_hostname || '-'}</td>
+            <td class="${statusClass}">${client.server_mode}</td>
+            <td class="${statusClass}">${client.description || '-'}${statusBadge}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editClient(${client.id})" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteClient(${client.id})" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function editClient(clientId) {
+        alert('Edit functionality coming soon. Client ID: ' + clientId);
+    }
+
+    function deleteClient(clientId) {
+        if (!confirm('Are you sure you want to delete this OpenVPN client?')) {
+            return;
+        }
+
+        fetch(`/vpn/api/openvpn/delete-client/${clientId}`, {
+            method: 'DELETE'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('OpenVPN client deleted successfully!');
+                    loadOpenVPNClients();
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting client');
+            });
+    }
+</script>
+
 {% endblock %}

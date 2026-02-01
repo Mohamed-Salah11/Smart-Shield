@@ -7,16 +7,20 @@
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
-    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+        <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}"
+            href="{{ url_for('vpn.openvpn') }}">Servers</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}"
+            href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client
+            Specific Overrides</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}"
+            href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
     </li>
 </ul>
 
@@ -28,7 +32,8 @@
             <div class="card-body p-4">
                 <h4 class="mb-3">OpenVPN Remote Access Server Setup</h4>
                 <p class="mb-2">This wizard will provide guidance through an OpenVPN Remote Access Server Setup.</p>
-                <p class="mb-0">The wizard may be stopped at any time by clicking the logo image at the top of the screen.</p>
+                <p class="mb-0">The wizard may be stopped at any time by clicking the logo image at the top of the
+                    screen.</p>
             </div>
         </div>
 
@@ -46,15 +51,47 @@
                             <option value="ldap">LDAP</option>
                             <option value="radius">RADIUS</option>
                         </select>
-                        <small class="text-muted">NOTE: If unsure, leave this set to &quot;Local User Access.&quot;</small>
+                        <small class="text-muted">NOTE: If unsure, leave this set to &quot;Local User
+                            Access.&quot;</small>
                     </div>
                 </div>
 
                 <div class="mt-4">
-                    <a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step2') }}">Next</a>
+                    <a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step2') }}"
+                        id="nextStepBtn">Next</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Save auth type before proceeding
+        document.getElementById('nextStepBtn').addEventListener('click', function (e) {
+            e.preventDefault();
+
+            const authType = document.getElementById('wizTypeOfServer').value;
+
+            fetch('/vpn/api/wizard/save-auth-type', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type_of_server: authType })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.href = "{{ url_for('vpn.openvpn_wizards_step2') }}";
+                    } else {
+                        alert('Error saving authentication type: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving authentication type');
+                });
+        });
+    });
+</script>
+
 {% endblock %}
