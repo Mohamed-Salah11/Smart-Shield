@@ -53,7 +53,7 @@
 					<tr>
 						<th class="align-middle ipsec-log-label">{{ label }}</th>
 						<td>
-							<select class="form-select" aria-label="{{ label }} logging level">
+							<select class="form-select ipsec-log-select" aria-label="{{ label }} logging level" data-log-key="{{ label|lower|replace(' ', '_')|replace('#', '') }}">
 								<option selected>Control</option>
 								<option>Silent</option>
 								<option>Audit</option>
@@ -83,7 +83,7 @@
 					<div class="fw-semibold">Configure Unique IDs as</div>
 				</div>
 				<div class="col-md-8">
-					<select class="form-select" aria-label="Configure Unique IDs as">
+					<select class="form-select" aria-label="Configure Unique IDs as" id="uniqueIds">
 						<option selected>Yes (Replace)</option>
 						<option>No</option>
 						<option>Never</option>
@@ -100,7 +100,7 @@
 					<div class="fw-semibold">IPsec Filter Mode</div>
 				</div>
 				<div class="col-md-8">
-					<select class="form-select" aria-label="IPsec Filter Mode">
+					<select class="form-select" aria-label="IPsec Filter Mode" id="ipsecFilterMode">
 						<option selected>Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)</option>
 						<option>Filter [IPsec VTI and Transport on assigned interfaces, block all tunnel mode traffic]</option>
 					</select>
@@ -184,7 +184,7 @@
 					<div class="fw-semibold">Maximum IKEv1 Phase 2 Exchanges</div>
 				</div>
 				<div class="col-md-8">
-					<input type="number" class="form-control" value="3" min="1" name="max_ikev1_phase2_exchanges" />
+					<input type="number" class="form-control" value="3" min="1" name="max_ikev1_phase2_exchanges" id="maxIkev1Phase2Exchanges" />
 					<div class="form-text">IKEv1 phase 2 rekeying for one VPN gateway can be initiated in parallel. By default only 3 parallel rekeys are allowed. Undersized values can break VPN connections with many phase 2 definitions. If unsure, set this value to match the largest number of phase 2 entries on any phase 1.</div>
 				</div>
 			</div>
@@ -222,7 +222,7 @@
 					<div class="fw-semibold">FQDN Endpoints Resolve Interval</div>
 				</div>
 				<div class="col-md-8">
-					<input type="number" class="form-control" value="60" min="1" name="fqdn_endpoints_resolve_interval" />
+					<input type="number" class="form-control" value="60" min="1" name="fqdn_endpoints_resolve_interval" id="fqdnResolveInterval" />
 					<div class="form-text">Interval, in seconds, that will be used to resolve FQDN remote gateways.</div>
 				</div>
 			</div>
@@ -260,10 +260,10 @@
 				<div class="col-md-8">
 					<div class="row g-3">
 						<div class="col-md-6">
-							<input type="text" class="form-control" placeholder="IKE port" name="custom_ike_port" />
+							<input type="text" class="form-control" placeholder="IKE port" name="custom_ike_port" id="customIkePort" />
 						</div>
 						<div class="col-md-6">
-							<input type="text" class="form-control" placeholder="NAT-T port" name="custom_nat_t_port" />
+							<input type="text" class="form-control" placeholder="NAT-T port" name="custom_nat_t_port" id="customNatTPort" />
 						</div>
 					</div>
 					<div class="form-text"><strong>IKE port</strong> - Local UDP port for IKE (Default: 500)<br /><strong>NAT-T port</strong> - Local UDP port for NAT-T (Default: 4500)</div>
@@ -299,9 +299,174 @@
 			</div>
 
 			<div class="mt-3">
-				<button type="button" class="btn btn-primary">Save</button>
+				<button type="button" class="btn btn-primary" id="ipsecAdvancedSaveBtn">Save</button>
 			</div>
 		</div>
 	</div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	loadIpsecAdvancedSettings();
+	const btn = document.getElementById('ipsecAdvancedSaveBtn');
+	if (btn) btn.addEventListener('click', saveIpsecAdvancedSettings);
+});
+
+function setCheck(id, value) {
+	const el = document.getElementById(id);
+	if (el) el.checked = !!value;
+}
+
+function getCheck(id) {
+	const el = document.getElementById(id);
+	return el ? !!el.checked : false;
+}
+
+function loadIpsecAdvancedSettings() {
+	fetch('/vpn/api/ipsec/advanced-settings')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load IPsec advanced settings');
+			const s = json.settings || {};
+
+			// logging controls
+			const map = {
+				daemon: 'log_daemon',
+				sa_manager: 'log_sa_manager',
+				ike_sa: 'log_ike_sa',
+				ike_child_sa: 'log_ike_child_sa',
+				job_processing: 'log_job_processing',
+				configuration_backend: 'log_config_backend',
+				kernel_interface: 'log_kernel_interface',
+				networking: 'log_networking',
+				asn_encoding: 'log_asn_encoding',
+				message_encoding: 'log_message_encoding',
+				integrity_checker: 'log_integrity_checker',
+				integrity_verifier: 'log_integrity_verifier',
+				platform_trust_service: 'log_platform_trust_service',
+				tls_handler: 'log_tls_handler',
+				ipsec_traffic: 'log_ipsec_traffic',
+				strongswan_lib: 'log_strongswan_lib',
+			};
+
+			document.querySelectorAll('.ipsec-log-select').forEach(sel => {
+				const k = sel.getAttribute('data-log-key') || '';
+				const normalized = k.replace(/__+/g, '_');
+				const col = map[normalized];
+				if (col && s[col]) sel.value = s[col];
+			});
+
+			if (s.unique_ids) document.getElementById('uniqueIds').value = s.unique_ids;
+			if (s.ipsec_filter_mode) document.getElementById('ipsecFilterMode').value = s.ipsec_filter_mode;
+
+			setCheck('ikev2Retransmission', s.ikev2_retransmission);
+			setCheck('ipCompression', s.ip_compression);
+			setCheck('pkcs11Support', s.pkcs11_support);
+			setCheck('strictInterfaceBinding', s.strict_interface_binding);
+			setCheck('ikev1Unencrypted', s.ikev1_unencrypted_payloads);
+			if (document.getElementById('maxIkev1Phase2Exchanges')) {
+				document.getElementById('maxIkev1Phase2Exchanges').value = s.max_ikev1_phase2_exchanges ?? 3;
+			}
+			setCheck('enableCiscoExtensions', s.enable_cisco_extensions);
+			setCheck('strictCrlChecking', s.strict_crl_checking);
+			if (document.getElementById('fqdnResolveInterval')) {
+				document.getElementById('fqdnResolveInterval').value = s.fqdn_endpoints_resolve_interval ?? 60;
+			}
+			setCheck('makeBeforeBreak', s.make_before_break);
+			setCheck('asyncCryptography', s.asynchronous_cryptography);
+			if (document.getElementById('customIkePort')) document.getElementById('customIkePort').value = s.custom_ike_port || '';
+			if (document.getElementById('customNatTPort')) document.getElementById('customNatTPort').value = s.custom_nat_t_port || '';
+			setCheck('autoExcludeLan', s.auto_exclude_lan_address);
+			setCheck('additionalIpsecBypass', s.additional_ipsec_bypass);
+		})
+		.catch(err => console.error('Load advanced settings failed:', err));
+}
+
+function saveIpsecAdvancedSettings() {
+	const payload = {
+		// logging controls
+		log_daemon: 'Control',
+		log_sa_manager: 'Control',
+		log_ike_sa: 'Control',
+		log_ike_child_sa: 'Control',
+		log_job_processing: 'Control',
+		log_config_backend: 'Control',
+		log_kernel_interface: 'Control',
+		log_networking: 'Control',
+		log_asn_encoding: 'Control',
+		log_message_encoding: 'Control',
+		log_integrity_checker: 'Control',
+		log_integrity_verifier: 'Control',
+		log_platform_trust_service: 'Control',
+		log_tls_handler: 'Control',
+		log_ipsec_traffic: 'Control',
+		log_strongswan_lib: 'Control',
+
+		unique_ids: document.getElementById('uniqueIds')?.value || 'Yes (Replace)',
+		ipsec_filter_mode: document.getElementById('ipsecFilterMode')?.value || 'Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)',
+		ikev2_retransmission: getCheck('ikev2Retransmission'),
+		ip_compression: getCheck('ipCompression'),
+		pkcs11_support: getCheck('pkcs11Support'),
+		strict_interface_binding: getCheck('strictInterfaceBinding'),
+		ikev1_unencrypted_payloads: getCheck('ikev1Unencrypted'),
+		max_ikev1_phase2_exchanges: parseInt(document.getElementById('maxIkev1Phase2Exchanges')?.value || '3', 10),
+		enable_cisco_extensions: getCheck('enableCiscoExtensions'),
+		strict_crl_checking: getCheck('strictCrlChecking'),
+		fqdn_endpoints_resolve_interval: parseInt(document.getElementById('fqdnResolveInterval')?.value || '60', 10),
+		make_before_break: getCheck('makeBeforeBreak'),
+		asynchronous_cryptography: getCheck('asyncCryptography'),
+		custom_ike_port: document.getElementById('customIkePort')?.value || '',
+		custom_nat_t_port: document.getElementById('customNatTPort')?.value || '',
+		auto_exclude_lan_address: getCheck('autoExcludeLan'),
+		additional_ipsec_bypass: getCheck('additionalIpsecBypass'),
+	};
+
+	// map select values back to payload based on their label keys
+	const map = {
+		daemon: 'log_daemon',
+		sa_manager: 'log_sa_manager',
+		ike_sa: 'log_ike_sa',
+		ike_child_sa: 'log_ike_child_sa',
+		job_processing: 'log_job_processing',
+		configuration_backend: 'log_config_backend',
+		kernel_interface: 'log_kernel_interface',
+		networking: 'log_networking',
+		asn_encoding: 'log_asn_encoding',
+		message_encoding: 'log_message_encoding',
+		integrity_checker: 'log_integrity_checker',
+		integrity_verifier: 'log_integrity_verifier',
+		platform_trust_service: 'log_platform_trust_service',
+		tls_handler: 'log_tls_handler',
+		ipsec_traffic: 'log_ipsec_traffic',
+		strongswan_lib: 'log_strongswan_lib',
+	};
+
+	document.querySelectorAll('.ipsec-log-select').forEach(sel => {
+		const k = (sel.getAttribute('data-log-key') || '').replace(/__+/g, '_');
+		const col = map[k];
+		if (col) payload[col] = sel.value;
+	});
+
+	fetch('/vpn/api/ipsec/advanced-settings', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	})
+		.then(r => r.json())
+		.then(json => {
+			if (!json.success) {
+				alert(json.error || 'Failed to save');
+				return;
+			}
+			alert('Saved successfully');
+		})
+		.catch(err => {
+			console.error(err);
+			alert(err.message || String(err));
+		});
+}
+</script>
 {% endblock %}

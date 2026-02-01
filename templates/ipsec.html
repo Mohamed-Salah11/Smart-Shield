@@ -39,9 +39,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<tr>
-					<td colspan="9" class="text-center text-muted py-5">No IPsec tunnels configured.</td>
-				</tr>
+				<!-- rows injected by JS -->
 			</tbody>
 		</table>
 
@@ -378,10 +376,234 @@
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-				<button type="button" class="btn btn-primary">Save P1 Configuration</button>
+				<button type="button" class="btn btn-primary" id="ipsecSaveP1Btn">Save P1 Configuration</button>
 			</div>
 		</div>
 	</div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+	loadIpsecP1();
+	const saveBtn = document.getElementById('ipsecSaveP1Btn');
+	if (saveBtn) saveBtn.addEventListener('click', saveIpsecP1);
+});
+
+function escapeHtml(text) {
+	if (!text) return '';
+	const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+	return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
+
+function algoSummary(algos) {
+	if (!algos || algos.length === 0) return '-';
+	return algos.map(a => {
+		const enc = a.encryption || '';
+		const kl = a.key_length ? `${a.key_length}` : '';
+		const h = a.hash || '';
+		return [enc, kl && `${kl}b`, h].filter(Boolean).join('-');
+	}).join(', ');
+}
+
+function dhSummary(algos) {
+	if (!algos || algos.length === 0) return '-';
+	// show first dh group
+	return algos[0].dh_group || '-';
+}
+
+function renderIpsecP1(tunnels) {
+	const tbody = document.querySelector('.openvpn-section-body table tbody');
+	if (!tbody) return;
+	if (!tunnels || tunnels.length === 0) {
+		tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-5">No IPsec tunnels configured.</td></tr>`;
+		return;
+	}
+	window.__ipsecP1Cache = tunnels;
+	const rows = tunnels.map(t => {
+		const authMode = t.auth_method || '-';
+		const ike = (t.ike_version || '').toUpperCase();
+		const transforms = algoSummary(t.algorithms);
+		const dh = dhSummary(t.algorithms);
+		const p1Proto = (t.internet_protocol || '').toUpperCase();
+		return `
+		<tr>
+			<td>${t.id}</td>
+			<td>${escapeHtml(ike)}</td>
+			<td>${escapeHtml(t.remote_gateway || '')}</td>
+			<td>${escapeHtml(authMode)}</td>
+			<td>${escapeHtml(p1Proto)}</td>
+			<td>${escapeHtml(transforms)}</td>
+			<td>${escapeHtml(dh)}</td>
+			<td>${escapeHtml(t.description || '')}</td>
+			<td>
+				<div class="d-grid gap-2">
+					<button type="button" class="btn btn-sm btn-secondary" onclick="editIpsecP1(${t.id})">Edit</button>
+					<button type="button" class="btn btn-sm btn-danger" onclick="deleteIpsecP1(${t.id})">Delete</button>
+				</div>
+			</td>
+		</tr>
+		`;
+	}).join('');
+	tbody.innerHTML = rows;
+}
+
+function loadIpsecP1() {
+	fetch('/vpn/api/ipsec/p1')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load IPsec tunnels');
+			renderIpsecP1(json.tunnels || []);
+		})
+		.catch(err => console.error('Error loading IPsec tunnels:', err));
+}
+
+function collectAlgorithms() {
+	const container = document.getElementById('algorithmsContainer');
+	if (!container) return [];
+	const encEls = container.querySelectorAll('.algorithm-encryption');
+	const keyEls = container.querySelectorAll('.algorithm-keylength');
+	const hashEls = container.querySelectorAll('.algorithm-hash');
+	const dhEls = container.querySelectorAll('.algorithm-dhgroup');
+	const out = [];
+	for (let i = 0; i < encEls.length; i++) {
+		out.push({
+			encryption: encEls[i].value,
+			key_length: parseInt(keyEls[i].value, 10),
+			hash: hashEls[i].value,
+			dh_group: dhEls[i].value,
+		});
+	}
+	return out;
+}
+
+function saveIpsecP1() {
+	const payload = {
+		description: document.getElementById('ipsecP1Description')?.value || '',
+		disabled: document.getElementById('ipsecP1Disabled')?.checked || false,
+		ike_version: document.getElementById('keyExchange')?.value || 'ikev2',
+		internet_protocol: document.getElementById('protocol')?.value || 'ipv4',
+		interface: document.getElementById('interface')?.value || 'wan',
+		remote_gateway: document.getElementById('ipsecP1RemoteGateway')?.value || '',
+		auth_method: document.getElementById('authMethod')?.value || 'mutual-psk',
+		my_identifier: document.getElementById('myIdentifier')?.value || 'my-ip',
+		peer_identifier: document.getElementById('peerIdentifier')?.value || 'peer-ip',
+		pre_shared_key: document.getElementById('ipsecP1PreSharedKey')?.value || '',
+		p1_life_time: parseInt(document.getElementById('ipsecP1LifeTime')?.value || '28800', 10),
+		p1_rekey_time: parseInt(document.getElementById('ipsecP1RekeyTime')?.value || '25920', 10),
+		p1_reauth_time: parseInt(document.getElementById('ipsecP1ReauthTime')?.value || '0', 10),
+		p1_rand_time: parseInt(document.getElementById('ipsecP1RandTime')?.value || '2880', 10),
+		child_sa_start_action: document.getElementById('ipsecP1ChildSaStartAction')?.value || 'default',
+		child_sa_close_action: document.getElementById('ipsecP1ChildSaCloseAction')?.value || 'default',
+		nat_traversal: document.getElementById('ipsecP1NatTraversal')?.value || 'auto',
+		mobike: document.getElementById('ipsecP1Mobike')?.value || 'disable',
+		gateway_duplicates: document.getElementById('ipsecP1GatewayDuplicates')?.checked || false,
+		split_connections: document.getElementById('ipsecP1SplitConnections')?.checked || false,
+		prf_selection: document.getElementById('ipsecP1PrfSelection')?.checked || false,
+		remote_ike_port: document.getElementById('ipsecP1RemoteIkePort')?.value || '',
+		remote_nat_t_port: document.getElementById('ipsecP1RemoteNatTPort')?.value || '',
+		dpd_enable: document.getElementById('ipsecP1DpdEnable')?.checked ?? true,
+		dpd_delay: parseInt(document.getElementById('ipsecP1DpdDelay')?.value || '10', 10),
+		dpd_max_failures: parseInt(document.getElementById('ipsecP1DpdMaxFailures')?.value || '5', 10),
+		algorithms: collectAlgorithms(),
+	};
+
+	if (!payload.remote_gateway.trim()) {
+		alert('Remote Gateway is required');
+		return;
+	}
+
+	fetch('/vpn/api/ipsec/p1', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	}).then(r => r.json()).then(json => {
+		if (!json.success) {
+			alert(json.error || 'Failed to save P1');
+			return;
+		}
+		const modalEl = document.getElementById('ipsecAddP1Modal');
+		const modal = bootstrap.Modal.getInstance(modalEl);
+		if (modal) modal.hide();
+		loadIpsecP1();
+	}).catch(err => {
+		console.error(err);
+		alert(err.message || String(err));
+	});
+}
+
+function editIpsecP1(id) {
+	const tunnels = window.__ipsecP1Cache || [];
+	const t = tunnels.find(x => x.id === id);
+	if (!t) return;
+
+	// Prefill the modal with existing values (edit is UI-only for now; saving still creates a new entry)
+	document.getElementById('ipsecP1Description').value = t.description || '';
+	document.getElementById('ipsecP1Disabled').checked = !!t.disabled;
+	if (t.ike_version) document.getElementById('keyExchange').value = t.ike_version;
+	if (t.internet_protocol) document.getElementById('protocol').value = t.internet_protocol;
+	if (t.interface) document.getElementById('interface').value = t.interface;
+	document.getElementById('ipsecP1RemoteGateway').value = t.remote_gateway || '';
+	if (t.auth_method) document.getElementById('authMethod').value = t.auth_method;
+	if (t.my_identifier) document.getElementById('myIdentifier').value = t.my_identifier;
+	if (t.peer_identifier) document.getElementById('peerIdentifier').value = t.peer_identifier;
+	document.getElementById('ipsecP1PreSharedKey').value = t.pre_shared_key || '';
+	document.getElementById('ipsecP1LifeTime').value = t.p1_life_time ?? 28800;
+	document.getElementById('ipsecP1RekeyTime').value = t.p1_rekey_time ?? 25920;
+	document.getElementById('ipsecP1ReauthTime').value = t.p1_reauth_time ?? 0;
+	document.getElementById('ipsecP1RandTime').value = t.p1_rand_time ?? 2880;
+	if (t.child_sa_start_action) document.getElementById('ipsecP1ChildSaStartAction').value = t.child_sa_start_action;
+	if (t.child_sa_close_action) document.getElementById('ipsecP1ChildSaCloseAction').value = t.child_sa_close_action;
+	if (t.nat_traversal) document.getElementById('ipsecP1NatTraversal').value = t.nat_traversal;
+	if (t.mobike) document.getElementById('ipsecP1Mobike').value = t.mobike;
+	document.getElementById('ipsecP1GatewayDuplicates').checked = !!t.gateway_duplicates;
+	document.getElementById('ipsecP1SplitConnections').checked = !!t.split_connections;
+	document.getElementById('ipsecP1PrfSelection').checked = !!t.prf_selection;
+	document.getElementById('ipsecP1RemoteIkePort').value = t.remote_ike_port || '';
+	document.getElementById('ipsecP1RemoteNatTPort').value = t.remote_nat_t_port || '';
+	document.getElementById('ipsecP1DpdEnable').checked = t.dpd_enable === 0 ? false : true;
+	document.getElementById('ipsecP1DpdDelay').value = t.dpd_delay ?? 10;
+	document.getElementById('ipsecP1DpdMaxFailures').value = t.dpd_max_failures ?? 5;
+
+	// Algorithms: only set first row if present (keeps behavior simple)
+	if (t.algorithms && t.algorithms.length > 0) {
+		const a = t.algorithms[0];
+		const container = document.getElementById('algorithmsContainer');
+		if (container) {
+			const encEl = container.querySelector('.algorithm-encryption');
+			const keyEl = container.querySelector('.algorithm-keylength');
+			const hashEl = container.querySelector('.algorithm-hash');
+			const dhEl = container.querySelector('.algorithm-dhgroup');
+			if (encEl && a.encryption) encEl.value = a.encryption;
+			if (keyEl && a.key_length) keyEl.value = a.key_length;
+			if (hashEl && a.hash) hashEl.value = a.hash;
+			if (dhEl && a.dh_group) dhEl.value = a.dh_group;
+		}
+	}
+
+	const modalEl = document.getElementById('ipsecAddP1Modal');
+	const modal = new bootstrap.Modal(modalEl);
+	modal.show();
+}
+
+function deleteIpsecP1(id) {
+	if (!confirm('Delete this IPsec P1 tunnel?')) return;
+	fetch(`/vpn/api/ipsec/p1/${id}`, { method: 'DELETE' })
+		.then(r => r.json())
+		.then(json => {
+			if (!json.success) {
+				alert(json.error || 'Failed to delete');
+				return;
+			}
+			loadIpsecP1();
+		})
+		.catch(err => {
+			console.error(err);
+			alert(err.message || String(err));
+		});
+}
+</script>
 {% endblock %}
 

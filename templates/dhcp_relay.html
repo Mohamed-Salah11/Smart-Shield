@@ -88,6 +88,46 @@ LAN</textarea>
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+	loadDHCPRelaySettings();
+});
+
+function setUpstreamServersList(servers) {
+	const list = document.getElementById('upstream-servers-list');
+	list.innerHTML = '';
+	(servers || []).forEach(server => {
+		const serverEntry = document.createElement('div');
+		serverEntry.className = 'd-flex gap-2 mb-2';
+		serverEntry.innerHTML = `
+			<input type="text" class="form-control" value="${escapeHtml(server)}" readonly style="max-width: 400px;">
+			<button type="button" class="btn btn-danger btn-sm" onclick="deleteUpstreamServer(this)">Delete</button>
+		`;
+		list.appendChild(serverEntry);
+	});
+}
+
+function loadDHCPRelaySettings() {
+	fetch('/services/api/dhcp-relay')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load DHCP Relay settings');
+			const s = json.settings || {};
+
+			document.getElementById('enable-dhcp-relay').checked = !!s.enabled;
+			document.getElementById('downstream-interfaces').value = s.downstream_interfaces || '';
+			document.getElementById('carp-status-vip').value = s.carp_status_vip || 'none';
+			document.getElementById('append-circuit-id').checked = !!s.append_circuit_id;
+
+			setUpstreamServersList(json.upstream_servers || []);
+		})
+		.catch(err => {
+			console.error('Error loading DHCP Relay settings:', err);
+		});
+}
+
 function addUpstreamServer() {
 	const input = document.getElementById('upstream-server');
 	const server = input.value.trim();
@@ -134,7 +174,32 @@ function saveDHCPRelaySettings() {
 		upstreamServers.push(input.value);
 	});
 	
-	alert('DHCP Relay settings saved!\n\nEnabled: ' + (enableRelay ? 'Yes' : 'No') + '\nDownstream Interfaces: ' + downstreamInterfaces.replace(/\n/g, ', ') + '\nUpstream Servers: ' + (upstreamServers.length > 0 ? upstreamServers.join(', ') : 'None') + '\nCARP VIP: ' + carpVIP);
+	fetch('/services/api/dhcp-relay', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			enabled: enableRelay,
+			downstream_interfaces: downstreamInterfaces,
+			carp_status_vip: carpVIP,
+			append_circuit_id: appendCircuitID,
+			upstream_servers: upstreamServers
+		})
+	}).then(r => r.json()).then(json => {
+		if (!json.success) {
+			alert(json.error || 'Failed to save DHCP Relay settings');
+			return;
+		}
+		alert('DHCP Relay settings saved!');
+	}).catch(err => {
+		console.error(err);
+		alert(err.message || String(err));
+	});
+}
+
+function escapeHtml(text) {
+	if (!text) return '';
+	const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+	return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
 </script>
 

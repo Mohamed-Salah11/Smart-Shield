@@ -33,9 +33,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<tr>
-					<td colspan="3" class="text-center text-muted py-5">No Pre-Shared Keys configured.</td>
-				</tr>
+				<!-- rows injected by JS -->
 			</tbody>
 		</table>
 
@@ -53,7 +51,7 @@
 				<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
 			</div>
 
-			<form method="post" action="#">
+			<form method="post" action="#" id="pskForm">
 				<div class="modal-body">
 					<div class="mb-3">
 						<label for="pskIdentifier" class="form-label fw-semibold">Identifier</label>
@@ -84,4 +82,129 @@
 		</div>
 	</div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	loadIpsecPsks();
+	const form = document.getElementById('pskForm');
+	if (form) form.addEventListener('submit', saveIpsecPsk);
+});
+
+function escapeHtml(text) {
+	if (!text) return '';
+	const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+	return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
+
+function renderIpsecPsks(keys) {
+	const tbody = document.querySelector('.openvpn-section-body table tbody');
+	if (!tbody) return;
+	if (!keys || keys.length === 0) {
+		tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-5">No Pre-Shared Keys configured.</td></tr>`;
+		return;
+	}
+	window.__ipsecPskCache = keys;
+	const rows = keys.map(k => `
+		<tr>
+			<td>${escapeHtml(k.identifier)}</td>
+			<td>${escapeHtml((k.secret_type || '').toUpperCase())}</td>
+			<td>
+				<div class="d-grid gap-2">
+					<button type="button" class="btn btn-sm btn-primary" onclick="editIpsecPsk(${k.id})">Edit</button>
+					<button type="button" class="btn btn-sm btn-danger" onclick="deleteIpsecPsk(${k.id})">Delete</button>
+				</div>
+			</td>
+		</tr>
+	`).join('');
+	tbody.innerHTML = rows;
+}
+
+function loadIpsecPsks() {
+	fetch('/vpn/api/ipsec/psk')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load PSKs');
+			renderIpsecPsks(json.keys || []);
+		})
+		.catch(err => console.error('Load PSKs failed:', err));
+}
+
+function saveIpsecPsk(e) {
+	e.preventDefault();
+	const payload = {
+		identifier: document.getElementById('pskIdentifier')?.value || '',
+		secret_type: document.getElementById('pskSecretType')?.value || 'psk',
+		pre_shared_key: document.getElementById('pskValue')?.value || '',
+	};
+	if (!payload.identifier.trim()) {
+		alert('Identifier is required');
+		return;
+	}
+	if (!payload.pre_shared_key.trim()) {
+		alert('Pre-Shared Key is required');
+		return;
+	}
+
+	fetch('/vpn/api/ipsec/psk', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	})
+		.then(r => r.json().then(j => ({ ok: r.ok, status: r.status, json: j })))
+		.then(({ ok, status, json }) => {
+			if (!ok || !json.success) {
+				alert(json.error || `Failed to save (HTTP ${status})`);
+				return;
+			}
+			// close modal + refresh list
+			const modalEl = document.getElementById('addPskModal');
+			const modal = bootstrap.Modal.getInstance(modalEl);
+			if (modal) modal.hide();
+			// clear inputs
+			document.getElementById('pskIdentifier').value = '';
+			document.getElementById('pskValue').value = '';
+			loadIpsecPsks();
+		})
+		.catch(err => {
+			console.error(err);
+			alert(err.message || String(err));
+		});
+}
+
+function deleteIpsecPsk(id) {
+	if (!confirm('Delete this Pre-Shared Key?')) return;
+	fetch(`/vpn/api/ipsec/psk/${id}`, { method: 'DELETE' })
+		.then(r => r.json())
+		.then(json => {
+			if (!json.success) {
+				alert(json.error || 'Failed to delete');
+				return;
+			}
+			loadIpsecPsks();
+		})
+		.catch(err => {
+			console.error(err);
+			alert(err.message || String(err));
+		});
+}
+
+function editIpsecPsk(id) {
+	// UI-only: prefill modal; saving will create a new PSK (no PUT endpoint yet)
+	const keys = window.__ipsecPskCache || [];
+	const k = keys.find(x => x.id === id);
+	if (!k) return;
+
+	document.getElementById('pskIdentifier').value = k.identifier || '';
+	if (k.secret_type) document.getElementById('pskSecretType').value = k.secret_type;
+	// don't prefill secret value for safety; user must type a new key
+	document.getElementById('pskValue').value = '';
+
+	const modalEl = document.getElementById('addPskModal');
+	const modal = new bootstrap.Modal(modalEl);
+	modal.show();
+}
+</script>
 {% endblock %}
