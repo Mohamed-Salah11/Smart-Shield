@@ -35,10 +35,10 @@
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>Port Forward Rules</h2>
                 <div>
-                    <button type="button" class="btn btn-success btn-sm" id="pf-add-top-btn" data-bs-toggle="modal" data-bs-target="#pfModal">
+                    <button type="button" class="btn btn-success btn-sm" id="pf-add-top-btn" data-position="top" data-bs-toggle="modal" data-bs-target="#pfModal">
                         <i class="fas fa-plus"></i> Add (Top)
                     </button>
-                    <button type="button" class="btn btn-success btn-sm" id="pf-add-bottom-btn" data-bs-toggle="modal" data-bs-target="#pfModal">
+                    <button type="button" class="btn btn-success btn-sm" id="pf-add-bottom-btn" data-position="bottom" data-bs-toggle="modal" data-bs-target="#pfModal">
                         <i class="fas fa-plus"></i> Add (Bottom)
                     </button>
                 </div>
@@ -81,10 +81,10 @@
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>1:1 NAT Mappings</h2>
                 <div>
-                    <button type="button" class="btn btn-success btn-sm" id="1to1-add-top-btn" data-bs-toggle="modal" data-bs-target="#oneToOneModal">
+                    <button type="button" class="btn btn-success btn-sm" id="1to1-add-top-btn" data-position="top" data-bs-toggle="modal" data-bs-target="#oneToOneModal">
                         <i class="fas fa-plus"></i> Add (Top)
                     </button>
-                    <button type="button" class="btn btn-success btn-sm" id="1to1-add-bottom-btn" data-bs-toggle="modal" data-bs-target="#oneToOneModal">
+                    <button type="button" class="btn btn-success btn-sm" id="1to1-add-bottom-btn" data-position="bottom" data-bs-toggle="modal" data-bs-target="#oneToOneModal">
                         <i class="fas fa-plus"></i> Add (Bottom)
                     </button>
                 </div>
@@ -164,10 +164,10 @@
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>Mappings</h2>
                 <div>
-                    <button type="button" class="btn btn-success btn-sm" id="outbound-add-top-btn" data-bs-toggle="modal" data-bs-target="#outboundModal">
+                    <button type="button" class="btn btn-success btn-sm" id="outbound-add-top-btn" data-position="top" data-bs-toggle="modal" data-bs-target="#outboundModal">
                         <i class="fas fa-plus"></i> Add (Top)
                     </button>
-                    <button type="button" class="btn btn-success btn-sm" id="outbound-add-bottom-btn" data-bs-toggle="modal" data-bs-target="#outboundModal">
+                    <button type="button" class="btn btn-success btn-sm" id="outbound-add-bottom-btn" data-position="bottom" data-bs-toggle="modal" data-bs-target="#outboundModal">
                         <i class="fas fa-plus"></i> Add (Bottom)
                     </button>
                 </div>
@@ -263,10 +263,10 @@
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>NPt (Network Prefix Translation)</h2>
                 <div>
-                    <button type="button" class="btn btn-success btn-sm" id="npt-add-top-btn" data-bs-toggle="modal" data-bs-target="#nptModal">
+                    <button type="button" class="btn btn-success btn-sm" id="npt-add-top-btn" data-position="top" data-bs-toggle="modal" data-bs-target="#nptModal">
                         <i class="fas fa-plus"></i> Add (Top)
                     </button>
-                    <button type="button" class="btn btn-success btn-sm" id="npt-add-bottom-btn" data-bs-toggle="modal" data-bs-target="#nptModal">
+                    <button type="button" class="btn btn-success btn-sm" id="npt-add-bottom-btn" data-position="bottom" data-bs-toggle="modal" data-bs-target="#nptModal">
                         <i class="fas fa-plus"></i> Add (Bottom)
                     </button>
                 </div>
@@ -655,15 +655,58 @@
     let outboundAddPosition = 'bottom';
     let nptAddPosition = 'bottom';
 
-    // Track add position for each type
-    document.getElementById('pf-add-top-btn').addEventListener('click', () => { pfAddPosition = 'top'; });
-    document.getElementById('pf-add-bottom-btn').addEventListener('click', () => { pfAddPosition = 'bottom'; });
-    document.getElementById('1to1-add-top-btn').addEventListener('click', () => { oneToOneAddPosition = 'top'; });
-    document.getElementById('1to1-add-bottom-btn').addEventListener('click', () => { oneToOneAddPosition = 'bottom'; });
-    document.getElementById('outbound-add-top-btn').addEventListener('click', () => { outboundAddPosition = 'top'; });
-    document.getElementById('outbound-add-bottom-btn').addEventListener('click', () => { outboundAddPosition = 'bottom'; });
-    document.getElementById('npt-add-top-btn').addEventListener('click', () => { nptAddPosition = 'top'; });
-    document.getElementById('npt-add-bottom-btn').addEventListener('click', () => { nptAddPosition = 'bottom'; });
+    // Use Bootstrap modal events to capture position from button data attribute
+    document.getElementById('pfModal').addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        if (button) {
+            pfAddPosition = button.getAttribute('data-position') || 'bottom';
+        }
+    });
+    
+    document.getElementById('oneToOneModal').addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        if (button) {
+            oneToOneAddPosition = button.getAttribute('data-position') || 'bottom';
+        }
+    });
+    
+    document.getElementById('outboundModal').addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        if (button) {
+            outboundAddPosition = button.getAttribute('data-position') || 'bottom';
+        }
+    });
+    
+    document.getElementById('nptModal').addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        if (button) {
+            nptAddPosition = button.getAttribute('data-position') || 'bottom';
+        }
+    });
+
+    // --- MOVE NAT RULE FUNCTION ---
+    async function moveNatRule(type, ruleId, direction) {
+        try {
+            const response = await fetch(`/firewall/api/nat/${type}/${ruleId}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction: direction })
+            });
+            const result = await response.json();
+            if (result.success) {
+                // Reload rules to reflect new order
+                if (type === 'pf') loadPortForwardRules();
+                else if (type === '1to1') load1to1Rules();
+                else if (type === 'outbound') loadOutboundRules();
+                else if (type === 'npt') loadNptRules();
+            } else {
+                alert('Error moving rule: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error moving rule:', error);
+            alert('Could not move rule');
+        }
+    }
 
     // --- PORT FORWARD SAVE ---
     const pfModal = document.getElementById('pfModal');
@@ -678,7 +721,8 @@
             dst_address: document.getElementById('pf_dst_address').value || '',
             redirect_ip: document.getElementById('pf_redirect_ip').value || '',
             description: document.getElementById('pf_description').value || 'New port forward rule',
-            nat_reflection: document.getElementById('pf_nat_reflection').value
+            nat_reflection: document.getElementById('pf_nat_reflection').value,
+            position: pfAddPosition
         };
 
         try {
@@ -712,7 +756,8 @@
             external_address: document.getElementById('1to1_external_address').value || '',
             internal_address: document.getElementById('1to1_internal_address').value || '',
             destination_address: 'any',
-            description: document.getElementById('1to1_description').value || 'New 1:1 NAT mapping'
+            description: document.getElementById('1to1_description').value || 'New 1:1 NAT mapping',
+            position: oneToOneAddPosition
         };
 
         try {
@@ -747,7 +792,8 @@
             src_address: document.getElementById('outbound_src_address').value || '',
             dst_address: document.getElementById('outbound_dst_address').value || 'any',
             static_port: document.getElementById('outbound_static_port').checked ? 1 : 0,
-            description: document.getElementById('outbound_description').value || 'New outbound NAT rule'
+            description: document.getElementById('outbound_description').value || 'New outbound NAT rule',
+            position: outboundAddPosition
         };
 
         try {
@@ -780,89 +826,102 @@
             interface: document.getElementById('npt_interface').value,
             src_prefix: document.getElementById('npt_src_prefix').value || 'fd00::/64',
             dst_prefix: document.getElementById('npt_dst_prefix').value || '2001:db8::/64',
-            description: document.getElementById('npt_description').value || 'New NPt mapping'
+            description: document.getElementById('npt_description').value || 'New NPt mapping',
+            position: nptAddPosition
         };
 
-        // For now, add locally (can be extended for API call)
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><input type="checkbox"></td>
-            <td>${ruleData.interface}</td>
-            <td>${ruleData.src_prefix}</td>
-            <td>${ruleData.dst_prefix}</td>
-            <td>${ruleData.description}</td>
-            <td>
-                <button class="btn btn-sm btn-primary">Edit</button>
-                <button class="btn btn-sm btn-danger">Delete</button>
-            </td>
-        `;
+        try {
+            const response = await fetch('/firewall/api/nat/npt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ruleData)
+            });
 
-        if (nptAddPosition === 'top') {
-            nptTbody.insertBefore(row, nptTbody.firstChild);
-        } else {
-            nptTbody.appendChild(row);
+            const result = await response.json();
+            if (result.success) {
+                alert('NPt mapping saved successfully!');
+                bootstrap.Modal.getInstance(nptModal).hide();
+                document.getElementById('nptRuleForm').reset();
+                loadNptRules();
+            } else {
+                alert('Error saving mapping: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Could not connect to the backend server.');
         }
-
-        bootstrap.Modal.getInstance(nptModal).hide();
-        document.getElementById('nptRuleForm').reset();
     });
 
     // --- DELETE BUTTONS ---
-    document.getElementById('pf-delete-btn').addEventListener('click', () => {
+    document.getElementById('pf-delete-btn').addEventListener('click', async () => {
         const checkboxes = pfTbody.querySelectorAll('input[type="checkbox"]:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one rule to delete');
             return;
         }
         if (confirm(`Are you sure you want to delete ${checkboxes.length} rule(s)?`)) {
-            checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            for (const checkbox of checkboxes) {
+                const row = checkbox.closest('tr');
+                const ruleId = row.dataset.ruleId;
+                if (ruleId) {
+                    await fetch(`/firewall/api/nat/pf/${ruleId}`, { method: 'DELETE' });
+                }
+            }
+            loadPortForwardRules();
         }
     });
 
-    document.getElementById('1to1-delete-btn').addEventListener('click', () => {
+    document.getElementById('1to1-delete-btn').addEventListener('click', async () => {
         const checkboxes = oneToOneTbody.querySelectorAll('input[type="checkbox"]:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one mapping to delete');
             return;
         }
         if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
-            checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            for (const checkbox of checkboxes) {
+                const row = checkbox.closest('tr');
+                const ruleId = row.dataset.ruleId;
+                if (ruleId) {
+                    await fetch(`/firewall/api/nat/1to1/${ruleId}`, { method: 'DELETE' });
+                }
+            }
+            load1to1Rules();
         }
     });
 
-    document.getElementById('outbound-delete-btn').addEventListener('click', () => {
+    document.getElementById('outbound-delete-btn').addEventListener('click', async () => {
         const checkboxes = outboundTbody.querySelectorAll('input[type="checkbox"]:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one mapping to delete');
             return;
         }
         if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
-            checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
+            for (const checkbox of checkboxes) {
+                const row = checkbox.closest('tr');
+                const ruleId = row.dataset.ruleId;
+                if (ruleId) {
+                    await fetch(`/firewall/api/nat/outbound/${ruleId}`, { method: 'DELETE' });
+                }
+            }
+            loadOutboundRules();
         }
     });
 
-    document.getElementById('npt-delete-btn').addEventListener('click', () => {
+    document.getElementById('npt-delete-btn').addEventListener('click', async () => {
         const checkboxes = nptTbody.querySelectorAll('input[type="checkbox"]:checked');
         if (checkboxes.length === 0) {
             alert('Please select at least one mapping to delete');
             return;
         }
         if (confirm(`Are you sure you want to delete ${checkboxes.length} mapping(s)?`)) {
-            checkboxes.forEach(checkbox => checkbox.closest('tr').remove());
-        }
-    });
-
-    // Handle individual delete buttons in all tables
-    [pfTbody, oneToOneTbody, outboundTbody, nptTbody].forEach(tbody => {
-        if (tbody) {
-            tbody.addEventListener('click', (e) => {
-                if (e.target.classList.contains('btn-danger') || e.target.closest('.btn-danger')) {
-                    const btn = e.target.classList.contains('btn-danger') ? e.target : e.target.closest('.btn-danger');
-                    if (confirm('Are you sure you want to delete this entry?')) {
-                        btn.closest('tr').remove();
-                    }
+            for (const checkbox of checkboxes) {
+                const row = checkbox.closest('tr');
+                const ruleId = row.dataset.ruleId;
+                if (ruleId) {
+                    await fetch(`/firewall/api/nat/npt/${ruleId}`, { method: 'DELETE' });
                 }
-            });
+            }
+            loadNptRules();
         }
     });
 
@@ -888,8 +947,10 @@
                         <td>*</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editNatRule('pf', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('pf', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('pf', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('pf', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('pf', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('pf', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     pfTbody.appendChild(row);
@@ -917,8 +978,10 @@
                         <td>${rule.destination_address || '*'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editNatRule('1to1', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('1to1', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('1to1', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('1to1', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('1to1', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('1to1', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     oneToOneTbody.appendChild(row);
@@ -950,8 +1013,10 @@
                         <td>${rule.static_port ? 'Yes' : 'No'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editNatRule('outbound', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('outbound', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('outbound', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('outbound', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('outbound', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('outbound', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     outboundTbody.appendChild(row);
@@ -977,6 +1042,7 @@
                 if (type === 'pf') loadPortForwardRules();
                 else if (type === '1to1') load1to1Rules();
                 else if (type === 'outbound') loadOutboundRules();
+                else if (type === 'npt') loadNptRules();
             } else {
                 alert('Error deleting rule: ' + result.error);
             }
@@ -991,10 +1057,42 @@
         alert(`Edit ${type} NAT rule #${ruleId} - Feature coming soon!`);
     }
 
+    // Load NPt rules from database
+    async function loadNptRules() {
+        try {
+            const response = await fetch('/firewall/api/nat/npt');
+            const result = await response.json();
+            if (result.success && result.rules) {
+                nptTbody.innerHTML = '';
+                result.rules.forEach(rule => {
+                    const row = document.createElement('tr');
+                    row.dataset.ruleId = rule.id;
+                    row.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.src_prefix || ''}</td>
+                        <td>${rule.dst_prefix || ''}</td>
+                        <td>${rule.description || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('npt', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveNatRule('npt', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editNatRule('npt', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteNatRule('npt', ${rule.id})"><i class="fas fa-trash"></i></button>
+                        </td>
+                    `;
+                    nptTbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading NPt rules:', error);
+        }
+    }
+
     // Load all NAT rules on page load
     loadPortForwardRules();
     load1to1Rules();
     loadOutboundRules();
+    loadNptRules();
 </script>
 
 {% endblock %}
