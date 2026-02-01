@@ -161,9 +161,94 @@
 			</div>
 
 			<div class="mt-3">
-				<button type="button" class="btn btn-primary">Save</button>
+				<button type="button" class="btn btn-primary" id="ipsecMobileClientsSaveBtn">Save</button>
 			</div>
 		</div>
 	</div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	loadIpsecMobileClients();
+	const btn = document.getElementById('ipsecMobileClientsSaveBtn');
+	if (btn) btn.addEventListener('click', saveIpsecMobileClients);
+});
+
+function setCheck(id, value) {
+	const el = document.getElementById(id);
+	if (!el) return;
+	el.checked = !!value;
+}
+
+function getCheck(id) {
+	const el = document.getElementById(id);
+	return el ? !!el.checked : false;
+}
+
+function loadIpsecMobileClients() {
+	fetch('/vpn/api/ipsec/mobile-clients')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load settings');
+			const s = json.settings || {};
+			setCheck('ikeExtensions', s.ike_extensions);
+			setCheck('groupAuth', s.group_auth);
+			setCheck('radiusAccounting', s.radius_accounting);
+			setCheck('virtualAddressPool', s.virtual_address_pool);
+			setCheck('virtualIpv6AddressPool', s.virtual_ipv6_address_pool);
+			setCheck('radiusIpPriority', s.radius_ip_priority);
+			setCheck('radiusAdvancedParameters', s.radius_advanced_parameters);
+			setCheck('networkList', s.network_list);
+			setCheck('saveXauthPassword', s.save_xauth_password);
+			setCheck('dnsDefaultDomain', s.dns_default_domain);
+			setCheck('splitDns', s.split_dns);
+			setCheck('dnsServers', s.dns_servers);
+			setCheck('winsServers', s.wins_servers);
+			setCheck('phase2PfsGroup', s.phase2_pfs_group);
+			setCheck('loginBanner', s.login_banner);
+		})
+		.catch(err => console.error('Load IPsec mobile clients failed:', err));
+}
+
+function saveIpsecMobileClients() {
+	const payload = {
+		ike_extensions: getCheck('ikeExtensions'),
+		group_auth: getCheck('groupAuth'),
+		radius_accounting: getCheck('radiusAccounting'),
+		virtual_address_pool: getCheck('virtualAddressPool'),
+		virtual_ipv6_address_pool: getCheck('virtualIpv6AddressPool'),
+		radius_ip_priority: getCheck('radiusIpPriority'),
+		radius_advanced_parameters: getCheck('radiusAdvancedParameters'),
+		network_list: getCheck('networkList'),
+		save_xauth_password: getCheck('saveXauthPassword'),
+		dns_default_domain: getCheck('dnsDefaultDomain'),
+		split_dns: getCheck('splitDns'),
+		dns_servers: getCheck('dnsServers'),
+		wins_servers: getCheck('winsServers'),
+		phase2_pfs_group: getCheck('phase2PfsGroup'),
+		login_banner: getCheck('loginBanner'),
+	};
+
+	fetch('/vpn/api/ipsec/mobile-clients', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(payload)
+	})
+		.then(r => r.json())
+		.then(json => {
+			if (!json.success) {
+				alert(json.error || 'Failed to save settings');
+				return;
+			}
+			alert('Saved successfully');
+		})
+		.catch(err => {
+			console.error(err);
+			alert(err.message || String(err));
+		});
+}
+</script>
 {% endblock %}

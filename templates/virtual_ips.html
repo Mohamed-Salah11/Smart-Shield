@@ -277,12 +277,10 @@ function displayVirtualIPsConfigs(configs) {
             <td>${escapeHtml(config.address || '')}${config.prefix ? '/' + escapeHtml(config.prefix.toString()) : ''}</td>
             <td>${escapeHtml(config.description || '-')}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editVirtualIP(${config.id})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteVirtualIP(${config.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-primary" onclick="editVirtualIP(${config.id})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteVirtualIP(${config.id})">Delete</button>
+                </div>
             </td>
         `;
         tbody.appendChild(row);
