@@ -312,6 +312,276 @@ def init_db():
     )
     """)
 
+    # ----------------------------
+    # VPN / IPsec Mobile Clients
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ipsec_mobile_clients_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            ike_extensions INTEGER DEFAULT 0,
+            group_auth INTEGER DEFAULT 0,
+            radius_accounting INTEGER DEFAULT 0,
+            virtual_address_pool INTEGER DEFAULT 1,
+            virtual_ipv6_address_pool INTEGER DEFAULT 0,
+            radius_ip_priority INTEGER DEFAULT 0,
+            radius_advanced_parameters INTEGER DEFAULT 0,
+            network_list INTEGER DEFAULT 1,
+            save_xauth_password INTEGER DEFAULT 0,
+            dns_default_domain INTEGER DEFAULT 0,
+            split_dns INTEGER DEFAULT 0,
+            dns_servers INTEGER DEFAULT 0,
+            wins_servers INTEGER DEFAULT 0,
+            phase2_pfs_group INTEGER DEFAULT 0,
+            login_banner INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # ensure singleton row exists
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO ipsec_mobile_clients_settings (id)
+        VALUES (1)
+        """
+    )
+
+    # ----------------------------
+    # VPN / IPsec Pre-Shared Keys
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ipsec_pre_shared_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identifier TEXT NOT NULL,
+            secret_type TEXT NOT NULL DEFAULT 'psk',
+            pre_shared_key TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ipsec_psk_identifier_type
+        ON ipsec_pre_shared_keys(identifier, secret_type)
+        """
+    )
+
+    # ----------------------------
+    # VPN / IPsec Advanced Settings
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ipsec_advanced_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+
+            -- Logging controls (defaults: Control)
+            log_daemon TEXT DEFAULT 'Control',
+            log_sa_manager TEXT DEFAULT 'Control',
+            log_ike_sa TEXT DEFAULT 'Control',
+            log_ike_child_sa TEXT DEFAULT 'Control',
+            log_job_processing TEXT DEFAULT 'Control',
+            log_config_backend TEXT DEFAULT 'Control',
+            log_kernel_interface TEXT DEFAULT 'Control',
+            log_networking TEXT DEFAULT 'Control',
+            log_asn_encoding TEXT DEFAULT 'Control',
+            log_message_encoding TEXT DEFAULT 'Control',
+            log_integrity_checker TEXT DEFAULT 'Control',
+            log_integrity_verifier TEXT DEFAULT 'Control',
+            log_platform_trust_service TEXT DEFAULT 'Control',
+            log_tls_handler TEXT DEFAULT 'Control',
+            log_ipsec_traffic TEXT DEFAULT 'Control',
+            log_strongswan_lib TEXT DEFAULT 'Control',
+
+            -- Advanced IPsec Settings
+            unique_ids TEXT DEFAULT 'Yes (Replace)',
+            ipsec_filter_mode TEXT DEFAULT 'Filter [IPsec Tunnel, Transport, and VTI] on IPsec tab (enc0)',
+            ikev2_retransmission INTEGER DEFAULT 0,
+            ip_compression INTEGER DEFAULT 0,
+            pkcs11_support INTEGER DEFAULT 0,
+            strict_interface_binding INTEGER DEFAULT 0,
+            ikev1_unencrypted_payloads INTEGER DEFAULT 0,
+            max_ikev1_phase2_exchanges INTEGER DEFAULT 3,
+            enable_cisco_extensions INTEGER DEFAULT 0,
+            strict_crl_checking INTEGER DEFAULT 0,
+            fqdn_endpoints_resolve_interval INTEGER DEFAULT 60,
+            make_before_break INTEGER DEFAULT 0,
+            asynchronous_cryptography INTEGER DEFAULT 0,
+            custom_ike_port TEXT DEFAULT '',
+            custom_nat_t_port TEXT DEFAULT '',
+            auto_exclude_lan_address INTEGER DEFAULT 0,
+            additional_ipsec_bypass INTEGER DEFAULT 0,
+
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO ipsec_advanced_settings (id)
+        VALUES (1)
+        """
+    )
+
+    # ----------------------------
+    # VPN / L2TP Configuration
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS l2tp_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            enabled INTEGER DEFAULT 1,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO l2tp_settings (id)
+        VALUES (1)
+        """
+    )
+
+    # ----------------------------
+    # FIREWALL SCHEDULES
+    # ----------------------------
+    # A schedule is a named container; it can have multiple configured date/time ranges.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_schedule_ranges (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        schedule_id INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        days_csv TEXT NOT NULL, -- comma-separated day numbers (1-31)
+        start_time TEXT NOT NULL, -- HH:MM
+        end_time TEXT NOT NULL,   -- HH:MM
+        range_description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(schedule_id) REFERENCES firewall_schedules(id) ON DELETE CASCADE
+    )
+    """)
+
+    # Index for fast listing
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_firewall_schedule_ranges_schedule_id ON firewall_schedule_ranges(schedule_id)")
+
+    # ----------------------------
+    # VIRTUAL IPs
+    # ----------------------------
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS virtual_ips_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        interface TEXT NOT NULL,
+        address_type TEXT DEFAULT 'single',
+        address TEXT NOT NULL,
+        prefix INTEGER DEFAULT 32,
+        expansion INTEGER DEFAULT 0,
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ----------------------------
+    # DHCP RELAY
+    # ----------------------------
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dhcp_relay_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        enabled INTEGER DEFAULT 0,
+        downstream_interfaces TEXT DEFAULT '',
+        carp_status_vip TEXT DEFAULT 'none',
+        append_circuit_id INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dhcp_relay_upstream_servers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_address TEXT NOT NULL
+    )
+    """)
+
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_dhcp_relay_upstream_server_address ON dhcp_relay_upstream_servers(server_address)")
+
+    # ----------------------------
+    # VPN / IPsec (Phase 1)
+    # ----------------------------
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ipsec_phase1 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled INTEGER DEFAULT 0,
+        ike_version TEXT DEFAULT 'ikev2',
+        internet_protocol TEXT DEFAULT 'ipv4',
+        interface TEXT DEFAULT 'wan',
+        remote_gateway TEXT NOT NULL,
+        auth_method TEXT DEFAULT 'mutual-psk',
+        my_identifier TEXT DEFAULT 'my-ip',
+        peer_identifier TEXT DEFAULT 'peer-ip',
+        pre_shared_key TEXT DEFAULT '',
+        p1_life_time INTEGER DEFAULT 28800,
+        p1_rekey_time INTEGER DEFAULT 25920,
+        p1_reauth_time INTEGER DEFAULT 0,
+        p1_rand_time INTEGER DEFAULT 2880,
+        child_sa_start_action TEXT DEFAULT 'default',
+        child_sa_close_action TEXT DEFAULT 'default',
+        nat_traversal TEXT DEFAULT 'auto',
+        mobike TEXT DEFAULT 'disable',
+        gateway_duplicates INTEGER DEFAULT 0,
+        split_connections INTEGER DEFAULT 0,
+        prf_selection INTEGER DEFAULT 0,
+        remote_ike_port TEXT DEFAULT '',
+        remote_nat_t_port TEXT DEFAULT '',
+        dpd_enable INTEGER DEFAULT 1,
+        dpd_delay INTEGER DEFAULT 10,
+        dpd_max_failures INTEGER DEFAULT 5,
+        description TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ipsec_phase1_algorithms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phase1_id INTEGER NOT NULL,
+        encryption TEXT NOT NULL,
+        key_length INTEGER,
+        hash TEXT,
+        dh_group TEXT,
+        FOREIGN KEY(phase1_id) REFERENCES ipsec_phase1(id) ON DELETE CASCADE
+    )
+    """)
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ipsec_phase1_algorithms_phase1_id ON ipsec_phase1_algorithms(phase1_id)")
+
+    # ----------------------------
+    # DHCP SERVER (whole page settings)
+    # ----------------------------
+    # Store the whole form as JSON so we can persist every option on the page without
+    # creating hundreds of columns.
+    # interface: 'wan' | 'lan'
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dhcp_server_settings (
+        interface TEXT PRIMARY KEY,
+        settings_json TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # ADVANCED NETWORK TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_network (
