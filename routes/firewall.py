@@ -1178,6 +1178,87 @@ def schedules():
     return render_template("schedules.html")
 
 
+@firewall_bp.route("/api/schedules", methods=["GET"])
+def get_schedules():
+    """Get all firewall schedules"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id, name, description, ranges_data FROM firewall_schedules ORDER BY name")
+        schedules = []
+        for row in cursor.fetchall():
+            schedules.append({
+                'id': row[0],
+                'name': row[1],
+                'description': row[2],
+                'ranges_data': row[3]
+            })
+        return jsonify({"success": True, "schedules": schedules})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/schedules", methods=["POST"])
+def add_schedule():
+    """Add a new schedule"""
+    try:
+        data = request.get_json()
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("""
+            INSERT INTO firewall_schedules (name, description, ranges_data)
+            VALUES (?, ?, ?)
+        """, (
+            data.get('name', ''),
+            data.get('description', ''),
+            data.get('ranges_data', '')
+        ))
+        
+        db.commit()
+        return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/schedules/<int:schedule_id>", methods=["PUT"])
+def update_schedule(schedule_id):
+    """Update a schedule"""
+    try:
+        data = request.get_json()
+        db = get_db()
+        cursor = db.cursor()
+        
+        cursor.execute("""
+            UPDATE firewall_schedules 
+            SET name=?, description=?, ranges_data=?
+            WHERE id=?
+        """, (
+            data.get('name'),
+            data.get('description'),
+            data.get('ranges_data'),
+            schedule_id
+        ))
+        
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/schedules/<int:schedule_id>", methods=["DELETE"])
+def delete_schedule(schedule_id):
+    """Delete a schedule"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM firewall_schedules WHERE id=?", (schedule_id,))
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ----------------------------
 # VIRTUAL IPs
 # ----------------------------
@@ -1198,11 +1279,10 @@ def traffic_shaper():
 @firewall_bp.route("/get-traffic-shaper-configs", methods=['GET'])
 def get_traffic_shaper_configs():
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, interface_type, enable_disable, name, scheduler_type, bandwidth, bandwidth_unit, queue_limit, tbr_size FROM traffic_shaper_configs ORDER BY interface_type, id')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -1226,14 +1306,13 @@ def get_traffic_shaper_configs():
 def save_traffic_shaper_config():
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''INSERT INTO traffic_shaper_configs (interface_type, enable_disable, name, scheduler_type, bandwidth, bandwidth_unit, queue_limit, tbr_size) 
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                        (data['interfaceType'], data['enableDisable'], data['name'], data['schedulerType'], data['bandwidth'], data['bandwidthUnit'], data['queueLimit'], data['tbrSize']))
-        conn.commit()
+        db.commit()
         config_id = cursor.lastrowid
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved', 'id': config_id})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1241,11 +1320,10 @@ def save_traffic_shaper_config():
 @firewall_bp.route("/get-traffic-shaper-config/<int:config_id>", methods=['GET'])
 def get_traffic_shaper_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, interface_type, enable_disable, name, scheduler_type, bandwidth, bandwidth_unit, queue_limit, tbr_size FROM traffic_shaper_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -1267,12 +1345,11 @@ def get_traffic_shaper_config(config_id):
 def update_traffic_shaper_config(config_id):
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''UPDATE traffic_shaper_configs SET interface_type = ?, enable_disable = ?, name = ?, scheduler_type = ?, bandwidth = ?, bandwidth_unit = ?, queue_limit = ?, tbr_size = ? WHERE id = ?''',
                        (data['interfaceType'], data['enableDisable'], data['name'], data['schedulerType'], data['bandwidth'], data['bandwidthUnit'], data['queueLimit'], data['tbrSize'], config_id))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1280,11 +1357,10 @@ def update_traffic_shaper_config(config_id):
 @firewall_bp.route("/delete-traffic-shaper-config/<int:config_id>", methods=['DELETE'])
 def delete_traffic_shaper_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('DELETE FROM traffic_shaper_configs WHERE id = ?', (config_id,))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1297,11 +1373,10 @@ def delete_traffic_shaper_config(config_id):
 @firewall_bp.route("/get-limiters-configs", methods=['GET'])
 def get_limiters_configs():
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, enable_disable, name, bandwidth, bandwidth_unit, mask_type, ipv4_mask_bits, ipv6_mask_bits, queue_management_algorithm, scheduler, queue_length, delay_ms, packet_loss_rate, bucket_size_slots, description FROM limiters_configs ORDER BY id')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -1331,14 +1406,13 @@ def get_limiters_configs():
 def save_limiters_config():
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''INSERT INTO limiters_configs (enable_disable, name, bandwidth, bandwidth_unit, mask_type, ipv4_mask_bits, ipv6_mask_bits, queue_management_algorithm, scheduler, queue_length, delay_ms, packet_loss_rate, bucket_size_slots, description) 
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                        (data['enableDisable'], data['name'], data['bandwidth'], data['bandwidthUnit'], data['maskType'], data['ipv4MaskBits'], data['ipv6MaskBits'], data['queueManagementAlgorithm'], data['scheduler'], data['queueLength'], data['delayMs'], data['packetLossRate'], data['bucketSizeSlots'], data['description']))
-        conn.commit()
+        db.commit()
         config_id = cursor.lastrowid
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Limiter saved', 'id': config_id})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1346,11 +1420,10 @@ def save_limiters_config():
 @firewall_bp.route("/get-limiters-config/<int:config_id>", methods=['GET'])
 def get_limiters_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, enable_disable, name, bandwidth, bandwidth_unit, mask_type, ipv4_mask_bits, ipv6_mask_bits, queue_management_algorithm, scheduler, queue_length, delay_ms, packet_loss_rate, bucket_size_slots, description FROM limiters_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -1378,12 +1451,11 @@ def get_limiters_config(config_id):
 def update_limiters_config(config_id):
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''UPDATE limiters_configs SET enable_disable = ?, name = ?, bandwidth = ?, bandwidth_unit = ?, mask_type = ?, ipv4_mask_bits = ?, ipv6_mask_bits = ?, queue_management_algorithm = ?, scheduler = ?, queue_length = ?, delay_ms = ?, packet_loss_rate = ?, bucket_size_slots = ?, description = ? WHERE id = ?''',
                        (data['enableDisable'], data['name'], data['bandwidth'], data['bandwidthUnit'], data['maskType'], data['ipv4MaskBits'], data['ipv6MaskBits'], data['queueManagementAlgorithm'], data['scheduler'], data['queueLength'], data['delayMs'], data['packetLossRate'], data['bucketSizeSlots'], data['description'], config_id))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Limiter updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1391,11 +1463,10 @@ def update_limiters_config(config_id):
 @firewall_bp.route("/delete-limiters-config/<int:config_id>", methods=['DELETE'])
 def delete_limiters_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('DELETE FROM limiters_configs WHERE id = ?', (config_id,))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Limiter deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1408,11 +1479,10 @@ def delete_limiters_config(config_id):
 @firewall_bp.route("/get-virtual-ips-configs", methods=['GET'])
 def get_virtual_ips_configs():
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, type, interface, address_type, address, prefix, expansion, description FROM virtual_ips_configs ORDER BY id')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -1435,14 +1505,13 @@ def get_virtual_ips_configs():
 def save_virtual_ips_config():
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''INSERT INTO virtual_ips_configs (type, interface, address_type, address, prefix, expansion, description) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)''',
                        (data['type'], data['interface'], data['addressType'], data['address'], data['prefix'], data['expansion'], data['description']))
-        conn.commit()
+        db.commit()
         config_id = cursor.lastrowid
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Virtual IP saved', 'id': config_id})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1450,11 +1519,10 @@ def save_virtual_ips_config():
 @firewall_bp.route("/get-virtual-ips-config/<int:config_id>", methods=['GET'])
 def get_virtual_ips_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('SELECT id, type, interface, address_type, address, prefix, expansion, description FROM virtual_ips_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -1475,12 +1543,11 @@ def get_virtual_ips_config(config_id):
 def update_virtual_ips_config(config_id):
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('''UPDATE virtual_ips_configs SET type = ?, interface = ?, address_type = ?, address = ?, prefix = ?, expansion = ?, description = ? WHERE id = ?''',
                        (data['type'], data['interface'], data['addressType'], data['address'], data['prefix'], data['expansion'], data['description'], config_id))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Virtual IP updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1488,11 +1555,10 @@ def update_virtual_ips_config(config_id):
 @firewall_bp.route("/delete-virtual-ips-config/<int:config_id>", methods=['DELETE'])
 def delete_virtual_ips_config(config_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute('DELETE FROM virtual_ips_configs WHERE id = ?', (config_id,))
-        conn.commit()
-        conn.close()
+        db.commit()
         return jsonify({'status': 'success', 'message': 'Virtual IP deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400

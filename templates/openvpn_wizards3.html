@@ -7,16 +7,20 @@
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
-    <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a>
+        <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}"
+            href="{{ url_for('vpn.openvpn') }}">Servers</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
+        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}"
+            href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a>
+        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client
+            Specific Overrides</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
+        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}"
+            href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
     </li>
 </ul>
 
@@ -29,17 +33,112 @@
                 <div class="card">
                     <div class="card-body p-4">
                         <h4 class="mb-3">Certificate Authority Created Successfully</h4>
-                        <p class="mb-2">Your Certificate Authority has been created. You can now create certificates or add additional CAs if needed.</p>
+                        <p class="mb-2">Your Certificate Authority has been created. You can now create certificates or
+                            add additional CAs if needed.</p>
                         <p class="mb-0">Click Next to continue with the OpenVPN Remote Access Server Setup.</p>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-body p-4">
+                        <h5 class="mb-3">Created Certificate Authorities</h5>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Descriptive Name</th>
+                                    <th>Common Name</th>
+                                    <th>Key Length</th>
+                                    <th>Lifetime (days)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="casTable">
+                                <tr>
+                                    <td colspan="5" class="text-muted py-4 text-center">No Certificate Authorities
+                                        created yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
                 <div class="mt-4">
                     <a class="btn btn-primary me-2" href="{{ url_for('vpn.openvpn_wizards_step2') }}">Add Another CA</a>
-                    <a class="btn btn-primary" href="#">Next</a>
+                    <a class="btn btn-success" href="{{ url_for('vpn.openvpn') }}">Finish & Go to OpenVPN Servers</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        loadCAs();
+    });
+
+    function loadCAs() {
+        fetch('/vpn/api/wizard/get-cas')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    displayCAs(data.cas);
+                } else {
+                    console.error('Error loading CAs:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    function displayCAs(cas) {
+        const tbody = document.getElementById('casTable');
+
+        if (!cas || cas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted py-4 text-center">No Certificate Authorities created yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        cas.forEach(ca => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+            <td>${ca.descriptive_name}</td>
+            <td>${ca.common_name || '-'}</td>
+            <td>${ca.key_length} bit</td>
+            <td>${ca.lifetime}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteCA(${ca.id})" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function deleteCA(caId) {
+        if (!confirm('Are you sure you want to delete this Certificate Authority?')) {
+            return;
+        }
+
+        fetch(`/vpn/api/wizard/delete-ca/${caId}`, {
+            method: 'DELETE'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Certificate Authority deleted successfully!');
+                    loadCAs();
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting Certificate Authority');
+            });
+    }
+</script>
+
 {% endblock %}
