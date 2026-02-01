@@ -563,6 +563,284 @@ def init_db():
         description TEXT
     )
     """)
+
+    # Traffic Shaper Configs (Queues)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS traffic_shaper_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        interface_type TEXT NOT NULL,
+        enable_disable INTEGER DEFAULT 1,
+        name TEXT NOT NULL,
+        scheduler_type TEXT DEFAULT 'HFSC',
+        bandwidth INTEGER,
+        bandwidth_unit TEXT DEFAULT 'Mbit/s',
+        queue_limit INTEGER,
+        tbr_size INTEGER,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Limiters Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS limiters_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enable_disable INTEGER DEFAULT 1,
+        name TEXT NOT NULL,
+        bandwidth INTEGER,
+        bandwidth_unit TEXT DEFAULT 'Mbit/s',
+        mask_type TEXT DEFAULT 'None',
+        ipv4_mask_bits INTEGER DEFAULT 32,
+        ipv6_mask_bits INTEGER DEFAULT 128,
+        queue_management_algorithm TEXT DEFAULT 'Tail Drop',
+        scheduler TEXT DEFAULT 'Worst-case Weighted fair Queuing (default)',
+        queue_length INTEGER,
+        delay_ms INTEGER,
+        packet_loss_rate REAL,
+        bucket_size_slots INTEGER,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Virtual IPs Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS virtual_ips_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        interface TEXT NOT NULL,
+        address_type TEXT,
+        address TEXT,
+        prefix INTEGER,
+        expansion INTEGER DEFAULT 0,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # OpenVPN Server Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS openvpn_servers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT,
+        disabled INTEGER DEFAULT 0,
+        server_mode TEXT DEFAULT 'peer2peer',
+        device_mode TEXT DEFAULT 'tun',
+        protocol TEXT DEFAULT 'udp4',
+        interface TEXT DEFAULT 'wan',
+        local_port INTEGER DEFAULT 1194,
+        tls_key INTEGER DEFAULT 1,
+        tls_key_auto INTEGER DEFAULT 1,
+        peer_ca TEXT,
+        tunnel_network TEXT,
+        tunnel_network_v6 TEXT,
+        redirect_gateway INTEGER DEFAULT 0,
+        local_network TEXT,
+        remote_network TEXT,
+        max_clients INTEGER,
+        compression TEXT,
+        inter_client_communication INTEGER DEFAULT 0,
+        duplicate_connection INTEGER DEFAULT 0,
+        dynamic_ip INTEGER DEFAULT 0,
+        topology TEXT DEFAULT 'subnet',
+        dns_server1 TEXT,
+        dns_server2 TEXT,
+        dns_server3 TEXT,
+        dns_server4 TEXT,
+        ntp_server1 TEXT,
+        ntp_server2 TEXT,
+        netbios_enable INTEGER DEFAULT 0,
+        netbios_node_type TEXT,
+        netbios_scope TEXT,
+        wins_server1 TEXT,
+        wins_server2 TEXT,
+        custom_options TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # OpenVPN Client Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS openvpn_clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT,
+        disabled INTEGER DEFAULT 0,
+        server_mode TEXT DEFAULT 'peer2peer',
+        protocol TEXT DEFAULT 'udp4',
+        interface TEXT DEFAULT 'wan',
+        server_hostname TEXT,
+        server_port INTEGER DEFAULT 1194,
+        use_tls_key INTEGER DEFAULT 0,
+        tls_key TEXT,
+        ca_cert TEXT,
+        client_cert TEXT,
+        client_key TEXT,
+        encryption_algorithm TEXT DEFAULT 'AES-256-CBC',
+        auth_digest_algorithm TEXT DEFAULT 'SHA256',
+        inactivity_timeout INTEGER DEFAULT 300,
+        ping_method TEXT DEFAULT 'keepalive',
+        ping_interval INTEGER DEFAULT 10,
+        ping_timeout INTEGER DEFAULT 60,
+        custom_options TEXT,
+        udp_fast_io INTEGER DEFAULT 0,
+        send_receive_buffer TEXT DEFAULT 'default',
+        verbosity_level INTEGER DEFAULT 3,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # IPsec Phase 1 (IKE) Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ipsec_phase1 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT,
+        disabled INTEGER DEFAULT 0,
+        key_exchange TEXT DEFAULT 'ikev2',
+        internet_protocol TEXT DEFAULT 'ipv4',
+        interface TEXT DEFAULT 'wan',
+        remote_gateway TEXT,
+        authentication_method TEXT DEFAULT 'preshared_key',
+        my_identifier TEXT,
+        peer_identifier TEXT,
+        preshared_key TEXT,
+        encryption_algorithm TEXT DEFAULT 'aes256',
+        hash_algorithm TEXT DEFAULT 'sha256',
+        dh_key_group TEXT DEFAULT '14',
+        lifetime INTEGER DEFAULT 28800,
+        nat_traversal TEXT DEFAULT 'auto',
+        dpd_delay INTEGER DEFAULT 10,
+        dpd_maxfail INTEGER DEFAULT 5,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # IPsec Phase 2 (Child SA) Configs
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ipsec_phase2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phase1_id INTEGER,
+        description TEXT,
+        disabled INTEGER DEFAULT 0,
+        mode TEXT DEFAULT 'tunnel',
+        local_network TEXT,
+        remote_network TEXT,
+        protocol TEXT DEFAULT 'esp',
+        encryption_algorithms TEXT DEFAULT 'aes256',
+        hash_algorithms TEXT DEFAULT 'sha256',
+        pfs_key_group TEXT DEFAULT '14',
+        lifetime INTEGER DEFAULT 3600,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(phase1_id) REFERENCES ipsec_phase1(id)
+    )
+    """)
+
+    # L2TP Configuration
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS l2tp_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled INTEGER DEFAULT 1,
+        interface TEXT DEFAULT 'wan',
+        server_address TEXT,
+        remote_address_range TEXT,
+        subnet_mask TEXT,
+        dns_server1 TEXT,
+        dns_server2 TEXT,
+        wins_server TEXT,
+        authentication TEXT DEFAULT 'chap',
+        require_chap INTEGER DEFAULT 0,
+        require_pap INTEGER DEFAULT 0,
+        radius_server TEXT,
+        radius_secret TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # L2TP Users
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS l2tp_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        ip_address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # OpenVPN Client Specific Overrides
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS openvpn_cso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        description TEXT,
+        disabled INTEGER DEFAULT 0,
+        common_name TEXT NOT NULL,
+        connection_blocking INTEGER DEFAULT 0,
+        server_list TEXT,
+        reset_server_options TEXT DEFAULT 'keep',
+        ipv4_tunnel_network TEXT,
+        ipv6_tunnel_network TEXT,
+        ipv4_gateway TEXT,
+        ipv6_gateway TEXT,
+        redirect_ipv4_gateway INTEGER DEFAULT 0,
+        redirect_ipv6_gateway INTEGER DEFAULT 0,
+        ipv4_local_networks TEXT,
+        ipv6_local_networks TEXT,
+        ipv4_remote_networks TEXT,
+        ipv6_remote_networks TEXT,
+        inactivity_timeout INTEGER DEFAULT 300,
+        ping_interval INTEGER DEFAULT 10,
+        ping_action TEXT DEFAULT 'none',
+        dns_default_domain INTEGER DEFAULT 0,
+        dns_servers INTEGER DEFAULT 0,
+        block_outside_dns INTEGER DEFAULT 0,
+        force_dns_cache_update INTEGER DEFAULT 0,
+        ntp_servers INTEGER DEFAULT 0,
+        netbios_options INTEGER DEFAULT 0,
+        advanced TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Certificate Authorities (CA)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS certificate_authorities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        descriptive_name TEXT NOT NULL,
+        randomize_serial INTEGER DEFAULT 1,
+        key_length INTEGER DEFAULT 2048,
+        lifetime INTEGER DEFAULT 3650,
+        common_name TEXT,
+        country_code TEXT,
+        state_or_province TEXT,
+        city TEXT,
+        organization TEXT,
+        organizational_unit TEXT,
+        ca_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # OpenVPN Wizard Configurations
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS openvpn_wizard_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type_of_server TEXT DEFAULT 'local',
+        ca_id INTEGER,
+        server_configured INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(ca_id) REFERENCES certificate_authorities(id)
+    )
+    """)
+
+    # Firewall Schedules
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS firewall_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        description TEXT,
+        ranges_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
     
     conn.commit()
     conn.close()

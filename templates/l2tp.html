@@ -32,7 +32,7 @@
 			</div>
 
 			<div class="mt-4">
-				<button type="button" class="btn btn-primary">Save</button>
+				<button type="button" class="btn btn-primary" id="saveL2tpConfig">Save</button>
 			</div>
 		</div>
 
@@ -41,4 +41,44 @@
 		</div>
 	</div>
 </div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		// Load L2TP configuration
+		fetch('/vpn/api/l2tp/get-config')
+			.then(response => response.json())
+			.then(data => {
+				if (data.status === 'success') {
+					document.getElementById('l2tpEnable').checked = data.enabled;
+				}
+			})
+			.catch(error => console.error('Error:', error));
+
+		// Save L2TP configuration
+		document.getElementById('saveL2tpConfig').addEventListener('click', function () {
+			const formData = {
+				enabled: document.getElementById('l2tpEnable').checked
+			};
+
+			fetch('/vpn/api/l2tp/save-config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(formData)
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data.status === 'success') {
+						alert('L2TP configuration saved successfully!');
+					} else {
+						alert('Error: ' + (data.message || 'Unknown error'));
+					}
+				})
+				.catch(error => {
+					console.error('Error:', error);
+					alert('Error saving L2TP configuration');
+				});
+		});
+	});
+</script>
+
 {% endblock %}
