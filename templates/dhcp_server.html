@@ -319,7 +319,7 @@
 </div>
 
 <div class="d-flex gap-2 mt-3">
-	<button type="button" class="btn btn-primary">Save</button>
+	<button type="button" class="btn btn-primary" id="dhcpServerSaveBtn">Save</button>
 </div>
 
 <div class="settings-section">
@@ -348,6 +348,114 @@
 </div>
 
 <script>
+function getDhcpServerSettingsRoot() {
+	// Capture everything on the DHCP Server page EXCEPT the static mappings table.
+	// We stop at the first "DHCP Static Mappings" section.
+	const allSections = Array.from(document.querySelectorAll('.settings-section'));
+	const untilMappings = [];
+	for (const sec of allSections) {
+		const title = (sec.querySelector('h5')?.textContent || '').trim();
+		if (title === 'DHCP Static Mappings') break;
+		untilMappings.push(sec);
+	}
+	return untilMappings.length ? untilMappings[0].parentElement : document;
+}
+
+function serializeDhcpServerForm() {
+	const allSections = Array.from(document.querySelectorAll('.settings-section'));
+	const targetSections = [];
+	for (const sec of allSections) {
+		const title = (sec.querySelector('h5')?.textContent || '').trim();
+		if (title === 'DHCP Static Mappings') break;
+		targetSections.push(sec);
+	}
+
+	const settings = { fields: {} };
+	const elems = [];
+	targetSections.forEach(sec => {
+		elems.push(...sec.querySelectorAll('input, select, textarea'));
+	});
+
+	// We rely on element ids. If an input lacks an id, we auto-generate a stable key by its position.
+	let anonCounter = 0;
+	elems.forEach(el => {
+		if (el.type === 'button' || el.type === 'submit') return;
+		const key = el.id || `__anon_${anonCounter++}`;
+		if (el.type === 'checkbox') {
+			settings.fields[key] = { type: 'checkbox', value: !!el.checked };
+		} else if (el.type === 'radio') {
+			// for radios, store selected value by group name
+			const group = el.name || key;
+			if (!(group in settings.fields)) settings.fields[group] = { type: 'radio', value: null };
+			if (el.checked) settings.fields[group].value = el.value;
+		} else {
+			settings.fields[key] = { type: (el.tagName || 'input').toLowerCase(), value: el.value };
+		}
+	});
+
+	return settings;
+}
+
+function applyDhcpServerForm(settings) {
+	settings = settings || {};
+	const fields = settings.fields || {};
+	Object.keys(fields).forEach(key => {
+		const entry = fields[key];
+		if (!entry) return;
+
+		if (entry.type === 'radio') {
+			const name = key;
+			const val = entry.value;
+			if (val == null) return;
+			const radio = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"][value="${CSS.escape(String(val))}"]`);
+			if (radio) radio.checked = true;
+			return;
+		}
+
+		const el = document.getElementById(key);
+		if (!el) return;
+		if (entry.type === 'checkbox') {
+			el.checked = !!entry.value;
+		} else {
+			el.value = entry.value ?? '';
+		}
+	});
+}
+
+function loadDhcpServerSettings() {
+	fetch('/services/api/dhcp-server/wan')
+		.then(r => {
+			if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
+			return r.json();
+		})
+		.then(json => {
+			if (!json.success) throw new Error(json.error || 'Failed to load DHCP server settings');
+			applyDhcpServerForm(json.settings);
+		})
+		.catch(err => console.error('Error loading DHCP Server settings:', err));
+}
+
+function saveDhcpServerSettings() {
+	const settings = serializeDhcpServerForm();
+	fetch('/services/api/dhcp-server/wan', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ settings })
+	})
+	.then(r => r.json())
+	.then(json => {
+		if (!json.success) {
+			alert(json.error || 'Failed to save DHCP server settings');
+			return;
+		}
+		alert('DHCP Server settings saved!');
+	})
+	.catch(err => {
+		console.error(err);
+		alert(err.message || String(err));
+	});
+}
+
 // Load static mappings from localStorage
 function loadStaticMappings() {
 	const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
@@ -388,7 +496,12 @@ function deleteMapping(index) {
 	}
 }
 
-// Load mappings when page loads
-document.addEventListener('DOMContentLoaded', loadStaticMappings);
+// Load mappings and DHCP server settings when page loads
+document.addEventListener('DOMContentLoaded', function() {
+	loadStaticMappings();
+	loadDhcpServerSettings();
+	const btn = document.getElementById('dhcpServerSaveBtn');
+	if (btn) btn.addEventListener('click', saveDhcpServerSettings);
+});
 </script>
 {% endblock %}

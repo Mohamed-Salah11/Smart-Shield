@@ -269,6 +269,11 @@
     .calendar-weekday:hover {
         background-color: #e9ecef;
     }
+
+    /* Actions column: stacked buttons like pfSense */
+    #schedules-tbody td:last-child .btn {
+        min-width: 80px;
+    }
 </style>
 
 <script>
@@ -279,6 +284,131 @@ document.addEventListener('DOMContentLoaded', function() {
     const configuredRanges = document.getElementById('configuredRanges');
     let selectedDates = [];
     let currentYear = new Date().getFullYear();
+    let editingScheduleId = null;
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function buildRangeSummary(ranges) {
+        if (!ranges || ranges.length === 0) return '-';
+        // Keep it compact for the table.
+        return ranges.map(r => {
+            const month = r.month;
+            const days = r.days_csv;
+            const time = `${r.start_time} - ${r.end_time}`;
+            const desc = r.range_description ? ` (${r.range_description})` : '';
+            return `${r.year}-${String(month).padStart(2,'0')}: ${days} @ ${time}${desc}`;
+        }).join('<br>');
+    }
+
+    async function loadSchedules() {
+        const tbody = document.getElementById('schedules-tbody');
+        tbody.innerHTML = '';
+        try {
+            const res = await fetch('/firewall/api/schedules');
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error || 'Failed to load schedules');
+
+            const schedules = json.schedules || [];
+            // cache for edit button
+            const schedulesById = new Map(schedules.map(s => [String(s.id), s]));
+            if (schedules.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="4" class="text-muted">No schedules defined.</td>`;
+                tbody.appendChild(row);
+                return;
+            }
+
+            schedules.forEach(s => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${escapeHtml(s.name)}</td>
+                    <td>${buildRangeSummary(s.ranges)}</td>
+                    <td>${escapeHtml(s.description || '')}</td>
+                    <td>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary btn-sm schedule-edit" data-id="${s.id}" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
+                                Edit
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm schedule-delete" data-id="${s.id}">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            tbody.querySelectorAll('.schedule-edit').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const s = schedulesById.get(String(this.dataset.id));
+                    if (!s) return;
+
+                    editingScheduleId = s.id;
+                    document.getElementById('scheduleName').value = s.name || '';
+                    document.getElementById('scheduleDesc').value = s.description || '';
+
+                    // Clear configured ranges and refill from stored ranges
+                    configuredRanges.innerHTML = '';
+                    (s.ranges || []).forEach(r => {
+                        const dateStr = r.days_csv || '';
+                        const timeStr = `${r.start_time} - ${r.end_time}`;
+                        const desc = r.range_description || '-';
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${escapeHtml(dateStr)}</td>
+                            <td>${escapeHtml(timeStr)}</td>
+                            <td>${escapeHtml(desc)}</td>
+                            <td>
+                                <button type="button" class="btn btn-danger btn-sm remove-range">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                        row.querySelector('.remove-range').addEventListener('click', function() {
+                            row.remove();
+                        });
+                        configuredRanges.appendChild(row);
+                    });
+
+                    // If the schedule has ranges, set month/year to the first range for convenience
+                    if (s.ranges && s.ranges.length > 0) {
+                        const first = s.ranges[0];
+                        if (first.year) currentYear = parseInt(first.year, 10);
+                        if (first.month) scheduleMonth.value = String(first.month);
+                        generateCalendar(parseInt(scheduleMonth.value, 10), currentYear);
+                    }
+                    document.getElementById('rangeDesc').value = '';
+                    document.getElementById('clearSelectionBtn').click();
+                });
+            });
+
+            tbody.querySelectorAll('.schedule-delete').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const id = this.dataset.id;
+                    if (!confirm('Delete this schedule?')) return;
+                    const res = await fetch(`/firewall/api/schedules/${id}`, { method: 'DELETE' });
+                    const json = await res.json();
+                    if (!json.success) {
+                        alert(json.error || 'Failed to delete schedule');
+                        return;
+                    }
+                    await loadSchedules();
+                });
+            });
+        } catch (e) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="4" class="text-danger">${escapeHtml(e.message || e)}</td>`;
+            tbody.appendChild(row);
+        }
+    }
 
     // Generate calendar for selected month
     function generateCalendar(month, year) {
@@ -398,6 +528,16 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('rangeDesc').value = '';
     });
 
+    // Reset modal state when opening add
+    document.getElementById('schedulesAdd').addEventListener('click', function() {
+        editingScheduleId = null;
+        document.getElementById('scheduleName').value = '';
+        document.getElementById('scheduleDesc').value = '';
+        configuredRanges.innerHTML = '';
+        document.getElementById('rangeDesc').value = '';
+        document.getElementById('clearSelectionBtn').click();
+    });
+
     // Save schedule
     document.getElementById('scheduleSaveBtn').addEventListener('click', function() {
         const name = document.getElementById('scheduleName').value;
@@ -405,12 +545,49 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please enter a schedule name');
             return;
         }
-        
-        // TODO: Save to backend
-        alert('Schedule saved successfully!');
-        const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleEditModal'));
-        modal.hide();
+        const description = document.getElementById('scheduleDesc').value;
+
+        // Build ranges from the configured table
+        const ranges = [];
+        document.querySelectorAll('#configuredRanges tr').forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            if (tds.length < 3) return;
+            const days_csv = (tds[0].textContent || '').trim();
+            const timeStr = (tds[1].textContent || '').trim();
+            const desc = (tds[2].textContent || '').trim();
+
+            const parts = timeStr.split(' - ');
+            if (parts.length !== 2) return;
+
+            ranges.push({
+                year: currentYear,
+                month: parseInt(scheduleMonth.value, 10),
+                days_csv,
+                start_time: parts[0],
+                end_time: parts[1],
+                range_description: desc === '-' ? '' : desc,
+            });
+        });
+
+        fetch(editingScheduleId ? `/firewall/api/schedules/${editingScheduleId}` : '/firewall/api/schedules', {
+            method: editingScheduleId ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description, ranges })
+        }).then(res => res.json()).then(async json => {
+            if (!json.success) {
+                alert(json.error || 'Failed to save schedule');
+                return;
+            }
+            await loadSchedules();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleEditModal'));
+            modal.hide();
+        }).catch(err => {
+            alert(err.message || String(err));
+        });
     });
+
+    // Initial load
+    loadSchedules();
 });
 </script>
 

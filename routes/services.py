@@ -1,4 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session
+import json
+
+from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
+
+from app.database import get_db
 
 services_bp = Blueprint("services", __name__, url_prefix="/services")
 
@@ -38,6 +42,102 @@ def dhcp_relay():
     return render_template("dhcp_relay.html")
 
 
+@services_bp.route("/api/dhcp-relay", methods=["GET"])
+def get_dhcp_relay_settings():
+    """Return DHCP Relay settings + list of upstream servers."""
+    try:
+        db = get_db()
+        cur = db.cursor()
+
+        cur.execute("SELECT enabled, downstream_interfaces, carp_status_vip, append_circuit_id FROM dhcp_relay_settings WHERE id = 1")
+        row = cur.fetchone()
+        if row is None:
+            # default empty settings
+            settings = {
+                "enabled": False,
+                "downstream_interfaces": "",
+                "carp_status_vip": "none",
+                "append_circuit_id": False,
+            }
+        else:
+            settings = {
+                "enabled": bool(row[0]),
+                "downstream_interfaces": row[1] or "",
+                "carp_status_vip": row[2] or "none",
+                "append_circuit_id": bool(row[3]),
+            }
+
+        cur.execute("SELECT server_address FROM dhcp_relay_upstream_servers ORDER BY id")
+        servers = [r[0] for r in cur.fetchall()]
+
+        return jsonify({"success": True, "settings": settings, "upstream_servers": servers})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@services_bp.route("/api/dhcp-relay", methods=["POST"])
+def save_dhcp_relay_settings():
+    """Save DHCP Relay settings + upstream servers.
+
+    Expects JSON:
+      {
+        enabled: bool,
+        downstream_interfaces: string,
+        carp_status_vip: string,
+        append_circuit_id: bool,
+        upstream_servers: string[]
+      }
+    """
+    try:
+        data = request.get_json() or {}
+        enabled = 1 if data.get("enabled") else 0
+        downstream_interfaces = (data.get("downstream_interfaces") or "").strip()
+        carp_status_vip = (data.get("carp_status_vip") or "none").strip() or "none"
+        append_circuit_id = 1 if data.get("append_circuit_id") else 0
+        upstream_servers = data.get("upstream_servers") or []
+        if not isinstance(upstream_servers, list):
+            return jsonify({"success": False, "error": "upstream_servers must be a list"}), 400
+
+        # normalize/unique, keep order
+        cleaned = []
+        seen = set()
+        for s in upstream_servers:
+            addr = str(s).strip()
+            if not addr:
+                continue
+            if addr in seen:
+                continue
+            cleaned.append(addr)
+            seen.add(addr)
+
+        db = get_db()
+        cur = db.cursor()
+
+        cur.execute(
+            """
+            INSERT INTO dhcp_relay_settings (id, enabled, downstream_interfaces, carp_status_vip, append_circuit_id, updated_at)
+            VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+              enabled=excluded.enabled,
+              downstream_interfaces=excluded.downstream_interfaces,
+              carp_status_vip=excluded.carp_status_vip,
+              append_circuit_id=excluded.append_circuit_id,
+              updated_at=CURRENT_TIMESTAMP
+            """,
+            (enabled, downstream_interfaces, carp_status_vip, append_circuit_id),
+        )
+
+        # replace servers list
+        cur.execute("DELETE FROM dhcp_relay_upstream_servers")
+        for addr in cleaned:
+            cur.execute("INSERT OR IGNORE INTO dhcp_relay_upstream_servers (server_address) VALUES (?)", (addr,))
+
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ----------------------------
 # DHCP SERVER (General)
 # ----------------------------
@@ -51,6 +151,60 @@ def dhcp_server():
 @services_bp.route("/dhcp-server-lan")
 def dhcp_server_lan():
     return render_template("dhcp_server_lan.html")
+
+
+@services_bp.route("/api/dhcp-server/<string:iface>", methods=["GET"])
+def api_get_dhcp_server_settings(iface):
+    """Load DHCP server settings for an interface (wan/lan)."""
+    try:
+        iface = (iface or '').lower()
+        if iface not in ('wan', 'lan'):
+            return jsonify({"success": False, "error": "Invalid interface"}), 400
+
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("SELECT settings_json FROM dhcp_server_settings WHERE interface=?", (iface,))
+        row = cur.fetchone()
+        settings = {}
+        if row and row[0]:
+            try:
+                settings = json.loads(row[0])
+            except Exception:
+                settings = {}
+        return jsonify({"success": True, "interface": iface, "settings": settings})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@services_bp.route("/api/dhcp-server/<string:iface>", methods=["POST"])
+def api_save_dhcp_server_settings(iface):
+    """Save DHCP server settings for an interface (wan/lan). Expects JSON: { settings: {...} }"""
+    try:
+        iface = (iface or '').lower()
+        if iface not in ('wan', 'lan'):
+            return jsonify({"success": False, "error": "Invalid interface"}), 400
+
+        data = request.get_json() or {}
+        settings = data.get('settings') or {}
+        if not isinstance(settings, dict):
+            return jsonify({"success": False, "error": "settings must be an object"}), 400
+
+        db = get_db()
+        cur = db.cursor()
+        cur.execute(
+            """
+            INSERT INTO dhcp_server_settings (interface, settings_json, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(interface) DO UPDATE SET
+              settings_json=excluded.settings_json,
+              updated_at=CURRENT_TIMESTAMP
+            """,
+            (iface, json.dumps(settings)),
+        )
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # DHCP Static Mapping (global)
