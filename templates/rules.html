@@ -32,10 +32,10 @@
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>Floating Rules</h2>
                 <div>
-                    <button id="floating-add-top-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#floatingModal">
+                    <button id="floating-add-top-btn" class="btn btn-success btn-sm" data-position="top" data-bs-toggle="modal" data-bs-target="#floatingModal">
                         <i class="fas fa-plus"></i> Add Rule (Top)
                     </button>
-                    <button id="floating-add-bottom-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#floatingModal">
+                    <button id="floating-add-bottom-btn" class="btn btn-success btn-sm" data-position="bottom" data-bs-toggle="modal" data-bs-target="#floatingModal">
                         <i class="fas fa-plus"></i> Add Rule (Bottom)
                     </button>
                 </div>
@@ -74,9 +74,14 @@
         <div class="section">
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>WAN Rules</h2>
-                <button id="wanAddBtn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#wanModal">
-                    <i class="fas fa-plus"></i> Add Rule
-                </button>
+                <div>
+                    <button id="wan-add-top-btn" class="btn btn-success btn-sm" data-position="top" data-bs-toggle="modal" data-bs-target="#wanModal">
+                        <i class="fas fa-plus"></i> Add Rule (Top)
+                    </button>
+                    <button id="wan-add-bottom-btn" class="btn btn-success btn-sm" data-position="bottom" data-bs-toggle="modal" data-bs-target="#wanModal">
+                        <i class="fas fa-plus"></i> Add Rule (Bottom)
+                    </button>
+                </div>
             </div>
             <div class="section-body">
                 <div class="table-responsive">
@@ -107,9 +112,14 @@
         <div class="section">
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>LAN Rules</h2>
-                <button id="lan-add-btn" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#lanModal">
-                    <i class="fas fa-plus"></i> Add Rule
-                </button>
+                <div>
+                    <button id="lan-add-top-btn" class="btn btn-success btn-sm" data-position="top" data-bs-toggle="modal" data-bs-target="#lanModal">
+                        <i class="fas fa-plus"></i> Add Rule (Top)
+                    </button>
+                    <button id="lan-add-bottom-btn" class="btn btn-success btn-sm" data-position="bottom" data-bs-toggle="modal" data-bs-target="#lanModal">
+                        <i class="fas fa-plus"></i> Add Rule (Bottom)
+                    </button>
+                </div>
             </div>
             <div class="section-body">
                 <div class="table-responsive">
@@ -344,17 +354,45 @@
         }
     }
 
+    // --- MOVE RULE FUNCTION ---
+    async function moveRule(type, ruleId, direction) {
+        try {
+            const response = await fetch(`/firewall/api/rules/${type}/${ruleId}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction: direction })
+            });
+            const result = await response.json();
+            if (result.success) {
+                // Reload rules to reflect new order
+                if (type === 'floating') loadFloatingRules();
+                else if (type === 'wan') loadWanRules();
+                else if (type === 'lan') loadLanRules();
+            } else {
+                alert('Error moving rule: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error moving rule:', error);
+            alert('Could not move rule');
+        }
+    }
+
     // --- FLOATING RULES LOGIC ---
-    const floatingAddTopBtn = document.getElementById('floating-add-top-btn');
-    const floatingAddBottomBtn = document.getElementById('floating-add-bottom-btn');
     const floatingTbody = document.getElementById('floating-tbody');
     const floatingRuleSaveBtn = document.getElementById('floatingRuleSaveBtn');
     const floatingModal = document.getElementById('floatingModal');
 
-    let addPosition = 'bottom';
+    let floatingAddPosition = 'bottom';
 
-    if (floatingAddTopBtn) floatingAddTopBtn.addEventListener('click', () => { addPosition = 'top'; });
-    if (floatingAddBottomBtn) floatingAddBottomBtn.addEventListener('click', () => { addPosition = 'bottom'; });
+    // Use Bootstrap modal event to capture position from button data attribute
+    if (floatingModal) {
+        floatingModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            if (button) {
+                floatingAddPosition = button.getAttribute('data-position') || 'bottom';
+            }
+        });
+    }
 
     if (floatingRuleSaveBtn) {
         floatingRuleSaveBtn.addEventListener('click', async () => {
@@ -369,24 +407,19 @@
                 gateway: '',
                 queue: '',
                 schedule: '',
-                description: document.getElementById('floating_description').value || 'New floating rule'
+                description: document.getElementById('floating_description').value || 'New floating rule',
+                position: floatingAddPosition
             };
 
             const result = await saveRuleToBackend(ruleData, 'floating');
 
             if (result) {
-                const row = document.createElement('tr');
-                row.dataset.ruleId = result.id;
-                row.innerHTML = `<td><input type="checkbox"></td><td>${ruleData.disabled ? '✗' : '✓'}</td><td>${ruleData.interface}</td><td>${ruleData.protocol}</td><td>${ruleData.source}</td><td>*</td><td>${ruleData.destination}</td><td>*</td><td>-</td><td>none</td><td>-</td><td>${ruleData.description}</td><td><button class="btn btn-sm btn-primary" onclick="editRule('floating', ${result.id})">Edit</button><button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${result.id})">Delete</button></td>`;
-                if (addPosition === 'top') floatingTbody.insertBefore(row, floatingTbody.firstChild);
-                else floatingTbody.appendChild(row);
-
-                // Close modal and reset form
                 bootstrap.Modal.getInstance(floatingModal).hide();
                 document.getElementById('floating_disabled').checked = false;
                 document.getElementById('floating_description').value = '';
                 document.getElementById('floating_redirect_ip').value = '';
                 alert('Rule saved successfully!');
+                loadFloatingRules();
             }
         });
     }
@@ -394,6 +427,18 @@
     // --- WAN RULES LOGIC ---
     const wanModal = document.getElementById('wanModal');
     const ruleEditSaveBtn = document.getElementById('ruleEditSaveBtn');
+
+    let wanAddPosition = 'bottom';
+
+    // Use Bootstrap modal event to capture position from button data attribute
+    if (wanModal) {
+        wanModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            if (button) {
+                wanAddPosition = button.getAttribute('data-position') || 'bottom';
+            }
+        });
+    }
 
     if (ruleEditSaveBtn) {
         ruleEditSaveBtn.addEventListener('click', async () => {
@@ -403,17 +448,17 @@
                 protocol: document.getElementById('wan_rule_protocol').value,
                 source: 'any',
                 destination: 'any',
-                description: document.getElementById('rule_desc').value || 'New WAN rule'
+                description: document.getElementById('rule_desc').value || 'New WAN rule',
+                position: wanAddPosition
             };
 
             const result = await saveRuleToBackend(ruleData, 'wan');
             if (result) {
                 alert('WAN Rule saved successfully!');
-                // Close modal and reset form
                 bootstrap.Modal.getInstance(wanModal).hide();
                 document.getElementById('wan_rule_disabled').checked = false;
                 document.getElementById('rule_desc').value = '';
-                location.reload();
+                loadWanRules();
             }
         });
     }
@@ -421,6 +466,18 @@
     // --- LAN RULES LOGIC ---
     const lanModal = document.getElementById('lanModal');
     const lanRuleSaveBtn = document.getElementById('lanRuleSaveBtn');
+
+    let lanAddPosition = 'bottom';
+
+    // Use Bootstrap modal event to capture position from button data attribute
+    if (lanModal) {
+        lanModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            if (button) {
+                lanAddPosition = button.getAttribute('data-position') || 'bottom';
+            }
+        });
+    }
 
     if (lanRuleSaveBtn) {
         lanRuleSaveBtn.addEventListener('click', async () => {
@@ -430,16 +487,16 @@
                 protocol: document.getElementById('lan_protocol').value,
                 source: 'any',
                 destination: 'any',
-                description: document.getElementById('lan_description').value || 'New LAN rule'
+                description: document.getElementById('lan_description').value || 'New LAN rule',
+                position: lanAddPosition
             };
 
             const result = await saveRuleToBackend(ruleData, 'lan');
             if (result) {
                 alert('LAN Rule saved successfully!');
-                // Close modal and reset form
                 bootstrap.Modal.getInstance(lanModal).hide();
                 document.getElementById('lan_description').value = '';
-                location.reload();
+                loadLanRules();
             }
         });
     }
@@ -451,7 +508,7 @@
             const result = await response.json();
             if (result.success && result.rules) {
                 const tbody = document.getElementById('floating-tbody');
-                tbody.innerHTML = ''; // Clear existing
+                tbody.innerHTML = '';
                 result.rules.forEach(rule => {
                     const row = document.createElement('tr');
                     row.dataset.ruleId = rule.id;
@@ -469,8 +526,10 @@
                         <td>${rule.schedule || '-'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('floating', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('floating', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('floating', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('floating', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -500,8 +559,10 @@
                         <td>${rule.destination || 'any'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('wan', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('wan', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('wan', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('wan', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('wan', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('wan', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -530,8 +591,10 @@
                         <td>${rule.destination || 'any'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('lan', ${rule.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('lan', ${rule.id})">Delete</button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('lan', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button class="btn btn-sm btn-secondary" onclick="moveRule('lan', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button class="btn btn-sm btn-primary" onclick="editRule('lan', ${rule.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRule('lan', ${rule.id})"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -553,7 +616,6 @@
             const result = await response.json();
             if (result.success) {
                 alert('Rule deleted successfully!');
-                // Reload the appropriate rules
                 if (type === 'floating') loadFloatingRules();
                 else if (type === 'wan') loadWanRules();
                 else if (type === 'lan') loadLanRules();

@@ -168,6 +168,28 @@ def edit_user(user_id):
     return redirect(url_for("users.user_manager"))
 
 
+@users_bp.route("/groups", methods=["GET"])
+def groups_manager():
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Get all groups with member count
+    cur.execute("""
+        SELECT groups.*, COUNT(user_groups.user_id) as member_count
+        FROM groups
+        LEFT JOIN user_groups ON groups.id = user_groups.group_id
+        GROUP BY groups.id
+    """)
+    groups = cur.fetchall()
+    
+    # Get all users for assigning to groups
+    cur.execute("SELECT id, username, full_name FROM users")
+    users = cur.fetchall()
+    
+    conn.close()
+    return render_template("user_group.html", groups=groups, users=users)
+
+
 @users_bp.route("/add-group", methods=["POST"])
 def add_group():
     name = request.form.get("group_name")
@@ -182,4 +204,87 @@ def add_group():
     """, (name, description))
 
     conn.commit()
+    conn.close()
+    
+    # Check if we came from the groups page
+    if request.referrer and '/groups' in request.referrer:
+        return redirect(url_for("users.groups_manager"))
     return redirect(url_for("users.user_manager"))
+
+
+@users_bp.route("/edit-group/<int:group_id>", methods=["POST"])
+def edit_group(group_id):
+    name = request.form.get("group_name")
+    description = request.form.get("description")
+    
+    conn = get_db()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        UPDATE groups SET name=?, description=? WHERE id=?
+    """, (name, description, group_id))
+    
+    conn.commit()
+    conn.close()
+    return redirect(url_for("users.groups_manager"))
+
+
+@users_bp.route("/delete-group/<int:group_id>", methods=["POST"])
+def delete_group(group_id):
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Remove all user associations first
+    cur.execute("DELETE FROM user_groups WHERE group_id=?", (group_id,))
+    # Delete the group
+    cur.execute("DELETE FROM groups WHERE id=?", (group_id,))
+    
+    conn.commit()
+    conn.close()
+    return redirect(url_for("users.groups_manager"))
+
+
+@users_bp.route("/group/<int:group_id>/members", methods=["GET"])
+def get_group_members(group_id):
+    conn = get_db()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT users.id, users.username, users.full_name
+        FROM users
+        JOIN user_groups ON users.id = user_groups.user_id
+        WHERE user_groups.group_id=?
+    """, (group_id,))
+    members = cur.fetchall()
+    
+    conn.close()
+    return {"members": [dict(m) for m in members]}
+
+
+@users_bp.route("/group/<int:group_id>/add-member", methods=["POST"])
+def add_group_member(group_id):
+    user_id = request.form.get("user_id")
+    
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Check if already a member
+    cur.execute("SELECT 1 FROM user_groups WHERE user_id=? AND group_id=?", (user_id, group_id))
+    if not cur.fetchone():
+        cur.execute("INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)", (user_id, group_id))
+        conn.commit()
+    
+    conn.close()
+    return redirect(url_for("users.groups_manager"))
+
+
+@users_bp.route("/group/<int:group_id>/remove-member/<int:user_id>", methods=["POST"])
+def remove_group_member(group_id, user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    
+    cur.execute("DELETE FROM user_groups WHERE user_id=? AND group_id=?", (user_id, group_id))
+    conn.commit()
+    
+    conn.close()
+    return redirect(url_for("users.groups_manager"))
