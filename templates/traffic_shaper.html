@@ -79,7 +79,8 @@
         <div class="section">
             <div class="section-header d-flex justify-content-between align-items-center">
                 <h2>Limiters</h2>
-                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
                     <i class="fas fa-plus"></i> New Limiter
                 </button>
             </div>
@@ -148,33 +149,35 @@
             <div class="modal-body">
                 <form id="limiterForm">
                     <input type="hidden" id="limiterEditId" value="">
-                    
+
                     <!-- General Settings -->
                     <h6 class="fw-semibold mb-3">General Settings</h6>
-                    
+
                     <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Enable</label>
                         <div class="col-sm-9">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="limiterEnable" checked>
-                                <label class="form-check-label" for="limiterEnable">Enable limiter and its children</label>
+                                <label class="form-check-label" for="limiterEnable">Enable limiter and its
+                                    children</label>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterName" class="col-sm-3 col-form-label fw-semibold">Name</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="limiterName" placeholder="Enter limiter name">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Bandwidth</label>
                         <div class="col-sm-9">
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <input type="text" class="form-control" id="limiterBandwidth" placeholder="Bandwidth">
+                                    <input type="text" class="form-control" id="limiterBandwidth"
+                                        placeholder="Bandwidth">
                                 </div>
                                 <div class="col-6">
                                     <select class="form-select" id="limiterBandwidthUnit">
@@ -186,7 +189,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterMaskType" class="col-sm-3 col-form-label fw-semibold">Mask</label>
                         <div class="col-sm-9">
@@ -195,7 +198,8 @@
                                 <option value="Source addresses">Source addresses</option>
                                 <option value="Destination addresses">Destination addresses</option>
                             </select>
-                            <small class="text-muted">Creates dynamic pipe per source/destination IP for per-host limits.</small>
+                            <small class="text-muted">Creates dynamic pipe per source/destination IP for per-host
+                                limits.</small>
                             <div class="row g-2 mt-2">
                                 <div class="col-6">
                                     <input type="text" class="form-control" id="limiterIPv4MaskBits" placeholder="32">
@@ -208,31 +212,34 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterDescription" class="col-sm-3 col-form-label fw-semibold">Description</label>
                         <div class="col-sm-9">
-                            <input type="text" class="form-control" id="limiterDescription" placeholder="Optional description">
+                            <input type="text" class="form-control" id="limiterDescription"
+                                placeholder="Optional description">
                         </div>
                     </div>
-                    
+
                     <!-- Queue Settings -->
                     <h6 class="fw-semibold mb-3 mt-4">Queue Settings</h6>
-                    
+
                     <div class="mb-3 row">
-                        <label for="limiterQueueManagementAlgorithm" class="col-sm-3 col-form-label fw-semibold">Queue Algorithm</label>
+                        <label for="limiterQueueManagementAlgorithm" class="col-sm-3 col-form-label fw-semibold">Queue
+                            Algorithm</label>
                         <div class="col-sm-9">
                             <select class="form-select" id="limiterQueueManagementAlgorithm">
                                 <option value="Tail Drop">Tail Drop</option>
                                 <option value="CoDel">CoDel</option>
                                 <option value="PIE">PIE</option>
                                 <option value="Random Early Detection (RED)">Random Early Detection (RED)</option>
-                                <option value="Gentle Random Early Detection (GRED)">Gentle Random Early Detection (GRED)</option>
+                                <option value="Gentle Random Early Detection (GRED)">Gentle Random Early Detection
+                                    (GRED)</option>
                             </select>
                             <small class="text-muted">Active queue management algorithm.</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterScheduler" class="col-sm-3 col-form-label fw-semibold">Scheduler</label>
                         <div class="col-sm-9">
@@ -248,17 +255,18 @@
                             <small class="text-muted">Manages the sequence of packets in the queue.</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterQueueLength" class="col-sm-3 col-form-label fw-semibold">Queue Length</label>
                         <div class="col-sm-9">
-                            <input type="text" class="form-control" id="limiterQueueLength" placeholder="Leave empty for default">
+                            <input type="text" class="form-control" id="limiterQueueLength"
+                                placeholder="Leave empty for default">
                         </div>
                     </div>
-                    
+
                     <!-- Advanced Options -->
                     <h6 class="fw-semibold mb-3 mt-4">Advanced Options</h6>
-                    
+
                     <div class="mb-3 row">
                         <label for="limiterDelayMs" class="col-sm-3 col-form-label fw-semibold">Delay (ms)</label>
                         <div class="col-sm-9">
@@ -266,19 +274,22 @@
                             <small class="text-muted">In most cases, use zero or leave empty.</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
-                        <label for="limiterPacketLossRate" class="col-sm-3 col-form-label fw-semibold">Packet Loss Rate</label>
+                        <label for="limiterPacketLossRate" class="col-sm-3 col-form-label fw-semibold">Packet Loss
+                            Rate</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="limiterPacketLossRate" placeholder="0">
                             <small class="text-muted">Value of 0.001 means 1 packet in 1000 gets dropped.</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
-                        <label for="limiterBucketSizeSlots" class="col-sm-3 col-form-label fw-semibold">Bucket Size (slots)</label>
+                        <label for="limiterBucketSizeSlots" class="col-sm-3 col-form-label fw-semibold">Bucket Size
+                            (slots)</label>
                         <div class="col-sm-9">
-                            <input type="text" class="form-control" id="limiterBucketSizeSlots" placeholder="Leave empty for default">
+                            <input type="text" class="form-control" id="limiterBucketSizeSlots"
+                                placeholder="Leave empty for default">
                             <small class="text-muted">Increases the hash size set.</small>
                         </div>
                     </div>
@@ -304,26 +315,28 @@
                 <form id="queueForm">
                     <input type="hidden" id="queueEditId" value="">
                     <input type="hidden" id="queueInterface" value="">
-                    
+
                     <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Enable</label>
                         <div class="col-sm-9">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="queueEnable" checked>
-                                <label class="form-check-label" for="queueEnable">Enable discipline and its children</label>
+                                <label class="form-check-label" for="queueEnable">Enable discipline and its
+                                    children</label>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="queueName" class="col-sm-3 col-form-label fw-semibold">Name</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="queueName" placeholder="Queue name">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
-                        <label for="queueSchedulerType" class="col-sm-3 col-form-label fw-semibold">Scheduler Type</label>
+                        <label for="queueSchedulerType" class="col-sm-3 col-form-label fw-semibold">Scheduler
+                            Type</label>
                         <div class="col-sm-9">
                             <select class="form-select" id="queueSchedulerType">
                                 <option value="HFSC">HFSC</option>
@@ -333,7 +346,7 @@
                             <small class="text-muted">Changing this changes all child queues!</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Bandwidth</label>
                         <div class="col-sm-9">
@@ -351,18 +364,19 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="queueLimit" class="col-sm-3 col-form-label fw-semibold">Queue Limit</label>
                         <div class="col-sm-9">
                             <input type="text" class="form-control" id="queueLimit" placeholder="Queue limit">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="queueTbrSize" class="col-sm-3 col-form-label fw-semibold">TBR Size</label>
                         <div class="col-sm-9">
-                            <input type="text" class="form-control" id="queueTbrSize" placeholder="Leave empty for default">
+                            <input type="text" class="form-control" id="queueTbrSize"
+                                placeholder="Leave empty for default">
                             <small class="text-muted">Token bucket regulator size in bytes.</small>
                         </div>
                     </div>
@@ -377,68 +391,68 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab switching
-    function openTab(tabId) {
-        document.querySelectorAll('.nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
-        document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-        document.getElementById(tabId).classList.add('active');
-    }
+    document.addEventListener('DOMContentLoaded', function () {
+        // Tab switching
+        function openTab(tabId) {
+            document.querySelectorAll('.nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-    document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            openTab(this.dataset.tab);
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                openTab(this.dataset.tab);
+            });
         });
+
+        // Load data
+        loadTrafficShaperConfigs();
+        loadLimitersConfigs();
+
+        // Save limiter button
+        document.getElementById('saveLimiterBtn').addEventListener('click', saveLimiter);
+
+        // Save queue button
+        document.getElementById('saveQueueBtn').addEventListener('click', saveQueue);
     });
 
-    // Load data
-    loadTrafficShaperConfigs();
-    loadLimitersConfigs();
-
-    // Save limiter button
-    document.getElementById('saveLimiterBtn').addEventListener('click', saveLimiter);
-
-    // Save queue button
-    document.getElementById('saveQueueBtn').addEventListener('click', saveQueue);
-});
-
-// Traffic Shaper Functions
-function loadTrafficShaperConfigs() {
-    fetch('/firewall/get-traffic-shaper-configs')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                displayTrafficShaperConfigs(data.data);
-            }
-        })
-        .catch(error => console.error('Error loading traffic shaper configs:', error));
-}
-
-function displayTrafficShaperConfigs(configs) {
-    const wanConfigs = configs.filter(c => c.interface_type === 'WAN');
-    const lanConfigs = configs.filter(c => c.interface_type === 'LAN');
-    
-    displayConfigsForInterface('wan', wanConfigs);
-    displayConfigsForInterface('lan', lanConfigs);
-}
-
-function displayConfigsForInterface(interfaceType, configs) {
-    const container = document.querySelector(`#${interfaceType}Config .config-entries`);
-    if (!container) return;
-    
-    if (configs.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center py-3">No queues configured</p>';
-        return;
+    // Traffic Shaper Functions
+    function loadTrafficShaperConfigs() {
+        fetch('/firewall/get-traffic-shaper-configs')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    displayTrafficShaperConfigs(data.data);
+                }
+            })
+            .catch(error => console.error('Error loading traffic shaper configs:', error));
     }
-    
-    container.innerHTML = '';
-    configs.forEach(config => {
-        const card = document.createElement('div');
-        card.className = 'card mb-3';
-        card.innerHTML = `
+
+    function displayTrafficShaperConfigs(configs) {
+        const wanConfigs = configs.filter(c => c.interface_type === 'WAN');
+        const lanConfigs = configs.filter(c => c.interface_type === 'LAN');
+
+        displayConfigsForInterface('wan', wanConfigs);
+        displayConfigsForInterface('lan', lanConfigs);
+    }
+
+    function displayConfigsForInterface(interfaceType, configs) {
+        const container = document.querySelector(`#${interfaceType}Config .config-entries`);
+        if (!container) return;
+
+        if (configs.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center py-3">No queues configured</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        configs.forEach(config => {
+            const card = document.createElement('div');
+            card.className = 'card mb-3';
+            card.innerHTML = `
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">${config.name}</span>
                 <span class="badge ${config.enable_disable ? 'bg-success' : 'bg-secondary'}">${config.enable_disable ? 'Enabled' : 'Disabled'}</span>
@@ -460,76 +474,73 @@ function displayConfigsForInterface(interfaceType, configs) {
                 </button>
             </div>
         `;
-        container.appendChild(card);
-    });
-}
-
-function editQueue(configId, interfaceType) {
-    fetch(`/firewall/get-traffic-shaper-configs`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const config = data.data.find(c => c.id === configId);
-                if (config) {
-                    document.getElementById('queueEditId').value = configId;
-                    document.getElementById('queueInterface').value = interfaceType;
-                    document.getElementById('queueEnable').checked = config.enable_disable;
-                    document.getElementById('queueName').value = config.name || '';
-                    document.getElementById('queueSchedulerType').value = config.scheduler_type || 'HFSC';
-                    document.getElementById('queueBandwidth').value = config.bandwidth || '';
-                    document.getElementById('queueBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
-                    document.getElementById('queueLimit').value = config.queue_limit || '';
-                    document.getElementById('queueTbrSize').value = config.tbr_size || '';
-                    
-                    new bootstrap.Modal(document.getElementById('queueModal')).show();
-                }
-            }
+            container.appendChild(card);
         });
-}
+    }
 
-function saveQueue() {
-    const configId = document.getElementById('queueEditId').value;
-    const interfaceType = document.getElementById('queueInterface').value;
-    
-    const formData = {
-        interfaceType: interfaceType.toUpperCase(),
-        enableDisable: document.getElementById('queueEnable').checked,
-        name: document.getElementById('queueName').value,
-        schedulerType: document.getElementById('queueSchedulerType').value,
-        bandwidth: parseInt(document.getElementById('queueBandwidth').value) || null,
-        bandwidthUnit: document.getElementById('queueBandwidthUnit').value,
-        queueLimit: parseInt(document.getElementById('queueLimit').value) || null,
-        tbrSize: parseInt(document.getElementById('queueTbrSize').value) || null
-    };
-
-    fetch(`/firewall/update-traffic-shaper-config/${configId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('Queue updated successfully!');
-            bootstrap.Modal.getInstance(document.getElementById('queueModal')).hide();
-            loadTrafficShaperConfigs();
-        } else {
-            alert('Error: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error updating queue');
-    });
-}
-
-function deleteTrafficShaperConfig(configId) {
-    if (confirm('Are you sure you want to delete this queue?')) {
-        fetch(`/firewall/delete-traffic-shaper-config/${configId}`, { method: 'DELETE' })
+    function editQueue(configId, interfaceType) {
+        fetch(`/firewall/get-traffic-shaper-configs`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert('Queue deleted successfully!');
+                    const config = data.data.find(c => c.id === configId);
+                    if (config) {
+                        document.getElementById('queueEditId').value = configId;
+                        document.getElementById('queueInterface').value = interfaceType;
+                        document.getElementById('queueEnable').checked = config.enable_disable;
+                        document.getElementById('queueName').value = config.name || '';
+                        document.getElementById('queueSchedulerType').value = config.scheduler_type || 'HFSC';
+                        document.getElementById('queueBandwidth').value = config.bandwidth || '';
+                        document.getElementById('queueBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
+                        document.getElementById('queueLimit').value = config.queue_limit || '';
+                        document.getElementById('queueTbrSize').value = config.tbr_size || '';
+                        document.getElementById('queueModalLabel').textContent = 'Edit Queue';
+
+                        new bootstrap.Modal(document.getElementById('queueModal')).show();
+                    }
+                }
+            });
+    }
+
+    function saveQueue() {
+        const configId = document.getElementById('queueEditId').value;
+        const interfaceType = document.getElementById('queueInterface').value;
+        const queueName = document.getElementById('queueName').value.trim();
+
+        // Validate name
+        if (!queueName) {
+            alert('Queue name is required');
+            return;
+        }
+
+        const formData = {
+            interfaceType: interfaceType.toUpperCase(),
+            enableDisable: document.getElementById('queueEnable').checked,
+            name: queueName,
+            schedulerType: document.getElementById('queueSchedulerType').value,
+            bandwidth: parseInt(document.getElementById('queueBandwidth').value) || null,
+            bandwidthUnit: document.getElementById('queueBandwidthUnit').value,
+            queueLimit: parseInt(document.getElementById('queueLimit').value) || null,
+            tbrSize: parseInt(document.getElementById('queueTbrSize').value) || null
+        };
+
+        // Determine if creating new or updating existing
+        const url = configId
+            ? `/firewall/update-traffic-shaper-config/${configId}`
+            : '/firewall/save-traffic-shaper-config';
+        const method = configId ? 'PUT' : 'POST';
+        const successMsg = configId ? 'Queue updated successfully!' : 'Queue created successfully!';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(successMsg);
+                    bootstrap.Modal.getInstance(document.getElementById('queueModal')).hide();
                     loadTrafficShaperConfigs();
                 } else {
                     alert('Error: ' + (data.message || 'Unknown error'));
@@ -537,67 +548,70 @@ function deleteTrafficShaperConfig(configId) {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error deleting queue');
+                alert('Error saving queue');
             });
     }
-}
 
-function addNewQueue(interfaceType) {
-    const formData = {
-        interfaceType: interfaceType.toUpperCase(),
-        enableDisable: true,
-        name: interfaceType.toLowerCase() + '_queue_' + Date.now(),
-        schedulerType: 'HFSC',
-        bandwidth: null,
-        bandwidthUnit: 'Mbit/s',
-        queueLimit: null,
-        tbrSize: null
-    };
-
-    fetch('/firewall/save-traffic-shaper-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('New queue added successfully!');
-            loadTrafficShaperConfigs();
-        } else {
-            alert('Error: ' + (data.message || 'Unknown error'));
+    function deleteTrafficShaperConfig(configId) {
+        if (confirm('Are you sure you want to delete this queue?')) {
+            fetch(`/firewall/delete-traffic-shaper-config/${configId}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Queue deleted successfully!');
+                        loadTrafficShaperConfigs();
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting queue');
+                });
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error adding new queue');
-    });
-}
-
-// Limiters Functions
-function loadLimitersConfigs() {
-    fetch('/firewall/get-limiters-configs')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                displayLimitersConfigs(data.data);
-            }
-        })
-        .catch(error => console.error('Error loading limiters:', error));
-}
-
-function displayLimitersConfigs(configs) {
-    const tbody = document.getElementById('limitersList');
-    
-    if (configs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No limiters configured</td></tr>';
-        return;
     }
-    
-    tbody.innerHTML = '';
-    configs.forEach(config => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
+
+    function addNewQueue(interfaceType) {
+        // Clear the form and set it up for new queue creation
+        document.getElementById('queueEditId').value = '';
+        document.getElementById('queueInterface').value = interfaceType;
+        document.getElementById('queueEnable').checked = true;
+        document.getElementById('queueName').value = '';
+        document.getElementById('queueSchedulerType').value = 'HFSC';
+        document.getElementById('queueBandwidth').value = '';
+        document.getElementById('queueBandwidthUnit').value = 'Mbit/s';
+        document.getElementById('queueLimit').value = '';
+        document.getElementById('queueTbrSize').value = '';
+        document.getElementById('queueModalLabel').textContent = 'Add Queue';
+
+        // Show the modal
+        new bootstrap.Modal(document.getElementById('queueModal')).show();
+    }
+
+    // Limiters Functions
+    function loadLimitersConfigs() {
+        fetch('/firewall/get-limiters-configs')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    displayLimitersConfigs(data.data);
+                }
+            })
+            .catch(error => console.error('Error loading limiters:', error));
+    }
+
+    function displayLimitersConfigs(configs) {
+        const tbody = document.getElementById('limitersList');
+
+        if (configs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No limiters configured</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        configs.forEach(config => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
             <td>${config.name}</td>
             <td>${config.bandwidth || '-'} ${config.bandwidth_unit || ''}</td>
             <td>${config.mask_type}</td>
@@ -612,117 +626,99 @@ function displayLimitersConfigs(configs) {
                 </button>
             </td>
         `;
-        tbody.appendChild(row);
-    });
-}
-
-function openNewLimiterModal() {
-    document.getElementById('limiterEditId').value = '';
-    document.getElementById('limiterEnable').checked = true;
-    document.getElementById('limiterName').value = '';
-    document.getElementById('limiterBandwidth').value = '';
-    document.getElementById('limiterBandwidthUnit').value = 'Mbit/s';
-    document.getElementById('limiterMaskType').value = 'None';
-    document.getElementById('limiterIPv4MaskBits').value = '32';
-    document.getElementById('limiterIPv6MaskBits').value = '128';
-    document.getElementById('limiterDescription').value = '';
-    document.getElementById('limiterQueueManagementAlgorithm').value = 'Tail Drop';
-    document.getElementById('limiterScheduler').value = 'Worst-case Weighted fair Queuing (default)';
-    document.getElementById('limiterQueueLength').value = '';
-    document.getElementById('limiterDelayMs').value = '';
-    document.getElementById('limiterPacketLossRate').value = '';
-    document.getElementById('limiterBucketSizeSlots').value = '';
-    document.getElementById('limiterModalLabel').textContent = 'Add Limiter';
-}
-
-function editLimiter(limiterId) {
-    fetch(`/firewall/get-limiters-config/${limiterId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const config = data.data;
-                document.getElementById('limiterEditId').value = limiterId;
-                document.getElementById('limiterEnable').checked = config.enable_disable;
-                document.getElementById('limiterName').value = config.name || '';
-                document.getElementById('limiterBandwidth').value = config.bandwidth || '';
-                document.getElementById('limiterBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
-                document.getElementById('limiterMaskType').value = config.mask_type || 'None';
-                document.getElementById('limiterIPv4MaskBits').value = config.ipv4_mask_bits || '32';
-                document.getElementById('limiterIPv6MaskBits').value = config.ipv6_mask_bits || '128';
-                document.getElementById('limiterDescription').value = config.description || '';
-                document.getElementById('limiterQueueManagementAlgorithm').value = config.queue_management_algorithm || 'Tail Drop';
-                document.getElementById('limiterScheduler').value = config.scheduler || 'Worst-case Weighted fair Queuing (default)';
-                document.getElementById('limiterQueueLength').value = config.queue_length || '';
-                document.getElementById('limiterDelayMs').value = config.delay_ms || '';
-                document.getElementById('limiterPacketLossRate').value = config.packet_loss_rate || '';
-                document.getElementById('limiterBucketSizeSlots').value = config.bucket_size_slots || '';
-                document.getElementById('limiterModalLabel').textContent = 'Edit Limiter';
-                
-                new bootstrap.Modal(document.getElementById('limiterModal')).show();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error loading limiter');
+            tbody.appendChild(row);
         });
-}
-
-function saveLimiter() {
-    const limiterId = document.getElementById('limiterEditId').value;
-    
-    const formData = {
-        enableDisable: document.getElementById('limiterEnable').checked,
-        name: document.getElementById('limiterName').value,
-        bandwidth: parseInt(document.getElementById('limiterBandwidth').value) || null,
-        bandwidthUnit: document.getElementById('limiterBandwidthUnit').value,
-        maskType: document.getElementById('limiterMaskType').value,
-        ipv4MaskBits: parseInt(document.getElementById('limiterIPv4MaskBits').value) || null,
-        ipv6MaskBits: parseInt(document.getElementById('limiterIPv6MaskBits').value) || null,
-        description: document.getElementById('limiterDescription').value,
-        queueManagementAlgorithm: document.getElementById('limiterQueueManagementAlgorithm').value,
-        scheduler: document.getElementById('limiterScheduler').value,
-        queueLength: parseInt(document.getElementById('limiterQueueLength').value) || null,
-        delayMs: parseInt(document.getElementById('limiterDelayMs').value) || null,
-        packetLossRate: parseFloat(document.getElementById('limiterPacketLossRate').value) || null,
-        bucketSizeSlots: parseInt(document.getElementById('limiterBucketSizeSlots').value) || null
-    };
-
-    if (!formData.name.trim()) {
-        alert('Limiter name is required');
-        return;
     }
 
-    const url = limiterId ? `/firewall/update-limiters-config/${limiterId}` : '/firewall/save-limiters-config';
-    const method = limiterId ? 'PUT' : 'POST';
+    function openNewLimiterModal() {
+        document.getElementById('limiterEditId').value = '';
+        document.getElementById('limiterEnable').checked = true;
+        document.getElementById('limiterName').value = '';
+        document.getElementById('limiterBandwidth').value = '';
+        document.getElementById('limiterBandwidthUnit').value = 'Mbit/s';
+        document.getElementById('limiterMaskType').value = 'None';
+        document.getElementById('limiterIPv4MaskBits').value = '32';
+        document.getElementById('limiterIPv6MaskBits').value = '128';
+        document.getElementById('limiterDescription').value = '';
+        document.getElementById('limiterQueueManagementAlgorithm').value = 'Tail Drop';
+        document.getElementById('limiterScheduler').value = 'Worst-case Weighted fair Queuing (default)';
+        document.getElementById('limiterQueueLength').value = '';
+        document.getElementById('limiterDelayMs').value = '';
+        document.getElementById('limiterPacketLossRate').value = '';
+        document.getElementById('limiterBucketSizeSlots').value = '';
+        document.getElementById('limiterModalLabel').textContent = 'Add Limiter';
+    }
 
-    fetch(url, {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(limiterId ? 'Limiter updated!' : 'Limiter saved!');
-            bootstrap.Modal.getInstance(document.getElementById('limiterModal')).hide();
-            loadLimitersConfigs();
-        } else {
-            alert('Error: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error saving limiter');
-    });
-}
-
-function deleteLimiter(limiterId) {
-    if (confirm('Are you sure you want to delete this limiter?')) {
-        fetch(`/firewall/delete-limiters-config/${limiterId}`, { method: 'DELETE' })
+    function editLimiter(limiterId) {
+        fetch(`/firewall/get-limiters-config/${limiterId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert('Limiter deleted!');
+                    const config = data.data;
+                    document.getElementById('limiterEditId').value = limiterId;
+                    document.getElementById('limiterEnable').checked = config.enable_disable;
+                    document.getElementById('limiterName').value = config.name || '';
+                    document.getElementById('limiterBandwidth').value = config.bandwidth || '';
+                    document.getElementById('limiterBandwidthUnit').value = config.bandwidth_unit || 'Mbit/s';
+                    document.getElementById('limiterMaskType').value = config.mask_type || 'None';
+                    document.getElementById('limiterIPv4MaskBits').value = config.ipv4_mask_bits || '32';
+                    document.getElementById('limiterIPv6MaskBits').value = config.ipv6_mask_bits || '128';
+                    document.getElementById('limiterDescription').value = config.description || '';
+                    document.getElementById('limiterQueueManagementAlgorithm').value = config.queue_management_algorithm || 'Tail Drop';
+                    document.getElementById('limiterScheduler').value = config.scheduler || 'Worst-case Weighted fair Queuing (default)';
+                    document.getElementById('limiterQueueLength').value = config.queue_length || '';
+                    document.getElementById('limiterDelayMs').value = config.delay_ms || '';
+                    document.getElementById('limiterPacketLossRate').value = config.packet_loss_rate || '';
+                    document.getElementById('limiterBucketSizeSlots').value = config.bucket_size_slots || '';
+                    document.getElementById('limiterModalLabel').textContent = 'Edit Limiter';
+
+                    new bootstrap.Modal(document.getElementById('limiterModal')).show();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading limiter');
+            });
+    }
+
+    function saveLimiter() {
+        const limiterId = document.getElementById('limiterEditId').value;
+
+        const formData = {
+            enableDisable: document.getElementById('limiterEnable').checked,
+            name: document.getElementById('limiterName').value,
+            bandwidth: parseInt(document.getElementById('limiterBandwidth').value) || null,
+            bandwidthUnit: document.getElementById('limiterBandwidthUnit').value,
+            maskType: document.getElementById('limiterMaskType').value,
+            ipv4MaskBits: parseInt(document.getElementById('limiterIPv4MaskBits').value) || null,
+            ipv6MaskBits: parseInt(document.getElementById('limiterIPv6MaskBits').value) || null,
+            description: document.getElementById('limiterDescription').value,
+            queueManagementAlgorithm: document.getElementById('limiterQueueManagementAlgorithm').value,
+            scheduler: document.getElementById('limiterScheduler').value,
+            queueLength: parseInt(document.getElementById('limiterQueueLength').value) || null,
+            delayMs: parseInt(document.getElementById('limiterDelayMs').value) || null,
+            packetLossRate: parseFloat(document.getElementById('limiterPacketLossRate').value) || null,
+            bucketSizeSlots: parseInt(document.getElementById('limiterBucketSizeSlots').value) || null
+        };
+
+        if (!formData.name.trim()) {
+            alert('Limiter name is required');
+            return;
+        }
+
+        const url = limiterId ? `/firewall/update-limiters-config/${limiterId}` : '/firewall/save-limiters-config';
+        const method = limiterId ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(limiterId ? 'Limiter updated!' : 'Limiter saved!');
+                    bootstrap.Modal.getInstance(document.getElementById('limiterModal')).hide();
                     loadLimitersConfigs();
                 } else {
                     alert('Error: ' + (data.message || 'Unknown error'));
@@ -730,10 +726,28 @@ function deleteLimiter(limiterId) {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error deleting limiter');
+                alert('Error saving limiter');
             });
     }
-}
+
+    function deleteLimiter(limiterId) {
+        if (confirm('Are you sure you want to delete this limiter?')) {
+            fetch(`/firewall/delete-limiters-config/${limiterId}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Limiter deleted!');
+                        loadLimitersConfigs();
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting limiter');
+                });
+        }
+    }
 </script>
 
 {% endblock %}

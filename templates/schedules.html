@@ -17,7 +17,8 @@
     <div class="section">
         <div class="section-header d-flex justify-content-between align-items-center">
             <h2>Schedules</h2>
-            <button type="button" class="btn btn-success btn-sm" id="schedulesAdd" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
+            <button type="button" class="btn btn-success btn-sm" id="schedulesAdd" data-bs-toggle="modal"
+                data-bs-target="#scheduleEditModal">
                 <i class="fas fa-plus"></i> Add Schedule
             </button>
         </div>
@@ -42,7 +43,8 @@
 </div>
 
 <!-- Edit Schedule Modal -->
-<div class="modal fade" id="scheduleEditModal" tabindex="-1" aria-labelledby="scheduleEditModalLabel" aria-hidden="true">
+<div class="modal fade" id="scheduleEditModal" tabindex="-1" aria-labelledby="scheduleEditModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -52,7 +54,7 @@
             <div class="modal-body">
                 <!-- Schedule Information -->
                 <h6 class="fw-semibold mb-3">Schedule Information</h6>
-                
+
                 <div class="mb-3 row">
                     <label for="scheduleName" class="col-sm-3 col-form-label fw-semibold">Schedule Name</label>
                     <div class="col-sm-9">
@@ -60,7 +62,7 @@
                         <small class="text-muted">The name may only consist of characters "a-z, A-Z, 0-9 and _".</small>
                     </div>
                 </div>
-                
+
                 <div class="mb-3 row">
                     <label for="scheduleDesc" class="col-sm-3 col-form-label fw-semibold">Description</label>
                     <div class="col-sm-9">
@@ -68,7 +70,7 @@
                         <small class="text-muted">A description for administrative reference.</small>
                     </div>
                 </div>
-                
+
                 <div class="mb-3 row">
                     <label for="scheduleMonth" class="col-sm-3 col-form-label fw-semibold">Month</label>
                     <div class="col-sm-9">
@@ -88,11 +90,12 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Date</label>
                     <div class="col-sm-9">
-                        <div class="bg-light border rounded p-2 mb-2 text-center fw-semibold" id="calendarHeader">January 2026</div>
+                        <div class="bg-light border rounded p-2 mb-2 text-center fw-semibold" id="calendarHeader">
+                            January 2026</div>
                         <div class="table-responsive" style="max-width: 400px;">
                             <table class="table table-bordered table-sm" id="calendarTable">
                                 <thead>
@@ -111,10 +114,11 @@
                                 </tbody>
                             </table>
                         </div>
-                        <small class="text-muted">Click a date to select. Click a weekday header to select all occurrences.</small>
+                        <small class="text-muted">Click a date to select. Click a weekday header to select all
+                            occurrences.</small>
                     </div>
                 </div>
-                
+
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Time</label>
                     <div class="col-sm-9">
@@ -201,14 +205,15 @@
                         <small class="text-muted">Select the time range. A full day is 0:00 - 23:59.</small>
                     </div>
                 </div>
-                
+
                 <div class="mb-3 row">
                     <label for="rangeDesc" class="col-sm-3 col-form-label fw-semibold">Time Range Description</label>
                     <div class="col-sm-9">
-                        <input type="text" id="rangeDesc" class="form-control" placeholder="Optional time range description">
+                        <input type="text" id="rangeDesc" class="form-control"
+                            placeholder="Optional time range description">
                     </div>
                 </div>
-                
+
                 <div class="mb-4 row">
                     <div class="col-sm-9 offset-sm-3">
                         <button type="button" class="btn btn-success btn-sm" id="addTimeBtn">
@@ -219,7 +224,7 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- Configured Ranges -->
                 <h6 class="fw-semibold mb-3">Configured Ranges</h6>
                 <div class="table-responsive">
@@ -252,20 +257,25 @@
         text-align: center;
         padding: 8px;
     }
+
     #calendarTable td:hover {
         background-color: #e9ecef;
     }
+
     #calendarTable td.selected {
         background-color: #0d6efd;
         color: white;
     }
+
     #calendarTable td.empty {
         background-color: #f8f9fa;
         cursor: default;
     }
+
     .calendar-weekday {
         cursor: pointer;
     }
+
     .calendar-weekday:hover {
         background-color: #e9ecef;
     }
@@ -409,106 +419,115 @@ document.addEventListener('DOMContentLoaded', function() {
             tbody.appendChild(row);
         }
     }
+=======
+    document.addEventListener('DOMContentLoaded', function () {
+        const scheduleMonth = document.getElementById('scheduleMonth');
+        const calendarHeader = document.getElementById('calendarHeader');
+        const calendarBody = document.getElementById('calendarBody');
+        const configuredRanges = document.getElementById('configuredRanges');
+        let selectedDates = [];
+        let currentYear = new Date().getFullYear();
+>>>>>>> 3edbb6c866252e768671d3aa9fb08c65ce0ae953
 
-    // Generate calendar for selected month
-    function generateCalendar(month, year) {
-        calendarBody.innerHTML = '';
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                           'July', 'August', 'September', 'October', 'November', 'December'];
-        calendarHeader.textContent = monthNames[month - 1] + ' ' + year;
-        
-        const firstDay = new Date(year, month - 1, 1);
-        const lastDay = new Date(year, month, 0);
-        const daysInMonth = lastDay.getDate();
-        
-        // Adjust for Monday start (0 = Monday, 6 = Sunday)
-        let startDay = firstDay.getDay() - 1;
-        if (startDay < 0) startDay = 6;
-        
-        let date = 1;
-        for (let i = 0; i < 6; i++) {
-            const row = document.createElement('tr');
-            for (let j = 0; j < 7; j++) {
-                const cell = document.createElement('td');
-                if (i === 0 && j < startDay) {
-                    cell.classList.add('empty');
-                } else if (date > daysInMonth) {
-                    cell.classList.add('empty');
-                } else {
-                    cell.textContent = date;
-                    cell.dataset.date = date;
-                    cell.dataset.weekday = j;
-                    cell.addEventListener('click', function() {
-                        this.classList.toggle('selected');
-                        updateSelectedDates();
-                    });
-                    date++;
+        // Generate calendar for selected month
+        function generateCalendar(month, year) {
+            calendarBody.innerHTML = '';
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+            calendarHeader.textContent = monthNames[month - 1] + ' ' + year;
+
+            const firstDay = new Date(year, month - 1, 1);
+            const lastDay = new Date(year, month, 0);
+            const daysInMonth = lastDay.getDate();
+
+            // Adjust for Monday start (0 = Monday, 6 = Sunday)
+            let startDay = firstDay.getDay() - 1;
+            if (startDay < 0) startDay = 6;
+
+            let date = 1;
+            for (let i = 0; i < 6; i++) {
+                const row = document.createElement('tr');
+                for (let j = 0; j < 7; j++) {
+                    const cell = document.createElement('td');
+                    if (i === 0 && j < startDay) {
+                        cell.classList.add('empty');
+                    } else if (date > daysInMonth) {
+                        cell.classList.add('empty');
+                    } else {
+                        cell.textContent = date;
+                        cell.dataset.date = date;
+                        cell.dataset.weekday = j;
+                        cell.addEventListener('click', function () {
+                            this.classList.toggle('selected');
+                            updateSelectedDates();
+                        });
+                        date++;
+                    }
+                    row.appendChild(cell);
                 }
-                row.appendChild(cell);
+                calendarBody.appendChild(row);
+                if (date > daysInMonth) break;
             }
-            calendarBody.appendChild(row);
-            if (date > daysInMonth) break;
         }
-    }
 
-    // Update selected dates array
-    function updateSelectedDates() {
-        selectedDates = [];
-        document.querySelectorAll('#calendarBody td.selected').forEach(td => {
-            selectedDates.push(parseInt(td.dataset.date));
-        });
-    }
-
-    // Select all dates for a weekday
-    document.querySelectorAll('.calendar-weekday').forEach(th => {
-        th.addEventListener('click', function() {
-            const weekday = parseInt(this.dataset.day);
-            document.querySelectorAll(`#calendarBody td[data-weekday="${weekday === 0 ? 6 : weekday - 1}"]`).forEach(td => {
-                if (!td.classList.contains('empty')) {
-                    td.classList.add('selected');
-                }
+        // Update selected dates array
+        function updateSelectedDates() {
+            selectedDates = [];
+            document.querySelectorAll('#calendarBody td.selected').forEach(td => {
+                selectedDates.push(parseInt(td.dataset.date));
             });
-            updateSelectedDates();
-        });
-    });
-
-    // Month change
-    if (scheduleMonth) {
-        scheduleMonth.addEventListener('change', function() {
-            generateCalendar(parseInt(this.value), currentYear);
-        });
-        // Initialize with current month
-        const currentMonth = new Date().getMonth() + 1;
-        scheduleMonth.value = currentMonth;
-        generateCalendar(currentMonth, currentYear);
-    }
-
-    // Clear selection
-    document.getElementById('clearSelectionBtn').addEventListener('click', function() {
-        document.querySelectorAll('#calendarBody td.selected').forEach(td => {
-            td.classList.remove('selected');
-        });
-        selectedDates = [];
-    });
-
-    // Add time range
-    document.getElementById('addTimeBtn').addEventListener('click', function() {
-        if (selectedDates.length === 0) {
-            alert('Please select at least one date');
-            return;
         }
-        
-        const startHour = document.getElementById('startHour').value;
-        const startMin = document.getElementById('startMin').value;
-        const stopHour = document.getElementById('stopHour').value;
-        const stopMin = document.getElementById('stopMin').value;
-        const rangeDesc = document.getElementById('rangeDesc').value;
-        
-        const dateStr = selectedDates.sort((a, b) => a - b).join(', ');
-        const timeStr = `${startHour}:${startMin} - ${stopHour}:${stopMin}`;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
+
+        // Select all dates for a weekday
+        document.querySelectorAll('.calendar-weekday').forEach(th => {
+            th.addEventListener('click', function () {
+                const weekday = parseInt(this.dataset.day);
+                document.querySelectorAll(`#calendarBody td[data-weekday="${weekday === 0 ? 6 : weekday - 1}"]`).forEach(td => {
+                    if (!td.classList.contains('empty')) {
+                        td.classList.add('selected');
+                    }
+                });
+                updateSelectedDates();
+            });
+        });
+
+        // Month change
+        if (scheduleMonth) {
+            scheduleMonth.addEventListener('change', function () {
+                generateCalendar(parseInt(this.value), currentYear);
+            });
+            // Initialize with current month
+            const currentMonth = new Date().getMonth() + 1;
+            scheduleMonth.value = currentMonth;
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        // Clear selection
+        document.getElementById('clearSelectionBtn').addEventListener('click', function () {
+            document.querySelectorAll('#calendarBody td.selected').forEach(td => {
+                td.classList.remove('selected');
+            });
+            selectedDates = [];
+        });
+
+        // Add time range
+        document.getElementById('addTimeBtn').addEventListener('click', function () {
+            if (selectedDates.length === 0) {
+                alert('Please select at least one date');
+                return;
+            }
+
+            const startHour = document.getElementById('startHour').value;
+            const startMin = document.getElementById('startMin').value;
+            const stopHour = document.getElementById('stopHour').value;
+            const stopMin = document.getElementById('stopMin').value;
+            const rangeDesc = document.getElementById('rangeDesc').value;
+
+            const dateStr = selectedDates.sort((a, b) => a - b).join(', ');
+            const timeStr = `${startHour}:${startMin} - ${stopHour}:${stopMin}`;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
             <td>${dateStr}</td>
             <td>${timeStr}</td>
             <td>${rangeDesc || '-'}</td>
@@ -518,14 +537,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 </button>
             </td>
         `;
-        row.querySelector('.remove-range').addEventListener('click', function() {
-            row.remove();
+            row.querySelector('.remove-range').addEventListener('click', function () {
+                row.remove();
+            });
+            configuredRanges.appendChild(row);
+
+            // Clear selection after adding
+            document.getElementById('clearSelectionBtn').click();
+            document.getElementById('rangeDesc').value = '';
         });
-        configuredRanges.appendChild(row);
-        
-        // Clear selection after adding
-        document.getElementById('clearSelectionBtn').click();
-        document.getElementById('rangeDesc').value = '';
+
+        // Save schedule
+        document.getElementById('scheduleSaveBtn').addEventListener('click', function () {
+            const name = document.getElementById('scheduleName').value;
+            if (!name) {
+                alert('Please enter a schedule name');
+                return;
+            }
+
+            const description = document.getElementById('scheduleDesc').value;
+
+            // Collect all configured ranges
+            const ranges = [];
+            document.querySelectorAll('#configuredRanges tr').forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                if (cells.length >= 3) {
+                    ranges.push({
+                        dates: cells[0].textContent,
+                        time: cells[1].textContent,
+                        description: cells[2].textContent
+                    });
+                }
+            });
+
+            const scheduleData = {
+                name: name,
+                description: description,
+                ranges_data: JSON.stringify(ranges)
+            };
+
+            fetch('/firewall/api/schedules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(scheduleData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Schedule saved successfully!');
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleEditModal'));
+                        modal.hide();
+                        loadSchedules();
+                        // Clear form
+                        document.getElementById('scheduleName').value = '';
+                        document.getElementById('scheduleDesc').value = '';
+                        document.getElementById('configuredRanges').innerHTML = '';
+                    } else {
+                        alert('Error saving schedule: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving schedule');
+                });
+        });
+
+        // Load schedules on page load
+        loadSchedules();
     });
 
     // Reset modal state when opening add
