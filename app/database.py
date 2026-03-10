@@ -1,4 +1,5 @@
 import sqlite3
+from werkzeug.security import generate_password_hash
 
 DATABASE = "data.db"
 
@@ -8,8 +9,10 @@ def get_db():
     return conn
 
 def init_db():
+    
     conn = get_db()
     cursor = conn.cursor()
+    
 
     # USERS TABLE
     cursor.execute("""
@@ -98,12 +101,16 @@ def init_db():
 
     # INTERFACE ASSIGNMENTS TABLE
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS interface_assignments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            interface_type TEXT NOT NULL,
-            network_port TEXT
-        )
-    ''')
+    CREATE TABLE IF NOT EXISTS interface_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        interface_type TEXT NOT NULL UNIQUE,
+        network_port TEXT
+    )
+''')
+    cursor.execute("""
+CREATE UNIQUE INDEX IF NOT EXISTS idx_interface_assignments_type
+ON interface_assignments(interface_type)
+""")
 
     # INTERFACE GROUPS TABLE
     cursor.execute('''
@@ -660,8 +667,8 @@ def init_db():
     if cursor.fetchone()["c"] == 0:
         cursor.execute("""
             INSERT INTO users (username, password, full_name)
-            VALUES ('admin', '1234', 'System Administrator')
-        """)
+            VALUES (?, ?, ?)
+        """, ('admin', generate_password_hash('1234'), 'System Administrator'))
         cursor.execute("""
             INSERT INTO groups (name, description)
             VALUES ('admins', 'System Administrators')
@@ -1111,6 +1118,46 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
-    
+    cursor.execute("""
+CREATE TABLE IF NOT EXISTS dhcp_pools (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    interface_type TEXT NOT NULL UNIQUE,
+    enabled INTEGER DEFAULT 0,
+    start_ip TEXT NOT NULL,
+    end_ip TEXT NOT NULL,
+    gateway_ip TEXT,
+    dns_servers TEXT DEFAULT '',
+    lease_time INTEGER DEFAULT 86400,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+    cursor.execute("SELECT COUNT(*) AS c FROM dhcp_pools")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute("""
+            INSERT INTO dhcp_pools (interface_type, enabled, start_ip, end_ip, gateway_ip, dns_servers, lease_time)
+            VALUES
+            ('LAN', 0, '192.168.1.100', '192.168.1.200', '192.168.1.1', '1.1.1.1,8.8.8.8', 86400),
+            ('WAN', 0, '0.0.0.0', '0.0.0.0', '', '', 86400)
+        """)
+
+    cursor.execute("""
+CREATE TABLE IF NOT EXISTS static_leases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    interface_type TEXT NOT NULL,
+    hostname TEXT,
+    mac_address TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
+
+    cursor.execute("""
+CREATE UNIQUE INDEX IF NOT EXISTS idx_static_leases_mac
+ON static_leases(mac_address)
+""")
+
     conn.commit()
     conn.close()
