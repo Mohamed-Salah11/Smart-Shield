@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template
+from app.auth_utils import login_required
 
 diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
 
@@ -7,6 +8,7 @@ diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
 # --------------------------------------------------
 
 @diagnostics_bp.route("/")
+@login_required
 def diagnostics_home():
     return render_template("diagnostics.html")
 
@@ -16,6 +18,7 @@ def diagnostics_home():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/arp-table")
+@login_required
 def arp_table():
     return render_template("arp_table.html")
 
@@ -25,6 +28,7 @@ def arp_table():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/authentication")
+@login_required
 def authentication():
     return render_template("authentication.html")
 
@@ -34,6 +38,7 @@ def authentication():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/backup-restore")
+@login_required
 def backup_restore():
     return render_template("backup_restore.html")
 
@@ -43,6 +48,7 @@ def backup_restore():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/command-prompt")
+@login_required
 def command_prompt():
     return render_template("command_prompt.html")
 
@@ -52,6 +58,7 @@ def command_prompt():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/dns-lookup")
+@login_required
 def dns_lookup():
     return render_template("dns_lookup.html")
 
@@ -61,6 +68,7 @@ def dns_lookup():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/edit-file")
+@login_required
 def edit_file():
     return render_template("edit_file.html")
 
@@ -70,6 +78,7 @@ def edit_file():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/factory-defaults")
+@login_required
 def factory_defaults():
     return render_template("factory_defaults.html")
 
@@ -79,6 +88,7 @@ def factory_defaults():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/halt-system")
+@login_required
 def halt_system():
     return render_template("halt_system.html")
 
@@ -88,6 +98,7 @@ def halt_system():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/limiter-info")
+@login_required
 def limiter_info():
     return render_template("limiter_info.html")
 
@@ -97,6 +108,7 @@ def limiter_info():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/ndp-table")
+@login_required
 def ndp_table():
     return render_template("ndp_table.html")
 
@@ -106,6 +118,7 @@ def ndp_table():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/packet-capture")
+@login_required
 def packet_capture():
     return render_template("packet_capture.html")
 
@@ -115,6 +128,7 @@ def packet_capture():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/pfinfo")
+@login_required
 def pfinfo():
     return render_template("pfinfo.html")
 
@@ -124,6 +138,7 @@ def pfinfo():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/pftop")
+@login_required
 def pftop():
     return render_template("pftop.html")
 
@@ -133,6 +148,7 @@ def pftop():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/ping")
+@login_required
 def ping_diag():
     return render_template("ping_diag.html")
 
@@ -142,6 +158,7 @@ def ping_diag():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/reboot")
+@login_required
 def reboot():
     return render_template("reboot.html")
 
@@ -151,6 +168,7 @@ def reboot():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/routes")
+@login_required
 def routes_diag():
     return render_template("routes_diag.html")
 
@@ -160,6 +178,7 @@ def routes_diag():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/smart-status")
+@login_required
 def smart_status():
     return render_template("smart_status.html")
 
@@ -169,6 +188,7 @@ def smart_status():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/sockets")
+@login_required
 def sockets():
     return render_template("sockets.html")
 
@@ -178,6 +198,7 @@ def sockets():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/states")
+@login_required
 def states():
     return render_template("states.html")
 
@@ -187,6 +208,7 @@ def states():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/status-summary")
+@login_required
 def status_summary():
     return render_template("status_summary.html")
 
@@ -196,6 +218,7 @@ def status_summary():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/system-activity")
+@login_required
 def system_activity():
     return render_template("system_activity.html")
 
@@ -205,6 +228,7 @@ def system_activity():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/tables")
+@login_required
 def tables():
     return render_template("tables.html")
 
@@ -214,6 +238,7 @@ def tables():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/test-port")
+@login_required
 def test_port():
     return render_template("test_port.html")
 
@@ -223,5 +248,6 @@ def test_port():
 # --------------------------------------------------
 
 @diagnostics_bp.route("/tunnels")
+@login_required
 def tunnels():
     return render_template("tunnels.html")

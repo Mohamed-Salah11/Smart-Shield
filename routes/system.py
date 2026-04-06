@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, session
 from app.database import get_db
+from app.auth_utils import login_required
 
 system_bp = Blueprint("system", __name__, url_prefix="/system")
 
@@ -8,10 +9,12 @@ system_bp = Blueprint("system", __name__, url_prefix="/system")
 # ----------------------------
 
 @system_bp.route("/")
+@login_required
 def system_home():
     return redirect(url_for("system.general_setup"))
 
 @system_bp.route("/dashboard")
+@login_required
 def dashboard():
     return render_template("dashboard.html")
 
@@ -71,6 +74,7 @@ def help_page():
 # ----------------------------
 
 @system_bp.route("/general-setup", methods=["GET", "POST"])
+@login_required
 def general_setup():
     from app.database import get_db
     conn = get_db()
@@ -130,14 +134,17 @@ def general_setup():
 # ----------------------------
 
 @system_bp.route("/advanced")
+@login_required
 def advanced():
     return redirect(url_for("system.admin_access"))
 
 @system_bp.route("/register")
+@login_required
 def register():
     return render_template("register.html")
 
 @system_bp.route("/admin-access", methods=["GET", "POST"])
+@login_required
 def admin_access():
     conn = get_db()
     cursor = conn.cursor()
@@ -208,6 +215,7 @@ def admin_access():
     return render_template("admin_access.html", config=config)
 
 @system_bp.route("/advanced/firewall-nat", methods=["GET", "POST"])
+@login_required
 def advanced_firewall_nat():
     conn = get_db()
     cursor = conn.cursor()
@@ -326,6 +334,7 @@ def advanced_firewall_nat():
     return render_template("advanced_firewall_nat.html", config=config)
 
 @system_bp.route("/advanced/network", methods=["GET", "POST"])
+@login_required
 def advanced_network():
     conn = get_db()
     cursor = conn.cursor()
@@ -382,6 +391,7 @@ def advanced_network():
     return render_template("advanced_network.html", config=config)
 
 @system_bp.route("/advanced/miscellaneous", methods=["GET", "POST"])
+@login_required
 def advanced_miscellaneous():
     conn = get_db()
     cursor = conn.cursor()
@@ -465,6 +475,7 @@ def advanced_miscellaneous():
 # ----------------------------
 
 @system_bp.route("/advanced/system-tunables")
+@login_required
 def advanced_system_tunables():
     conn = get_db()
     cursor = conn.cursor()
@@ -476,6 +487,7 @@ def advanced_system_tunables():
 
 @system_bp.route("/advanced/system-tunables/edit", methods=["GET", "POST"])
 @system_bp.route("/advanced/system-tunables/edit/<int:index>", methods=["GET", "POST"])
+@login_required
 def advanced_system_tunables_edit(index=None):
     conn = get_db()
     cursor = conn.cursor()
@@ -490,6 +502,7 @@ def advanced_system_tunables_edit(index=None):
 
 
 @system_bp.route("/advanced/system-tunables/save", methods=["POST"])
+@login_required
 def advanced_system_tunables_save():
     conn = get_db()
     cursor = conn.cursor()
@@ -520,6 +533,7 @@ def advanced_system_tunables_save():
 
 
 @system_bp.route("/advanced/system-tunables/delete/<int:index>", methods=["POST"])
+@login_required
 def advanced_system_tunables_delete(index):
     conn = get_db()
     cursor = conn.cursor()
@@ -534,10 +548,13 @@ def advanced_system_tunables_delete(index):
 # ----------------------------
 
 @system_bp.route("/certificates")
+@login_required
+
 def certificates():
     return render_template("certificates.html")
 
 @system_bp.route("/add_ca", methods=["GET", "POST"])
+@login_required
 def add_ca():
     if request.method == "POST":
         # Handle form submission - currently just redirect back
@@ -546,6 +563,7 @@ def add_ca():
     return render_template("add_ca.html")
 
 @system_bp.route("/add_certificate", methods=["GET", "POST"])
+@login_required
 def add_certificate():
     if request.method == "POST":
         # Handle form submission - currently just redirect back
@@ -558,6 +576,7 @@ def add_certificate():
 # ----------------------------
 
 @system_bp.route("/high-availability")
+@login_required
 def high_availability():
     return render_template("high_availability.html")
 
@@ -567,6 +586,7 @@ def high_availability():
 # ----------------------------
 
 @system_bp.route("/package-manager")
+@login_required
 def package_manager():
     return render_template("package_manager.html")
 
@@ -576,11 +596,13 @@ def package_manager():
 # ----------------------------
 
 @system_bp.route("/setup-wizard")
+@login_required
 def setup_wizard():
     return render_template("setup_wizard.html")
 
 
 @system_bp.route("/setup-wizard/step/<int:step>")
+@login_required
 def setup_wizard_step(step):
     if step in range(2, 11):
         return render_template(f"setup_wizard_step{step}.html")
@@ -592,6 +614,7 @@ def setup_wizard_step(step):
 # ----------------------------
 
 @system_bp.route("/copyright", methods=["GET", "POST"])
+@login_required
 def copyright_page():
     if request.method == "POST":
         return redirect(url_for("system.dashboard"))
@@ -603,6 +626,7 @@ def copyright_page():
 # ----------------------------
 
 @system_bp.route("/update", methods=["GET", "POST"])
+@login_required
 def update_page():
     active_tab = "system"
     message = None
@@ -628,6 +652,7 @@ def update_page():
 # ----------------------------
 
 @system_bp.route("/notifications", methods=["GET", "POST"])
+@login_required
 def notifications():
     if request.method == "POST":
         return redirect(url_for("system.notifications"))

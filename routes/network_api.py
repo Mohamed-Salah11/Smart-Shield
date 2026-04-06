@@ -1,9 +1,11 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db
+from app.auth_utils import login_required
 import ipaddress
 import os
 import re
 import subprocess
+
 
 
 network_api_bp = Blueprint("network_api", __name__, url_prefix="/api/network")
@@ -39,6 +41,7 @@ def row_to_bool(row, key, default=False):
 
 
 @network_api_bp.route("/interfaces", methods=["GET"])
+@login_required
 def get_interfaces():
     conn = get_db()
     cur = conn.cursor()
@@ -112,6 +115,7 @@ def get_interfaces():
 
 
 @network_api_bp.route("/interfaces/<interface_type>", methods=["PUT"])
+@login_required
 def update_interface(interface_type):
     try:
         validate_interface_type(interface_type)
@@ -219,6 +223,7 @@ def update_interface(interface_type):
 
 
 @network_api_bp.route("/dhcp", methods=["GET"])
+@login_required
 def get_dhcp():
     conn = get_db()
     cur = conn.cursor()
@@ -243,6 +248,7 @@ def get_dhcp():
 
 
 @network_api_bp.route("/dhcp/<interface_type>", methods=["PUT"])
+@login_required
 def update_dhcp(interface_type):
     try:
         validate_interface_type(interface_type)
@@ -289,6 +295,7 @@ def update_dhcp(interface_type):
 
 
 @network_api_bp.route("/leases", methods=["GET"])
+@login_required
 def get_leases():
     conn = get_db()
     cur = conn.cursor()
@@ -305,6 +312,7 @@ def get_leases():
 
 
 @network_api_bp.route("/leases", methods=["POST"])
+@login_required
 def add_lease():
     try:
         data = request.get_json(force=True) or {}
@@ -335,6 +343,7 @@ def add_lease():
 
 
 @network_api_bp.route("/leases/<int:lease_id>", methods=["DELETE"])
+@login_required
 def delete_lease(lease_id):
     conn = get_db()
     cur = conn.cursor()
@@ -345,6 +354,7 @@ def delete_lease(lease_id):
 
 
 @network_api_bp.route("/connections", methods=["GET"])
+@login_required
 def get_connections():
     clients = []
     arp_path = "/proc/net/arp"
@@ -367,6 +377,7 @@ def get_connections():
 
 
 @network_api_bp.route("/apply", methods=["POST"])
+@login_required
 def apply_network():
     try:
         data = request.get_json(force=True) or {}

@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from app.database import get_db
+from app.auth_utils import login_required
 import os
 
 
@@ -18,6 +19,7 @@ def allowed_file(filename):
 
 
 @users_bp.route("/", methods=["GET"])
+@login_required
 def user_manager():
     conn = get_db()
     cur = conn.cursor()
@@ -41,6 +43,7 @@ def user_manager():
 
 
 @users_bp.route("/add", methods=["POST"])
+@login_required
 def add_user():
     username = (request.form.get("username") or "").strip()
     password = request.form.get("password") or ""
@@ -83,6 +86,7 @@ def add_user():
 
 
 @users_bp.route("/delete/<int:user_id>", methods=["POST"])
+@login_required
 def delete_user(user_id):
     conn = get_db()
     cur = conn.cursor()
@@ -94,6 +98,7 @@ def delete_user(user_id):
 
 
 @users_bp.route("/change-password/<int:user_id>", methods=["POST"])
+@login_required
 def change_password(user_id):
     new_password = request.form.get("new_password") or ""
 
@@ -109,6 +114,7 @@ def change_password(user_id):
 
 
 @users_bp.route("/edit/<int:user_id>", methods=["POST"])
+@login_required
 def edit_user(user_id):
     username = request.form.get("username")
     full_name = request.form.get("full_name")

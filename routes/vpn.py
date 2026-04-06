@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from app.database import get_db
+from app.auth_utils import login_required
+import sqlite3
 
 vpn_bp = Blueprint("vpn", __name__, url_prefix="/vpn")
 
@@ -8,6 +10,7 @@ vpn_bp = Blueprint("vpn", __name__, url_prefix="/vpn")
 # ----------------------------
 
 @vpn_bp.route("/")
+@login_required
 def vpn_home():
     return render_template("vpn.html")
 
@@ -17,37 +20,44 @@ def vpn_home():
 # ----------------------------
 
 @vpn_bp.route("/openvpn", methods=['GET', 'POST'])
+@login_required
 def openvpn():
     # OpenVPN Servers (default tab)
     return render_template("openvpn.html", active_tab="servers")
 
 
 @vpn_bp.route("/openvpn/servers", methods=['GET', 'POST'])
+@login_required
 def openvpn_servers():
     return render_template("openvpn.html", active_tab="servers")
 
 
 @vpn_bp.route("/openvpn/clients", methods=['GET', 'POST'])
+@login_required
 def openvpn_clients():
     return render_template("openvpn_clients.html", active_tab="clients")
 
 
 @vpn_bp.route("/openvpn/cso", methods=['GET', 'POST'])
+@login_required
 def openvpn_cso():
     return render_template("openvpn_cso.html", active_tab="cso")
 
 
 @vpn_bp.route("/openvpn/wizards", methods=['GET', 'POST'])
+@login_required
 def openvpn_wizards():
     return render_template("openvpn_wizards1.html", active_tab="wizards")
 
 
 @vpn_bp.route("/openvpn/wizards/step2", methods=['GET', 'POST'])
+@login_required
 def openvpn_wizards_step2():
     return render_template("openvpn_wizards2.html", active_tab="wizards")
 
 
 @vpn_bp.route("/openvpn/wizards/step3", methods=['GET', 'POST'])
+@login_required
 def openvpn_wizards_step3():
     return render_template("openvpn_wizards3.html", active_tab="wizards")
 
@@ -57,6 +67,7 @@ def openvpn_wizards_step3():
 # ----------------------------
 
 @vpn_bp.route("/ipsec", methods=['GET', 'POST'])
+@login_required
 def ipsec():
     return render_template("ipsec.html")
 
@@ -66,6 +77,7 @@ def ipsec():
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/p1", methods=["GET"])
+@login_required
 def ipsec_p1_list():
     try:
         db = get_db()
@@ -95,6 +107,7 @@ def ipsec_p1_list():
 
 
 @vpn_bp.route("/api/ipsec/p1", methods=["POST"])
+@login_required
 def ipsec_p1_create():
     try:
         data = request.get_json() or {}
@@ -186,6 +199,7 @@ def ipsec_p1_create():
 
 
 @vpn_bp.route("/api/ipsec/p1/<int:p1_id>", methods=["DELETE"])
+@login_required
 def ipsec_p1_delete(p1_id):
     try:
         db = get_db()
@@ -198,16 +212,19 @@ def ipsec_p1_delete(p1_id):
 
 
 @vpn_bp.route("/ipsec/mobile-clients", methods=['GET', 'POST'])
+@login_required
 def ipsec_mobile_clients():
     return render_template("IPsec_mob_clients.html", active_tab="mobile_clients")
 
 
 @vpn_bp.route("/ipsec/pre-shared-keys", methods=['GET', 'POST'])
+@login_required
 def ipsec_pre_shared_keys():
     return render_template("IPsec_pre_shared_keys.html", active_tab="psk")
 
 
 @vpn_bp.route("/ipsec/advanced-settings", methods=['GET', 'POST'])
+@login_required
 def ipsec_advanced_settings():
     return render_template("IPsec_advanced_settings.html", active_tab="advanced")
 
@@ -217,6 +234,7 @@ def ipsec_advanced_settings():
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/mobile-clients", methods=["GET"])
+@login_required
 def ipsec_mobile_clients_get():
     try:
         db = get_db()
@@ -241,6 +259,7 @@ def ipsec_mobile_clients_get():
 
 
 @vpn_bp.route("/api/ipsec/mobile-clients", methods=["POST"])
+@login_required
 def ipsec_mobile_clients_save():
     try:
         data = request.get_json() or {}
@@ -300,6 +319,7 @@ def ipsec_mobile_clients_save():
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/psk", methods=["GET"])
+@login_required
 def ipsec_psk_list():
     try:
         db = get_db()
@@ -318,6 +338,7 @@ def ipsec_psk_list():
 
 
 @vpn_bp.route("/api/ipsec/psk", methods=["POST"])
+@login_required
 def ipsec_psk_create():
     try:
         data = request.get_json() or {}
@@ -358,6 +379,7 @@ def ipsec_psk_create():
 
 
 @vpn_bp.route("/api/ipsec/psk/<int:psk_id>", methods=["DELETE"])
+@login_required
 def ipsec_psk_delete(psk_id):
     try:
         db = get_db()
@@ -374,6 +396,7 @@ def ipsec_psk_delete(psk_id):
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/advanced-settings", methods=["GET"])
+@login_required
 def ipsec_advanced_settings_get():
     try:
         db = get_db()
@@ -386,6 +409,7 @@ def ipsec_advanced_settings_get():
 
 
 @vpn_bp.route("/api/ipsec/advanced-settings", methods=["POST"])
+@login_required
 def ipsec_advanced_settings_save():
     try:
         data = request.get_json() or {}
@@ -485,11 +509,13 @@ def ipsec_advanced_settings_save():
 # ----------------------------
 
 @vpn_bp.route("/l2tp", methods=['GET', 'POST'])
+@login_required
 def l2tp():
     return render_template("l2tp.html")
 
 
 @vpn_bp.route("/l2tp/users", methods=['GET', 'POST'])
+@login_required
 def l2tp_users():
     return render_template("l2tp_users.html")
 
@@ -499,6 +525,7 @@ def l2tp_users():
 # ----------------------------
 
 @vpn_bp.route("/api/l2tp/settings", methods=["GET"])
+@login_required
 def l2tp_settings_get():
     try:
         db = get_db()
@@ -511,6 +538,7 @@ def l2tp_settings_get():
 
 
 @vpn_bp.route("/api/l2tp/settings", methods=["POST"])
+@login_required
 def l2tp_settings_save():
     try:
         data = request.get_json() or {}
@@ -536,6 +564,7 @@ def l2tp_settings_save():
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-server", methods=['POST'])
+@login_required
 def save_openvpn_server():
     try:
         data = request.get_json()
@@ -576,6 +605,7 @@ def save_openvpn_server():
 
 
 @vpn_bp.route("/api/openvpn/get-servers", methods=['GET'])
+@login_required
 def get_openvpn_servers():
     try:
         db = get_db()
@@ -614,6 +644,7 @@ def get_openvpn_servers():
 
 
 @vpn_bp.route("/api/openvpn/delete-server/<int:server_id>", methods=['DELETE'])
+@login_required
 def delete_openvpn_server(server_id):
     try:
         db = get_db()
@@ -638,6 +669,7 @@ def delete_openvpn_server(server_id):
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-client", methods=['POST'])
+@login_required
 def save_openvpn_client():
     try:
         data = request.get_json()
@@ -693,6 +725,7 @@ def save_openvpn_client():
 
 
 @vpn_bp.route("/api/openvpn/get-clients", methods=['GET'])
+@login_required
 def get_openvpn_clients():
     try:
         db = get_db()
@@ -731,6 +764,7 @@ def get_openvpn_clients():
 
 
 @vpn_bp.route("/api/openvpn/delete-client/<int:client_id>", methods=['DELETE'])
+@login_required
 def delete_openvpn_client(client_id):
     try:
         db = get_db()
@@ -755,6 +789,7 @@ def delete_openvpn_client(client_id):
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-cso", methods=['POST'])
+@login_required
 def save_openvpn_cso():
     try:
         data = request.get_json()
@@ -816,6 +851,7 @@ def save_openvpn_cso():
 
 
 @vpn_bp.route("/api/openvpn/get-csos", methods=['GET'])
+@login_required
 def get_openvpn_csos():
     try:
         db = get_db()
@@ -850,6 +886,7 @@ def get_openvpn_csos():
 
 
 @vpn_bp.route("/api/openvpn/delete-cso/<int:cso_id>", methods=['DELETE'])
+@login_required
 def delete_openvpn_cso(cso_id):
     try:
         db = get_db()
@@ -874,6 +911,7 @@ def delete_openvpn_cso(cso_id):
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/save-phase1", methods=['POST'])
+@login_required
 def save_ipsec_phase1():
     try:
         data = request.get_json()
@@ -910,6 +948,7 @@ def save_ipsec_phase1():
 
 
 @vpn_bp.route("/api/ipsec/get-phase1", methods=['GET'])
+@login_required
 def get_ipsec_phase1():
     try:
         db = get_db()
@@ -940,6 +979,7 @@ def get_ipsec_phase1():
 
 
 @vpn_bp.route("/api/ipsec/delete-phase1/<int:phase1_id>", methods=['DELETE'])
+@login_required
 def delete_ipsec_phase1(phase1_id):
     try:
         db = get_db()
@@ -957,6 +997,7 @@ def delete_ipsec_phase1(phase1_id):
 # ----------------------------
 
 @vpn_bp.route("/api/l2tp/save-config", methods=['POST'])
+@login_required
 def save_l2tp_config():
     try:
         data = request.get_json()
@@ -983,6 +1024,7 @@ def save_l2tp_config():
 
 
 @vpn_bp.route("/api/l2tp/get-config", methods=['GET'])
+@login_required
 def get_l2tp_config():
     try:
         db = get_db()
@@ -997,6 +1039,7 @@ def get_l2tp_config():
 
 
 @vpn_bp.route("/api/l2tp/save-user", methods=['POST'])
+@login_required
 def save_l2tp_user():
     try:
         data = request.get_json()
@@ -1019,6 +1062,7 @@ def save_l2tp_user():
 
 
 @vpn_bp.route("/api/l2tp/get-users", methods=['GET'])
+@login_required
 def get_l2tp_users():
     try:
         db = get_db()
@@ -1039,6 +1083,7 @@ def get_l2tp_users():
 
 
 @vpn_bp.route("/api/l2tp/get-user/<int:user_id>", methods=['GET'])
+@login_required
 def get_l2tp_user(user_id):
     try:
         db = get_db()
@@ -1060,6 +1105,7 @@ def get_l2tp_user(user_id):
 
 
 @vpn_bp.route("/api/l2tp/update-user/<int:user_id>", methods=['PUT'])
+@login_required
 def update_l2tp_user(user_id):
     try:
         data = request.get_json()
@@ -1096,6 +1142,7 @@ def update_l2tp_user(user_id):
 
 
 @vpn_bp.route("/api/l2tp/delete-user/<int:user_id>", methods=['DELETE'])
+@login_required
 def delete_l2tp_user(user_id):
     try:
         db = get_db()
@@ -1112,6 +1159,7 @@ def delete_l2tp_user(user_id):
 # ----------------------------
 
 @vpn_bp.route("/api/wizard/save-auth-type", methods=['POST'])
+@login_required
 def save_wizard_auth_type():
     try:
         data = request.get_json()
@@ -1141,6 +1189,7 @@ def save_wizard_auth_type():
 
 
 @vpn_bp.route("/api/wizard/save-ca", methods=['POST'])
+@login_required
 def save_wizard_ca():
     try:
         data = request.get_json()
@@ -1188,6 +1237,7 @@ def save_wizard_ca():
 
 
 @vpn_bp.route("/api/wizard/get-cas", methods=['GET'])
+@login_required
 def get_wizard_cas():
     try:
         db = get_db()
@@ -1215,6 +1265,7 @@ def get_wizard_cas():
 
 
 @vpn_bp.route("/api/wizard/delete-ca/<int:ca_id>", methods=['DELETE'])
+@login_required
 def delete_wizard_ca(ca_id):
     try:
         db = get_db()
