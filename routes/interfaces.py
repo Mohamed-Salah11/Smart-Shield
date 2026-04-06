@@ -1,6 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify
 import sqlite3
 from app.auth_utils import login_required
+from app.db_utils import db_cursor
+from app.database import get_db
 
 interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
 
@@ -32,18 +34,16 @@ def interfaces_assignments():
 @login_required
 def get_interface_groups():
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, group_name, description, members FROM interface_groups')
-        groups = cursor.fetchall()
-        conn.close()
-        
+        with db_cursor() as (_, cursor):
+            cursor.execute('SELECT id, group_name, description, members FROM interface_groups')
+            groups = cursor.fetchall()
+
         groups_list = [
             {
-                'id': g[0],
-                'name': g[1],
-                'description': g[2],
-                'members': g[3].split(',') if g[3] else []
+                'id': g["id"],
+                'name': g["group_name"],
+                'description': g["description"],
+                'members': g["members"].split(',') if g["members"] else []
             }
             for g in groups
         ]
@@ -57,13 +57,17 @@ def get_interface_groups():
 def save_interface_group():
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO interface_groups (group_name, description, members) 
-                          VALUES (?, ?, ?)''', 
-                       (data['groupName'], data['groupDescription'], ','.join(data['groupMembers'])))
-        conn.commit()
-        conn.close()
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute(
+                '''INSERT INTO interface_groups (group_name, description, members) 
+                   VALUES (?, ?, ?)''',
+                (
+                    data['groupName'],
+                    data['groupDescription'],
+                    ','.join(data['groupMembers'])
+                )
+            )
+
         return jsonify({'status': 'success', 'message': 'Interface group saved'})
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -73,18 +77,19 @@ def save_interface_group():
 @login_required
 def get_interface_group(group_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, group_name, description, members FROM interface_groups WHERE id = ?', (group_id,))
-        group = cursor.fetchone()
-        conn.close()
-        
+        with db_cursor() as (_, cursor):
+            cursor.execute(
+                'SELECT id, group_name, description, members FROM interface_groups WHERE id = ?',
+                (group_id,)
+            )
+            group = cursor.fetchone()
+
         if group:
             return jsonify({'status': 'success', 'data': {
-                'id': group[0],
-                'name': group[1],
-                'description': group[2],
-                'members': group[3].split(',') if group[3] else []
+                'id': group["id"],
+                'name': group["group_name"],
+                'description': group["description"],
+                'members': group["members"].split(',') if group["members"] else []
             }})
         return jsonify({'status': 'error', 'message': 'Group not found'}), 404
     except Exception as e:
@@ -95,12 +100,19 @@ def get_interface_group(group_id):
 def update_interface_group(group_id):
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('''UPDATE interface_groups SET group_name = ?, description = ?, members = ? WHERE id = ?''',
-                       (data['groupName'], data['groupDescription'], ','.join(data['groupMembers']), group_id))
-        conn.commit()
-        conn.close()
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute(
+                '''UPDATE interface_groups
+                   SET group_name = ?, description = ?, members = ?
+                   WHERE id = ?''',
+                (
+                    data['groupName'],
+                    data['groupDescription'],
+                    ','.join(data['groupMembers']),
+                    group_id
+                )
+            )
+
         return jsonify({'status': 'success', 'message': 'Group updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -109,11 +121,9 @@ def update_interface_group(group_id):
 @login_required
 def delete_interface_group(group_id):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM interface_groups WHERE id = ?', (group_id,))
-        conn.commit()
-        conn.close()
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute('DELETE FROM interface_groups WHERE id = ?', (group_id,))
+
         return jsonify({'status': 'success', 'message': 'Group deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -126,17 +136,15 @@ def delete_interface_group(group_id):
 @login_required
 def get_interface_assignments():
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('''SELECT id, interface_type, network_port FROM interface_assignments''')
-        assignments = cursor.fetchall()
-        conn.close()
-        
+        with db_cursor() as (_, cursor):
+            cursor.execute('SELECT id, interface_type, network_port FROM interface_assignments')
+            assignments = cursor.fetchall()
+
         assignments_list = [
             {
-                'id': a[0],
-                'interface_type': a[1],
-                'network_port': a[2]
+                'id': a["id"],
+                'interface_type': a["interface_type"],
+                'network_port': a["network_port"]
             }
             for a in assignments
         ]
@@ -150,25 +158,28 @@ def get_interface_assignments():
 def save_interface_assignment():
     try:
         data = request.get_json()
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        
-        # Check if assignment already exists for this interface type
-        cursor.execute('SELECT id FROM interface_assignments WHERE interface_type = ?', (data['interfaceType'],))
-        existing = cursor.fetchone()
-        
-        if existing:
-            # Update existing assignment
-            cursor.execute('''UPDATE interface_assignments SET network_port = ? WHERE interface_type = ?''',
-                           (data['networkPort'], data['interfaceType']))
-        else:
-            # Insert new assignment
-            cursor.execute('''INSERT INTO interface_assignments (interface_type, network_port) 
-                              VALUES (?, ?)''', 
-                           (data['interfaceType'], data['networkPort']))
-        
-        conn.commit()
-        conn.close()
+
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute(
+                'SELECT id FROM interface_assignments WHERE interface_type = ?',
+                (data['interfaceType'],)
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                cursor.execute(
+                    '''UPDATE interface_assignments
+                       SET network_port = ?
+                       WHERE interface_type = ?''',
+                    (data['networkPort'], data['interfaceType'])
+                )
+            else:
+                cursor.execute(
+                    '''INSERT INTO interface_assignments (interface_type, network_port)
+                       VALUES (?, ?)''',
+                    (data['interfaceType'], data['networkPort'])
+                )
+
         return jsonify({'status': 'success', 'message': 'Interface assignment saved'})
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -178,11 +189,12 @@ def save_interface_assignment():
 @login_required
 def delete_interface_assignment(interface_type):
     try:
-        conn = sqlite3.connect('data.db')
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM interface_assignments WHERE interface_type = ?', (interface_type,))
-        conn.commit()
-        conn.close()
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute(
+                'DELETE FROM interface_assignments WHERE interface_type = ?',
+                (interface_type,)
+            )
+
         return jsonify({'status': 'success', 'message': 'Interface assignment deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
