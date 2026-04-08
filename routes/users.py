@@ -8,7 +8,10 @@ from app.db_utils import db_cursor
 
 users_bp = Blueprint("users", __name__, url_prefix="/system/user-manager")
 
-UPLOAD_FOLDER = "static/uploads/profile_pictures"
+UPLOAD_FOLDER = os.getenv(
+    "SMARTSHIELD_UPLOAD_DIR",
+    "static/uploads/profile_pictures"
+)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
