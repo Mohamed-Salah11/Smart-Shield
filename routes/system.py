@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, session
 from app.database import get_db
 from app.auth_utils import login_required
+import json, os
 
 system_bp = Blueprint("system", __name__, url_prefix="/system")
 
@@ -81,8 +82,8 @@ def general_setup():
     cursor = conn.cursor()
 
     # Load config (temporary until SQLite integration)
-    import json, os
-    CONFIG_FILE = "config.json"
+    # import json, os
+    CONFIG_FILE = os.getenv("SMARTSHIELD_CONFIG_PATH", "config.json")
 
     def load_config():
         if os.path.exists(CONFIG_FILE):

@@ -1,11 +1,11 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db
 from app.auth_utils import login_required
+from app.services.network_service import normalize_interface_payload
 import ipaddress
 import os
 import re
 import subprocess
-
 
 
 network_api_bp = Blueprint("network_api", __name__, url_prefix="/api/network")
@@ -120,9 +120,10 @@ def update_interface(interface_type):
     try:
         validate_interface_type(interface_type)
         data = request.get_json(force=True) or {}
+        payload = normalize_interface_payload(data, interface_type)
 
-        ipv4_address = (data.get("ipv4_address") or "").strip()
-        gateway = (data.get("ipv4_upstream_gateway") or "").strip()
+        ipv4_address = (payload["ipv4_address"] or "").strip()
+        gateway = (payload["ipv4_upstream_gateway"] or "").strip()
         validate_cidr(ipv4_address)
         validate_ip(gateway)
 
@@ -148,18 +149,18 @@ def update_interface(interface_type):
                 WHERE id = 1
                 """,
                 (
-                    int(bool(data.get("enable_interface", True))),
-                    data.get("description", "LAN"),
-                    data.get("ipv4_config_type", "static"),
-                    data.get("ipv6_config_type", "none"),
-                    data.get("mac_address", ""),
-                    data.get("mtu", ""),
-                    data.get("mss", ""),
-                    data.get("speed_and_duplex", "default"),
+                    int(payload["enable_interface"]),
+                    payload["description"],
+                    payload["ipv4_config_type"],
+                    payload["ipv6_config_type"],
+                    payload["mac_address"],
+                    payload["mtu"],
+                    payload["mss"],
+                    payload["speed_and_duplex"],
                     ipv4_address,
                     gateway,
-                    int(bool(data.get("block_private_networks", False))),
-                    int(bool(data.get("block_bogon_networks", False))),
+                    int(payload["block_private_networks"]),
+                    int(payload["block_bogon_networks"]),
                 ),
             )
         else:
@@ -185,26 +186,26 @@ def update_interface(interface_type):
                 WHERE id = 1
                 """,
                 (
-                    int(bool(data.get("enable_interface", True))),
-                    data.get("description", "WAN"),
-                    data.get("ipv4_config_type", "dhcp"),
-                    data.get("ipv6_config_type", "none"),
-                    data.get("mac_address", ""),
-                    data.get("mtu", ""),
-                    data.get("mss", ""),
-                    data.get("speed_and_duplex", "default"),
+                    int(payload["enable_interface"]),
+                    payload["description"],
+                    payload["ipv4_config_type"],
+                    payload["ipv6_config_type"],
+                    payload["mac_address"],
+                    payload["mtu"],
+                    payload["mss"],
+                    payload["speed_and_duplex"],
                     ipv4_address,
                     gateway,
-                    data.get("username", ""),
-                    data.get("password", ""),
-                    int(bool(data.get("dial_on_demand", False))),
-                    int(data.get("idle_timeout", 0) or 0),
-                    int(bool(data.get("block_private_networks", True))),
-                    int(bool(data.get("block_bogon_networks", True))),
+                    payload["username"],
+                    payload["password"],
+                    int(payload["dial_on_demand"]),
+                    payload["idle_timeout"],
+                    int(payload["block_private_networks"]),
+                    int(payload["block_bogon_networks"]),
                 ),
             )
 
-        assigned_port = (data.get("assigned_port") or "").strip()
+        assigned_port = payload["assigned_port"]
         if assigned_port:
             cur.execute(
                 """
@@ -388,14 +389,25 @@ def apply_network():
         validate_interface_name(interface_name)
         validate_cidr(ipv4_address)
         validate_ip(gateway_ip)
+# uncomment in freebsd isa
+        # subprocess.run(["ip", "addr", "flush", "dev", interface_name], check=True)
+        # subprocess.run(["ip", "addr", "add", ipv4_address, "dev", interface_name], check=True)
+        # subprocess.run(["ip", "link", "set", interface_name, "up"], check=True)
 
-        subprocess.run(["ip", "addr", "flush", "dev", interface_name], check=True)
-        subprocess.run(["ip", "addr", "add", ipv4_address, "dev", interface_name], check=True)
-        subprocess.run(["ip", "link", "set", interface_name, "up"], check=True)
+        # if gateway_ip:
+        #     subprocess.run(["ip", "route", "replace", "default", "via", gateway_ip], check=True)
 
-        if gateway_ip:
-            subprocess.run(["ip", "route", "replace", "default", "via", gateway_ip], check=True)
-
-        return jsonify({"status": "success", "message": "Network settings applied"})
+        # return jsonify({"status": "success", "message": "Network settings applied"})
+        return jsonify({
+                    "status": "success",
+                    "message": "Configuration saved. Live OS network apply is temporarily disabled until FreeBSD support is implemented."
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+@network_api_bp.route("/connections", methods=["GET"])
+@login_required
+def get_connections():
+     return jsonify({
+        "status": "error",
+        "message": "Connections endpoint is not implemented yet for FreeBSD."
+      }), 501

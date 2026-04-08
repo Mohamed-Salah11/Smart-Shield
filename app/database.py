@@ -1,7 +1,8 @@
+import os
 import sqlite3
 from werkzeug.security import generate_password_hash
 
-DATABASE = "data.db"
+DATABASE = os.getenv("SMARTSHIELD_DB_PATH", "data.db")
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -662,21 +663,21 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # Create default admin if not exists
+    # Create bootstrap admin only if explicitly provided
     cursor.execute("SELECT COUNT(*) AS c FROM users")
     if cursor.fetchone()["c"] == 0:
-        cursor.execute("""
+        admin_user = os.getenv("BOOTSTRAP_ADMIN_USERNAME")
+        admin_pass = os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
+
+        if admin_user and admin_pass:
+            cursor.execute("""
             INSERT INTO users (username, password, full_name)
             VALUES (?, ?, ?)
-        """, ('admin', generate_password_hash('1234'), 'System Administrator'))
-        cursor.execute("""
-            INSERT INTO groups (name, description)
-            VALUES ('admins', 'System Administrators')
-        """)
-        cursor.execute("""
-            INSERT INTO user_groups (user_id, group_id)
-            VALUES (1, 1)
-        """)
+        """, (
+             admin_user,
+             generate_password_hash(admin_pass),
+             "System Administrator"
+        ))
 
     # Create default advanced settings if not exists
     cursor.execute("SELECT COUNT(*) AS c FROM advanced_admin_access")
@@ -880,20 +881,7 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # Virtual IPs Configs
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS virtual_ips_configs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        interface TEXT NOT NULL,
-        address_type TEXT,
-        address TEXT,
-        prefix INTEGER,
-        expansion INTEGER DEFAULT 0,
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+
 
     # OpenVPN Server Configs
     cursor.execute("""
