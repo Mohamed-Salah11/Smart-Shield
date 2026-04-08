@@ -1,16 +1,23 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from app.database import get_db
 from app.auth_utils import login_required
 import os
+import sys
 from app.db_utils import db_cursor
 
 users_bp = Blueprint("users", __name__, url_prefix="/system/user-manager")
 
+DEFAULT_UPLOAD_DIR = (
+    "/var/db/smart-shield/uploads/profile_pictures"
+    if sys.platform.startswith("freebsd")
+    else "static/uploads/profile_pictures"
+)
+
 UPLOAD_FOLDER = os.getenv(
     "SMARTSHIELD_UPLOAD_DIR",
-    "static/uploads/profile_pictures"
+    DEFAULT_UPLOAD_DIR
 )
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
@@ -19,6 +26,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _redirect_back(default_endpoint="users.user_manager"):
+    return redirect(request.referrer or url_for(default_endpoint))
 
 
 @users_bp.route("/", methods=["GET"])
@@ -40,6 +51,27 @@ def user_manager():
         groups = cur.fetchall()
 
     return render_template("user_manager.html", users=users, groups=groups)
+
+
+@users_bp.route("/groups", methods=["GET"])
+@login_required
+def group_manager():
+    with db_cursor() as (_, cur):
+        cur.execute(
+            """
+            SELECT g.id, g.name, g.description, COUNT(ug.user_id) AS member_count
+            FROM groups g
+            LEFT JOIN user_groups ug ON ug.group_id = g.id
+            GROUP BY g.id, g.name, g.description
+            ORDER BY g.name COLLATE NOCASE
+            """
+        )
+        groups = cur.fetchall()
+
+        cur.execute("SELECT id, username, full_name FROM users ORDER BY username COLLATE NOCASE")
+        users = cur.fetchall()
+
+    return render_template("user_group.html", groups=groups, users=users)
 
 
 @users_bp.route("/add", methods=["POST"])
@@ -80,6 +112,97 @@ def add_user():
                 )
 
     return redirect(url_for("users.user_manager"))
+
+
+@users_bp.route("/add-group", methods=["POST"])
+@login_required
+def add_group():
+    group_name = (request.form.get("group_name") or request.form.get("name") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not group_name:
+        return _redirect_back()
+
+    with db_cursor(commit=True) as (_, cur):
+        cur.execute(
+            "INSERT OR IGNORE INTO groups (name, description) VALUES (?, ?)",
+            (group_name, description),
+        )
+
+    return _redirect_back()
+
+
+@users_bp.route("/edit-group/<int:group_id>", methods=["POST"])
+@login_required
+def edit_group(group_id):
+    group_name = (request.form.get("group_name") or request.form.get("name") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not group_name:
+        return _redirect_back("users.group_manager")
+
+    with db_cursor(commit=True) as (_, cur):
+        cur.execute(
+            "UPDATE groups SET name = ?, description = ? WHERE id = ?",
+            (group_name, description, group_id),
+        )
+
+    return _redirect_back("users.group_manager")
+
+
+@users_bp.route("/delete-group/<int:group_id>", methods=["POST"])
+@login_required
+def delete_group(group_id):
+    with db_cursor(commit=True) as (_, cur):
+        cur.execute("DELETE FROM user_groups WHERE group_id = ?", (group_id,))
+        cur.execute("DELETE FROM groups WHERE id = ?", (group_id,))
+
+    return _redirect_back("users.group_manager")
+
+
+@users_bp.route("/group/<int:group_id>/add-member", methods=["POST"])
+@login_required
+def add_group_member(group_id):
+    user_id = request.form.get("user_id", type=int)
+    if user_id is None:
+        return _redirect_back("users.group_manager")
+
+    with db_cursor(commit=True) as (_, cur):
+        cur.execute(
+            "INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)",
+            (user_id, group_id),
+        )
+
+    return _redirect_back("users.group_manager")
+
+
+@users_bp.route("/group/<int:group_id>/remove-member/<int:user_id>", methods=["POST"])
+@login_required
+def remove_group_member(group_id, user_id):
+    with db_cursor(commit=True) as (_, cur):
+        cur.execute(
+            "DELETE FROM user_groups WHERE user_id = ? AND group_id = ?",
+            (user_id, group_id),
+        )
+
+    return _redirect_back("users.group_manager")
+
+
+@users_bp.route("/group/<int:group_id>/members", methods=["GET"])
+@login_required
+def list_group_members(group_id):
+    with db_cursor() as (_, cur):
+        cur.execute(
+            """
+            SELECT u.id, u.username, u.full_name
+            FROM users u
+            INNER JOIN user_groups ug ON ug.user_id = u.id
+            WHERE ug.group_id = ?
+            ORDER BY u.username COLLATE NOCASE
+            """,
+            (group_id,),
+        )
+        members = [dict(row) for row in cur.fetchall()]
+
+    return jsonify({"members": members})
 
 
 @users_bp.route("/delete/<int:user_id>", methods=["POST"])

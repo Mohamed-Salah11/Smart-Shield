@@ -1560,7 +1560,7 @@ table tbody tr:last-child td,
 }
 
 /* ========================================
-   APP SHELL + SIDEBAR (FortiGate-style)
+   APP SHELL + SIDEBAR (Smart Shield style)
 ======================================== */
 
 .app-shell {
@@ -1891,9 +1891,9 @@ table tbody tr:last-child td,
 }
 
 /* ========================================
-   FORTIGATE-LIKE TOPBAR + LEFT MENU (OVERRIDES)
+   SMART SHIELD TOPBAR + LEFT MENU (OVERRIDES)
    - Keeps the existing user dropdown styles (#userDropdown, .user-avatar, .user-name)
-   - Replaces top nav links with a FortiGate-inspired left sidebar menu (.app-shell/.sidebar)
+   - Replaces top nav links with a Smart Shield left sidebar menu (.app-shell/.sidebar)
    - Responsive: desktop collapse + mobile off-canvas open/close
 ======================================== */
 
@@ -2498,4 +2498,211 @@ table tbody tr:last-child td,
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: #4b5563;
+}
+
+/* ========================================
+   DASHBOARD WIDGETS
+======================================== */
+
+.dashboard-workspace {
+  --dash-cols: 2;
+}
+
+.dashboard-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid var(--border-color-soft);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--dash-cols), minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.dashboard-widget {
+  background: #ffffff;
+  border: 1px solid var(--border-color-soft);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-widget.widget-wide {
+  grid-column: span 2;
+}
+
+.dashboard-widget.dragging {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.dashboard-widget.is-hidden {
+  display: none !important;
+}
+
+.dashboard-widget.collapsed .dashboard-widget-body {
+  display: none;
+}
+
+.dashboard-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #2f3c4d;
+  color: #ffffff;
+  cursor: grab;
+  user-select: none;
+}
+
+.widget-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.widget-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: #ffffff;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.widget-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.dashboard-widget-body {
+  padding: 12px;
+}
+
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kpi-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.kpi-item {
+  background: #f7f9fb;
+  border: 1px solid var(--border-color-soft);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+}
+
+.kpi-item span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.kpi-item strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.widget-table {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.widget-table table {
+  margin-bottom: 0;
+}
+
+.dash-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.widget-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.widget-manager-list .form-check {
+  margin: 0;
+}
+
+@media (max-width: 1400px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-widget.widget-wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-widget.widget-wide {
+    grid-column: span 1;
+  }
+}
+
+[data-theme="dark"] .dashboard-toolbar,
+[data-theme="dark"] .dashboard-widget {
+  background: var(--panel);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .dashboard-widget-header {
+  background: #1e2235;
+}
+
+[data-theme="dark"] .kpi-item {
+  background: #1a1f31;
+  border-color: #2d3748;
+}
+
+[data-theme="dark"] .kpi-item strong {
+  color: #e4e6eb;
 }

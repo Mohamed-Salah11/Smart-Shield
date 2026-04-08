@@ -1,6 +1,6 @@
 # Smart Shield Firewall Panel
 
-A **Flask + SQLite** web application that provides a pfSense-inspired, desktop-focused **firewall/router management panel** branded as **Smart Shield**.
+A **Flask + SQLite** web application that provides an appliance-inspired, desktop-focused **firewall/router management panel** branded as **Smart Shield**.
 
 It includes UI pages (Jinja templates) for common firewall appliance areas like **System**, **Interfaces**, **Routing**, **Services**, **Firewall**, **VPN**, **Status**, and **Diagnostics**. Some areas are fully wired to a database/API (notably *Users*, *Advanced settings*, and *Firewall/NAT*), while others are currently UI stubs/placeholders that render pages without persistent backend logic.
 
@@ -544,7 +544,7 @@ Columns: `id`, `name`, `type`, `alias_values`, `description`
 - `GET,POST` `/system/notifications`
 - `GET` `/system/package-manager`
 - `GET` `/system/paid-support`
-- `GET` `/system/pfsense-book`
+- `GET` `/system/smart-shield-book`
 - `GET` `/system/register`
 - `GET` `/system/setup-wizard`
 - `GET` `/system/setup-wizard/step/<int:step>`

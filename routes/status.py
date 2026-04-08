@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from app.auth_utils import login_required
+from app.audit_log import tail_events
 
 status_bp = Blueprint("status", __name__, url_prefix="/status")
 
@@ -91,7 +92,26 @@ def queues():
 @status_bp.route("/system-logs")
 @login_required
 def system_logs():
-    return render_template("system_logs.html")
+    active_tab = (request.args.get("tab") or "system").lower()
+    if active_tab not in {"system", "sessions", "security"}:
+        active_tab = "system"
+
+    all_events = tail_events(limit=300)
+    session_events = [e for e in all_events if e.get("category") == "session"]
+    system_events = [e for e in all_events if e.get("category") == "system"]
+    security_events = [
+        e for e in all_events
+        if e.get("category") == "security"
+        or (e.get("category") == "session" and e.get("action") == "login_failed")
+    ]
+
+    return render_template(
+        "system_logs.html",
+        active_tab=active_tab,
+        system_events=system_events[:150],
+        session_events=session_events[:150],
+        security_events=security_events[:150],
+    )
 
 
 # --------------------------------------------------

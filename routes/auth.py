@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash
 from app.database import get_db
+from app.audit_log import log_event
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -32,8 +33,22 @@ def login():
                 session["user_avatar"] = url_for("static", filename=user["profile_picture"])
             else:
                 session.pop("user_avatar", None)
+            log_event(
+                category="session",
+                action="login_success",
+                username=user["username"],
+                remote_addr=request.remote_addr,
+                details={"user_id": user["id"]},
+            )
             return redirect(url_for("system.dashboard"))
 
+        log_event(
+            category="session",
+            action="login_failed",
+            username=username or "anonymous",
+            remote_addr=request.remote_addr,
+            details={"reason": "invalid_credentials"},
+        )
         error = "Invalid username or password"
 
     return render_template("login.html", error=error)
@@ -41,5 +56,12 @@ def login():
 
 @auth_bp.route("/logout")
 def logout():
+    log_event(
+        category="session",
+        action="logout",
+        username=session.get("username", "anonymous"),
+        remote_addr=request.remote_addr,
+        details={"user_id": session.get("user_id")},
+    )
     session.clear()
     return redirect(url_for("auth.login"))

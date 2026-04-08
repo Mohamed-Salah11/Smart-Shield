@@ -772,6 +772,7 @@ def delete_nat_1to1(rule_id):
 
 # Outbound NAT CRUD
 @firewall_bp.route("/api/nat/outbound", methods=["GET"])
+@login_required
 def get_nat_outbound():
     """Get all outbound NAT rules"""
     try:
@@ -916,6 +917,7 @@ def delete_nat_outbound(rule_id):
 
 # NPt (Network Prefix Translation) CRUD
 @firewall_bp.route("/api/nat/npt", methods=["GET"])
+@login_required
 def get_nat_npt():
     """Get all NPt mappings"""
     try:
@@ -1069,12 +1071,14 @@ def delete_nat_npt(rule_id):
 # ----------------------------
 
 @firewall_bp.route("/aliases")
+@login_required
 def aliases():
     # Default tab = 'all'
     return render_template("aliases.html", tab="all")
 
 
 @firewall_bp.route("/aliases/<tab>")
+@login_required
 def firewall_aliases_tab(tab):
     valid_tabs = ["ip", "ports", "urls", "all"]
     if tab not in valid_tabs:
@@ -1083,6 +1087,7 @@ def firewall_aliases_tab(tab):
 
 
 @firewall_bp.route("/api/aliases", methods=["GET"])
+@login_required
 def get_aliases():
     """Get all aliases with optional type filter"""
     try:
@@ -1222,6 +1227,7 @@ def schedules():
 
 
 @firewall_bp.route("/api/schedules", methods=["GET"])
+@login_required
 def list_schedules():
     """List all firewall schedules with their ranges."""
     try:
@@ -1399,6 +1405,7 @@ def virtual_ips():
 # ----------------------------
 
 @firewall_bp.route("/traffic-shaper")
+@login_required
 def traffic_shaper():
     return render_template("traffic_shaper.html")
 

@@ -6,6 +6,7 @@ import ipaddress
 import os
 import re
 import subprocess
+import sys
 
 
 network_api_bp = Blueprint("network_api", __name__, url_prefix="/api/network")
@@ -38,6 +39,15 @@ def validate_mac(value: str):
 
 def row_to_bool(row, key, default=False):
     return bool(row[key]) if row and key in row.keys() else default
+
+
+def _network_apply_enabled():
+    return os.getenv("SMARTSHIELD_ENABLE_NETWORK_APPLY", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 @network_api_bp.route("/interfaces", methods=["GET"])
@@ -354,29 +364,6 @@ def delete_lease(lease_id):
     return jsonify({"status": "success", "message": "Static lease deleted"})
 
 
-@network_api_bp.route("/connections", methods=["GET"])
-@login_required
-def get_connections():
-    clients = []
-    arp_path = "/proc/net/arp"
-
-    if os.path.exists(arp_path):
-        with open(arp_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()[1:]
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 6:
-                    clients.append(
-                        {
-                            "ip_address": parts[0],
-                            "mac_address": parts[3],
-                            "interface": parts[5],
-                        }
-                    )
-
-    return jsonify({"status": "success", "data": clients})
-
-
 @network_api_bp.route("/apply", methods=["POST"])
 @login_required
 def apply_network():
@@ -389,25 +376,73 @@ def apply_network():
         validate_interface_name(interface_name)
         validate_cidr(ipv4_address)
         validate_ip(gateway_ip)
-# uncomment in freebsd isa
-        # subprocess.run(["ip", "addr", "flush", "dev", interface_name], check=True)
-        # subprocess.run(["ip", "addr", "add", ipv4_address, "dev", interface_name], check=True)
-        # subprocess.run(["ip", "link", "set", interface_name, "up"], check=True)
 
-        # if gateway_ip:
-        #     subprocess.run(["ip", "route", "replace", "default", "via", gateway_ip], check=True)
-
-        # return jsonify({"status": "success", "message": "Network settings applied"})
-        return jsonify({
+        if not _network_apply_enabled():
+            return jsonify(
+                {
                     "status": "success",
-                    "message": "Configuration saved. Live OS network apply is temporarily disabled until FreeBSD support is implemented."
-        })
+                    "message": (
+                        "Configuration saved. Live FreeBSD network apply is disabled. "
+                        "Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 to enable it."
+                    ),
+                }
+            )
+
+        if not sys.platform.startswith("freebsd"):
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Live network apply is only supported when running on FreeBSD.",
+                }
+            ), 400
+
+        interface = ipaddress.ip_interface(ipv4_address)
+        if interface.version != 4:
+            return jsonify({"status": "error", "message": "Only IPv4 is supported for live apply."}), 400
+
+        subprocess.run(
+            [
+                "ifconfig",
+                interface_name,
+                "inet",
+                str(interface.ip),
+                "netmask",
+                str(interface.network.netmask),
+            ],
+            check=True,
+        )
+        subprocess.run(["ifconfig", interface_name, "up"], check=True)
+
+        if gateway_ip:
+            # Deleting default route may fail if none exists; add route afterward.
+            subprocess.run(["route", "-n", "delete", "default"], check=False)
+            subprocess.run(["route", "-n", "add", "default", gateway_ip], check=True)
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Network settings applied on FreeBSD.",
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
 @network_api_bp.route("/connections", methods=["GET"])
 @login_required
 def get_connections():
-     return jsonify({
-        "status": "error",
-        "message": "Connections endpoint is not implemented yet for FreeBSD."
-      }), 501
+    if not sys.platform.startswith("freebsd"):
+        return jsonify(
+            {
+                "status": "success",
+                "data": [],
+                "message": "Live connection listing is available only on FreeBSD.",
+            }
+        )
+
+    try:
+        proc = subprocess.run(["sockstat", "-46"], capture_output=True, text=True, check=True)
+        lines = [line for line in proc.stdout.splitlines() if line.strip()]
+        return jsonify({"status": "success", "data": lines})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

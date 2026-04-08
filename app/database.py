@@ -1,11 +1,22 @@
 import os
 import sqlite3
+import sys
 from werkzeug.security import generate_password_hash
 
-DATABASE = os.getenv("SMARTSHIELD_DB_PATH", "data.db")
+DEFAULT_DB_PATH = "/var/db/smart-shield/data.db" if sys.platform.startswith("freebsd") else "data.db"
+DATABASE = os.getenv("SMARTSHIELD_DB_PATH", DEFAULT_DB_PATH)
+
+
+def _ensure_parent_dir(path: str):
+    parent_dir = os.path.dirname(os.path.abspath(path))
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
 
 def get_db():
+    _ensure_parent_dir(DATABASE)
     conn = sqlite3.connect(DATABASE)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
 

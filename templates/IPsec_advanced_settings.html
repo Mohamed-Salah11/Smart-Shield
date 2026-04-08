@@ -175,7 +175,7 @@
 						<input class="form-check-input" type="checkbox" id="ikev1Unencrypted" name="ikev1_unencrypted_payloads" />
 						<label class="form-check-label" for="ikev1Unencrypted">Accept unencrypted ID and HASH payloads in IKEv1 Main Mode</label>
 					</div>
-					<div class="form-text">Some implementations send the third Main Mode message unencrypted, probably to find the PSKs for the specified ID for authentication. This is very similar to Aggressive Mode, and has the same security implications: A passive attacker can sniff the negotiated identity, and start brute forcing the PSK using the HASH payload. It is recommended to keep this option to no, unless the exact implications are known and compatibility is required for such devices (for example, some SonicWall boxes).</div>
+					<div class="form-text">Some implementations send the third Main Mode message unencrypted, probably to find the PSKs for the specified ID for authentication. This is very similar to Aggressive Mode, and has the same security implications: A passive attacker can sniff the negotiated identity, and start brute forcing the PSK using the HASH payload. It is recommended to keep this option to no, unless the exact implications are known and compatibility is required for such devices (for example, some third-party VPN devices).</div>
 				</div>
 			</div>
 
@@ -470,3 +470,4 @@ function saveIpsecAdvancedSettings() {
 }
 </script>
 {% endblock %}
+
