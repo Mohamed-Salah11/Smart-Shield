@@ -914,35 +914,73 @@ def delete_openvpn_cso(cso_id):
 @login_required
 def save_ipsec_phase1():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        remote_gateway = (data.get('remote_gateway') or '').strip()
+        if not remote_gateway:
+            return jsonify({'status': 'error', 'message': 'remote_gateway is required'}), 400
         db = get_db()
         cursor = db.cursor()
         
         cursor.execute("""
             INSERT INTO ipsec_phase1 
-            (description, disabled, key_exchange, internet_protocol, interface, 
-             remote_gateway, authentication_method, my_identifier, peer_identifier, 
-             preshared_key, encryption_algorithm, hash_algorithm, dh_key_group, lifetime)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (
+                disabled, ike_version, internet_protocol, interface, remote_gateway,
+                auth_method, my_identifier, peer_identifier, pre_shared_key,
+                p1_life_time, p1_rekey_time, p1_reauth_time, p1_rand_time,
+                child_sa_start_action, child_sa_close_action,
+                nat_traversal, mobike,
+                gateway_duplicates, split_connections, prf_selection,
+                remote_ike_port, remote_nat_t_port,
+                dpd_enable, dpd_delay, dpd_max_failures,
+                description
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            data.get('description', ''),
             1 if data.get('disabled') else 0,
-            data.get('key_exchange', 'ikev2'),
+            data.get('ike_version', data.get('key_exchange', 'ikev2')),
             data.get('internet_protocol', 'ipv4'),
             data.get('interface', 'wan'),
-            data.get('remote_gateway', ''),
-            data.get('authentication_method', 'preshared_key'),
+            remote_gateway,
+            data.get('auth_method', data.get('authentication_method', 'mutual-psk')),
             data.get('my_identifier', ''),
             data.get('peer_identifier', ''),
-            data.get('preshared_key', ''),
-            data.get('encryption_algorithm', 'aes256'),
-            data.get('hash_algorithm', 'sha256'),
-            data.get('dh_key_group', '14'),
-            data.get('lifetime', 28800)
+            data.get('pre_shared_key', data.get('preshared_key', '')),
+            int(data.get('p1_life_time', data.get('lifetime', 28800)) or 28800),
+            int(data.get('p1_rekey_time', 25920) or 25920),
+            int(data.get('p1_reauth_time', 0) or 0),
+            int(data.get('p1_rand_time', 2880) or 2880),
+            data.get('child_sa_start_action', 'default'),
+            data.get('child_sa_close_action', 'default'),
+            data.get('nat_traversal', 'auto'),
+            data.get('mobike', 'disable'),
+            1 if data.get('gateway_duplicates') else 0,
+            1 if data.get('split_connections') else 0,
+            1 if data.get('prf_selection') else 0,
+            data.get('remote_ike_port', ''),
+            data.get('remote_nat_t_port', ''),
+            1 if data.get('dpd_enable', True) else 0,
+            int(data.get('dpd_delay', 10) or 10),
+            int(data.get('dpd_max_failures', 5) or 5),
+            data.get('description', ''),
         ))
+
+        phase1_id = cursor.lastrowid
+        cursor.execute(
+            """
+            INSERT INTO ipsec_phase1_algorithms (phase1_id, encryption, key_length, hash, dh_group)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                phase1_id,
+                data.get('encryption_algorithm', 'aes'),
+                data.get('key_length', 128),
+                data.get('hash_algorithm', 'sha256'),
+                data.get('dh_key_group', '14'),
+            ),
+        )
         
         db.commit()
-        return jsonify({'status': 'success', 'id': cursor.lastrowid})
+        return jsonify({'status': 'success', 'id': phase1_id})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -954,13 +992,23 @@ def get_ipsec_phase1():
         db = get_db()
         cursor = db.cursor()
         cursor.execute("""
-            SELECT id, description, disabled, key_exchange, remote_gateway, 
-                   authentication_method, encryption_algorithm, hash_algorithm, dh_key_group
+            SELECT id, description, disabled, ike_version, remote_gateway, auth_method
             FROM ipsec_phase1 ORDER BY id DESC
         """)
         
         tunnels = []
         for row in cursor.fetchall():
+            cursor.execute(
+                """
+                SELECT encryption, hash, dh_group
+                FROM ipsec_phase1_algorithms
+                WHERE phase1_id = ?
+                ORDER BY id
+                LIMIT 1
+                """,
+                (row[0],),
+            )
+            algo = cursor.fetchone()
             tunnels.append({
                 'id': row[0],
                 'description': row[1],
@@ -968,9 +1016,9 @@ def get_ipsec_phase1():
                 'key_exchange': row[3],
                 'remote_gateway': row[4],
                 'auth_method': row[5],
-                'encryption': row[6],
-                'hash': row[7],
-                'dh_group': row[8]
+                'encryption': algo[0] if algo else '',
+                'hash': algo[1] if algo else '',
+                'dh_group': algo[2] if algo else ''
             })
         
         return jsonify({'status': 'success', 'tunnels': tunnels})
@@ -984,6 +1032,7 @@ def delete_ipsec_phase1(phase1_id):
     try:
         db = get_db()
         cursor = db.cursor()
+        cursor.execute("DELETE FROM ipsec_phase1_algorithms WHERE phase1_id = ?", (phase1_id,))
         cursor.execute("DELETE FROM ipsec_phase2 WHERE phase1_id = ?", (phase1_id,))
         cursor.execute("DELETE FROM ipsec_phase1 WHERE id = ?", (phase1_id,))
         db.commit()

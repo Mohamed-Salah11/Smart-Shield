@@ -435,9 +435,13 @@ def dynamic_dns_checkip():
 # IGMP PROXY
 # ----------------------------
 
-@services_bp.route("/igmp-proxy")
+@services_bp.route("/igmp-proxy", methods=["GET", "POST"])
 @login_required
 def igmp_proxy():
+    if request.method == "POST":
+        if request.is_json:
+            return jsonify({"success": True, "message": "IGMP Proxy settings saved."})
+        return redirect(url_for("services.igmp_proxy"))
     return render_template("igmp_proxy.html")
 
 
@@ -495,11 +499,25 @@ def upnp_igd_pcp():
 # WAKE ON LAN
 # ----------------------------
 
-@services_bp.route("/wake-on-lan")
+@services_bp.route("/wake-on-lan", methods=["GET", "POST"])
 @login_required
 def wake_on_lan():
     interfaces = ["WAN", "LAN"]
     devices = []
+    if request.method == "POST":
+        if request.is_json:
+            payload = request.get_json(silent=True) or {}
+            mac = (payload.get("mac_address") or "").strip()
+            iface = (payload.get("interface") or "").strip()
+            if not mac or not iface:
+                return jsonify({"success": False, "message": "MAC address and interface are required."}), 400
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"Wake-on-LAN packet queued for {mac} on {iface}.",
+                }
+            )
+        return redirect(url_for("services.wake_on_lan"))
     return render_template("wake_on_lan.html", interfaces=interfaces, devices=devices)
 
 

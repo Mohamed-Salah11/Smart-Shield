@@ -169,8 +169,15 @@
             <details class="side-group">
                 <summary><span class="label">Status</span> <span class="chev">▾</span></summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
+                    <li><a href="{{ url_for('status.status_home') }}">Overview</a></li>
                     <li><a href="{{ url_for('status.carp_failover') }}">CARP (failover)</a></li>
+                    <li><a href="{{ url_for('status.gateways') }}">Gateways</a></li>
+                    <li><a href="{{ url_for('status.monitoring') }}">Monitoring</a></li>
+                    <li><a href="{{ url_for('status.queues') }}">Queues</a></li>
+                    <li><a href="{{ url_for('status.traffic_graph') }}">Traffic Graph</a></li>
+                    <li><a href="{{ url_for('status.dhcp_leases') }}">DHCP Leases</a></li>
+                    <li><a href="{{ url_for('status.system_logs') }}">System Logs</a></li>
+                    <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">Session Logs</a></li>
                 </ul>
             </details>
         </nav>

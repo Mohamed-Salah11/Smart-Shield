@@ -280,24 +280,32 @@
         background-color: #e9ecef;
     }
 
-    /* Actions column: stacked buttons like pfSense */
+    /* Actions column: stacked buttons */
     #schedules-tbody td:last-child .btn {
         min-width: 80px;
     }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const scheduleMonth = document.getElementById('scheduleMonth');
     const calendarHeader = document.getElementById('calendarHeader');
     const calendarBody = document.getElementById('calendarBody');
     const configuredRanges = document.getElementById('configuredRanges');
+    const scheduleName = document.getElementById('scheduleName');
+    const scheduleDesc = document.getElementById('scheduleDesc');
+    const rangeDesc = document.getElementById('rangeDesc');
+    const schedulesAdd = document.getElementById('schedulesAdd');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+    const addTimeBtn = document.getElementById('addTimeBtn');
+    const scheduleSaveBtn = document.getElementById('scheduleSaveBtn');
+
     let selectedDates = [];
     let currentYear = new Date().getFullYear();
     let editingScheduleId = null;
 
-    function escapeHtml(str) {
-        return String(str ?? '')
+    function escapeHtml(value) {
+        return String(value ?? '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -306,365 +314,301 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function buildRangeSummary(ranges) {
-        if (!ranges || ranges.length === 0) return '-';
-        // Keep it compact for the table.
-        return ranges.map(r => {
-            const month = r.month;
-            const days = r.days_csv;
-            const time = `${r.start_time} - ${r.end_time}`;
-            const desc = r.range_description ? ` (${r.range_description})` : '';
-            return `${r.year}-${String(month).padStart(2,'0')}: ${days} @ ${time}${desc}`;
+        if (!Array.isArray(ranges) || ranges.length === 0) return '-';
+        return ranges.map((range) => {
+            const desc = range.range_description ? ` (${range.range_description})` : '';
+            return `${range.year}-${String(range.month).padStart(2, '0')}: ${range.days_csv} @ ${range.start_time} - ${range.end_time}${desc}`;
         }).join('<br>');
+    }
+
+    function resetForm() {
+        editingScheduleId = null;
+        scheduleName.value = '';
+        scheduleDesc.value = '';
+        rangeDesc.value = '';
+        configuredRanges.innerHTML = '';
+        clearSelectionBtn.click();
+    }
+
+    function updateSelectedDates() {
+        selectedDates = [];
+        document.querySelectorAll('#calendarBody td.selected').forEach((td) => {
+            selectedDates.push(parseInt(td.dataset.date, 10));
+        });
+    }
+
+    function generateCalendar(month, year) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+
+        calendarHeader.textContent = `${monthNames[month - 1]} ${year}`;
+        calendarBody.innerHTML = '';
+
+        const firstDay = new Date(year, month - 1, 1);
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        let startDay = firstDay.getDay() - 1;
+        if (startDay < 0) startDay = 6;
+
+        let date = 1;
+        for (let i = 0; i < 6; i += 1) {
+            const row = document.createElement('tr');
+
+            for (let j = 0; j < 7; j += 1) {
+                const cell = document.createElement('td');
+
+                if ((i === 0 && j < startDay) || date > daysInMonth) {
+                    cell.classList.add('empty');
+                } else {
+                    cell.textContent = String(date);
+                    cell.dataset.date = String(date);
+                    cell.dataset.weekday = String(j);
+                    cell.addEventListener('click', function () {
+                        cell.classList.toggle('selected');
+                        updateSelectedDates();
+                    });
+                    date += 1;
+                }
+
+                row.appendChild(cell);
+            }
+
+            calendarBody.appendChild(row);
+            if (date > daysInMonth) break;
+        }
     }
 
     async function loadSchedules() {
         const tbody = document.getElementById('schedules-tbody');
         tbody.innerHTML = '';
-        try {
-            const res = await fetch('/firewall/api/schedules');
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error || 'Failed to load schedules');
 
-            const schedules = json.schedules || [];
-            // cache for edit button
-            const schedulesById = new Map(schedules.map(s => [String(s.id), s]));
+        try {
+            const response = await fetch('/firewall/api/schedules');
+            const payload = await response.json();
+
+            if (!payload.success) {
+                throw new Error(payload.error || 'Failed to load schedules');
+            }
+
+            const schedules = payload.schedules || [];
+            const schedulesById = new Map(schedules.map((schedule) => [String(schedule.id), schedule]));
+
             if (schedules.length === 0) {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td colspan="4" class="text-muted">No schedules defined.</td>`;
+                row.innerHTML = '<td colspan="4" class="text-muted">No schedules defined.</td>';
                 tbody.appendChild(row);
                 return;
             }
 
-            schedules.forEach(s => {
+            schedules.forEach((schedule) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${escapeHtml(s.name)}</td>
-                    <td>${buildRangeSummary(s.ranges)}</td>
-                    <td>${escapeHtml(s.description || '')}</td>
+                    <td>${escapeHtml(schedule.name)}</td>
+                    <td>${buildRangeSummary(schedule.ranges)}</td>
+                    <td>${escapeHtml(schedule.description || '')}</td>
                     <td>
                         <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-primary btn-sm schedule-edit" data-id="${s.id}" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
-                                Edit
-                            </button>
-                            <button type="button" class="btn btn-danger btn-sm schedule-delete" data-id="${s.id}">
-                                Delete
-                            </button>
+                            <button type="button" class="btn btn-primary btn-sm schedule-edit" data-id="${schedule.id}" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">Edit</button>
+                            <button type="button" class="btn btn-danger btn-sm schedule-delete" data-id="${schedule.id}">Delete</button>
                         </div>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
 
-            tbody.querySelectorAll('.schedule-edit').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const s = schedulesById.get(String(this.dataset.id));
-                    if (!s) return;
+            tbody.querySelectorAll('.schedule-edit').forEach((button) => {
+                button.addEventListener('click', function () {
+                    const schedule = schedulesById.get(String(button.dataset.id));
+                    if (!schedule) return;
 
-                    editingScheduleId = s.id;
-                    document.getElementById('scheduleName').value = s.name || '';
-                    document.getElementById('scheduleDesc').value = s.description || '';
-
-                    // Clear configured ranges and refill from stored ranges
+                    editingScheduleId = schedule.id;
+                    scheduleName.value = schedule.name || '';
+                    scheduleDesc.value = schedule.description || '';
+                    rangeDesc.value = '';
                     configuredRanges.innerHTML = '';
-                    (s.ranges || []).forEach(r => {
-                        const dateStr = r.days_csv || '';
-                        const timeStr = `${r.start_time} - ${r.end_time}`;
-                        const desc = r.range_description || '-';
 
+                    (schedule.ranges || []).forEach((range) => {
                         const row = document.createElement('tr');
+                        const timeStr = `${range.start_time} - ${range.end_time}`;
+                        const desc = range.range_description || '-';
+
                         row.innerHTML = `
-                            <td>${escapeHtml(dateStr)}</td>
+                            <td>${escapeHtml(range.days_csv || '')}</td>
                             <td>${escapeHtml(timeStr)}</td>
                             <td>${escapeHtml(desc)}</td>
                             <td>
-                                <button type="button" class="btn btn-danger btn-sm remove-range">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                <button type="button" class="btn btn-danger btn-sm remove-range"><i class="fas fa-trash"></i></button>
                             </td>
                         `;
-                        row.querySelector('.remove-range').addEventListener('click', function() {
+
+                        row.querySelector('.remove-range').addEventListener('click', function () {
                             row.remove();
                         });
+
                         configuredRanges.appendChild(row);
                     });
 
-                    // If the schedule has ranges, set month/year to the first range for convenience
-                    if (s.ranges && s.ranges.length > 0) {
-                        const first = s.ranges[0];
+                    if (Array.isArray(schedule.ranges) && schedule.ranges.length > 0) {
+                        const first = schedule.ranges[0];
                         if (first.year) currentYear = parseInt(first.year, 10);
                         if (first.month) scheduleMonth.value = String(first.month);
-                        generateCalendar(parseInt(scheduleMonth.value, 10), currentYear);
                     }
-                    document.getElementById('rangeDesc').value = '';
-                    document.getElementById('clearSelectionBtn').click();
+
+                    generateCalendar(parseInt(scheduleMonth.value, 10), currentYear);
+                    clearSelectionBtn.click();
                 });
             });
 
-            tbody.querySelectorAll('.schedule-delete').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const id = this.dataset.id;
+            tbody.querySelectorAll('.schedule-delete').forEach((button) => {
+                button.addEventListener('click', async function () {
                     if (!confirm('Delete this schedule?')) return;
-                    const res = await fetch(`/firewall/api/schedules/${id}`, { method: 'DELETE' });
-                    const json = await res.json();
-                    if (!json.success) {
-                        alert(json.error || 'Failed to delete schedule');
+
+                    const response = await fetch(`/firewall/api/schedules/${button.dataset.id}`, {
+                        method: 'DELETE',
+                    });
+                    const payload = await response.json();
+
+                    if (!payload.success) {
+                        alert(payload.error || 'Failed to delete schedule');
                         return;
                     }
+
                     await loadSchedules();
                 });
             });
-        } catch (e) {
+        } catch (error) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="4" class="text-danger">${escapeHtml(e.message || e)}</td>`;
+            row.innerHTML = `<td colspan="4" class="text-danger">${escapeHtml(error.message || error)}</td>`;
             tbody.appendChild(row);
         }
     }
-=======
-    document.addEventListener('DOMContentLoaded', function () {
-        const scheduleMonth = document.getElementById('scheduleMonth');
-        const calendarHeader = document.getElementById('calendarHeader');
-        const calendarBody = document.getElementById('calendarBody');
-        const configuredRanges = document.getElementById('configuredRanges');
-        let selectedDates = [];
-        let currentYear = new Date().getFullYear();
->>>>>>> 3edbb6c866252e768671d3aa9fb08c65ce0ae953
 
-        // Generate calendar for selected month
-        function generateCalendar(month, year) {
-            calendarBody.innerHTML = '';
-            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'];
-            calendarHeader.textContent = monthNames[month - 1] + ' ' + year;
+    document.querySelectorAll('.calendar-weekday').forEach((weekdayHeader) => {
+        weekdayHeader.addEventListener('click', function () {
+            const weekday = parseInt(weekdayHeader.dataset.day, 10);
+            const normalizedWeekday = weekday === 0 ? 6 : weekday - 1;
 
-            const firstDay = new Date(year, month - 1, 1);
-            const lastDay = new Date(year, month, 0);
-            const daysInMonth = lastDay.getDate();
-
-            // Adjust for Monday start (0 = Monday, 6 = Sunday)
-            let startDay = firstDay.getDay() - 1;
-            if (startDay < 0) startDay = 6;
-
-            let date = 1;
-            for (let i = 0; i < 6; i++) {
-                const row = document.createElement('tr');
-                for (let j = 0; j < 7; j++) {
-                    const cell = document.createElement('td');
-                    if (i === 0 && j < startDay) {
-                        cell.classList.add('empty');
-                    } else if (date > daysInMonth) {
-                        cell.classList.add('empty');
-                    } else {
-                        cell.textContent = date;
-                        cell.dataset.date = date;
-                        cell.dataset.weekday = j;
-                        cell.addEventListener('click', function () {
-                            this.classList.toggle('selected');
-                            updateSelectedDates();
-                        });
-                        date++;
-                    }
-                    row.appendChild(cell);
+            document.querySelectorAll(`#calendarBody td[data-weekday="${normalizedWeekday}"]`).forEach((td) => {
+                if (!td.classList.contains('empty')) {
+                    td.classList.add('selected');
                 }
-                calendarBody.appendChild(row);
-                if (date > daysInMonth) break;
-            }
-        }
-
-        // Update selected dates array
-        function updateSelectedDates() {
-            selectedDates = [];
-            document.querySelectorAll('#calendarBody td.selected').forEach(td => {
-                selectedDates.push(parseInt(td.dataset.date));
             });
-        }
 
-        // Select all dates for a weekday
-        document.querySelectorAll('.calendar-weekday').forEach(th => {
-            th.addEventListener('click', function () {
-                const weekday = parseInt(this.dataset.day);
-                document.querySelectorAll(`#calendarBody td[data-weekday="${weekday === 0 ? 6 : weekday - 1}"]`).forEach(td => {
-                    if (!td.classList.contains('empty')) {
-                        td.classList.add('selected');
-                    }
-                });
-                updateSelectedDates();
-            });
+            updateSelectedDates();
         });
+    });
 
-        // Month change
-        if (scheduleMonth) {
-            scheduleMonth.addEventListener('change', function () {
-                generateCalendar(parseInt(this.value), currentYear);
-            });
-            // Initialize with current month
-            const currentMonth = new Date().getMonth() + 1;
-            scheduleMonth.value = currentMonth;
-            generateCalendar(currentMonth, currentYear);
+    scheduleMonth.addEventListener('change', function () {
+        generateCalendar(parseInt(scheduleMonth.value, 10), currentYear);
+    });
+
+    clearSelectionBtn.addEventListener('click', function () {
+        document.querySelectorAll('#calendarBody td.selected').forEach((td) => {
+            td.classList.remove('selected');
+        });
+        selectedDates = [];
+    });
+
+    addTimeBtn.addEventListener('click', function () {
+        if (selectedDates.length === 0) {
+            alert('Please select at least one date');
+            return;
         }
 
-        // Clear selection
-        document.getElementById('clearSelectionBtn').addEventListener('click', function () {
-            document.querySelectorAll('#calendarBody td.selected').forEach(td => {
-                td.classList.remove('selected');
-            });
-            selectedDates = [];
-        });
+        const startHour = document.getElementById('startHour').value;
+        const startMin = document.getElementById('startMin').value;
+        const stopHour = document.getElementById('stopHour').value;
+        const stopMin = document.getElementById('stopMin').value;
+        const dateStr = selectedDates.sort((a, b) => a - b).join(', ');
+        const timeStr = `${startHour}:${startMin} - ${stopHour}:${stopMin}`;
 
-        // Add time range
-        document.getElementById('addTimeBtn').addEventListener('click', function () {
-            if (selectedDates.length === 0) {
-                alert('Please select at least one date');
-                return;
-            }
-
-            const startHour = document.getElementById('startHour').value;
-            const startMin = document.getElementById('startMin').value;
-            const stopHour = document.getElementById('stopHour').value;
-            const stopMin = document.getElementById('stopMin').value;
-            const rangeDesc = document.getElementById('rangeDesc').value;
-
-            const dateStr = selectedDates.sort((a, b) => a - b).join(', ');
-            const timeStr = `${startHour}:${startMin} - ${stopHour}:${stopMin}`;
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-            <td>${dateStr}</td>
-            <td>${timeStr}</td>
-            <td>${rangeDesc || '-'}</td>
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${escapeHtml(dateStr)}</td>
+            <td>${escapeHtml(timeStr)}</td>
+            <td>${escapeHtml(rangeDesc.value || '-')}</td>
             <td>
-                <button type="button" class="btn btn-danger btn-sm remove-range">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <button type="button" class="btn btn-danger btn-sm remove-range"><i class="fas fa-trash"></i></button>
             </td>
         `;
-            row.querySelector('.remove-range').addEventListener('click', function () {
-                row.remove();
-            });
-            configuredRanges.appendChild(row);
 
-            // Clear selection after adding
-            document.getElementById('clearSelectionBtn').click();
-            document.getElementById('rangeDesc').value = '';
+        row.querySelector('.remove-range').addEventListener('click', function () {
+            row.remove();
         });
 
-        // Save schedule
-        document.getElementById('scheduleSaveBtn').addEventListener('click', function () {
-            const name = document.getElementById('scheduleName').value;
-            if (!name) {
-                alert('Please enter a schedule name');
-                return;
-            }
-
-            const description = document.getElementById('scheduleDesc').value;
-
-            // Collect all configured ranges
-            const ranges = [];
-            document.querySelectorAll('#configuredRanges tr').forEach(tr => {
-                const cells = tr.querySelectorAll('td');
-                if (cells.length >= 3) {
-                    ranges.push({
-                        dates: cells[0].textContent,
-                        time: cells[1].textContent,
-                        description: cells[2].textContent
-                    });
-                }
-            });
-
-            const scheduleData = {
-                name: name,
-                description: description,
-                ranges_data: JSON.stringify(ranges)
-            };
-
-            fetch('/firewall/api/schedules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scheduleData)
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Schedule saved successfully!');
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleEditModal'));
-                        modal.hide();
-                        loadSchedules();
-                        // Clear form
-                        document.getElementById('scheduleName').value = '';
-                        document.getElementById('scheduleDesc').value = '';
-                        document.getElementById('configuredRanges').innerHTML = '';
-                    } else {
-                        alert('Error saving schedule: ' + (data.error || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error saving schedule');
-                });
-        });
-
-        // Load schedules on page load
-        loadSchedules();
+        configuredRanges.appendChild(row);
+        rangeDesc.value = '';
+        clearSelectionBtn.click();
     });
 
-    // Reset modal state when opening add
-    document.getElementById('schedulesAdd').addEventListener('click', function() {
-        editingScheduleId = null;
-        document.getElementById('scheduleName').value = '';
-        document.getElementById('scheduleDesc').value = '';
-        configuredRanges.innerHTML = '';
-        document.getElementById('rangeDesc').value = '';
-        document.getElementById('clearSelectionBtn').click();
+    schedulesAdd.addEventListener('click', function () {
+        resetForm();
     });
 
-    // Save schedule
-    document.getElementById('scheduleSaveBtn').addEventListener('click', function() {
-        const name = document.getElementById('scheduleName').value;
-        if (!name) {
+    scheduleSaveBtn.addEventListener('click', async function () {
+        if (!scheduleName.value.trim()) {
             alert('Please enter a schedule name');
             return;
         }
-        const description = document.getElementById('scheduleDesc').value;
 
-        // Build ranges from the configured table
         const ranges = [];
-        document.querySelectorAll('#configuredRanges tr').forEach(tr => {
-            const tds = tr.querySelectorAll('td');
-            if (tds.length < 3) return;
-            const days_csv = (tds[0].textContent || '').trim();
-            const timeStr = (tds[1].textContent || '').trim();
-            const desc = (tds[2].textContent || '').trim();
+        document.querySelectorAll('#configuredRanges tr').forEach((row) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 3) return;
 
+            const daysCsv = (cells[0].textContent || '').trim();
+            const timeStr = (cells[1].textContent || '').trim();
+            const desc = (cells[2].textContent || '').trim();
             const parts = timeStr.split(' - ');
             if (parts.length !== 2) return;
 
             ranges.push({
                 year: currentYear,
                 month: parseInt(scheduleMonth.value, 10),
-                days_csv,
+                days_csv: daysCsv,
                 start_time: parts[0],
                 end_time: parts[1],
                 range_description: desc === '-' ? '' : desc,
             });
         });
 
-        fetch(editingScheduleId ? `/firewall/api/schedules/${editingScheduleId}` : '/firewall/api/schedules', {
-            method: editingScheduleId ? 'PUT' : 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, ranges })
-        }).then(res => res.json()).then(async json => {
-            if (!json.success) {
-                alert(json.error || 'Failed to save schedule');
+        const endpoint = editingScheduleId ? `/firewall/api/schedules/${editingScheduleId}` : '/firewall/api/schedules';
+        const method = editingScheduleId ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: scheduleName.value.trim(),
+                    description: scheduleDesc.value.trim(),
+                    ranges,
+                }),
+            });
+
+            const payload = await response.json();
+            if (!payload.success) {
+                alert(payload.error || 'Failed to save schedule');
                 return;
             }
+
             await loadSchedules();
-            const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleEditModal'));
-            modal.hide();
-        }).catch(err => {
-            alert(err.message || String(err));
-        });
+
+            const modalElement = document.getElementById('scheduleEditModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+
+            resetForm();
+        } catch (error) {
+            alert(error.message || String(error));
+        }
     });
 
-    // Initial load
+    const currentMonth = new Date().getMonth() + 1;
+    scheduleMonth.value = String(currentMonth);
+    generateCalendar(currentMonth, currentYear);
     loadSchedules();
 });
 </script>

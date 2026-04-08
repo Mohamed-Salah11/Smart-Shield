@@ -1,7 +1,88 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>System Logs</h1>
-<p>Placeholder for system logs.</p>
-{% endblock %}
+{% block main %}
+<div class="container">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('status.status_home') }}">Status</a></li>
+                <li class="breadcrumb-item active" aria-current="page">System Logs</li>
+            </ol>
+        </nav>
+        <h1>System Logs</h1>
+        <p class="lead">Track sessions and log activity from one page.</p>
+    </div>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'system' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='system') }}">System</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'sessions' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='sessions') }}">Sessions</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'security' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='security') }}">Security</a>
+        </li>
+    </ul>
+
+    <div class="section">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2>
+                {% if active_tab == 'sessions' %}Session Log Events{% elif active_tab == 'security' %}Security Log Events{% else %}System Log Events{% endif %}
+            </h2>
+            <span class="badge bg-light text-dark">
+                {% if active_tab == 'sessions' %}
+                {{ session_events|length }}
+                {% elif active_tab == 'security' %}
+                {{ security_events|length }}
+                {% else %}
+                {{ system_events|length }}
+                {% endif %}
+                entries
+            </span>
+        </div>
+        <div class="section-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time (UTC)</th>
+                            <th>Category</th>
+                            <th>Action</th>
+                            <th>User</th>
+                            <th>IP</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set rows = system_events if active_tab == 'system' else (session_events if active_tab == 'sessions' else security_events) %}
+                        {% for event in rows %}
+                        <tr>
+                            <td>{{ event.timestamp.replace('T', ' ')[:19] if event.timestamp else '-' }}</td>
+                            <td>{{ event.category or '-' }}</td>
+                            <td><span class="badge bg-primary">{{ event.action or '-' }}</span></td>
+                            <td>{{ event.username or '-' }}</td>
+                            <td>{{ event.remote_addr or '-' }}</td>
+                            <td>
+                                {% if event.details and event.details.reason %}
+                                {{ event.details.reason }}
+                                {% elif event.details and event.details.user_id %}
+                                user_id={{ event.details.user_id }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-muted">No log entries available for this tab yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
