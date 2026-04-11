@@ -31,7 +31,7 @@
 						<input class="form-check-input" type="checkbox" id="enable-acb">
 						<label class="form-check-label" for="enable-acb">Enable automatic configuration backups</label>
 					</div>
-					<div class="help-text">Auto Configuration Backup automatically encrypts configuration backup content using the Encryption Password below and then securely uploads the encrypted backup over HTTPS to Netgate servers.</div>
+					<div class="help-text">Auto Configuration Backup automatically encrypts configuration backup content using the Encryption Password below and then securely uploads the encrypted backup over HTTPS to the configured backup service.</div>
 				</div>
 			</div>
 
@@ -85,7 +85,7 @@
 				<label>Hint/Identifier</label>
 				<div class="form-group-content">
 					<input type="text" id="hint-identifier" class="form-control" placeholder="Optional identifier" style="max-width: 400px;">
-					<div class="help-text">Optional identifier which AutoConfigBackup will store in plain text along with each encrypted backup. This may allow Netgate TAC to recover a device key should it become lost.</div>
+					<div class="help-text">Optional identifier which AutoConfigBackup will store in plain text along with each encrypted backup. This can help recovery workflows if a device key is lost.</div>
 				</div>
 			</div>
 

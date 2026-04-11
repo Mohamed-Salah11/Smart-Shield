@@ -1,6 +1,508 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Dashboard</h1>
-<p>Welcome to the dashboard.</p>
+<div class="container dashboard-workspace" style="--dash-cols: {{ dashboard_columns }};">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
+            </ol>
+        </nav>
+        <h1>Dashboard</h1>
+        <p class="lead">Live operational widgets with customizable layout and refresh controls.</p>
+    </div>
+
+    <div class="dashboard-toolbar">
+        <div class="toolbar-actions">
+            <button type="button" class="btn btn-sm btn-primary" id="dashboardRefreshBtn">
+                <i class="fas fa-rotate"></i> Refresh
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#widgetManagerModal">
+                <i class="fas fa-grip"></i> Widget Manager
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="dashboardResetBtn">
+                <i class="fas fa-rotate-left"></i> Reset Layout
+            </button>
+        </div>
+        <div class="toolbar-status">
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="dashboardAutoRefresh">
+                <label class="form-check-label" for="dashboardAutoRefresh">Auto Refresh (30s)</label>
+            </div>
+            <small class="text-muted" id="dashboardLastUpdate">Last update: --</small>
+        </div>
+    </div>
+
+    <div class="dashboard-grid" id="dashboardGrid">
+        <section class="dashboard-widget" data-widget-id="appliance_status" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-server"></i> Appliance Status</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body">
+                <div class="kpi-row">
+                    <div class="kpi-item"><span>Hostname</span><strong id="dashHostname">-</strong></div>
+                    <div class="kpi-item"><span>Timezone</span><strong id="dashTimezone">-</strong></div>
+                    <div class="kpi-item"><span>Theme</span><strong id="dashTheme">-</strong></div>
+                </div>
+                <div class="kpi-row mt-2">
+                    <div class="kpi-item"><span>Dashboard Cols</span><strong id="dashColumns">-</strong></div>
+                    <div class="kpi-item"><span>Updated</span><strong id="dashUpdated">-</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-widget" data-widget-id="session_summary" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-user-shield"></i> Session Summary</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body">
+                <div class="kpi-row">
+                    <div class="kpi-item"><span>Successful</span><strong id="dashLoginSuccess">0</strong></div>
+                    <div class="kpi-item"><span>Failed</span><strong id="dashLoginFailed">0</strong></div>
+                    <div class="kpi-item"><span>Logouts</span><strong id="dashLogouts">0</strong></div>
+                </div>
+                <a class="btn btn-sm btn-primary mt-2" href="{{ url_for('status.system_logs', tab='sessions') }}">Open Session Logs</a>
+            </div>
+        </section>
+
+        <section class="dashboard-widget" data-widget-id="log_controls" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-file-lines"></i> Log Controls</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body">
+                <div class="kpi-row">
+                    <div class="kpi-item"><span>Widgets</span><strong id="dashWidgetsEnabled">-</strong></div>
+                    <div class="kpi-item"><span>Log Filter</span><strong id="dashLogFilterEnabled">-</strong></div>
+                    <div class="kpi-item"><span>Manage Log</span><strong id="dashManageLogEnabled">-</strong></div>
+                </div>
+                <div class="kpi-row mt-2">
+                    <div class="kpi-item"><span>Monitoring</span><strong id="dashMonitoringEnabled">-</strong></div>
+                </div>
+                <a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('status.system_logs') }}">Open System Logs</a>
+            </div>
+        </section>
+
+        <section class="dashboard-widget" data-widget-id="object_counts" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-layer-group"></i> Policy & Object Counts</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body">
+                <div class="kpi-grid-compact">
+                    <div class="kpi-item"><span>Users</span><strong id="dashCountUsers">0</strong></div>
+                    <div class="kpi-item"><span>Groups</span><strong id="dashCountGroups">0</strong></div>
+                    <div class="kpi-item"><span>WAN Rules</span><strong id="dashCountWanRules">0</strong></div>
+                    <div class="kpi-item"><span>LAN Rules</span><strong id="dashCountLanRules">0</strong></div>
+                    <div class="kpi-item"><span>Floating</span><strong id="dashCountFloatingRules">0</strong></div>
+                    <div class="kpi-item"><span>NAT PF</span><strong id="dashCountNatPf">0</strong></div>
+                    <div class="kpi-item"><span>OpenVPN</span><strong id="dashCountOpenvpnServers">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-widget widget-wide" data-widget-id="session_activity" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-clock-rotate-left"></i> Recent Session Activity</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body p-0">
+                <div class="widget-table">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Time (UTC)</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>IP</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashSessionTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-widget widget-wide" data-widget-id="event_stream" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-stream"></i> Recent Event Stream</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body p-0">
+                <div class="widget-table">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Time (UTC)</th>
+                                <th>Category</th>
+                                <th>Action</th>
+                                <th>User</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashEventsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-widget" data-widget-id="quick_links" draggable="true">
+            <header class="dashboard-widget-header">
+                <div class="widget-title"><i class="fas fa-link"></i> Quick Links</div>
+                <div class="widget-actions">
+                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
+                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
+                </div>
+            </header>
+            <div class="dashboard-widget-body">
+                <div class="dash-links">
+                    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-outline-primary">Session Logs</a>
+                    <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-outline-primary">System Logs</a>
+                    <a href="{{ url_for('firewall.rules') }}" class="btn btn-sm btn-outline-primary">Firewall Rules</a>
+                    <a href="{{ url_for('services.dns_resolver') }}" class="btn btn-sm btn-outline-primary">DNS Resolver</a>
+                    <a href="{{ url_for('interfaces.interfaces_assignments') }}" class="btn btn-sm btn-outline-primary">Interfaces</a>
+                    <a href="{{ url_for('system.general_setup') }}" class="btn btn-sm btn-outline-primary">General Setup</a>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="modal fade" id="widgetManagerModal" tabindex="-1" aria-labelledby="widgetManagerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="widgetManagerModalLabel">Widget Manager</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">Show or hide widgets. Drag widgets on the dashboard to reorder them.</p>
+                <div class="widget-manager-list">
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="appliance_status" checked> <span class="form-check-label">Appliance Status</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="session_summary" checked> <span class="form-check-label">Session Summary</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="log_controls" checked> <span class="form-check-label">Log Controls</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="object_counts" checked> <span class="form-check-label">Policy & Object Counts</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="session_activity" checked> <span class="form-check-label">Recent Session Activity</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="event_stream" checked> <span class="form-check-label">Recent Event Stream</span></label>
+                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="quick_links" checked> <span class="form-check-label">Quick Links</span></label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const initialPayload = {{ dashboard_payload | tojson }};
+    const dataEndpoint = "{{ url_for('system.dashboard_data') }}";
+    const username = {{ session.get('username', 'admin') | tojson }};
+    const keyPrefix = `ss.dashboard.${username}.`;
+    const ORDER_KEY = `${keyPrefix}order`;
+    const HIDDEN_KEY = `${keyPrefix}hidden`;
+    const COLLAPSED_KEY = `${keyPrefix}collapsed`;
+    const AUTO_REFRESH_KEY = `${keyPrefix}auto_refresh`;
+
+    const grid = document.getElementById('dashboardGrid');
+    const refreshBtn = document.getElementById('dashboardRefreshBtn');
+    const resetBtn = document.getElementById('dashboardResetBtn');
+    const autoRefreshToggle = document.getElementById('dashboardAutoRefresh');
+    const lastUpdateEl = document.getElementById('dashboardLastUpdate');
+    const widgets = Array.from(document.querySelectorAll('.dashboard-widget'));
+    const widgetIds = widgets.map((w) => w.dataset.widgetId);
+    let autoRefreshTimer = null;
+    let draggingWidget = null;
+
+    const parseStoredArray = (key, fallback = []) => {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return fallback;
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : fallback;
+        } catch {
+            return fallback;
+        }
+    };
+
+    const saveArray = (key, arr) => {
+        localStorage.setItem(key, JSON.stringify(arr));
+    };
+
+    const loadOrder = () => {
+        const stored = parseStoredArray(ORDER_KEY, []);
+        const order = stored.filter((id) => widgetIds.includes(id));
+        widgetIds.forEach((id) => {
+            if (!order.includes(id)) order.push(id);
+        });
+        return order;
+    };
+
+    const applyOrder = (order) => {
+        order.forEach((id) => {
+            const widget = grid.querySelector(`[data-widget-id="${id}"]`);
+            if (widget) grid.appendChild(widget);
+        });
+    };
+
+    const getHiddenSet = () => new Set(parseStoredArray(HIDDEN_KEY, []));
+    const getCollapsedSet = () => new Set(parseStoredArray(COLLAPSED_KEY, []));
+
+    const applyVisibility = () => {
+        const hidden = getHiddenSet();
+        widgets.forEach((widget) => {
+            const id = widget.dataset.widgetId;
+            widget.classList.toggle('is-hidden', hidden.has(id));
+        });
+        document.querySelectorAll('[data-widget-checkbox]').forEach((cb) => {
+            cb.checked = !hidden.has(cb.dataset.widgetCheckbox);
+        });
+    };
+
+    const applyCollapsedState = () => {
+        const collapsed = getCollapsedSet();
+        widgets.forEach((widget) => {
+            const id = widget.dataset.widgetId;
+            const isCollapsed = collapsed.has(id);
+            widget.classList.toggle('collapsed', isCollapsed);
+            const icon = widget.querySelector('[data-widget-action="collapse"] i');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down', isCollapsed);
+                icon.classList.toggle('fa-chevron-up', !isCollapsed);
+            }
+        });
+    };
+
+    const formatTimestamp = (value) => {
+        if (!value) return '-';
+        return value.replace('T', ' ').slice(0, 19);
+    };
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
+    const boolLabel = (value) => (value ? 'Enabled' : 'Disabled');
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const renderSessionTable = (rows) => {
+        const tbody = document.getElementById('dashSessionTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No session activity recorded yet.</td></tr>';
+            return;
+        }
+        rows.forEach((event) => {
+            const details = event?.details?.reason ? event.details.reason : '-';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(formatTimestamp(event.timestamp))}</td>
+                <td>${escapeHtml(event.username || '-')}</td>
+                <td><span class="badge bg-primary">${escapeHtml(event.action || '-')}</span></td>
+                <td>${escapeHtml(event.remote_addr || '-')}</td>
+                <td>${escapeHtml(details)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    const renderEventsTable = (rows) => {
+        const tbody = document.getElementById('dashEventsTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No logs available yet.</td></tr>';
+            return;
+        }
+        rows.forEach((event) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(formatTimestamp(event.timestamp))}</td>
+                <td>${escapeHtml(event.category || '-')}</td>
+                <td>${escapeHtml(event.action || '-')}</td>
+                <td>${escapeHtml(event.username || '-')}</td>
+                <td>${escapeHtml(event.remote_addr || '-')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    const renderPayload = (payload) => {
+        if (!payload) return;
+        setText('dashHostname', payload.hostname || 'Smart Shield');
+        setText('dashTimezone', payload.timezone || 'Etc/UTC');
+        setText('dashTheme', payload.theme || 'Smart Shield');
+        setText('dashColumns', String(payload.dashboard_columns || 2));
+        setText('dashUpdated', formatTimestamp(payload.generated_at));
+
+        setText('dashLoginSuccess', String(payload.session_summary?.successful_logins ?? 0));
+        setText('dashLoginFailed', String(payload.session_summary?.failed_logins ?? 0));
+        setText('dashLogouts', String(payload.session_summary?.logouts ?? 0));
+
+        setText('dashWidgetsEnabled', boolLabel(Boolean(payload.widgets_enabled)));
+        setText('dashLogFilterEnabled', boolLabel(Boolean(payload.log_filter_enabled)));
+        setText('dashManageLogEnabled', boolLabel(Boolean(payload.manage_log_enabled)));
+        setText('dashMonitoringEnabled', boolLabel(Boolean(payload.monitoring_enabled)));
+
+        setText('dashCountUsers', String(payload.object_counts?.users ?? 0));
+        setText('dashCountGroups', String(payload.object_counts?.groups ?? 0));
+        setText('dashCountWanRules', String(payload.object_counts?.wan_rules ?? 0));
+        setText('dashCountLanRules', String(payload.object_counts?.lan_rules ?? 0));
+        setText('dashCountFloatingRules', String(payload.object_counts?.floating_rules ?? 0));
+        setText('dashCountNatPf', String(payload.object_counts?.nat_port_forwards ?? 0));
+        setText('dashCountOpenvpnServers', String(payload.object_counts?.openvpn_servers ?? 0));
+
+        renderSessionTable(payload.recent_session_events || []);
+        renderEventsTable(payload.recent_events || []);
+
+        if (lastUpdateEl) {
+            lastUpdateEl.textContent = `Last update: ${formatTimestamp(payload.generated_at)}`;
+        }
+    };
+
+    const fetchLatestData = async () => {
+        refreshBtn.disabled = true;
+        try {
+            const response = await fetch(dataEndpoint, { cache: 'no-store' });
+            const body = await response.json();
+            if (body.status === 'success') {
+                renderPayload(body.data);
+            }
+        } catch (err) {
+            console.error('Dashboard refresh failed:', err);
+        } finally {
+            refreshBtn.disabled = false;
+        }
+    };
+
+    const persistOrderFromDom = () => {
+        const order = Array.from(grid.querySelectorAll('.dashboard-widget')).map((w) => w.dataset.widgetId);
+        saveArray(ORDER_KEY, order);
+    };
+
+    const setAutoRefresh = (enabled) => {
+        localStorage.setItem(AUTO_REFRESH_KEY, enabled ? '1' : '0');
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = null;
+        }
+        if (enabled) {
+            autoRefreshTimer = setInterval(fetchLatestData, 30000);
+        }
+    };
+
+    widgets.forEach((widget) => {
+        widget.addEventListener('dragstart', () => {
+            draggingWidget = widget;
+            widget.classList.add('dragging');
+        });
+        widget.addEventListener('dragend', () => {
+            widget.classList.remove('dragging');
+            draggingWidget = null;
+            persistOrderFromDom();
+        });
+        widget.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        widget.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggingWidget || draggingWidget === widget) return;
+            grid.insertBefore(draggingWidget, widget);
+            persistOrderFromDom();
+        });
+    });
+
+    document.querySelectorAll('[data-widget-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const widget = btn.closest('.dashboard-widget');
+            if (!widget) return;
+            const widgetId = widget.dataset.widgetId;
+            const action = btn.dataset.widgetAction;
+
+            if (action === 'hide') {
+                const hidden = getHiddenSet();
+                hidden.add(widgetId);
+                saveArray(HIDDEN_KEY, Array.from(hidden));
+                applyVisibility();
+                return;
+            }
+
+            if (action === 'collapse') {
+                const collapsed = getCollapsedSet();
+                if (collapsed.has(widgetId)) {
+                    collapsed.delete(widgetId);
+                } else {
+                    collapsed.add(widgetId);
+                }
+                saveArray(COLLAPSED_KEY, Array.from(collapsed));
+                applyCollapsedState();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-widget-checkbox]').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+            const widgetId = checkbox.dataset.widgetCheckbox;
+            const hidden = getHiddenSet();
+            if (checkbox.checked) {
+                hidden.delete(widgetId);
+            } else {
+                hidden.add(widgetId);
+            }
+            saveArray(HIDDEN_KEY, Array.from(hidden));
+            applyVisibility();
+        });
+    });
+
+    refreshBtn.addEventListener('click', fetchLatestData);
+
+    resetBtn.addEventListener('click', () => {
+        localStorage.removeItem(ORDER_KEY);
+        localStorage.removeItem(HIDDEN_KEY);
+        localStorage.removeItem(COLLAPSED_KEY);
+        localStorage.removeItem(AUTO_REFRESH_KEY);
+        location.reload();
+    });
+
+    const order = loadOrder();
+    applyOrder(order);
+    applyVisibility();
+    applyCollapsedState();
+    renderPayload(initialPayload);
+
+    const autoRefreshEnabled = localStorage.getItem(AUTO_REFRESH_KEY) !== '0';
+    autoRefreshToggle.checked = autoRefreshEnabled;
+    setAutoRefresh(autoRefreshEnabled);
+    autoRefreshToggle.addEventListener('change', () => {
+        setAutoRefresh(autoRefreshToggle.checked);
+    });
+})();
+</script>
 {% endblock %}

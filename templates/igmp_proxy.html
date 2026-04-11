@@ -9,7 +9,7 @@
 	<div class="settings-section">
 		<h5>General IGMP Options</h5>
 
-		<form action="/api/save_general_settings" method="POST">
+		<form id="igmp-general-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
 			<div class="form-group">
 				<label>Enable</label>
 				<div class="form-group-content">
@@ -56,7 +56,7 @@
 	</div>
 
 	<div class="d-flex gap-2 mt-3">
-		<button type="submit" class="btn btn-primary">Save</button>
+		<button type="submit" form="igmp-general-form" class="btn btn-primary">Save</button>
 		<button class="btn btn-success" onclick="showEditForm()">+ Add</button>
 	</div>
 </div>
@@ -65,7 +65,7 @@
 	<div class="settings-section">
 		<h5>IGMP Proxy Edit / Add</h5>
 
-		<form id="proxy-edit-form" action="/api/save_proxy_entry" method="POST">
+		<form id="proxy-edit-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
 
 			<div class="form-group">
 				<label>Interface</label>
@@ -128,7 +128,7 @@
 	</div>
 
 	<div class="d-flex gap-2 mt-3">
-		<button type="submit" class="btn btn-primary">Save</button>
+		<button type="submit" form="proxy-edit-form" class="btn btn-primary">Save</button>
 		<button type="button" class="btn btn-secondary" onclick="showMainView()">Cancel</button>
 	</div>
 </div>

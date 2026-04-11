@@ -1,591 +1,347 @@
-# Smart Shield Firewall Panel
+# Smart Shield
 
-A **Flask + SQLite** web application that provides a pfSense-inspired, desktop-focused **firewall/router management panel** branded as **Smart Shield**.
+Smart Shield is a Flask-based web administration panel for a firewall/router appliance style product. The project currently behaves as a **management UI and configuration store** with a growing number of backed endpoints, while most appliance actions are **not yet applied to the host operating system**.
 
-It includes UI pages (Jinja templates) for common firewall appliance areas like **System**, **Interfaces**, **Routing**, **Services**, **Firewall**, **VPN**, **Status**, and **Diagnostics**. Some areas are fully wired to a database/API (notably *Users*, *Advanced settings*, and *Firewall/NAT*), while others are currently UI stubs/placeholders that render pages without persistent backend logic.
-
----
-
-## What’s in this repository
-
-### Main features (implemented)
-- **Authentication**
-  - Simple login using the `users` table in SQLite.
-- **User Manager**
-  - CRUD users & groups.
-  - Upload profile pictures (stored under `static/uploads/profile_pictures/`).
-- **System → General Setup**
-  - Edits a JSON config file (`config.json`) for hostname, DNS, timezone, UI theme, etc.
-- **System → Advanced**
-  - Multiple “advanced” configuration pages backed by SQLite tables:
-    - Admin Access
-    - Firewall & NAT
-    - Network
-    - Miscellaneous
-    - System Tunables (add/edit/delete)
-- **Firewall Rules + NAT (backend + frontend)**
-  - UI pages in `templates/rules.html` and `templates/nat.html`
-  - JSON CRUD APIs under `/firewall/api/...` backed by SQLite tables:
-    - Floating/WAN/LAN rules
-    - Port forwards, 1:1 NAT, outbound NAT, NPt (IPv6 prefix translation)
-    - Firewall Aliases
-
-### UI pages / placeholders (mostly template-only)
-Many routes simply `render_template(...)` without backend persistence yet, for example:
-- Interfaces, routing pages, various services pages (DHCP, SNMP, NTP, etc.)
-- Status & diagnostics pages
-- Portions of VPN (see the “Known gaps” section below)
+The repository appears to be in a **migration-preparation stage for FreeBSD** rather than a finished FreeBSD appliance.
 
 ---
 
-## Quick start
+## What this project is right now
 
-### Prerequisites
-- Python **3.11+** recommended
-- pip
+- **Backend:** Python + Flask
+- **Storage:** SQLite
+- **Frontend:** Jinja templates with a desktop-style firewall appliance UI
+- **Focus areas already wired:**
+  - Authentication and sessions
+  - User and group management
+  - General system configuration
+  - Advanced settings pages
+  - Interface assignment/config persistence
+  - Firewall/NAT CRUD persistence
+  - VPN CRUD persistence for OpenVPN/IPsec/L2TP data models
+  - Audit logging and dashboard summaries
 
-### Install dependencies
-There is no `requirements.txt` in this repo. The code imports:
-- `flask`
-- `werkzeug` (for `secure_filename` used in uploads)
+In its current form, Smart Shield is best described as:
 
-Example setup:
+> **A pfSense-like admin panel prototype with real persistence, partial API coverage, and limited live FreeBSD integration.**
 
+---
+
+## Current FreeBSD preparation already present
+
+The `freebsd-migration-prep` branch has already introduced several changes that clearly move the app toward FreeBSD compatibility:
+
+### 1) FreeBSD-aware filesystem defaults
+The app now switches important runtime paths based on platform/environment:
+
+- Database: `/var/db/smart-shield/data.db`
+- General config: `/usr/local/etc/smart-shield/config.json`
+- Uploads: `/var/db/smart-shield/uploads/profile_pictures`
+- Audit log: `/var/log/smart-shield/audit.log`
+
+These defaults can also be overridden with environment variables.
+
+### 2) Safer app bootstrap
+- `SECRET_KEY` is required from environment.
+- Bootstrap admin creation is env-driven.
+- Passwords are hashed using Werkzeug.
+- Audit logging was added for login/logout activity.
+
+### 3) Initial FreeBSD live-network hooks
+There is a small but real FreeBSD integration surface in `routes/network_api.py`:
+
+- Uses `ifconfig` to apply IPv4 interface settings
+- Uses `route` to update the default gateway
+- Uses `sockstat -46` to list live connections
+- Live apply is protected behind `SMARTSHIELD_ENABLE_NETWORK_APPLY`
+- Live apply is explicitly restricted to FreeBSD
+
+This is a good sign: the branch is no longer purely UI-only.
+
+---
+
+## Implemented areas
+
+### Authentication
+- Login/logout flow
+- Session-based auth
+- Password hash verification
+- Audit log events
+
+### Users and groups
+- Add/edit/delete users
+- Change passwords
+- Add/edit/delete groups
+- Group membership management
+- Profile picture uploads
+
+### System configuration
+- General setup persisted to JSON config
+- Dashboard summary built from audit log and database objects
+- Advanced settings persisted in SQLite
+
+### Interfaces and networking
+- LAN/WAN configuration persistence
+- Interface assignment persistence
+- DHCP pool and static lease persistence
+- Limited FreeBSD live apply for interface IPv4/gateway configuration
+
+### Firewall and NAT
+- CRUD APIs for:
+  - Floating rules
+  - WAN rules
+  - LAN rules
+  - Port forwards
+  - 1:1 NAT
+  - Outbound NAT
+  - NPt
+  - Aliases
+  - Schedules
+  - Traffic shaper records
+  - Limiters
+  - Virtual IP records
+
+### VPN
+- OpenVPN server/client/CSO persistence
+- IPsec phase 1, PSK, and advanced settings persistence
+- L2TP settings persistence
+
+---
+
+## Important limitation
+
+Most saved settings are stored in SQLite or JSON only.
+
+That means **many pages currently configure Smart Shield's internal data model, not the real FreeBSD system state**.
+
+Examples of what is **not fully implemented yet**:
+
+- Generating and applying `pf` rules from firewall/NAT records
+- Managing FreeBSD service configs for DHCP/DNS/VPN
+- Starting/reloading OS services after config changes
+- Building a real appliance boot/runtime environment
+- Syncing UI state with real interface/service state on the host
+
+---
+
+## What is missing before serious FreeBSD work can continue
+
+### 1) A real system abstraction layer
+Right now, host integration is scattered and minimal. The project needs a dedicated service layer for FreeBSD operations, for example:
+
+- `pfctl` / anchor generation and reload
+- `ifconfig` inventory and interface status
+- routing table reads/writes
+- `service` / `sysrc` wrappers
+- config file writers under `/usr/local/etc`
+- safe command execution + rollback behavior
+
+Without this, the UI stays a database editor instead of a firewall appliance.
+
+### 2) Firewall engine translation
+This is the biggest missing piece.
+
+The project stores firewall and NAT rules, but it does **not** yet:
+
+- translate DB records into `pf.conf` or anchor files
+- validate rule conflicts against real interfaces
+- run `pfctl -nf` validation before apply
+- load or reload rules safely
+- show real pf state/tables/rules from the host
+
+Until this exists, the firewall section is configuration persistence only.
+
+### 3) Service configuration writers
+The Services and VPN pages need real writers/generators for FreeBSD services such as:
+
+- DHCP server / relay
+- DNS resolver / forwarder
+- NTP
+- IGMP proxy
+- OpenVPN
+- IPsec / strongSwan
+- L2TP
+- possibly UPnP / dynamic DNS if those features remain in scope
+
+Each service needs:
+
+- canonical config model
+- config file renderer
+- syntax validation
+- service start/stop/reload integration
+- UI-to-runtime status feedback
+
+### 4) Read-from-host support
+The current app mostly writes to its own DB. A FreeBSD appliance also needs to **discover actual state**:
+
+- physical NICs from `ifconfig`
+- interface addresses and link state
+- routes from the kernel routing table
+- active leases
+- running daemons and health
+- pf states/tables/rules
+- VPN tunnel/session state
+
+Otherwise the UI will drift away from the machine’s real condition.
+
+### 5) Privilege and security design
+If this will actually manage a FreeBSD box, the app needs a clear privilege model:
+
+- how Flask gains permission to run network/system commands
+- whether commands run through `sudo`, a root helper, or a daemon
+- input validation before shelling out
+- CSRF protection for mutating forms/APIs
+- session hardening
+- secret handling for VPN keys and passwords
+
+At the moment, this is still prototype territory.
+
+### 6) Deployment and appliance packaging
+A FreeBSD move also needs OS-level packaging and startup artifacts, which are currently missing from the repo:
+
+- rc.d service script
+- production WSGI/web server setup guidance
+- package/port structure
+- install layout
+- permissions/ownership plan
+- upgrade path for DB/config files
+
+### 7) Tests and migration safety
+There are currently no visible automated tests or migration framework files in the repo snapshot.
+
+Before touching real FreeBSD networking, the project should have:
+
+- route/API tests
+- DB initialization tests
+- config renderer tests
+- command wrapper tests
+- dry-run validation tests for firewall/service apply
+- migration/versioning strategy for SQLite schema changes
+
+### 8) Repository cleanup
+The uploaded zip includes runtime and local-development artifacts that should not be part of a clean GitHub repo snapshot:
+
+- `.env`
+- `.venv/`
+- `data.db`
+- `logs/`
+- `__pycache__/`
+- tracked local modifications across many files
+
+These should be removed from versioned source or regenerated locally.
+
+---
+
+## Recommended next steps for the FreeBSD branch
+
+### Phase 1 — make the app clean and deterministic
+- Remove local artifacts from the repository
+- Normalize `requirements.txt` and verify install flow
+- Refresh README and setup docs
+- Add `.env.example` driven bootstrap instructions
+- Confirm app boots cleanly in a fresh environment
+
+### Phase 2 — build the FreeBSD integration layer
+- Create a dedicated `app/services/freebsd/` module
+- Add wrappers for:
+  - interface discovery
+  - address apply
+  - route management
+  - service control
+  - pf syntax check + reload
+- Add dry-run mode and structured error reporting
+
+### Phase 3 — make one subsystem real end-to-end
+The best first candidate is **Interfaces + Routing**, because part of it already exists.
+
+Recommended first milestone:
+- discover real interfaces from FreeBSD
+- assign LAN/WAN to actual ports
+- apply IPv4 settings safely
+- read back resulting state
+- expose rollback/error feedback in UI
+
+After that, move to **Firewall/NAT → pf**.
+
+### Phase 4 — implement service-backed features
+Start with the services that are core to an appliance:
+- DHCP
+- DNS
+- OpenVPN or IPsec
+- system status / logs / service health
+
+---
+
+## Local development
+
+### Requirements
+The repository includes a `requirements.txt`, but it is currently stored as **UTF-16**. Converting it to normal UTF-8 text is recommended for GitHub and tooling compatibility.
+
+Packages currently referenced include:
+- Flask
+- Flask-Session
+- Werkzeug
+- python-dotenv
+- Jinja2
+- cachelib
+- blinker
+- click
+- itsdangerous
+- MarkupSafe
+
+### Example setup
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install flask werkzeug
-```
-
-### Run
-```bash
+pip install -r requirements.txt
+cp .env.example .env
 python run.py
 ```
 
-This starts Flask in **debug mode** on `http://127.0.0.1:5000/`.
-
-> The app writes to `data.db` and `config.json` in the project root. Make sure the process has write permissions.
-
----
-
-## Default credentials
-
-On first run (when `users` table is empty), `app/database.py:init_db()` inserts a default admin user:
-
-- **Username:** `admin`
-- **Password:** `1234`
-
-> ⚠️ Passwords are stored in **plain text** in SQLite in this prototype. Do not use this as-is in production.
-
----
-
-## Project layout
-
-```
-Smart-Shield/
-├─ run.py                     # Flask entrypoint
-├─ config.json                # General setup configuration (JSON file)
-├─ data.db                    # SQLite database (created/updated on startup)
-├─ app/
-│  ├─ __init__.py            # create_app(), blueprint registration, DB init calls
-│  ├─ config.py              # Config class (currently minimal)
-│  └─ database.py            # SQLite connection + schema creation + defaults
-├─ routes/
-│  ├─ auth.py                # Login/logout
-│  ├─ users.py               # User Manager CRUD + uploads
-│  ├─ system.py              # System pages + Advanced settings persistence
-│  ├─ interfaces.py          # Interfaces pages (template-only)
-│  ├─ routing.py             # Routing pages (mostly template-only)
-│  ├─ services.py            # Services pages (some session-based temporary storage)
-│  ├─ firewall.py            # Firewall UI + JSON CRUD APIs (rules/NAT/aliases)
-│  ├─ vpn.py                 # VPN pages (OpenVPN/IPsec/L2TP; depends on missing modules)
-│  ├─ status.py              # Status pages (template-only)
-│  ├─ diagnostics.py         # Diagnostics pages (template-only)
-│  └─ dns.py                 # Minimal DNS blueprint (not registered by default)
-├─ templates/                 # Jinja2 templates (132 HTML files)
-└─ static/
-   ├─ css/                    # base.css, login.css
-   ├─ images/                 # SS.png logo
-   └─ uploads/profile_pictures/
+### Example `.env`
+```env
+SECRET_KEY=replace-this-with-a-long-random-secret
+FLASK_DEBUG=1
+SMARTSHIELD_DB_PATH=data.db
+SMARTSHIELD_CONFIG_PATH=config.json
+SMARTSHIELD_UPLOAD_DIR=static/uploads/profile_pictures
+SMARTSHIELD_AUDIT_LOG_PATH=logs/audit.log
+SMARTSHIELD_ENABLE_NETWORK_APPLY=0
+BOOTSTRAP_ADMIN_USERNAME=admin
+BOOTSTRAP_ADMIN_PASSWORD=change-this-before-first-run
 ```
 
----
-
-## How the app boots
-
-`run.py` imports `create_app()` from `app/__init__.py`.
-
-`create_app()`:
-1. Creates the Flask app with `templates/` and `static/` folders at the project root.
-2. Sets `app.secret_key` (currently hard-coded).
-3. Calls database initialization functions (see “Known gaps” below).
-4. Registers blueprints:
-   - `auth`, `users`, `system`, `interfaces`, `routing`, `services`, `firewall`, `vpn`, `status`, `diagnostics`
+> Keep `SMARTSHIELD_ENABLE_NETWORK_APPLY=0` during development unless you are intentionally testing on a FreeBSD host.
 
 ---
 
-## Routes overview (high level)
+## Running on FreeBSD
 
-### Auth
-- `GET /` → redirects to login
-- `GET|POST /login` → authenticate against `users`
-- `GET /logout` → clear session
+A sensible target layout for FreeBSD is already implied by the code:
 
-### System (prefix: `/system`)
-- Dashboard: `/system/dashboard`
-- General Setup (JSON config): `/system/general-setup`
-- Advanced pages (SQLite-backed):
-  - `/system/admin-access`
-  - `/system/advanced/firewall-nat`
-  - `/system/advanced/network`
-  - `/system/advanced/miscellaneous`
-  - `/system/advanced/system-tunables` (+ add/edit/delete routes)
+- App data: `/var/db/smart-shield/`
+- Config: `/usr/local/etc/smart-shield/`
+- Logs: `/var/log/smart-shield/`
 
-### Users (prefix: `/system/user-manager`)
-- List users/groups: `GET /system/user-manager/`
-- Add user: `POST /system/user-manager/add`
-- Edit user: `POST /system/user-manager/edit/<user_id>`
-- Delete user: `POST /system/user-manager/delete/<user_id>`
-- Change password: `POST /system/user-manager/change-password/<user_id>`
-- Add group: `POST /system/user-manager/add-group`
+For actual production use, the project still needs:
 
-### Firewall (prefix: `/firewall`)
-UI pages:
-- `/firewall/rules` → rules UI (tabs: Floating/WAN/LAN)
-- `/firewall/nat` → NAT UI
-- `/firewall/aliases`, `/firewall/schedules`, `/firewall/traffic-shaper`, `/firewall/virtual-ips`
-
-JSON API endpoints (CRUD):
-- Rules:
-  - `GET|POST /firewall/api/rules/floating`
-  - `PUT|DELETE /firewall/api/rules/floating/<rule_id>`
-  - `GET|POST /firewall/api/rules/wan`
-  - `PUT|DELETE /firewall/api/rules/wan/<rule_id>`
-  - `GET|POST /firewall/api/rules/lan`
-  - `PUT|DELETE /firewall/api/rules/lan/<rule_id>`
-- NAT:
-  - `GET|POST /firewall/api/nat/pf` (port forwards)
-  - `PUT|DELETE /firewall/api/nat/pf/<rule_id>`
-  - `GET|POST /firewall/api/nat/1to1`
-  - `PUT|DELETE /firewall/api/nat/1to1/<rule_id>`
-  - `GET|POST /firewall/api/nat/outbound`
-  - `PUT|DELETE /firewall/api/nat/outbound/<rule_id>`
-  - `GET|POST /firewall/api/nat/npt`
-  - `PUT|DELETE /firewall/api/nat/npt/<rule_id>`
-- Aliases:
-  - `GET|POST /firewall/api/aliases`
-  - `PUT|DELETE /firewall/api/aliases/<alias_id>`
-
-### Services (prefix: `/services`)
-Primarily template-driven pages. A few pages store temporary edits in the **Flask session** (not in SQLite yet), such as:
-- DNS Resolver host/domain overrides and access lists
-- Dynamic DNS clients and “check IP” services
-
-### VPN (prefix: `/vpn`)
-UI pages:
-- `/vpn/openvpn`
-- `/vpn/ipsec`
-- `/vpn/l2tp`
-
-> Note: the VPN blueprint imports several missing backend modules (see below). The route handlers reference tables like `openvpn_servers`, `openvpn_clients`, IPsec tunnels, PSKs, etc.
-
-### Status (prefix: `/status`) and Diagnostics (prefix: `/diagnostics`)
-Template-only pages that resemble an appliance UI.
+- a production WSGI stack
+- an rc.d service definition
+- privilege separation for host operations
+- a hardened reverse proxy/web server in front of Flask
 
 ---
 
-## Persistence
+## Current project status
 
-### 1) SQLite (`data.db`)
-The app uses SQLite for users and several configuration categories. `app/database.py` creates (if missing) these tables:
+Smart Shield is **not yet a completed FreeBSD firewall appliance**.
 
-- **users** — local users
-- **groups** — user groups
-- **user_groups** — many-to-many user↔group links
+It is a **strong UI/data-model prototype with early FreeBSD-aware pathing and a small amount of real network integration**.
 
-Advanced settings:
-- **advanced_admin_access**
-- **advanced_firewall_nat**
-- **advanced_network**
-- **advanced_miscellaneous**
-- **advanced_system_tunables**
-
-Firewall/NAT:
-- **nat_pf** — port forward rules
-- **nat_1to1** — 1:1 NAT mappings
-- **nat_outbound** — outbound NAT rules
-- **nat_npt** — IPv6 NPt rules
-- **firewall_rules_floating**
-- **firewall_rules_wan**
-- **firewall_rules_lan**
-- **firewall_aliases**
-
-> The shipped `data.db` may not include every table until the app runs `init_db()`.
-
-### 2) JSON config (`config.json`)
-System → General Setup reads/writes `config.json` in the project root.
+That means the branch is in a good place to start the FreeBSD port properly, but the next work should focus on **system integration, pf/service generation, host state discovery, and deployment design** rather than adding more HTML pages.
 
 ---
 
-## Included scripts
+## Suggested GitHub description
 
-Located under `scripts/`:
-
-- `list_wizard_tables.py` / `drop_extra_wizard_tables.py`
-  - Look for and delete wizard-related tables in `data.db`.
-- `inspect_psks.py` / `inspect_ipsec_adv_settings.py`
-  - Inspect certain IPsec-related tables (expected by the VPN subsystem).
-- `smoke_l2tp_config_db.py` / `smoke_l2tp_users_db.py`
-  - Smoke tests for L2TP config/users persistence.
-
-> These scripts reference modules like `app.l2configdb` and `app.l2users` which are **not present** in this repo (see next section).
-
----
-
-## Known gaps / issues
-
-### Missing backend modules referenced by the app
-`app/__init__.py` and `routes/vpn.py` import modules that are **not included** as `.py` sources in this repository, for example:
-- `app.vpndb`
-- `app.vpn_servers_db`
-- `app.cscdb`
-- `app.wizardsdb`
-- `app.tunnelsdb`
-- `app.mobclientsdb`
-- `app.pskdb`
-- `app.advs`
-- `app.l2configdb`
-- `app.l2users`
-
-Because of this, **running the app as-is may fail at import time**, especially around VPN initialization and routes.
-
-You’ll likely want to either:
-1. Add/restore those missing modules, or
-2. Temporarily remove/comment their imports and any routes that depend on them.
-
-### Security / production readiness
-This is clearly a prototype/demo UI:
-- Plain-text passwords in SQLite
-- Hard-coded Flask `secret_key`
-- Debug mode enabled in `run.py`
-- No global login-required guard on most routes
-
-Do not expose this app to untrusted networks without hardening.
-
----
-
-## Development notes / suggested improvements
-- Add `requirements.txt` (or `pyproject.toml`) to pin dependencies.
-- Hash passwords (e.g., `werkzeug.security.generate_password_hash()`).
-- Add an `@login_required` decorator / middleware for protected pages.
-- Move secret key and other settings into environment variables.
-- Implement persistence for session-only sections (DNS resolver, Dynamic DNS, etc.).
-- Restore/implement the missing VPN-related modules so `/vpn/*` routes work.
-
----
-
-## License
-No license file is included. If you intend to redistribute this project, add a LICENSE file and clarify usage terms.
-
-
-## Appendix: SQLite schema created by `app/database.py`
-
-### `users`
-
-Columns: `id`, `username`, `password`, `full_name`, `status`, `profile_picture`, `email`, `created_at`
-
-### `groups`
-
-Columns: `id`, `name`, `description`
-
-### `user_groups`
-
-Columns: `user_id`, `group_id`
-
-### `advanced_admin_access`
-
-Columns: `id`, `protocol`, `ssl_cert`, `tcp_port`, `max_processes`, `webgui_redirect`, `ocsp_stapling`, `webgui_autocomplete`, `gui_login_messages`, `roaming`, `hsts`, `anti_lockout`, `dns_rebind`, `alternate_hostnames`, `http_referer`, `browser_tab_text`, `enable_ssh`, `ssh_key_only`, `ssh_agent_forwarding`, `ssh_port`, `threshold`, `blocktime`, `detection_time`, `pass_list`, `serial_terminal`, `serial_speed`, `primary_console`, `console_menu`
-
-### `advanced_firewall_nat`
-
-Columns: `id`, `ip_fragment`, `ip_random`, `firewall_optimization`, `disable_scrub`, `adaptive_start`, `adaptive_end`, `firewall_max_states`, `firewall_max_table`, `firewall_max_fragment`, `vpn_ip_fragment`, `ip_fragment_reassemble`, `enable_mss`, `maximum_mss`, `disable_firewall`, `firewall_state_policy`, `disable_static_policy`, `static_route_filtering`, `disable_auto_added_vpn`, `disable_reply_to`, `disable_negate_rules`, `allow_apipa`, `aliases_hostnames_interval`, `check_certificate_aliases_urls`, `update_frequency`, `nat_reflection_mode`, `reflection_timeout`, `enable_nat_reflection`, `enable_automatic_outbound`, `tftp_proxy_wan`, `tftp_proxy_lan`, `tcp_first`, `tcp_opening`, `tcp_established`, `tcp_closing`, `tcp_fin_wait`, `tcp_closed`, `tcp_tsdiff`, `sctp_first`, `sctp_opening`, `sctp_established`, `sctp_closing`, `sctp_closed`, `udp_first`, `udp_single`, `udp_multiple`, `icmp_first`, `icmp_error`, `other_first`, `other_single`, `other_multiple`
-
-### `advanced_network`
-
-Columns: `id`, `server_backend`, `ignore_deprecation`, `radvd_debug`, `dhcp6_debug`, `do_not_allow_release`, `dhcpv6_duid`, `raw_duid`, `allow_ipv6`, `ipv6_over_ipv4_tunneling`, `ipv4_address_tunnel_peer`, `prefer_ipv4_over_ipv6`, `ipv6_dns_entry`, `hardware_checksum_offloading`, `hardware_tcp_segmentation`, `hardware_large_receive`, `hn_altq_support`, `arp_handling`, `reset_all_states`, `if_pppoe_kernel`
-
-### `advanced_miscellaneous`
-
-Columns: `id`, `proxy_url`, `proxy_port`, `proxy_username`, `proxy_password`, `load_balancing`, `sticky_timeout`, `powerd`, `ac_power`, `battery_power`, `unknown_power`, `cryptographic_hardware`, `thermal_sensors`, `kernel_pti`, `mds_mode`, `schedule_states`, `state_killing_on_gateway_recovery`, `dont_kill_policy_routing`, `state_killing_on_gateway_failure`, `skip_rules_gateway_down`, `static_routes`, `memory_limit`, `use_ram_disks`, `tmp_ram_disk`, `var_ram_disk`, `rrd_data_backup`, `dhcp_leases_backup`, `log_directory_backup`, `captive_portal_data_backup`, `hard_disk_standby_time`, `smart_shield_device_id`
-
-### `advanced_system_tunables`
-
-Columns: `id`, `name`, `description`, `value`
-
-### `nat_pf`
-
-Columns: `id`, `disabled`, `interface`, `protocol`, `src_type`, `src_address`, `dst_type`, `dst_address`, `redirect_ip`, `description`, `nat_reflection`
-
-### `nat_1to1`
-
-Columns: `id`, `disabled`, `interface`, `external_address`, `internal_address`, `destination_address`, `description`
-
-### `nat_outbound`
-
-Columns: `id`, `disabled`, `interface`, `src_address`, `dst_address`, `nat_address`, `static_port`, `description`
-
-### `nat_npt`
-
-Columns: `id`, `disabled`, `interface`, `src_not`, `src_prefix`, `src_prefix_length`, `dst_not`, `dst_type`, `dst_prefix`, `dst_prefix_length`, `description`
-
-### `firewall_rules_floating`
-
-Columns: `id`, `disabled`, `interface`, `protocol`, `source`, `source_port`, `destination`, `dest_port`, `gateway`, `queue`, `schedule`, `description`, `rule_order`
-
-### `firewall_rules_wan`
-
-Columns: `id`, `action`, `disabled`, `protocol`, `source`, `destination`, `description`, `rule_order`
-
-### `firewall_rules_lan`
-
-Columns: `id`, `disabled`, `interface`, `protocol`, `source`, `destination`, `description`, `rule_order`
-
-### `firewall_aliases`
-
-Columns: `id`, `name`, `type`, `alias_values`, `description`
-
-
-
-## Appendix: Route index (generated)
-
-### auth
-
-- `GET` `/`
-- `GET,POST` `/login`
-- `GET` `/logout`
-
-### diagnostics
-
-- `GET` `/diagnostics/`
-- `GET` `/diagnostics/arp-table`
-- `GET` `/diagnostics/authentication`
-- `GET` `/diagnostics/backup-restore`
-- `GET` `/diagnostics/command-prompt`
-- `GET` `/diagnostics/dns-lookup`
-- `GET` `/diagnostics/edit-file`
-- `GET` `/diagnostics/factory-defaults`
-- `GET` `/diagnostics/halt-system`
-- `GET` `/diagnostics/limiter-info`
-- `GET` `/diagnostics/ndp-table`
-- `GET` `/diagnostics/packet-capture`
-- `GET` `/diagnostics/pfinfo`
-- `GET` `/diagnostics/pftop`
-- `GET` `/diagnostics/ping`
-- `GET` `/diagnostics/reboot`
-- `GET` `/diagnostics/routes`
-- `GET` `/diagnostics/smart-status`
-- `GET` `/diagnostics/sockets`
-- `GET` `/diagnostics/states`
-- `GET` `/diagnostics/status-summary`
-- `GET` `/diagnostics/system-activity`
-- `GET` `/diagnostics/tables`
-- `GET` `/diagnostics/test-port`
-- `GET` `/diagnostics/tunnels`
-
-### dns
-
-- `GET` `/services/dns-resolver`
-
-### firewall
-
-- `GET` `/firewall/`
-- `GET` `/firewall/aliases`
-- `GET` `/firewall/aliases/<tab>`
-- `GET` `/firewall/api/aliases`
-- `POST` `/firewall/api/aliases`
-- `PUT` `/firewall/api/aliases/<int:alias_id>`
-- `DELETE` `/firewall/api/aliases/<int:alias_id>`
-- `GET` `/firewall/api/nat/1to1`
-- `POST` `/firewall/api/nat/1to1`
-- `PUT` `/firewall/api/nat/1to1/<int:rule_id>`
-- `DELETE` `/firewall/api/nat/1to1/<int:rule_id>`
-- `POST` `/firewall/api/nat/npt`
-- `GET` `/firewall/api/nat/npt`
-- `PUT` `/firewall/api/nat/npt/<int:rule_id>`
-- `DELETE` `/firewall/api/nat/npt/<int:rule_id>`
-- `POST` `/firewall/api/nat/outbound`
-- `GET` `/firewall/api/nat/outbound`
-- `PUT` `/firewall/api/nat/outbound/<int:rule_id>`
-- `DELETE` `/firewall/api/nat/outbound/<int:rule_id>`
-- `GET` `/firewall/api/nat/pf`
-- `POST` `/firewall/api/nat/pf`
-- `PUT` `/firewall/api/nat/pf/<int:rule_id>`
-- `DELETE` `/firewall/api/nat/pf/<int:rule_id>`
-- `GET` `/firewall/api/rules/floating`
-- `POST` `/firewall/api/rules/floating`
-- `PUT` `/firewall/api/rules/floating/<int:rule_id>`
-- `DELETE` `/firewall/api/rules/floating/<int:rule_id>`
-- `GET` `/firewall/api/rules/lan`
-- `POST` `/firewall/api/rules/lan`
-- `PUT` `/firewall/api/rules/lan/<int:rule_id>`
-- `DELETE` `/firewall/api/rules/lan/<int:rule_id>`
-- `GET` `/firewall/api/rules/wan`
-- `POST` `/firewall/api/rules/wan`
-- `PUT` `/firewall/api/rules/wan/<int:rule_id>`
-- `DELETE` `/firewall/api/rules/wan/<int:rule_id>`
-- `GET` `/firewall/home`
-- `GET` `/firewall/nat`
-- `GET` `/firewall/rules`
-- `GET` `/firewall/schedules`
-- `GET` `/firewall/traffic-shaper`
-- `GET` `/firewall/virtual-ips`
-
-### interfaces
-
-- `GET` `/interfaces/`
-- `GET` `/interfaces/assignments`
-- `GET` `/interfaces/interfaces`
-- `GET` `/interfaces/lan`
-- `GET` `/interfaces/wan`
-
-### routing
-
-- `GET` `/system/routing/`
-- `GET` `/system/routing/gateway/edit`
-- `GET` `/system/routing/gateway/edit/<int:index>`
-- `POST` `/system/routing/group/delete/<int:index>`
-- `GET` `/system/routing/group/edit`
-- `GET` `/system/routing/group/edit/<int:index>`
-- `GET` `/system/routing/groups`
-- `POST` `/system/routing/save`
-- `GET` `/system/routing/static`
-- `POST` `/system/routing/static/delete/<int:index>`
-- `GET` `/system/routing/static/edit`
-- `GET` `/system/routing/static/edit/<int:index>`
-
-### services
-
-- `GET` `/services/`
-- `GET` `/services/auto-config-backup`
-- `GET` `/services/captive-portal`
-- `GET` `/services/dhcp-relay`
-- `GET` `/services/dhcp-server`
-- `GET` `/services/dhcp-server-lan`
-- `GET` `/services/dhcp-server-lan/static-mapping`
-- `GET` `/services/dhcp-server/static-mapping`
-- `GET` `/services/dhcpv6-relay`
-- `GET` `/services/dhcpv6-server`
-- `GET,POST` `/services/dns-domain-edit`
-- `GET` `/services/dns-forwarder`
-- `GET,POST` `/services/dns-forwarder/edit-domain-override`
-- `GET,POST` `/services/dns-forwarder/edit-host-override`
-- `GET,POST` `/services/dns-host-edit`
-- `GET` `/services/dns-resolver`
-- `GET` `/services/dns-resolver/access-lists`
-- `GET,POST` `/services/dns-resolver/access-lists/edit`
-- `GET,POST` `/services/dns-resolver/advanced`
-- `GET,POST` `/services/dns-resolver/edit-domain`
-- `GET,POST` `/services/dns-resolver/edit-host`
-- `GET` `/services/dynamic-dns`
-- `GET` `/services/dynamic-dns/checkip`
-- `GET,POST` `/services/dynamic-dns/checkip/edit`
-- `GET,POST` `/services/dynamic-dns/edit`
-- `GET` `/services/dynamic-dns/rfc2136`
-- `GET,POST` `/services/dynamic-dns/rfc2136/edit`
-- `GET` `/services/igmp-proxy`
-- `GET` `/services/ntp`
-- `GET` `/services/openvpn-server`
-- `GET` `/services/router-advertisement`
-- `GET` `/services/services`
-- `GET` `/services/snmp`
-- `GET` `/services/upnp-igd-pcp`
-- `GET` `/services/wake-on-lan`
-
-### status
-
-- `GET` `/status/`
-- `GET` `/status/carp-failover`
-- `GET` `/status/dhcp-leases`
-- `GET` `/status/dhcpv6-leases`
-- `GET` `/status/filter-reload`
-- `GET` `/status/gateways`
-- `GET` `/status/monitoring`
-- `GET` `/status/queues`
-- `GET` `/status/system-logs`
-- `GET` `/status/traffic-graph`
-
-### system
-
-- `GET` `/system/`
-- `GET` `/system/about`
-- `GET` `/system/add_ca`
-- `GET` `/system/add_certificate`
-- `GET,POST` `/system/admin-access`
-- `GET` `/system/advanced`
-- `GET,POST` `/system/advanced/firewall-nat`
-- `GET,POST` `/system/advanced/miscellaneous`
-- `GET,POST` `/system/advanced/network`
-- `GET` `/system/advanced/system-tunables`
-- `POST` `/system/advanced/system-tunables/delete/<int:index>`
-- `GET,POST` `/system/advanced/system-tunables/edit`
-- `GET,POST` `/system/advanced/system-tunables/edit/<int:index>`
-- `POST` `/system/advanced/system-tunables/save`
-- `GET` `/system/bug`
-- `GET` `/system/certificates`
-- `GET,POST` `/system/copyright`
-- `GET` `/system/dashboard`
-- `GET` `/system/docs`
-- `GET` `/system/forum`
-- `GET` `/system/freebsd`
-- `GET,POST` `/system/general-setup`
-- `GET` `/system/help`
-- `GET` `/system/high-availability`
-- `GET` `/system/logout`
-- `GET,POST` `/system/notifications`
-- `GET` `/system/package-manager`
-- `GET` `/system/paid-support`
-- `GET` `/system/pfsense-book`
-- `GET` `/system/register`
-- `GET` `/system/setup-wizard`
-- `GET` `/system/setup-wizard/step/<int:step>`
-- `GET` `/system/survey`
-- `GET,POST` `/system/update`
-- `GET` `/system/upgrade`
-
-### users
-
-- `GET` `/system/user-manager/`
-- `POST` `/system/user-manager/add`
-- `POST` `/system/user-manager/add-group`
-- `POST` `/system/user-manager/change-password/<int:user_id>`
-- `POST` `/system/user-manager/delete/<int:user_id>`
-- `POST` `/system/user-manager/edit/<int:user_id>`
-
-### vpn
-
-- `GET` `/vpn/`
-- `GET` `/vpn/ipsec`
-- `POST` `/vpn/ipsec/advanced-settings/save`
-- `POST` `/vpn/ipsec/mobile-clients/save`
-- `POST` `/vpn/ipsec/psk/add`
-- `POST` `/vpn/ipsec/psk/delete/<int:psk_id>`
-- `POST` `/vpn/ipsec/psk/edit/<int:psk_id>`
-- `POST` `/vpn/ipsec/tunnels/add`
-- `POST` `/vpn/ipsec/tunnels/delete/<int:tunnel_id>`
-- `POST` `/vpn/ipsec/tunnels/edit/<int:tunnel_id>`
-- `GET,POST` `/vpn/l2tp`
-- `POST` `/vpn/l2tp/users/add`
-- `POST` `/vpn/l2tp/users/delete/<int:user_id>`
-- `POST` `/vpn/l2tp/users/edit/<int:user_id>`
-- `GET` `/vpn/openvpn`
-- `GET,POST` `/vpn/openvpn/add`
-- `GET,POST` `/vpn/openvpn/client/add`
-- `POST` `/vpn/openvpn/client/delete/<int:client_id>`
-- `GET,POST` `/vpn/openvpn/client/edit/<int:client_id>`
-- `POST` `/vpn/openvpn/csc/add`
-- `POST` `/vpn/openvpn/csc/delete/<int:override_id>`
-- `POST` `/vpn/openvpn/csc/edit/<int:override_id>`
-- `POST` `/vpn/openvpn/delete/<int:server_id>`
-- `GET,POST` `/vpn/openvpn/edit/<int:server_id>`
-- `POST` `/vpn/openvpn/wizard/ca/add`
-
+**Smart Shield** is a Flask-based firewall/router administration panel inspired by appliance-style UIs. It currently provides configuration persistence, dashboarding, and partial FreeBSD networking integration, and is being prepared for deeper FreeBSD system management support.

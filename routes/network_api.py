@@ -1,9 +1,12 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db
+from app.auth_utils import login_required
+from app.services.network_service import normalize_interface_payload
 import ipaddress
 import os
 import re
 import subprocess
+import sys
 
 
 network_api_bp = Blueprint("network_api", __name__, url_prefix="/api/network")
@@ -38,7 +41,17 @@ def row_to_bool(row, key, default=False):
     return bool(row[key]) if row and key in row.keys() else default
 
 
+def _network_apply_enabled():
+    return os.getenv("SMARTSHIELD_ENABLE_NETWORK_APPLY", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 @network_api_bp.route("/interfaces", methods=["GET"])
+@login_required
 def get_interfaces():
     conn = get_db()
     cur = conn.cursor()
@@ -112,13 +125,15 @@ def get_interfaces():
 
 
 @network_api_bp.route("/interfaces/<interface_type>", methods=["PUT"])
+@login_required
 def update_interface(interface_type):
     try:
         validate_interface_type(interface_type)
         data = request.get_json(force=True) or {}
+        payload = normalize_interface_payload(data, interface_type)
 
-        ipv4_address = (data.get("ipv4_address") or "").strip()
-        gateway = (data.get("ipv4_upstream_gateway") or "").strip()
+        ipv4_address = (payload["ipv4_address"] or "").strip()
+        gateway = (payload["ipv4_upstream_gateway"] or "").strip()
         validate_cidr(ipv4_address)
         validate_ip(gateway)
 
@@ -144,18 +159,18 @@ def update_interface(interface_type):
                 WHERE id = 1
                 """,
                 (
-                    int(bool(data.get("enable_interface", True))),
-                    data.get("description", "LAN"),
-                    data.get("ipv4_config_type", "static"),
-                    data.get("ipv6_config_type", "none"),
-                    data.get("mac_address", ""),
-                    data.get("mtu", ""),
-                    data.get("mss", ""),
-                    data.get("speed_and_duplex", "default"),
+                    int(payload["enable_interface"]),
+                    payload["description"],
+                    payload["ipv4_config_type"],
+                    payload["ipv6_config_type"],
+                    payload["mac_address"],
+                    payload["mtu"],
+                    payload["mss"],
+                    payload["speed_and_duplex"],
                     ipv4_address,
                     gateway,
-                    int(bool(data.get("block_private_networks", False))),
-                    int(bool(data.get("block_bogon_networks", False))),
+                    int(payload["block_private_networks"]),
+                    int(payload["block_bogon_networks"]),
                 ),
             )
         else:
@@ -181,26 +196,26 @@ def update_interface(interface_type):
                 WHERE id = 1
                 """,
                 (
-                    int(bool(data.get("enable_interface", True))),
-                    data.get("description", "WAN"),
-                    data.get("ipv4_config_type", "dhcp"),
-                    data.get("ipv6_config_type", "none"),
-                    data.get("mac_address", ""),
-                    data.get("mtu", ""),
-                    data.get("mss", ""),
-                    data.get("speed_and_duplex", "default"),
+                    int(payload["enable_interface"]),
+                    payload["description"],
+                    payload["ipv4_config_type"],
+                    payload["ipv6_config_type"],
+                    payload["mac_address"],
+                    payload["mtu"],
+                    payload["mss"],
+                    payload["speed_and_duplex"],
                     ipv4_address,
                     gateway,
-                    data.get("username", ""),
-                    data.get("password", ""),
-                    int(bool(data.get("dial_on_demand", False))),
-                    int(data.get("idle_timeout", 0) or 0),
-                    int(bool(data.get("block_private_networks", True))),
-                    int(bool(data.get("block_bogon_networks", True))),
+                    payload["username"],
+                    payload["password"],
+                    int(payload["dial_on_demand"]),
+                    payload["idle_timeout"],
+                    int(payload["block_private_networks"]),
+                    int(payload["block_bogon_networks"]),
                 ),
             )
 
-        assigned_port = (data.get("assigned_port") or "").strip()
+        assigned_port = payload["assigned_port"]
         if assigned_port:
             cur.execute(
                 """
@@ -219,6 +234,7 @@ def update_interface(interface_type):
 
 
 @network_api_bp.route("/dhcp", methods=["GET"])
+@login_required
 def get_dhcp():
     conn = get_db()
     cur = conn.cursor()
@@ -243,6 +259,7 @@ def get_dhcp():
 
 
 @network_api_bp.route("/dhcp/<interface_type>", methods=["PUT"])
+@login_required
 def update_dhcp(interface_type):
     try:
         validate_interface_type(interface_type)
@@ -289,6 +306,7 @@ def update_dhcp(interface_type):
 
 
 @network_api_bp.route("/leases", methods=["GET"])
+@login_required
 def get_leases():
     conn = get_db()
     cur = conn.cursor()
@@ -305,6 +323,7 @@ def get_leases():
 
 
 @network_api_bp.route("/leases", methods=["POST"])
+@login_required
 def add_lease():
     try:
         data = request.get_json(force=True) or {}
@@ -335,6 +354,7 @@ def add_lease():
 
 
 @network_api_bp.route("/leases/<int:lease_id>", methods=["DELETE"])
+@login_required
 def delete_lease(lease_id):
     conn = get_db()
     cur = conn.cursor()
@@ -344,29 +364,8 @@ def delete_lease(lease_id):
     return jsonify({"status": "success", "message": "Static lease deleted"})
 
 
-@network_api_bp.route("/connections", methods=["GET"])
-def get_connections():
-    clients = []
-    arp_path = "/proc/net/arp"
-
-    if os.path.exists(arp_path):
-        with open(arp_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()[1:]
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 6:
-                    clients.append(
-                        {
-                            "ip_address": parts[0],
-                            "mac_address": parts[3],
-                            "interface": parts[5],
-                        }
-                    )
-
-    return jsonify({"status": "success", "data": clients})
-
-
 @network_api_bp.route("/apply", methods=["POST"])
+@login_required
 def apply_network():
     try:
         data = request.get_json(force=True) or {}
@@ -378,13 +377,72 @@ def apply_network():
         validate_cidr(ipv4_address)
         validate_ip(gateway_ip)
 
-        subprocess.run(["ip", "addr", "flush", "dev", interface_name], check=True)
-        subprocess.run(["ip", "addr", "add", ipv4_address, "dev", interface_name], check=True)
-        subprocess.run(["ip", "link", "set", interface_name, "up"], check=True)
+        if not _network_apply_enabled():
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": (
+                        "Configuration saved. Live FreeBSD network apply is disabled. "
+                        "Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 to enable it."
+                    ),
+                }
+            )
+
+        if not sys.platform.startswith("freebsd"):
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Live network apply is only supported when running on FreeBSD.",
+                }
+            ), 400
+
+        interface = ipaddress.ip_interface(ipv4_address)
+        if interface.version != 4:
+            return jsonify({"status": "error", "message": "Only IPv4 is supported for live apply."}), 400
+
+        subprocess.run(
+            [
+                "ifconfig",
+                interface_name,
+                "inet",
+                str(interface.ip),
+                "netmask",
+                str(interface.network.netmask),
+            ],
+            check=True,
+        )
+        subprocess.run(["ifconfig", interface_name, "up"], check=True)
 
         if gateway_ip:
-            subprocess.run(["ip", "route", "replace", "default", "via", gateway_ip], check=True)
+            # Deleting default route may fail if none exists; add route afterward.
+            subprocess.run(["route", "-n", "delete", "default"], check=False)
+            subprocess.run(["route", "-n", "add", "default", gateway_ip], check=True)
 
-        return jsonify({"status": "success", "message": "Network settings applied"})
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Network settings applied on FreeBSD.",
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@network_api_bp.route("/connections", methods=["GET"])
+@login_required
+def get_connections():
+    if not sys.platform.startswith("freebsd"):
+        return jsonify(
+            {
+                "status": "success",
+                "data": [],
+                "message": "Live connection listing is available only on FreeBSD.",
+            }
+        )
+
+    try:
+        proc = subprocess.run(["sockstat", "-46"], capture_output=True, text=True, check=True)
+        lines = [line for line in proc.stdout.splitlines() if line.strip()]
+        return jsonify({"status": "success", "data": lines})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

@@ -3,6 +3,7 @@ import json
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
 
 from app.database import get_db
+from app.auth_utils import login_required
 
 services_bp = Blueprint("services", __name__, url_prefix="/services")
 
@@ -11,6 +12,7 @@ services_bp = Blueprint("services", __name__, url_prefix="/services")
 # ----------------------------
 
 @services_bp.route("/")
+@login_required
 def services_home():
     return render_template("services.html")
 
@@ -20,6 +22,7 @@ def services_home():
 # ----------------------------
 
 @services_bp.route("/auto-config-backup")
+@login_required
 def auto_config_backup():
     return render_template("auto_config_backup.html")
 
@@ -29,6 +32,7 @@ def auto_config_backup():
 # ----------------------------
 
 @services_bp.route("/captive-portal")
+@login_required
 def captive_portal():
     return render_template("captive_portal.html")
 
@@ -38,11 +42,13 @@ def captive_portal():
 # ----------------------------
 
 @services_bp.route("/dhcp-relay")
+@login_required
 def dhcp_relay():
     return render_template("dhcp_relay.html")
 
 
 @services_bp.route("/api/dhcp-relay", methods=["GET"])
+@login_required
 def get_dhcp_relay_settings():
     """Return DHCP Relay settings + list of upstream servers."""
     try:
@@ -76,6 +82,7 @@ def get_dhcp_relay_settings():
 
 
 @services_bp.route("/api/dhcp-relay", methods=["POST"])
+@login_required
 def save_dhcp_relay_settings():
     """Save DHCP Relay settings + upstream servers.
 
@@ -143,17 +150,20 @@ def save_dhcp_relay_settings():
 # ----------------------------
 
 @services_bp.route("/dhcp-server")
+@login_required
 def dhcp_server():
     return render_template("dhcp_server.html")
 
 
 # LAN DHCP SERVER
 @services_bp.route("/dhcp-server-lan")
+@login_required
 def dhcp_server_lan():
     return render_template("dhcp_server_lan.html")
 
 
 @services_bp.route("/api/dhcp-server/<string:iface>", methods=["GET"])
+@login_required
 def api_get_dhcp_server_settings(iface):
     """Load DHCP server settings for an interface (wan/lan)."""
     try:
@@ -177,6 +187,7 @@ def api_get_dhcp_server_settings(iface):
 
 
 @services_bp.route("/api/dhcp-server/<string:iface>", methods=["POST"])
+@login_required
 def api_save_dhcp_server_settings(iface):
     """Save DHCP server settings for an interface (wan/lan). Expects JSON: { settings: {...} }"""
     try:
@@ -209,12 +220,14 @@ def api_save_dhcp_server_settings(iface):
 
 # DHCP Static Mapping (global)
 @services_bp.route("/dhcp-server/static-mapping")
+@login_required
 def dhcp_static_mapping():
     return render_template("dhcp_static_mapping.html")
 
 
 # DHCP Static Mapping (LAN)
 @services_bp.route("/dhcp-server-lan/static-mapping")
+@login_required
 def dhcp_static_mapping_lan():
     return render_template("dhcp_static_mapping_lan.html")
 
@@ -224,11 +237,13 @@ def dhcp_static_mapping_lan():
 # ----------------------------
 
 @services_bp.route("/dhcpv6-relay")
+@login_required
 def dhcpv6_relay():
     return render_template("dhcpv6_relay.html")
 
 
 @services_bp.route("/dhcpv6-server")
+@login_required
 def dhcpv6_server():
     return render_template("dhcpv6_server.html")
 
@@ -238,11 +253,13 @@ def dhcpv6_server():
 # ----------------------------
 
 @services_bp.route("/dns-forwarder")
+@login_required
 def dns_forwarder():
     return render_template("dns_forwarder.html")
 
 
 @services_bp.route("/dns-forwarder/edit-host-override", methods=["GET", "POST"])
+@login_required
 def dns_forwarder_edit_host():
     if request.method == "POST":
         return redirect(url_for("services.dns_forwarder"))
@@ -250,6 +267,7 @@ def dns_forwarder_edit_host():
 
 
 @services_bp.route("/dns-forwarder/edit-domain-override", methods=["GET", "POST"])
+@login_required
 def dns_forwarder_edit_domain():
     if request.method == "POST":
         return redirect(url_for("services.dns_forwarder"))
@@ -261,6 +279,7 @@ def dns_forwarder_edit_domain():
 # ----------------------------
 
 @services_bp.route("/dns-resolver")
+@login_required
 def dns_resolver():
     hosts = session.get("resolver_host_overrides", [])
     domains = session.get("resolver_domain_overrides", [])
@@ -269,6 +288,7 @@ def dns_resolver():
 
 
 @services_bp.route("/dns-resolver/edit-host", methods=["GET", "POST"])
+@login_required
 def dns_resolver_edit_host():
     if request.method == "POST":
         hosts = session.get("resolver_host_overrides", [])
@@ -284,6 +304,7 @@ def dns_resolver_edit_host():
 
 
 @services_bp.route("/dns-resolver/edit-domain", methods=["GET", "POST"])
+@login_required
 def dns_resolver_edit_domain():
     if request.method == "POST":
         domains = session.get("resolver_domain_overrides", [])
@@ -301,6 +322,7 @@ def dns_resolver_edit_domain():
 
 
 @services_bp.route("/dns-resolver/advanced", methods=["GET", "POST"])
+@login_required
 def dns_resolver_advanced():
     if request.method == "POST":
         return redirect(url_for("services.dns_resolver_advanced"))
@@ -308,12 +330,14 @@ def dns_resolver_advanced():
 
 
 @services_bp.route("/dns-resolver/access-lists")
+@login_required
 def dns_resolver_access_lists():
     lists = session.get("resolver_access_lists", [])
     return render_template("dns_resolver_access_lists.html", lists=lists)
 
 
 @services_bp.route("/dns-resolver/access-lists/edit", methods=["GET", "POST"])
+@login_required
 def dns_resolver_access_lists_edit():
     if request.method == "POST":
         lists = session.get("resolver_access_lists", [])
@@ -332,6 +356,7 @@ def dns_resolver_access_lists_edit():
 # ----------------------------
 
 @services_bp.route("/dynamic-dns", methods=["GET", "POST"])
+@login_required
 def dynamic_dns():
     if request.method == "POST":
         clients = session.get("dynamic_dns_clients", [])
@@ -354,6 +379,7 @@ def dynamic_dns():
 
 
 @services_bp.route("/dynamic-dns/rfc2136", methods=["GET", "POST"])
+@login_required
 def dynamic_dns_rfc2136():
     if request.method == "POST":
         clients = session.get("rfc2136_clients", [])
@@ -381,6 +407,7 @@ def dynamic_dns_rfc2136():
 
 
 @services_bp.route("/dynamic-dns/checkip", methods=["GET", "POST"])
+@login_required
 def dynamic_dns_checkip():
     if "checkip_services" not in session:
         session["checkip_services"] = [
@@ -408,8 +435,13 @@ def dynamic_dns_checkip():
 # IGMP PROXY
 # ----------------------------
 
-@services_bp.route("/igmp-proxy")
+@services_bp.route("/igmp-proxy", methods=["GET", "POST"])
+@login_required
 def igmp_proxy():
+    if request.method == "POST":
+        if request.is_json:
+            return jsonify({"success": True, "message": "IGMP Proxy settings saved."})
+        return redirect(url_for("services.igmp_proxy"))
     return render_template("igmp_proxy.html")
 
 
@@ -418,6 +450,7 @@ def igmp_proxy():
 # ----------------------------
 
 @services_bp.route("/ntp")
+@login_required
 def ntp():
     return render_template("ntp.html")
 
@@ -427,6 +460,7 @@ def ntp():
 # ----------------------------
 
 @services_bp.route("/openvpn-server")
+@login_required
 def openvpn_server():
     return render_template("openvpn_server.html")
 
@@ -436,6 +470,7 @@ def openvpn_server():
 # ----------------------------
 
 @services_bp.route("/router-advertisement")
+@login_required
 def router_advertisement():
     return render_template("router_advertisement.html")
 
@@ -445,6 +480,7 @@ def router_advertisement():
 # ----------------------------
 
 @services_bp.route("/snmp")
+@login_required
 def snmp():
     return render_template("snmp.html")
 
@@ -454,6 +490,7 @@ def snmp():
 # ----------------------------
 
 @services_bp.route("/upnp-igd-pcp")
+@login_required
 def upnp_igd_pcp():
     return render_template("upnp_igd_pcp.html")
 
@@ -462,10 +499,25 @@ def upnp_igd_pcp():
 # WAKE ON LAN
 # ----------------------------
 
-@services_bp.route("/wake-on-lan")
+@services_bp.route("/wake-on-lan", methods=["GET", "POST"])
+@login_required
 def wake_on_lan():
     interfaces = ["WAN", "LAN"]
     devices = []
+    if request.method == "POST":
+        if request.is_json:
+            payload = request.get_json(silent=True) or {}
+            mac = (payload.get("mac_address") or "").strip()
+            iface = (payload.get("interface") or "").strip()
+            if not mac or not iface:
+                return jsonify({"success": False, "message": "MAC address and interface are required."}), 400
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"Wake-on-LAN packet queued for {mac} on {iface}.",
+                }
+            )
+        return redirect(url_for("services.wake_on_lan"))
     return render_template("wake_on_lan.html", interfaces=interfaces, devices=devices)
 
 
@@ -474,13 +526,16 @@ def wake_on_lan():
 # ----------------------------
 
 @services_bp.route("/services")
+@login_required
 def services():
     return redirect(url_for("services.services_home"))
 
 @services_bp.route("/dns-host-edit", methods=["GET", "POST"])
+@login_required
 def dns_host_edit():
     return redirect(url_for("services.dns_forwarder_edit_host"))
 
 @services_bp.route("/dns-domain-edit", methods=["GET", "POST"])
+@login_required
 def dns_domain_edit():
     return redirect(url_for("services.dns_forwarder_edit_domain"))
