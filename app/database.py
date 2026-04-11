@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import sys
+import tempfile
 from werkzeug.security import generate_password_hash
 
 _MEMORY_ANCHOR_CONN = None
@@ -8,7 +9,13 @@ _MEMORY_ANCHOR_PATH = None
 
 
 def _default_db_path():
-    return "/var/db/smart-shield/data.db" if sys.platform.startswith("freebsd") else "data.db"
+    if sys.platform.startswith("freebsd"):
+        return "/var/db/smart-shield/data.db"
+    if sys.platform.startswith("win"):
+        # Keep Windows dev DB out of compressed/synced workdirs and in persistent user-local storage.
+        local_appdata = os.getenv("LOCALAPPDATA") or tempfile.gettempdir()
+        return os.path.join(local_appdata, "SmartShield", "data.db")
+    return "data.db"
 
 
 def _database_path():
@@ -53,6 +60,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        is_superuser INTEGER DEFAULT 0,
         full_name TEXT,
         status TEXT DEFAULT 'active',
         profile_picture TEXT,
@@ -80,6 +88,31 @@ def init_db():
         FOREIGN KEY(group_id) REFERENCES groups(id)
     )
     """)
+
+    # Backward-compatible migration for older DBs created before is_superuser existed.
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = {row["name"] for row in cursor.fetchall()}
+    if "is_superuser" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_superuser INTEGER DEFAULT 0")
+
+    # Group-level page whitelist permissions.
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS group_page_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            endpoint TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_group_page_permissions_group_endpoint
+        ON group_page_permissions(group_id, endpoint)
+        """
+    )
 
     # LAN INTERFACE CONFIGURATION TABLE
     cursor.execute("""
@@ -716,13 +749,22 @@ ON interface_assignments(interface_type)
 
         if admin_user and admin_pass:
             cursor.execute("""
-            INSERT INTO users (username, password, full_name)
-            VALUES (?, ?, ?)
+            INSERT INTO users (username, password, full_name, is_superuser)
+            VALUES (?, ?, ?, 1)
         """, (
              admin_user,
              generate_password_hash(admin_pass),
              "System Administrator"
         ))
+
+    # Ensure there is always at least one superuser.
+    cursor.execute("SELECT COUNT(*) AS c FROM users WHERE COALESCE(is_superuser, 0) = 1")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute("UPDATE users SET is_superuser = 1 WHERE username = 'admin'")
+        if cursor.rowcount == 0:
+            cursor.execute(
+                "UPDATE users SET is_superuser = 1 WHERE id = (SELECT MIN(id) FROM users)"
+            )
 
     # Create default advanced settings if not exists
     cursor.execute("SELECT COUNT(*) AS c FROM advanced_admin_access")
