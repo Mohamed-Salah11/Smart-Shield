@@ -3,8 +3,17 @@ import sqlite3
 import sys
 from werkzeug.security import generate_password_hash
 
-DEFAULT_DB_PATH = "/var/db/smart-shield/data.db" if sys.platform.startswith("freebsd") else "data.db"
-DATABASE = os.getenv("SMARTSHIELD_DB_PATH", DEFAULT_DB_PATH)
+_MEMORY_ANCHOR_CONN = None
+_MEMORY_ANCHOR_PATH = None
+
+
+def _default_db_path():
+    return "/var/db/smart-shield/data.db" if sys.platform.startswith("freebsd") else "data.db"
+
+
+def _database_path():
+    # Read from env at call time so tests and runtime overrides behave deterministically.
+    return os.getenv("SMARTSHIELD_DB_PATH", _default_db_path())
 
 
 def _ensure_parent_dir(path: str):
@@ -14,8 +23,20 @@ def _ensure_parent_dir(path: str):
 
 
 def get_db():
-    _ensure_parent_dir(DATABASE)
-    conn = sqlite3.connect(DATABASE)
+    global _MEMORY_ANCHOR_CONN, _MEMORY_ANCHOR_PATH
+    db_path = _database_path()
+    is_uri = db_path.startswith("file:")
+    if not is_uri:
+        _ensure_parent_dir(db_path)
+    elif "mode=memory" in db_path:
+        # Keep an anchor connection alive so shared-memory DBs persist across connections.
+        if _MEMORY_ANCHOR_CONN is None or _MEMORY_ANCHOR_PATH != db_path:
+            if _MEMORY_ANCHOR_CONN is not None:
+                _MEMORY_ANCHOR_CONN.close()
+            _MEMORY_ANCHOR_CONN = sqlite3.connect(db_path, uri=True)
+            _MEMORY_ANCHOR_CONN.execute("PRAGMA foreign_keys = ON")
+            _MEMORY_ANCHOR_PATH = db_path
+    conn = sqlite3.connect(db_path, uri=is_uri)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
@@ -601,6 +622,19 @@ ON interface_assignments(interface_type)
     )
     """)
 
+    # ----------------------------
+    # Generic service state store (JSON blobs)
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS service_state (
+            key_name TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # ADVANCED NETWORK TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_network (
@@ -965,31 +999,6 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # IPsec Phase 1 (IKE) Configs
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ipsec_phase1 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT,
-        disabled INTEGER DEFAULT 0,
-        key_exchange TEXT DEFAULT 'ikev2',
-        internet_protocol TEXT DEFAULT 'ipv4',
-        interface TEXT DEFAULT 'wan',
-        remote_gateway TEXT,
-        authentication_method TEXT DEFAULT 'preshared_key',
-        my_identifier TEXT,
-        peer_identifier TEXT,
-        preshared_key TEXT,
-        encryption_algorithm TEXT DEFAULT 'aes256',
-        hash_algorithm TEXT DEFAULT 'sha256',
-        dh_key_group TEXT DEFAULT '14',
-        lifetime INTEGER DEFAULT 28800,
-        nat_traversal TEXT DEFAULT 'auto',
-        dpd_delay INTEGER DEFAULT 10,
-        dpd_maxfail INTEGER DEFAULT 5,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
     # IPsec Phase 2 (Child SA) Configs
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ipsec_phase2 (
@@ -1107,16 +1116,6 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # Firewall Schedules
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS firewall_schedules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        description TEXT,
-        ranges_data TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS dhcp_pools (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

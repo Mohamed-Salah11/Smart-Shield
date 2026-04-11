@@ -218,7 +218,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{% set hosts = session.get('resolver_host_overrides', []) %}
+				{% set hosts = hosts if hosts is defined else [] %}
 				{% if hosts %}
 					{% for h in hosts %}
 					<tr>
@@ -256,7 +256,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{% set doms = session.get('resolver_domain_overrides', []) %}
+				{% set doms = domains if domains is defined else [] %}
 				{% if doms %}
 					{% for d in doms %}
 					<tr>

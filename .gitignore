@@ -7,4 +7,9 @@ __pycache__/
 venv/
 instance/
 *.log
+logs/
 static/uploads/
+data.db
+config.json
+.pytest_cache/
+tests/.tmp/
