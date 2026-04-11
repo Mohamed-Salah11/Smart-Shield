@@ -1,6 +1,58 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Status</h1>
-<p>Status page placeholder.</p>
+<div class="container">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Status</li>
+            </ol>
+        </nav>
+        <h1>Status Overview</h1>
+        <p class="lead">Quick access to runtime status pages and log tracking.</p>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6 col-xl-3">
+            <div class="section h-100">
+                <div class="section-header"><h2>Gateways</h2></div>
+                <div class="section-body p-3">
+                    <p class="text-muted mb-3">Review gateway health and route availability.</p>
+                    <a href="{{ url_for('status.gateways') }}" class="btn btn-sm btn-primary">Open</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="section h-100">
+                <div class="section-header"><h2>Monitoring</h2></div>
+                <div class="section-body p-3">
+                    <p class="text-muted mb-3">Inspect interface graphs and monitoring data.</p>
+                    <a href="{{ url_for('status.monitoring') }}" class="btn btn-sm btn-primary">Open</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="section h-100">
+                <div class="section-header"><h2>System Logs</h2></div>
+                <div class="section-body p-3">
+                    <p class="text-muted mb-3">View system, security, and session tracking tabs.</p>
+                    <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-primary">Open Logs</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="section h-100">
+                <div class="section-header"><h2>Session Logs</h2></div>
+                <div class="section-body p-3">
+                    <p class="text-muted mb-3">Track sign-ins, failures, and logout activity.</p>
+                    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-primary">Open Sessions</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

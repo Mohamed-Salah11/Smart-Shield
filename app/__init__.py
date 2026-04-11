@@ -1,17 +1,22 @@
-from flask import Flask
+from flask import Flask, app
 from .database import init_db
 import os
+from dotenv import load_dotenv
 
 
 def create_app():
+    load_dotenv()
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     app = Flask(
         __name__,
-        template_folder=os.path.join(base_dir, 'templates'),
-        static_folder=os.path.join(base_dir, 'static'),
+        template_folder=os.path.join(base_dir, "templates"),
+        static_folder=os.path.join(base_dir, "static"),
     )
-    app.secret_key = "your-secret-key"
+
+    app.secret_key = os.getenv("SECRET_KEY")
+    if not app.secret_key:
+     raise RuntimeError("SECRET_KEY is not set")
 
     init_db()
 

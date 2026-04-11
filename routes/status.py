@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
+from app.auth_utils import login_required
+from app.audit_log import tail_events
 
 status_bp = Blueprint("status", __name__, url_prefix="/status")
 
@@ -8,6 +10,7 @@ status_bp = Blueprint("status", __name__, url_prefix="/status")
 # --------------------------------------------------
 
 @status_bp.route("/")
+@login_required
 def status_home():
     return render_template("status.html")
 
@@ -17,6 +20,7 @@ def status_home():
 # --------------------------------------------------
 
 @status_bp.route("/carp-failover")
+@login_required
 def carp_failover():
     return render_template("carp_failover.html")
 
@@ -26,6 +30,7 @@ def carp_failover():
 # --------------------------------------------------
 
 @status_bp.route("/dhcp-leases")
+@login_required
 def dhcp_leases():
     return render_template("dhcp_leases.html")
 
@@ -35,6 +40,7 @@ def dhcp_leases():
 # --------------------------------------------------
 
 @status_bp.route("/dhcpv6-leases")
+@login_required
 def dhcpv6_leases():
     return render_template("dhcpv6_leases.html")
 
@@ -44,6 +50,7 @@ def dhcpv6_leases():
 # --------------------------------------------------
 
 @status_bp.route("/filter-reload")
+@login_required
 def filter_reload():
     return render_template("filter_reload.html")
 
@@ -53,6 +60,7 @@ def filter_reload():
 # --------------------------------------------------
 
 @status_bp.route("/gateways")
+@login_required
 def gateways():
     return render_template("gateways.html")
 
@@ -62,6 +70,7 @@ def gateways():
 # --------------------------------------------------
 
 @status_bp.route("/monitoring")
+@login_required
 def monitoring():
     return render_template("monitoring.html")
 
@@ -71,6 +80,7 @@ def monitoring():
 # --------------------------------------------------
 
 @status_bp.route("/queues")
+@login_required
 def queues():
     return render_template("queues.html")
 
@@ -80,8 +90,28 @@ def queues():
 # --------------------------------------------------
 
 @status_bp.route("/system-logs")
+@login_required
 def system_logs():
-    return render_template("system_logs.html")
+    active_tab = (request.args.get("tab") or "system").lower()
+    if active_tab not in {"system", "sessions", "security"}:
+        active_tab = "system"
+
+    all_events = tail_events(limit=300)
+    session_events = [e for e in all_events if e.get("category") == "session"]
+    system_events = [e for e in all_events if e.get("category") == "system"]
+    security_events = [
+        e for e in all_events
+        if e.get("category") == "security"
+        or (e.get("category") == "session" and e.get("action") == "login_failed")
+    ]
+
+    return render_template(
+        "system_logs.html",
+        active_tab=active_tab,
+        system_events=system_events[:150],
+        session_events=session_events[:150],
+        security_events=security_events[:150],
+    )
 
 
 # --------------------------------------------------
@@ -89,5 +119,6 @@ def system_logs():
 # --------------------------------------------------
 
 @status_bp.route("/traffic-graph")
+@login_required
 def traffic_graph():
     return render_template("traffic_graph.html")

@@ -1,22 +1,154 @@
-from flask import Blueprint, render_template, redirect, url_for, request, session
+from flask import Blueprint, render_template, redirect, url_for, request, session, jsonify
 from app.database import get_db
+from app.auth_utils import login_required
+from app.audit_log import tail_events, log_event
+import json, os
+import sys
+from datetime import datetime, timezone
 
 system_bp = Blueprint("system", __name__, url_prefix="/system")
+
+GENERAL_SETUP_DEFAULTS = {
+    "hostname": "Smart Shield",
+    "domain": "home.arpa",
+    "dns_servers": [],
+    "dns_override": True,
+    "dns_behavior": "Use local DNS (127.0.0.1), fall back to remote DNS Servers (Default)",
+    "timezone": "Etc/UTC",
+    "timeservers": "2.pool.ntp.org",
+    "language": "English",
+    "theme": "Smart Shield",
+    "login_color": "Dark Blue",
+    "show_hostname": True,
+    "login_message": "",
+    "dashboard_columns": 2,
+    "widgets": True,
+    "log_filter": True,
+    "manage_log": True,
+    "monitoring": True,
+}
+
+
+def _general_config_path():
+    default_config_path = "/usr/local/etc/smart-shield/config.json" if sys.platform.startswith("freebsd") else "config.json"
+    return os.getenv("SMARTSHIELD_CONFIG_PATH", default_config_path)
+
+
+def _config_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def _load_general_config():
+    config = GENERAL_SETUP_DEFAULTS.copy()
+    config_path = _general_config_path()
+
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                config.update(loaded)
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    return config
+
+
+def _safe_count(cursor, table_name):
+    try:
+        cursor.execute(f"SELECT COUNT(*) AS c FROM {table_name}")
+        row = cursor.fetchone()
+        return int(row["c"]) if row and "c" in row.keys() else 0
+    except Exception:
+        return 0
+
+
+def _build_dashboard_payload():
+    config = _load_general_config()
+    events = tail_events(limit=300)
+    session_events = [e for e in events if e.get("category") == "session"]
+
+    session_summary = {
+        "successful_logins": sum(1 for e in session_events if e.get("action") == "login_success"),
+        "failed_logins": sum(1 for e in session_events if e.get("action") == "login_failed"),
+        "logouts": sum(1 for e in session_events if e.get("action") == "logout"),
+    }
+
+    conn = get_db()
+    cur = conn.cursor()
+    object_counts = {
+        "users": _safe_count(cur, "users"),
+        "groups": _safe_count(cur, "groups"),
+        "wan_rules": _safe_count(cur, "firewall_rules_wan"),
+        "lan_rules": _safe_count(cur, "firewall_rules_lan"),
+        "floating_rules": _safe_count(cur, "firewall_rules_floating"),
+        "nat_port_forwards": _safe_count(cur, "nat_pf"),
+        "openvpn_servers": _safe_count(cur, "openvpn_servers"),
+    }
+    conn.close()
+
+    try:
+        dashboard_columns = int(config.get("dashboard_columns", 2))
+    except (TypeError, ValueError):
+        dashboard_columns = 2
+    dashboard_columns = min(max(dashboard_columns, 1), 4)
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "dashboard_columns": dashboard_columns,
+        "widgets_enabled": _config_bool(config.get("widgets"), True),
+        "log_filter_enabled": _config_bool(config.get("log_filter"), True),
+        "manage_log_enabled": _config_bool(config.get("manage_log"), True),
+        "monitoring_enabled": _config_bool(config.get("monitoring"), True),
+        "hostname": config.get("hostname") or "Smart Shield",
+        "timezone": config.get("timezone") or "Etc/UTC",
+        "theme": config.get("theme") or "Smart Shield",
+        "session_summary": session_summary,
+        "object_counts": object_counts,
+        "recent_session_events": session_events[:25],
+        "recent_events": events[:25],
+    }
 
 # ----------------------------
 # SYSTEM MAIN PAGES
 # ----------------------------
 
 @system_bp.route("/")
+@login_required
 def system_home():
     return redirect(url_for("system.general_setup"))
 
 @system_bp.route("/dashboard")
+@login_required
 def dashboard():
-    return render_template("dashboard.html")
+    payload = _build_dashboard_payload()
+    return render_template(
+        "dashboard.html",
+        dashboard_columns=payload["dashboard_columns"],
+        dashboard_payload=payload,
+    )
+
+
+@system_bp.route("/dashboard/data", methods=["GET"])
+@login_required
+def dashboard_data():
+    return jsonify({"status": "success", "data": _build_dashboard_payload()})
 
 @system_bp.route("/logout")
 def logout():
+    log_event(
+        category="session",
+        action="logout",
+        username=session.get("username", "anonymous"),
+        remote_addr=request.remote_addr,
+        details={"user_id": session.get("user_id")},
+    )
     session.clear()
     return redirect(url_for("auth.login"))
 
@@ -45,9 +177,9 @@ def forum():
 def freebsd():
     return render_template("freebsd.html")
 
-@system_bp.route("/pfsense-book")
-def pfsense_book():
-    return render_template("pfsense_book.html")
+@system_bp.route("/smart-shield-book")
+def smart_shield_book():
+    return render_template("smart_shield_book.html")
 
 @system_bp.route("/paid-support")
 def paid_support():
@@ -71,36 +203,18 @@ def help_page():
 # ----------------------------
 
 @system_bp.route("/general-setup", methods=["GET", "POST"])
+@login_required
 def general_setup():
-    from app.database import get_db
-    conn = get_db()
-    cursor = conn.cursor()
-
-    # Load config (temporary until SQLite integration)
-    import json, os
-    CONFIG_FILE = "config.json"
+    config_file = _general_config_path()
 
     def load_config():
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                return json.load(f)
-        return {
-            "hostname": "Smart Shield",
-            "domain": "home.arpa",
-            "dns_servers": [],
-            "dns_override": True,
-            "dns_behavior": "Use local DNS (127.0.0.1), fall back to remote DNS Servers (Default)",
-            "timezone": "Etc/UTC",
-            "timeservers": "2.smartshield.pool.ntp.org",
-            "language": "English",
-            "theme": "Smart Shield",
-            "login_color": "Dark Blue",
-            "show_hostname": True,
-            "login_message": ""
-        }
+        return _load_general_config()
 
     def save_config(cfg):
-        with open(CONFIG_FILE, "w") as f:
+        config_dir = os.path.dirname(os.path.abspath(config_file))
+        if config_dir:
+            os.makedirs(config_dir, exist_ok=True)
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
 
     config = load_config()
@@ -118,6 +232,17 @@ def general_setup():
         config["login_color"] = request.form.get("login_color")
         config["show_hostname"] = bool(request.form.get("show_hostname"))
         config["login_message"] = request.form.get("login_message")
+        config["top_navigation"] = request.form.get("top_navigation")
+        config["hostname_menu"] = request.form.get("hostname_menu")
+
+        try:
+            config["dashboard_columns"] = min(max(int(request.form.get("dashboard_columns", 2)), 1), 4)
+        except (TypeError, ValueError):
+            config["dashboard_columns"] = 2
+        config["widgets"] = bool(request.form.get("widgets"))
+        config["log_filter"] = bool(request.form.get("log_filter"))
+        config["manage_log"] = bool(request.form.get("manage_log"))
+        config["monitoring"] = bool(request.form.get("monitoring"))
 
         save_config(config)
         return redirect(url_for("system.general_setup"))
@@ -129,15 +254,18 @@ def general_setup():
 # ADVANCED SYSTEM (submenus)
 # ----------------------------
 
-@system_bp.route("/advanced")
+@system_bp.route("/advanced", methods=["GET", "POST"])
+@login_required
 def advanced():
     return redirect(url_for("system.admin_access"))
 
 @system_bp.route("/register")
+@login_required
 def register():
     return render_template("register.html")
 
 @system_bp.route("/admin-access", methods=["GET", "POST"])
+@login_required
 def admin_access():
     conn = get_db()
     cursor = conn.cursor()
@@ -208,6 +336,7 @@ def admin_access():
     return render_template("admin_access.html", config=config)
 
 @system_bp.route("/advanced/firewall-nat", methods=["GET", "POST"])
+@login_required
 def advanced_firewall_nat():
     conn = get_db()
     cursor = conn.cursor()
@@ -326,6 +455,7 @@ def advanced_firewall_nat():
     return render_template("advanced_firewall_nat.html", config=config)
 
 @system_bp.route("/advanced/network", methods=["GET", "POST"])
+@login_required
 def advanced_network():
     conn = get_db()
     cursor = conn.cursor()
@@ -382,6 +512,7 @@ def advanced_network():
     return render_template("advanced_network.html", config=config)
 
 @system_bp.route("/advanced/miscellaneous", methods=["GET", "POST"])
+@login_required
 def advanced_miscellaneous():
     conn = get_db()
     cursor = conn.cursor()
@@ -465,6 +596,7 @@ def advanced_miscellaneous():
 # ----------------------------
 
 @system_bp.route("/advanced/system-tunables")
+@login_required
 def advanced_system_tunables():
     conn = get_db()
     cursor = conn.cursor()
@@ -476,6 +608,7 @@ def advanced_system_tunables():
 
 @system_bp.route("/advanced/system-tunables/edit", methods=["GET", "POST"])
 @system_bp.route("/advanced/system-tunables/edit/<int:index>", methods=["GET", "POST"])
+@login_required
 def advanced_system_tunables_edit(index=None):
     conn = get_db()
     cursor = conn.cursor()
@@ -490,6 +623,7 @@ def advanced_system_tunables_edit(index=None):
 
 
 @system_bp.route("/advanced/system-tunables/save", methods=["POST"])
+@login_required
 def advanced_system_tunables_save():
     conn = get_db()
     cursor = conn.cursor()
@@ -514,12 +648,9 @@ def advanced_system_tunables_save():
     conn.close()
     return redirect(url_for("system.advanced_system_tunables"))
 
-    conn.commit()
-    conn.close()
-    return redirect(url_for("system.advanced_system_tunables"))
-
 
 @system_bp.route("/advanced/system-tunables/delete/<int:index>", methods=["POST"])
+@login_required
 def advanced_system_tunables_delete(index):
     conn = get_db()
     cursor = conn.cursor()
@@ -534,10 +665,13 @@ def advanced_system_tunables_delete(index):
 # ----------------------------
 
 @system_bp.route("/certificates")
+@login_required
+
 def certificates():
     return render_template("certificates.html")
 
 @system_bp.route("/add_ca", methods=["GET", "POST"])
+@login_required
 def add_ca():
     if request.method == "POST":
         # Handle form submission - currently just redirect back
@@ -546,6 +680,7 @@ def add_ca():
     return render_template("add_ca.html")
 
 @system_bp.route("/add_certificate", methods=["GET", "POST"])
+@login_required
 def add_certificate():
     if request.method == "POST":
         # Handle form submission - currently just redirect back
@@ -557,8 +692,11 @@ def add_certificate():
 # HIGH AVAILABILITY
 # ----------------------------
 
-@system_bp.route("/high-availability")
+@system_bp.route("/high-availability", methods=["GET", "POST"])
+@login_required
 def high_availability():
+    if request.method == "POST":
+        return redirect(url_for("system.high_availability"))
     return render_template("high_availability.html")
 
 
@@ -567,6 +705,7 @@ def high_availability():
 # ----------------------------
 
 @system_bp.route("/package-manager")
+@login_required
 def package_manager():
     return render_template("package_manager.html")
 
@@ -576,11 +715,13 @@ def package_manager():
 # ----------------------------
 
 @system_bp.route("/setup-wizard")
+@login_required
 def setup_wizard():
     return render_template("setup_wizard.html")
 
 
 @system_bp.route("/setup-wizard/step/<int:step>")
+@login_required
 def setup_wizard_step(step):
     if step in range(2, 11):
         return render_template(f"setup_wizard_step{step}.html")
@@ -592,6 +733,7 @@ def setup_wizard_step(step):
 # ----------------------------
 
 @system_bp.route("/copyright", methods=["GET", "POST"])
+@login_required
 def copyright_page():
     if request.method == "POST":
         return redirect(url_for("system.dashboard"))
@@ -603,6 +745,7 @@ def copyright_page():
 # ----------------------------
 
 @system_bp.route("/update", methods=["GET", "POST"])
+@login_required
 def update_page():
     active_tab = "system"
     message = None
@@ -628,6 +771,7 @@ def update_page():
 # ----------------------------
 
 @system_bp.route("/notifications", methods=["GET", "POST"])
+@login_required
 def notifications():
     if request.method == "POST":
         return redirect(url_for("system.notifications"))
