@@ -191,6 +191,7 @@ def delete_floating_rule(rule_id):
 @login_required
 def get_wan_rules():
     """Get all WAN firewall rules"""
+    db = None
     try:
         db = get_db()
         cursor = db.cursor()
@@ -203,12 +204,16 @@ def get_wan_rules():
         return jsonify({"success": True, "rules": rules})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if db is not None:
+            db.close()
 
 
 @firewall_bp.route("/api/rules/wan", methods=["POST"])
 @login_required
 def add_wan_rule():
     """Add a new WAN rule"""
+    db = None
     try:
         data = request.get_json()
         db = get_db()
@@ -241,6 +246,9 @@ def add_wan_rule():
         return jsonify({"success": True, "id": cursor.lastrowid})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if db is not None:
+            db.close()
 
 
 @firewall_bp.route("/api/rules/wan/<int:rule_id>/move", methods=["POST"])
@@ -316,6 +324,7 @@ def update_wan_rule(rule_id):
 @login_required
 def delete_wan_rule(rule_id):
     """Delete a WAN rule"""
+    db = None
     try:
         db = get_db()
         cursor = db.cursor()
@@ -324,6 +333,9 @@ def delete_wan_rule(rule_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if db is not None:
+            db.close()
 
 
 # LAN Rules CRUD

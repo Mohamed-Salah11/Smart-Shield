@@ -1,0 +1,96 @@
+#!/bin/sh
+# Smart Shield console menu for appliance-style local administration.
+#
+# What to do with this file:
+# 1) Copy to: /usr/local/sbin/smartshield-cli
+# 2) Make executable: chmod 555 /usr/local/sbin/smartshield-cli
+# 3) Run manually on console, or configure admin shell/login profile
+#    to launch it automatically on tty for pfSense-style workflow.
+#
+# Typical integration approaches:
+# - Keep root shell default and run smartshield-cli manually.
+# - Create dedicated admin user with login shell wrapper that launches
+#   smartshield-cli after authentication.
+# - Use /etc/gettytab + /etc/ttys automation carefully for kiosk console.
+#
+# This menu intentionally delegates service actions to smartshieldctl.
+# Extend options here as smartshieldctl gains apply/rollback subcommands.
+set -eu
+
+pause() {
+    printf "\nPress Enter to continue..."
+    read -r _
+}
+
+run_ctl() {
+    if smartshieldctl "$@"; then
+        :
+    else
+        echo "Command failed: smartshieldctl $*"
+    fi
+    pause
+}
+
+while :; do
+    clear
+    cat <<'EOF'
+=========================================
+ Smart Shield Console (FreeBSD Appliance)
+=========================================
+1) Service status
+2) Start service
+3) Stop service
+4) Restart service
+5) Tail logs
+6) Enable service at boot
+7) Disable service at boot
+8) Network apply reminder
+9) Reboot system
+0) Shutdown system
+q) Quit to shell
+EOF
+
+    printf "\nSelect option: "
+    read -r choice
+
+    case "${choice}" in
+        1) run_ctl status ;;
+        2) run_ctl start ;;
+        3) run_ctl stop ;;
+        4) run_ctl restart ;;
+        5)
+            printf "Tail how many lines? [100]: "
+            read -r n
+            n="${n:-100}"
+            run_ctl logs "${n}"
+            ;;
+        6) run_ctl enable ;;
+        7) run_ctl disable ;;
+        8)
+            echo "Use Web UI actions for config apply (CSRF-protected API)."
+            echo "In future, wire smartshieldctl apply-* commands to backend workers."
+            pause
+            ;;
+        9)
+            printf "Reboot now? [y/N]: "
+            read -r yn
+            case "${yn}" in
+                y|Y) reboot ;;
+                *) ;;
+            esac
+            ;;
+        0)
+            printf "Shutdown now? [y/N]: "
+            read -r yn
+            case "${yn}" in
+                y|Y) shutdown -p now ;;
+                *) ;;
+            esac
+            ;;
+        q|Q) exit 0 ;;
+        *)
+            echo "Invalid option."
+            pause
+            ;;
+    esac
+done

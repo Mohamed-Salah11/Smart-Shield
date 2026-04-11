@@ -29,6 +29,7 @@ def login():
         if user and check_password_hash(user["password"], password):
             session["username"] = user["username"]
             session["user_id"] = user["id"]
+            session["is_superuser"] = bool(user["is_superuser"]) if "is_superuser" in user.keys() else (user["username"] == "admin")
             if user["profile_picture"]:
                 session["user_avatar"] = url_for("static", filename=user["profile_picture"])
             else:

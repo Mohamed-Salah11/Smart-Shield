@@ -1,11 +1,17 @@
 from flask import Blueprint, jsonify, request
 from app.database import get_db
 from app.auth_utils import login_required
-from app.services.network_service import normalize_interface_payload
+from app.services.network_service import (
+    FreeBSDNetworkError,
+    apply_interface_ipv4,
+    ensure_freebsd,
+    list_live_connections,
+    normalize_interface_payload,
+    set_default_gateway,
+)
 import ipaddress
 import os
 import re
-import subprocess
 import sys
 
 
@@ -388,35 +394,11 @@ def apply_network():
                 }
             )
 
-        if not sys.platform.startswith("freebsd"):
-            return jsonify(
-                {
-                    "status": "error",
-                    "message": "Live network apply is only supported when running on FreeBSD.",
-                }
-            ), 400
-
-        interface = ipaddress.ip_interface(ipv4_address)
-        if interface.version != 4:
-            return jsonify({"status": "error", "message": "Only IPv4 is supported for live apply."}), 400
-
-        subprocess.run(
-            [
-                "ifconfig",
-                interface_name,
-                "inet",
-                str(interface.ip),
-                "netmask",
-                str(interface.network.netmask),
-            ],
-            check=True,
-        )
-        subprocess.run(["ifconfig", interface_name, "up"], check=True)
+        ensure_freebsd()
+        apply_interface_ipv4(interface_name, ipv4_address)
 
         if gateway_ip:
-            # Deleting default route may fail if none exists; add route afterward.
-            subprocess.run(["route", "-n", "delete", "default"], check=False)
-            subprocess.run(["route", "-n", "add", "default", gateway_ip], check=True)
+            set_default_gateway(gateway_ip)
 
         return jsonify(
             {
@@ -424,6 +406,8 @@ def apply_network():
                 "message": "Network settings applied on FreeBSD.",
             }
         )
+    except FreeBSDNetworkError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
@@ -441,8 +425,9 @@ def get_connections():
         )
 
     try:
-        proc = subprocess.run(["sockstat", "-46"], capture_output=True, text=True, check=True)
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
+        lines = list_live_connections()
         return jsonify({"status": "success", "data": lines})
+    except FreeBSDNetworkError as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

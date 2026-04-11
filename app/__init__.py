@@ -1,7 +1,8 @@
-from flask import Flask, app
+from flask import Flask
 from .database import init_db
 import os
 from dotenv import load_dotenv
+from .security import get_csrf_token, validate_csrf_or_abort
 
 
 def create_app():
@@ -16,7 +17,17 @@ def create_app():
 
     app.secret_key = os.getenv("SECRET_KEY")
     if not app.secret_key:
-     raise RuntimeError("SECRET_KEY is not set")
+        raise RuntimeError(
+            "SECRET_KEY is not set. Create a .env file (for example: copy .env.example .env) and set SECRET_KEY."
+        )
+
+    @app.before_request
+    def _csrf_guard():
+        validate_csrf_or_abort()
+
+    @app.context_processor
+    def _csrf_context():
+        return {"csrf_token": get_csrf_token}
 
     init_db()
 

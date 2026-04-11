@@ -207,7 +207,7 @@ A FreeBSD move also needs OS-level packaging and startup artifacts, which are cu
 - upgrade path for DB/config files
 
 ### 7) Tests and migration safety
-There are currently no visible automated tests or migration framework files in the repo snapshot.
+The repository now includes initial automated tests under `tests/`.
 
 Before touching real FreeBSD networking, the project should have:
 
@@ -242,7 +242,7 @@ These should be removed from versioned source or regenerated locally.
 - Confirm app boots cleanly in a fresh environment
 
 ### Phase 2 — build the FreeBSD integration layer
-- Create a dedicated `app/services/freebsd/` module
+- Continue extending the dedicated network/system service layer in `app/services/network_service.py`
 - Add wrappers for:
   - interface discovery
   - address apply
@@ -275,7 +275,7 @@ Start with the services that are core to an appliance:
 ## Local development
 
 ### Requirements
-The repository includes a `requirements.txt`, but it is currently stored as **UTF-16**. Converting it to normal UTF-8 text is recommended for GitHub and tooling compatibility.
+The repository uses UTF-8 `requirements.txt` and includes security/test dependencies used by the current codebase.
 
 Packages currently referenced include:
 - Flask
@@ -294,8 +294,16 @@ Packages currently referenced include:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+# Optional for tests:
+# pip install -r requirements-dev.txt
 cp .env.example .env
+cp config.example.json config.json
 python run.py
+```
+
+### Run tests
+```bash
+python -m unittest tests/test_app_unittest.py -v
 ```
 
 ### Example `.env`
@@ -307,6 +315,7 @@ SMARTSHIELD_CONFIG_PATH=config.json
 SMARTSHIELD_UPLOAD_DIR=static/uploads/profile_pictures
 SMARTSHIELD_AUDIT_LOG_PATH=logs/audit.log
 SMARTSHIELD_ENABLE_NETWORK_APPLY=0
+SMARTSHIELD_NETWORK_DRY_RUN=1
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=change-this-before-first-run
 ```
@@ -339,6 +348,22 @@ Smart Shield is **not yet a completed FreeBSD firewall appliance**.
 It is a **strong UI/data-model prototype with early FreeBSD-aware pathing and a small amount of real network integration**.
 
 That means the branch is in a good place to start the FreeBSD port properly, but the next work should focus on **system integration, pf/service generation, host state discovery, and deployment design** rather than adding more HTML pages.
+
+---
+
+## Recent hardening updates
+
+- Added a FreeBSD-oriented network service layer in `app/services/network_service.py` and routed `/api/network/apply` through structured command helpers.
+- Added CSRF protection for mutating requests (forms + JSON APIs), including automatic token attachment for frontend fetch calls.
+- Added encrypted-at-rest handling for sensitive VPN secrets and hashed L2TP user passwords.
+- Consolidated duplicate IPsec API behavior by mapping legacy endpoints to the primary `/vpn/api/ipsec/p1` flow.
+- Removed duplicate schema declarations in `app/database.py` (for `ipsec_phase1` and `firewall_schedules`) and added `service_state` for persistent service-side UI state.
+- Added initial automated tests under `tests/` for auth, firewall CRUD, VPN CRUD, and network apply guardrails.
+- Repository hygiene improvements:
+  - `data.db` and `config.json` removed from tracked source
+  - `config.example.json` added as a safe config template
+  - `.gitignore` expanded for runtime/log/test artifacts
+  - `requirements.txt` normalized to UTF-8 and `requirements-dev.txt` added for test tooling
 
 ---
 

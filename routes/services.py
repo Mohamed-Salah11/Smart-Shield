@@ -1,11 +1,43 @@
 import json
 
-from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 
 from app.database import get_db
 from app.auth_utils import login_required
+from app.secret_store import seal
 
 services_bp = Blueprint("services", __name__, url_prefix="/services")
+
+
+def _load_service_state(key_name, default):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT value_json FROM service_state WHERE key_name = ?", (key_name,))
+    row = cur.fetchone()
+    db.close()
+    if not row:
+        return default
+    try:
+        return json.loads(row["value_json"])
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _save_service_state(key_name, value):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(
+        """
+        INSERT INTO service_state (key_name, value_json, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key_name) DO UPDATE SET
+            value_json = excluded.value_json,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (key_name, json.dumps(value)),
+    )
+    db.commit()
+    db.close()
 
 # ----------------------------
 # SERVICES MAIN PAGE
@@ -281,9 +313,9 @@ def dns_forwarder_edit_domain():
 @services_bp.route("/dns-resolver")
 @login_required
 def dns_resolver():
-    hosts = session.get("resolver_host_overrides", [])
-    domains = session.get("resolver_domain_overrides", [])
-    lists = session.get("resolver_access_lists", [])
+    hosts = _load_service_state("resolver_host_overrides", [])
+    domains = _load_service_state("resolver_domain_overrides", [])
+    lists = _load_service_state("resolver_access_lists", [])
     return render_template("dns_resolver.html", hosts=hosts, domains=domains, lists=lists)
 
 
@@ -291,14 +323,14 @@ def dns_resolver():
 @login_required
 def dns_resolver_edit_host():
     if request.method == "POST":
-        hosts = session.get("resolver_host_overrides", [])
+        hosts = _load_service_state("resolver_host_overrides", [])
         host = request.form.get("host")
         domain = request.form.get("domain")
         ip = request.form.get("ip")
         description = request.form.get("description", "")
         if host or domain:
             hosts.append({"host": host, "domain": domain, "ip": ip, "description": description})
-            session["resolver_host_overrides"] = hosts
+            _save_service_state("resolver_host_overrides", hosts)
         return redirect(url_for("services.dns_resolver"))
     return render_template("dns_resolver_edit_host.html")
 
@@ -307,7 +339,7 @@ def dns_resolver_edit_host():
 @login_required
 def dns_resolver_edit_domain():
     if request.method == "POST":
-        domains = session.get("resolver_domain_overrides", [])
+        domains = _load_service_state("resolver_domain_overrides", [])
         domain = request.form.get("domain")
         server = request.form.get("server")
         tls_queries = bool(request.form.get("tls_queries"))
@@ -316,7 +348,7 @@ def dns_resolver_edit_domain():
         if domain:
             domains.append({"domain": domain, "server": server, "tls_queries": tls_queries,
                             "tls_hostname": tls_hostname, "description": description})
-            session["resolver_domain_overrides"] = domains
+            _save_service_state("resolver_domain_overrides", domains)
         return redirect(url_for("services.dns_resolver"))
     return render_template("dns_resolver_edit_domain.html")
 
@@ -332,7 +364,7 @@ def dns_resolver_advanced():
 @services_bp.route("/dns-resolver/access-lists")
 @login_required
 def dns_resolver_access_lists():
-    lists = session.get("resolver_access_lists", [])
+    lists = _load_service_state("resolver_access_lists", [])
     return render_template("dns_resolver_access_lists.html", lists=lists)
 
 
@@ -340,13 +372,13 @@ def dns_resolver_access_lists():
 @login_required
 def dns_resolver_access_lists_edit():
     if request.method == "POST":
-        lists = session.get("resolver_access_lists", [])
+        lists = _load_service_state("resolver_access_lists", [])
         name = request.form.get("name")
         action = request.form.get("action")
         description = request.form.get("description")
         if name:
             lists.append({"name": name, "action": action, "description": description})
-            session["resolver_access_lists"] = lists
+            _save_service_state("resolver_access_lists", lists)
         return redirect(url_for("services.dns_resolver_access_lists"))
     return render_template("dns_resolver_access_lists_edit.html")
 
@@ -359,7 +391,7 @@ def dns_resolver_access_lists_edit():
 @login_required
 def dynamic_dns():
     if request.method == "POST":
-        clients = session.get("dynamic_dns_clients", [])
+        clients = _load_service_state("dynamic_dns_clients", [])
         client = {
             "disabled": bool(request.form.get("disabled")),
             "service_type": request.form.get("service_type"),
@@ -370,19 +402,21 @@ def dynamic_dns():
             "wildcards": bool(request.form.get("wildcards")),
             "verbose": bool(request.form.get("verbose")),
             "username": request.form.get("username"),
+            "password": seal(request.form.get("password", "")),
             "description": request.form.get("description", "")
         }
         clients.append(client)
-        session["dynamic_dns_clients"] = clients
+        _save_service_state("dynamic_dns_clients", clients)
         return redirect(url_for("services.dynamic_dns"))
-    return render_template("dynamic_dns.html")
+    clients = _load_service_state("dynamic_dns_clients", [])
+    return render_template("dynamic_dns.html", clients=clients)
 
 
 @services_bp.route("/dynamic-dns/rfc2136", methods=["GET", "POST"])
 @login_required
 def dynamic_dns_rfc2136():
     if request.method == "POST":
-        clients = session.get("rfc2136_clients", [])
+        clients = _load_service_state("rfc2136_clients", [])
         client = {
             "enabled": bool(request.form.get("enable")),
             "interface": request.form.get("interface"),
@@ -391,7 +425,7 @@ def dynamic_dns_rfc2136():
             "ttl": request.form.get("ttl"),
             "key_name": request.form.get("key_name"),
             "key_algorithm": request.form.get("key_algorithm"),
-            "key": request.form.get("key"),
+            "key": seal(request.form.get("key", "")),
             "server": request.form.get("server"),
             "protocol_tcp": bool(request.form.get("protocol_tcp")),
             "use_public_ip": bool(request.form.get("use_public_ip")),
@@ -401,34 +435,38 @@ def dynamic_dns_rfc2136():
             "description": request.form.get("description", "")
         }
         clients.append(client)
-        session["rfc2136_clients"] = clients
+        _save_service_state("rfc2136_clients", clients)
         return redirect(url_for("services.dynamic_dns_rfc2136"))
-    return render_template("dynamic_dns_rfc2136.html")
+    clients = _load_service_state("rfc2136_clients", [])
+    return render_template("dynamic_dns_rfc2136.html", clients=clients)
 
 
 @services_bp.route("/dynamic-dns/checkip", methods=["GET", "POST"])
 @login_required
 def dynamic_dns_checkip():
-    if "checkip_services" not in session:
-        session["checkip_services"] = [
+    services = _load_service_state("checkip_services", [])
+    if not services:
+        services = [
             {"name": "Default", "url": "http://checkip.dyndns.org", "verify_ssl": False,
              "description": "Default Check IP Service"}
         ]
+        _save_service_state("checkip_services", services)
     if request.method == "POST":
-        services = session.get("checkip_services", [])
+        services = _load_service_state("checkip_services", [])
         svc = {
             "enabled": bool(request.form.get("enable")),
             "name": request.form.get("name"),
             "url": request.form.get("url"),
             "username": request.form.get("username"),
-            "password": request.form.get("password"),
+            "password": seal(request.form.get("password", "")),
             "verify_ssl": bool(request.form.get("verify_ssl")),
             "description": request.form.get("description", "")
         }
         services.append(svc)
-        session["checkip_services"] = services
+        _save_service_state("checkip_services", services)
         return redirect(url_for("services.dynamic_dns_checkip"))
-    return render_template("dynamic_dns_checkip.html")
+    services = _load_service_state("checkip_services", services)
+    return render_template("dynamic_dns_checkip.html", services=services)
 
 
 # ----------------------------

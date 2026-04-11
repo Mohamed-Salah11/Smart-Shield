@@ -2,15 +2,21 @@
     "hostname": "Smart Shield",
     "domain": "home.arpa",
     "dns_servers": [
-        ""
+        "1.1.1.1",
+        "8.8.8.8"
     ],
     "dns_override": true,
     "dns_behavior": "Use local DNS (127.0.0.1), fall back to remote DNS Servers (Default)",
     "timezone": "Etc/UTC",
-    "timeservers": "ss",
+    "timeservers": "2.pool.ntp.org",
     "language": "English",
     "theme": "Smart Shield",
     "login_color": "Dark Blue",
     "show_hostname": true,
-    "login_message": ""
+    "login_message": "",
+    "dashboard_columns": 2,
+    "widgets": true,
+    "log_filter": true,
+    "manage_log": true,
+    "monitoring": true
 }
