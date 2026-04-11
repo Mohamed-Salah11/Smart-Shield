@@ -1,0 +1,86 @@
+#!/bin/sh
+# Smart Shield service control helper for FreeBSD.
+#
+# What to do with this file:
+# 1) Copy to: /usr/local/sbin/smartshieldctl
+# 2) Make executable: chmod 555 /usr/local/sbin/smartshieldctl
+# 3) Use as operator shortcut instead of raw service/sysrc commands.
+#
+# Examples:
+# - smartshieldctl status
+# - smartshieldctl start
+# - smartshieldctl enable
+# - smartshieldctl logs 200
+#
+# Notes:
+# - Expects rc.d service name: smart_shield (customizable via env).
+# - health command probes http://127.0.0.1:5000/login by default.
+#   Change this if your deployed UI binds another port/path.
+set -eu
+
+SERVICE_NAME="${SMARTSHIELD_SERVICE_NAME:-smart_shield}"
+LOG_FILE="${SMARTSHIELD_LOG_FILE:-/var/log/smart-shield/app.log}"
+
+usage() {
+    cat <<'EOF'
+Usage: smartshieldctl <command> [args]
+
+Commands:
+  start             Start Smart Shield service
+  stop              Stop Smart Shield service
+  restart           Restart Smart Shield service
+  reload            Reload Smart Shield service
+  status            Show service status
+  enable            Enable service at boot (rc.conf)
+  disable           Disable service at boot (rc.conf)
+  logs [N]          Tail app log (default N=100)
+  health            HTTP check against local UI endpoint
+  menu              Start smartshield-cli
+EOF
+}
+
+need_arg() {
+    if [ "${#}" -lt 1 ]; then
+        usage
+        exit 1
+    fi
+}
+
+need_arg "$@"
+cmd="$1"
+shift || true
+
+case "${cmd}" in
+    start|stop|restart|reload|status)
+        # Bridge directly to FreeBSD service manager.
+        exec service "${SERVICE_NAME}" "${cmd}"
+        ;;
+    enable)
+        # Persist boot enable in rc.conf.
+        exec sysrc "${SERVICE_NAME}_enable=YES"
+        ;;
+    disable)
+        # Persist boot disable in rc.conf.
+        exec sysrc "${SERVICE_NAME}_enable=NO"
+        ;;
+    logs)
+        lines="${1:-100}"
+        exec tail -n "${lines}" "${LOG_FILE}"
+        ;;
+    health)
+        if command -v fetch >/dev/null 2>&1; then
+            fetch -qo - http://127.0.0.1:5000/login >/dev/null
+            echo "smartshield: health check OK"
+        else
+            echo "smartshield: 'fetch' not found; install FreeBSD base tools"
+            exit 1
+        fi
+        ;;
+    menu)
+        exec smartshield-cli
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

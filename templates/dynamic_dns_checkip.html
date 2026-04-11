@@ -28,7 +28,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{% set services = session.get('checkip_services', [{'name':'Default','url':'http://checkip.dyndns.org','verify_ssl':False,'description':'Default Check IP Service'}]) %}
+			{% set services = services if services is defined else [{'name':'Default','url':'http://checkip.dyndns.org','verify_ssl':False,'description':'Default Check IP Service'}] %}
 			{% for s in services %}
 			<tr>
 				<td>{{ s.name }}</td>

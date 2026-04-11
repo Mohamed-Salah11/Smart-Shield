@@ -1,3 +1,83 @@
+import ipaddress
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class CommandResult:
+    command: List[str]
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+class FreeBSDNetworkError(RuntimeError):
+    pass
+
+
+def _network_dry_run_enabled():
+    return os.getenv("SMARTSHIELD_NETWORK_DRY_RUN", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def ensure_freebsd():
+    if not sys.platform.startswith("freebsd"):
+        raise FreeBSDNetworkError("Live network apply is only supported on FreeBSD.")
+
+
+def run_command(cmd: List[str], check=True) -> CommandResult:
+    if _network_dry_run_enabled():
+        return CommandResult(command=cmd, returncode=0, stdout="", stderr="")
+
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if check and proc.returncode != 0:
+        raise FreeBSDNetworkError(
+            f"Command failed ({' '.join(cmd)}): {proc.stderr.strip() or proc.stdout.strip()}"
+        )
+    return CommandResult(
+        command=cmd,
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+    )
+
+
+def apply_interface_ipv4(interface_name: str, cidr: str):
+    iface = ipaddress.ip_interface(cidr)
+    if iface.version != 4:
+        raise FreeBSDNetworkError("Only IPv4 is supported for live apply.")
+    run_command(
+        [
+            "ifconfig",
+            interface_name,
+            "inet",
+            str(iface.ip),
+            "netmask",
+            str(iface.network.netmask),
+        ],
+        check=True,
+    )
+    run_command(["ifconfig", interface_name, "up"], check=True)
+
+
+def set_default_gateway(gateway_ip: str):
+    # Delete may fail if no default route exists yet.
+    run_command(["route", "-n", "delete", "default"], check=False)
+    run_command(["route", "-n", "add", "default", gateway_ip], check=True)
+
+
+def list_live_connections():
+    result = run_command(["sockstat", "-46"], check=True)
+    return [line for line in (result.stdout or "").splitlines() if line.strip()]
+
+
 def normalize_interface_payload(data, interface_type):
     interface_type = interface_type.upper()
 
