@@ -1,10 +1,26 @@
 import os
 import sqlite3
 import sys
+import tempfile
 from werkzeug.security import generate_password_hash
 
-DEFAULT_DB_PATH = "/var/db/smart-shield/data.db" if sys.platform.startswith("freebsd") else "data.db"
-DATABASE = os.getenv("SMARTSHIELD_DB_PATH", DEFAULT_DB_PATH)
+_MEMORY_ANCHOR_CONN = None
+_MEMORY_ANCHOR_PATH = None
+
+
+def _default_db_path():
+    if sys.platform.startswith("freebsd"):
+        return "/var/db/smart-shield/data.db"
+    if sys.platform.startswith("win"):
+        # Keep Windows dev DB out of compressed/synced workdirs and in persistent user-local storage.
+        local_appdata = os.getenv("LOCALAPPDATA") or tempfile.gettempdir()
+        return os.path.join(local_appdata, "SmartShield", "data.db")
+    return "data.db"
+
+
+def _database_path():
+    # Read from env at call time so tests and runtime overrides behave deterministically.
+    return os.getenv("SMARTSHIELD_DB_PATH", _default_db_path())
 
 
 def _ensure_parent_dir(path: str):
@@ -14,8 +30,20 @@ def _ensure_parent_dir(path: str):
 
 
 def get_db():
-    _ensure_parent_dir(DATABASE)
-    conn = sqlite3.connect(DATABASE)
+    global _MEMORY_ANCHOR_CONN, _MEMORY_ANCHOR_PATH
+    db_path = _database_path()
+    is_uri = db_path.startswith("file:")
+    if not is_uri:
+        _ensure_parent_dir(db_path)
+    elif "mode=memory" in db_path:
+        # Keep an anchor connection alive so shared-memory DBs persist across connections.
+        if _MEMORY_ANCHOR_CONN is None or _MEMORY_ANCHOR_PATH != db_path:
+            if _MEMORY_ANCHOR_CONN is not None:
+                _MEMORY_ANCHOR_CONN.close()
+            _MEMORY_ANCHOR_CONN = sqlite3.connect(db_path, uri=True)
+            _MEMORY_ANCHOR_CONN.execute("PRAGMA foreign_keys = ON")
+            _MEMORY_ANCHOR_PATH = db_path
+    conn = sqlite3.connect(db_path, uri=is_uri)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
@@ -32,6 +60,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        is_superuser INTEGER DEFAULT 0,
         full_name TEXT,
         status TEXT DEFAULT 'active',
         profile_picture TEXT,
@@ -59,6 +88,31 @@ def init_db():
         FOREIGN KEY(group_id) REFERENCES groups(id)
     )
     """)
+
+    # Backward-compatible migration for older DBs created before is_superuser existed.
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = {row["name"] for row in cursor.fetchall()}
+    if "is_superuser" not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_superuser INTEGER DEFAULT 0")
+
+    # Group-level page whitelist permissions.
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS group_page_permissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            endpoint TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_group_page_permissions_group_endpoint
+        ON group_page_permissions(group_id, endpoint)
+        """
+    )
 
     # LAN INTERFACE CONFIGURATION TABLE
     cursor.execute("""
@@ -601,6 +655,19 @@ ON interface_assignments(interface_type)
     )
     """)
 
+    # ----------------------------
+    # Generic service state store (JSON blobs)
+    # ----------------------------
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS service_state (
+            key_name TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # ADVANCED NETWORK TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_network (
@@ -682,13 +749,22 @@ ON interface_assignments(interface_type)
 
         if admin_user and admin_pass:
             cursor.execute("""
-            INSERT INTO users (username, password, full_name)
-            VALUES (?, ?, ?)
+            INSERT INTO users (username, password, full_name, is_superuser)
+            VALUES (?, ?, ?, 1)
         """, (
              admin_user,
              generate_password_hash(admin_pass),
              "System Administrator"
         ))
+
+    # Ensure there is always at least one superuser.
+    cursor.execute("SELECT COUNT(*) AS c FROM users WHERE COALESCE(is_superuser, 0) = 1")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute("UPDATE users SET is_superuser = 1 WHERE username = 'admin'")
+        if cursor.rowcount == 0:
+            cursor.execute(
+                "UPDATE users SET is_superuser = 1 WHERE id = (SELECT MIN(id) FROM users)"
+            )
 
     # Create default advanced settings if not exists
     cursor.execute("SELECT COUNT(*) AS c FROM advanced_admin_access")
@@ -965,31 +1041,6 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # IPsec Phase 1 (IKE) Configs
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ipsec_phase1 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT,
-        disabled INTEGER DEFAULT 0,
-        key_exchange TEXT DEFAULT 'ikev2',
-        internet_protocol TEXT DEFAULT 'ipv4',
-        interface TEXT DEFAULT 'wan',
-        remote_gateway TEXT,
-        authentication_method TEXT DEFAULT 'preshared_key',
-        my_identifier TEXT,
-        peer_identifier TEXT,
-        preshared_key TEXT,
-        encryption_algorithm TEXT DEFAULT 'aes256',
-        hash_algorithm TEXT DEFAULT 'sha256',
-        dh_key_group TEXT DEFAULT '14',
-        lifetime INTEGER DEFAULT 28800,
-        nat_traversal TEXT DEFAULT 'auto',
-        dpd_delay INTEGER DEFAULT 10,
-        dpd_maxfail INTEGER DEFAULT 5,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
     # IPsec Phase 2 (Child SA) Configs
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ipsec_phase2 (
@@ -1107,16 +1158,6 @@ ON interface_assignments(interface_type)
     )
     """)
 
-    # Firewall Schedules
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS firewall_schedules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        description TEXT,
-        ranges_data TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS dhcp_pools (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

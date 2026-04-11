@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# FreeBSD rc.d service template for Smart Shield.
+#
+# What to do with this file:
+# 1) Copy to: /usr/local/etc/rc.d/smart_shield
+# 2) Make executable: chmod 555 /usr/local/etc/rc.d/smart_shield
+# 3) Enable at boot: sysrc smart_shield_enable=YES
+# 4) Control service: service smart_shield start|stop|restart|status
+#
+# Required runtime assumptions:
+# - Project code is installed under /usr/local/share/smart-shield
+# - Environment file exists at /usr/local/etc/smart-shield/smart-shield.env
+# - SECRET_KEY is set in env file (required by app startup)
+#
+# Before production:
+# - Review path variables below to match your final appliance image.
+# - Replace built-in Flask server startup with a production WSGI server
+#   (gunicorn/uwsgi/waitress equivalent for your FreeBSD stack).
+#
+# PROVIDE: smart_shield
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+
+. /etc/rc.subr
+
+name="smart_shield"
+rcvar="${name}_enable"
+
+load_rc_config "${name}"
+
+: ${smart_shield_enable:="NO"}
+: ${smart_shield_user:="root"}
+: ${smart_shield_group:="wheel"}
+# App root where run.py/wsgi.py live in deployed system.
+: ${smart_shield_app_root:="/usr/local/share/smart-shield"}
+# Environment file containing SECRET_KEY and DB path vars.
+: ${smart_shield_env_file:="/usr/local/etc/smart-shield/smart-shield.env"}
+: ${smart_shield_rundir:="/var/run/smart-shield"}
+: ${smart_shield_logdir:="/var/log/smart-shield"}
+: ${smart_shield_pidfile:="/var/run/smart-shield/smart_shield.pid"}
+: ${smart_shield_python:="/usr/local/bin/python3"}
+: ${smart_shield_app:="/usr/local/share/smart-shield/run.py"}
+
+required_files="${smart_shield_app}"
+pidfile="${smart_shield_pidfile}"
+procname="${smart_shield_python}"
+command="/usr/sbin/daemon"
+command_args="-f -P ${pidfile} -o ${smart_shield_logdir}/app.log ${smart_shield_python} ${smart_shield_app}"
+
+start_precmd="${name}_prestart"
+stop_postcmd="${name}_poststop"
+
+smart_shield_prestart()
+{
+    # Ensure runtime directories exist with correct ownership.
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_rundir}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_logdir}"
+
+    # Load optional runtime env values if file exists.
+    if [ -f "${smart_shield_env_file}" ]; then
+        # shellcheck source=/dev/null
+        . "${smart_shield_env_file}"
+    fi
+
+    # Export only variables used by app startup logic.
+    export FLASK_DEBUG
+    export SECRET_KEY
+    export SMARTSHIELD_DB_PATH
+    export SMARTSHIELD_NETWORK_DRY_RUN
+}
+
+smart_shield_poststop()
+{
+    rm -f "${pidfile}"
+}
+
+run_rc_command "$1"

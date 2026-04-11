@@ -30,7 +30,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{% set clients = session.get('rfc2136_clients', []) %}
+			{% set clients = clients if clients is defined else [] %}
 			{% if clients %}
 				{% for c in clients %}
 				<tr>

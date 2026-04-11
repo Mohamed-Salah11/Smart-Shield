@@ -1,6 +1,28 @@
 {% extends 'base.html' %}
 {% set title = "System - Group Manager" %}
 
+{% block head %}
+<style>
+.permission-search-wrap {
+    max-width: 420px;
+}
+
+.permission-entry {
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.permission-entry:hover {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.08);
+}
+
+.permission-category .card-header {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+
 {% block main %}
 
 <div class="container">
@@ -42,6 +64,7 @@
                             <th>Group Name</th>
                             <th>Description</th>
                             <th>Members</th>
+                            <th>Allowed Pages</th>
                             <th style="width: 200px;">Actions</th>
                         </tr>
                     </thead>
@@ -56,10 +79,17 @@
                             <td class="align-middle">
                                 <span class="badge bg-secondary">{{ g.member_count }} member{{ 's' if g.member_count != 1 else '' }}</span>
                             </td>
+                            <td class="align-middle">
+                                {% set allowed = group_permissions.get(g.id, []) %}
+                                <span class="badge bg-info text-dark">{{ allowed|length }} page{{ 's' if allowed|length != 1 else '' }}</span>
+                            </td>
                             <td class="align-middle text-end">
                                 <div class="btn-group" role="group">
                                     <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#membersModal{{ g.id }}" title="Manage Members">
                                         <i class="fa-solid fa-user-group me-1"></i>Members
+                                    </button>
+                                    <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#permissionsModal{{ g.id }}" title="Page Whitelist">
+                                        <i class="fa-solid fa-list-check me-1"></i>Pages
                                     </button>
                                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGroupModal{{ g.id }}" title="Edit Group">
                                         <i class="fa-solid fa-pen me-1"></i>Edit
@@ -157,11 +187,103 @@
                             </div>
                         </div>
 
+                        <!-- Permissions Modal -->
+                        <div class="modal fade permissions-modal" id="permissionsModal{{ g.id }}" tabindex="-1" data-group-id="{{ g.id }}">
+                            <div class="modal-dialog modal-xl">
+                                <form method="POST" action="/system/user-manager/group/{{ g.id }}/permissions">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">
+                                                <i class="fa-solid fa-list-check me-2"></i>Page Whitelist: {{ g.name }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="text-muted mb-3">
+                                                Select exactly which pages this group can open. Anything not selected will return "You are not authorized to view this page."
+                                            </p>
+
+                                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                                <div class="input-group input-group-sm permission-search-wrap">
+                                                    <span class="input-group-text">
+                                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                                    </span>
+                                                    <input
+                                                        type="search"
+                                                        class="form-control permission-search-input"
+                                                        placeholder="Search pages, endpoints, or paths..."
+                                                    >
+                                                </div>
+
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-success permission-select-visible">
+                                                        <i class="fa-solid fa-check-double me-1"></i>Select Visible
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-secondary permission-clear-visible">
+                                                        <i class="fa-solid fa-eraser me-1"></i>Clear Visible
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {% set allowed = group_permissions.get(g.id, []) %}
+                                            {% for c in permission_categories %}
+                                            <div class="card mb-3 permission-category" data-category="{{ c['key'] }}">
+                                                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                    <div>
+                                                        <strong>{{ c['name'] }}</strong>
+                                                        <span class="badge bg-light text-dark ms-2 category-visible-count">{{ c['items']|length }} visible</span>
+                                                    </div>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button type="button" class="btn btn-outline-primary permission-category-select" data-category="{{ c['key'] }}">
+                                                            Select Category
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-secondary permission-category-clear" data-category="{{ c['key'] }}">
+                                                            Clear Category
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="card-body py-2">
+                                                    <div class="row g-2">
+                                                        {% for p in c['items'] %}
+                                                        <div class="col-md-6 permission-col" data-category="{{ c['key'] }}">
+                                                            <label
+                                                                class="form-check border rounded p-2 w-100 permission-entry"
+                                                                data-search="{{ (c['name'] ~ ' ' ~ p.label ~ ' ' ~ p.path ~ ' ' ~ p.endpoint)|lower }}"
+                                                            >
+                                                                <input
+                                                                    class="form-check-input me-2"
+                                                                    type="checkbox"
+                                                                    name="allowed_endpoints"
+                                                                    value="{{ p.endpoint }}"
+                                                                    {% if p.endpoint in allowed %}checked{% endif %}
+                                                                >
+                                                                <span class="form-check-label">
+                                                                    <strong>{{ p.label }}</strong><br>
+                                                                </span>
+                                                            </label>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-warning">
+                                                <i class="fa-solid fa-save me-1"></i>Save Page Whitelist
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
                         {% endfor %}
 
                         {% if not groups %}
                         <tr>
-                            <td colspan="4" class="text-center py-5">
+                            <td colspan="5" class="text-center py-5">
                                 <i class="fa-solid fa-users fa-3x text-muted mb-3"></i>
                                 <p class="text-muted mb-0">No groups defined.</p>
                                 <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addGroupModal">
@@ -179,7 +301,7 @@
 
 <!-- Add Group Modal -->
 <div class="modal fade" id="addGroupModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <form method="POST" action="/system/user-manager/add-group">
             <div class="modal-content">
                 <div class="modal-header">
@@ -196,6 +318,49 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Description</label>
                         <input name="description" class="form-control" placeholder="Enter description">
+                    </div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="enableCreateWhitelist">
+                        <label class="form-check-label" for="enableCreateWhitelist">
+                            Configure page whitelist now (optional)
+                        </label>
+                    </div>
+
+                    <div id="createGroupWhitelistPanel" class="border rounded p-2 d-none">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div class="input-group input-group-sm permission-search-wrap">
+                                <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                <input type="search" class="form-control create-group-permission-search" placeholder="Search pages...">
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-success" id="createWhitelistSelectVisible">Select Visible</button>
+                                <button type="button" class="btn btn-outline-secondary" id="createWhitelistClearVisible">Clear Visible</button>
+                            </div>
+                        </div>
+
+                        {% for c in permission_categories %}
+                        <div class="card mb-2 create-permission-category" data-category="{{ c['key'] }}">
+                            <div class="card-header py-1 d-flex justify-content-between align-items-center">
+                                <strong>{{ c['name'] }}</strong>
+                                <span class="badge bg-light text-dark create-category-visible-count">{{ c['items']|length }} visible</span>
+                            </div>
+                            <div class="card-body py-2">
+                                <div class="row g-2">
+                                    {% for p in c['items'] %}
+                                    <div class="col-12 create-permission-col" data-category="{{ c['key'] }}">
+                                        <label class="form-check border rounded p-2 w-100 create-permission-entry" data-search="{{ (c['name'] ~ ' ' ~ p.label ~ ' ' ~ p.path ~ ' ' ~ p.endpoint)|lower }}">
+                                            <input class="form-check-input me-2" type="checkbox" name="allowed_endpoints" value="{{ p.endpoint }}">
+                                            <span class="form-check-label">
+                                                <strong>{{ p.label }}</strong>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -217,6 +382,9 @@ document.addEventListener('DOMContentLoaded', function() {
         loadGroupMembers({{ g.id }});
     });
     {% endfor %}
+
+    document.querySelectorAll('.permissions-modal').forEach(setupPermissionModal);
+    setupCreateGroupWhitelist();
 });
 
 function loadGroupMembers(groupId) {
@@ -253,6 +421,155 @@ function loadGroupMembers(groupId) {
         .catch(error => {
             listContainer.innerHTML = '<div class="text-center py-4 text-danger"><i class="fa-solid fa-exclamation-triangle me-2"></i>Error loading members.</div>';
         });
+}
+
+function setupPermissionModal(modal) {
+    const searchInput = modal.querySelector('.permission-search-input');
+    const selectVisibleBtn = modal.querySelector('.permission-select-visible');
+    const clearVisibleBtn = modal.querySelector('.permission-clear-visible');
+
+    const applyFilter = () => {
+        const query = (searchInput?.value || '').trim().toLowerCase();
+        const entries = modal.querySelectorAll('.permission-entry');
+
+        entries.forEach((entry) => {
+            const col = entry.closest('.permission-col');
+            const haystack = (entry.dataset.search || '').toLowerCase();
+            const isVisible = !query || haystack.includes(query);
+            if (col) {
+                col.classList.toggle('d-none', !isVisible);
+            }
+        });
+
+        modal.querySelectorAll('.permission-category').forEach((categoryBlock) => {
+            const visibleCount = categoryBlock.querySelectorAll('.permission-col:not(.d-none)').length;
+            categoryBlock.classList.toggle('d-none', visibleCount === 0);
+            const countBadge = categoryBlock.querySelector('.category-visible-count');
+            if (countBadge) {
+                countBadge.textContent = `${visibleCount} visible`;
+            }
+        });
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyFilter);
+    }
+
+    if (selectVisibleBtn) {
+        selectVisibleBtn.addEventListener('click', () => {
+            modal.querySelectorAll('.permission-col:not(.d-none) input[name="allowed_endpoints"]').forEach((cb) => {
+                cb.checked = true;
+            });
+        });
+    }
+
+    if (clearVisibleBtn) {
+        clearVisibleBtn.addEventListener('click', () => {
+            modal.querySelectorAll('.permission-col:not(.d-none) input[name="allowed_endpoints"]').forEach((cb) => {
+                cb.checked = false;
+            });
+        });
+    }
+
+    modal.querySelectorAll('.permission-category-select').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const key = btn.dataset.category;
+            modal.querySelectorAll(`.permission-col[data-category="${key}"]:not(.d-none) input[name="allowed_endpoints"]`).forEach((cb) => {
+                cb.checked = true;
+            });
+        });
+    });
+
+    modal.querySelectorAll('.permission-category-clear').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const key = btn.dataset.category;
+            modal.querySelectorAll(`.permission-col[data-category="${key}"]:not(.d-none) input[name="allowed_endpoints"]`).forEach((cb) => {
+                cb.checked = false;
+            });
+        });
+    });
+
+    modal.addEventListener('show.bs.modal', () => {
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        applyFilter();
+    });
+}
+
+function setupCreateGroupWhitelist() {
+    const toggle = document.getElementById('enableCreateWhitelist');
+    const panel = document.getElementById('createGroupWhitelistPanel');
+    const search = document.querySelector('.create-group-permission-search');
+    const selectVisibleBtn = document.getElementById('createWhitelistSelectVisible');
+    const clearVisibleBtn = document.getElementById('createWhitelistClearVisible');
+    const modal = document.getElementById('addGroupModal');
+
+    if (!toggle || !panel || !modal) {
+        return;
+    }
+
+    const applyFilter = () => {
+        const query = (search?.value || '').trim().toLowerCase();
+        panel.querySelectorAll('.create-permission-entry').forEach((entry) => {
+            const col = entry.closest('.create-permission-col');
+            const haystack = (entry.dataset.search || '').toLowerCase();
+            const isVisible = !query || haystack.includes(query);
+            if (col) {
+                col.classList.toggle('d-none', !isVisible);
+            }
+        });
+
+        panel.querySelectorAll('.create-permission-category').forEach((cat) => {
+            const visibleCount = cat.querySelectorAll('.create-permission-col:not(.d-none)').length;
+            cat.classList.toggle('d-none', visibleCount === 0);
+            const badge = cat.querySelector('.create-category-visible-count');
+            if (badge) {
+                badge.textContent = `${visibleCount} visible`;
+            }
+        });
+    };
+
+    const setPanelVisibility = () => {
+        panel.classList.toggle('d-none', !toggle.checked);
+        if (toggle.checked) {
+            applyFilter();
+        }
+    };
+
+    toggle.addEventListener('change', setPanelVisibility);
+
+    if (search) {
+        search.addEventListener('input', applyFilter);
+    }
+
+    if (selectVisibleBtn) {
+        selectVisibleBtn.addEventListener('click', () => {
+            panel.querySelectorAll('.create-permission-col:not(.d-none) input[name="allowed_endpoints"]').forEach((cb) => {
+                cb.checked = true;
+            });
+        });
+    }
+
+    if (clearVisibleBtn) {
+        clearVisibleBtn.addEventListener('click', () => {
+            panel.querySelectorAll('.create-permission-col:not(.d-none) input[name="allowed_endpoints"]').forEach((cb) => {
+                cb.checked = false;
+            });
+        });
+    }
+
+    modal.addEventListener('show.bs.modal', () => {
+        toggle.checked = false;
+        panel.classList.add('d-none');
+        if (search) {
+            search.value = '';
+        }
+        panel.querySelectorAll('input[name="allowed_endpoints"]').forEach((cb) => {
+            cb.checked = false;
+        });
+        applyFilter();
+    });
 }
 </script>
 
