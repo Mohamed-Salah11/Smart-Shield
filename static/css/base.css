@@ -2812,3 +2812,46 @@ body {
     padding: 12px;
   }
 }
+
+/* ========================================
+   MODAL UX OVERRIDES (GLOBAL)
+======================================== */
+
+/* Keep popup menus/modals away from the very top under sticky navbar. */
+.modal-dialog {
+  margin: calc(var(--topbar-height, 56px) + 18px) auto 24px;
+}
+
+/* Make dialog width adapt to screen comfortably. */
+.modal-dialog {
+  width: min(96vw, 1140px);
+}
+
+/* Ensure long forms scroll inside the modal instead of pushing to page top. */
+.modal-dialog-scrollable {
+  max-height: calc(100dvh - var(--topbar-height, 56px) - 28px);
+}
+
+.modal-dialog-scrollable .modal-content {
+  max-height: calc(100dvh - var(--topbar-height, 56px) - 28px);
+}
+
+.modal-content {
+  border-radius: 10px;
+}
+
+.modal-body {
+  overflow-y: auto;
+}
+
+@media (max-width: 991.98px) {
+  .modal-dialog {
+    width: min(96vw, 960px);
+    margin: calc(var(--topbar-height, 56px) + 12px) auto 16px;
+  }
+
+  .modal-dialog-scrollable,
+  .modal-dialog-scrollable .modal-content {
+    max-height: calc(100dvh - var(--topbar-height, 56px) - 18px);
+  }
+}
