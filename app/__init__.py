@@ -17,7 +17,9 @@ def create_app():
 
     app.secret_key = os.getenv("SECRET_KEY")
     if not app.secret_key:
-        raise RuntimeError("SECRET_KEY is not set")
+        raise RuntimeError(
+            "SECRET_KEY is not set. Create a .env file (for example: copy .env.example .env) and set SECRET_KEY."
+        )
 
     @app.before_request
     def _csrf_guard():

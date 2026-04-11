@@ -2706,3 +2706,109 @@ table tbody tr:last-child td,
 [data-theme="dark"] .kpi-item strong {
   color: #e4e6eb;
 }
+
+/* ========================================
+   GLOBAL PATH/BREADCRUMB HIDE + FULL RESPONSIVE OVERRIDES
+======================================== */
+
+/* Hide breadcrumb/path strips globally (e.g. "System / ..."). */
+nav[aria-label="breadcrumb"],
+.breadcrumb,
+.breadcrumb-section,
+.breadcrumb-box,
+.nav-breadcrumb {
+  display: none !important;
+}
+
+/* Make content scale with screen size instead of fixed width blocks. */
+.container,
+.pf-container,
+.cp-container,
+.dhcp-relay-container,
+.acb-container {
+  width: 100%;
+  max-width: none !important;
+  margin: 0 0 16px 0;
+}
+
+.main-content {
+  width: 100%;
+  max-width: none !important;
+  padding: clamp(12px, 2vw, 24px);
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Desktop layout: sidebar can push content. */
+@media (min-width: 992px) {
+  .app-shell.sidebar-open .main-content {
+    margin-left: 0 !important;
+    padding-left: calc(var(--sidebar-width, 270px) + clamp(12px, 2vw, 24px));
+  }
+
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  .sidebar-close-btn {
+    display: none;
+  }
+}
+
+/* Tablet/mobile layout: sidebar overlays content, no "desktop only" lockout. */
+@media (max-width: 991.98px) {
+  .mobile-block-message {
+    display: none !important;
+  }
+
+  .navbar,
+  .app-shell {
+    display: block !important;
+  }
+
+  .app-shell.sidebar-open .main-content {
+    margin-left: 0 !important;
+  }
+
+  .sidebar {
+    width: min(86vw, 320px);
+    transform: translateX(-100%);
+  }
+
+  .app-shell.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1040;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .app-shell.sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-close-btn {
+    display: inline-flex;
+  }
+
+  .container,
+  .pf-container,
+  .cp-container,
+  .dhcp-relay-container,
+  .acb-container {
+    width: 100%;
+    margin: 0 0 12px 0;
+    padding: 12px;
+  }
+}
