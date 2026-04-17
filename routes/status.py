@@ -93,12 +93,13 @@ def queues():
 @login_required
 def system_logs():
     active_tab = (request.args.get("tab") or "system").lower()
-    if active_tab not in {"system", "sessions", "security"}:
+    if active_tab not in {"system", "sessions", "security", "browsing"}:
         active_tab = "system"
 
     all_events = tail_events(limit=300)
     session_events = [e for e in all_events if e.get("category") == "session"]
     system_events = [e for e in all_events if e.get("category") == "system"]
+    browsing_events = [e for e in all_events if e.get("category") == "browsing"]
     security_events = [
         e for e in all_events
         if e.get("category") == "security"
@@ -110,6 +111,7 @@ def system_logs():
         active_tab=active_tab,
         system_events=system_events[:150],
         session_events=session_events[:150],
+        browsing_events=browsing_events[:150],
         security_events=security_events[:150],
     )
 

@@ -160,6 +160,7 @@
                                 <th>Action</th>
                                 <th>User</th>
                                 <th>IP</th>
+                                <th>Activity</th>
                             </tr>
                         </thead>
                         <tbody id="dashEventsTableBody"></tbody>
@@ -311,6 +312,40 @@
         .replace(/\"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
+    const summarizeEventActivity = (event) => {
+        const details = event?.details || {};
+        const activity = details.activity || '';
+        const method = details.method || '';
+        const path = details.path || '';
+        const statusCode = details.status_code || '';
+        const latency = details.latency_ms ?? '';
+        const payloadKeys = Array.isArray(details.payload_keys) ? details.payload_keys : [];
+        const discoveredHosts = details.discovered_hosts;
+        const reason = details.reason || '';
+
+        let main = activity;
+        if (!main && method && path) {
+            main = `${method} ${path}`;
+        } else if (!main && path) {
+            main = path;
+        } else if (!main && reason) {
+            main = reason;
+        } else if (!main && discoveredHosts !== undefined) {
+            main = `Host refresh discovered ${discoveredHosts} host(s)`;
+        }
+        if (!main) {
+            main = '-';
+        }
+
+        const extraParts = [];
+        if (statusCode) extraParts.push(`status=${statusCode}`);
+        if (latency !== '') extraParts.push(`latency=${latency}ms`);
+        if (payloadKeys.length > 0) extraParts.push(`keys=${payloadKeys.join(',')}`);
+
+        const extra = extraParts.length > 0 ? `<div class="small text-muted">${escapeHtml(extraParts.join(' | '))}</div>` : '';
+        return `${escapeHtml(main)}${extra}`;
+    };
+
     const renderSessionTable = (rows) => {
         const tbody = document.getElementById('dashSessionTableBody');
         if (!tbody) return;
@@ -338,7 +373,7 @@
         if (!tbody) return;
         tbody.innerHTML = '';
         if (!rows || rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No logs available yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No logs available yet.</td></tr>';
             return;
         }
         rows.forEach((event) => {
@@ -349,6 +384,7 @@
                 <td>${escapeHtml(event.action || '-')}</td>
                 <td>${escapeHtml(event.username || '-')}</td>
                 <td>${escapeHtml(event.remote_addr || '-')}</td>
+                <td>${summarizeEventActivity(event)}</td>
             `;
             tbody.appendChild(tr);
         });

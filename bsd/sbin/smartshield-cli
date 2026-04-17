@@ -31,6 +31,62 @@ run_ctl() {
     pause
 }
 
+configure_interface() {
+    iface="$1"
+    mode=""
+    cidr=""
+    gateway=""
+    apply_now=""
+
+    echo "Current ${iface} settings:"
+    smartshieldctl iface-show "${iface}" || true
+    echo
+
+    printf "Set ${iface} IPv4 mode [dhcp/static]: "
+    read -r mode
+    mode="$(echo "${mode}" | tr '[:upper:]' '[:lower:]')"
+
+    case "${mode}" in
+        dhcp)
+            printf "Apply now on assigned interface? [y/N]: "
+            read -r apply_now
+            case "${apply_now}" in
+                y|Y) run_ctl iface-set "${iface}" dhcp --apply ;;
+                *) run_ctl iface-set "${iface}" dhcp ;;
+            esac
+            ;;
+        static)
+            printf "Enter static IPv4 CIDR (example 192.168.1.1/24): "
+            read -r cidr
+            if [ -z "${cidr}" ]; then
+                echo "CIDR is required for static mode."
+                pause
+                return
+            fi
+            printf "Enter gateway IPv4 (optional): "
+            read -r gateway
+            printf "Apply now on assigned interface? [y/N]: "
+            read -r apply_now
+
+            if [ -n "${gateway}" ]; then
+                case "${apply_now}" in
+                    y|Y) run_ctl iface-set "${iface}" static "${cidr}" "${gateway}" --apply ;;
+                    *) run_ctl iface-set "${iface}" static "${cidr}" "${gateway}" ;;
+                esac
+            else
+                case "${apply_now}" in
+                    y|Y) run_ctl iface-set "${iface}" static "${cidr}" --apply ;;
+                    *) run_ctl iface-set "${iface}" static "${cidr}" ;;
+                esac
+            fi
+            ;;
+        *)
+            echo "Invalid mode. Use 'dhcp' or 'static'."
+            pause
+            ;;
+    esac
+}
+
 while :; do
     clear
     cat <<'EOF'
@@ -42,10 +98,14 @@ while :; do
 3) Stop service
 4) Restart service
 5) Tail logs
-6) Enable service at boot
-7) Disable service at boot
-8) Network apply reminder
-9) Reboot system
+6) Tail audit log
+7) Tail PF filter log
+8) Enable service at boot
+9) Disable service at boot
+10) Configure LAN IPv4 mode
+11) Configure WAN IPv4 mode
+n) Network apply reminder
+r) Reboot system
 0) Shutdown system
 q) Quit to shell
 EOF
@@ -64,14 +124,36 @@ EOF
             n="${n:-100}"
             run_ctl logs "${n}"
             ;;
-        6) run_ctl enable ;;
-        7) run_ctl disable ;;
         8)
+            run_ctl enable
+            ;;
+        9)
+            run_ctl disable
+            ;;
+        10)
+            configure_interface "LAN"
+            ;;
+        11)
+            configure_interface "WAN"
+            ;;
+        6)
+            printf "Tail how many audit lines? [100]: "
+            read -r n
+            n="${n:-100}"
+            run_ctl audit "${n}"
+            ;;
+        7)
+            printf "Tail how many PF filter lines? [100]: "
+            read -r n
+            n="${n:-100}"
+            run_ctl filterlog "${n}"
+            ;;
+        n|N)
             echo "Use Web UI actions for config apply (CSRF-protected API)."
             echo "In future, wire smartshieldctl apply-* commands to backend workers."
             pause
             ;;
-        9)
+        r|R)
             printf "Reboot now? [y/N]: "
             read -r yn
             case "${yn}" in
