@@ -20,6 +20,178 @@ set -eu
 
 SERVICE_NAME="${SMARTSHIELD_SERVICE_NAME:-smart_shield}"
 LOG_FILE="${SMARTSHIELD_LOG_FILE:-/var/log/smart-shield/app.log}"
+AUDIT_LOG_FILE="${SMARTSHIELD_AUDIT_LOG_FILE:-/var/log/smart-shield/audit.log}"
+FILTER_LOG_FILE="${SMARTSHIELD_FILTER_LOG_FILE:-/var/log/filter.log}"
+SMARTSHIELD_ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smart-shield/smart-shield.env}"
+DEFAULT_DB_PATH="${SMARTSHIELD_DB_PATH:-/var/db/smart-shield/data.db}"
+
+load_env_file() {
+    if [ -f "${SMARTSHIELD_ENV_FILE}" ]; then
+        # shellcheck source=/dev/null
+        . "${SMARTSHIELD_ENV_FILE}"
+    fi
+}
+
+db_path() {
+    load_env_file
+    echo "${SMARTSHIELD_DB_PATH:-${DEFAULT_DB_PATH}}"
+}
+
+require_sqlite3() {
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+        echo "smartshield: sqlite3 command is required"
+        exit 1
+    fi
+}
+
+require_python3() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "smartshield: python3 command is required"
+        exit 1
+    fi
+}
+
+validate_cidr() {
+    require_python3
+    python3 - "$1" <<'PY'
+import ipaddress
+import sys
+value = (sys.argv[1] or "").strip()
+if not value:
+    raise SystemExit(1)
+iface = ipaddress.ip_interface(value)
+if iface.version != 4:
+    raise SystemExit(1)
+print(iface.with_prefixlen)
+PY
+}
+
+validate_ip() {
+    require_python3
+    python3 - "$1" <<'PY'
+import ipaddress
+import sys
+value = (sys.argv[1] or "").strip()
+if not value:
+    raise SystemExit(1)
+addr = ipaddress.ip_address(value)
+if addr.version != 4:
+    raise SystemExit(1)
+print(str(addr))
+PY
+}
+
+resolve_assigned_interface() {
+    iface_type="$1"
+    db="$(db_path)"
+    raw="$(sqlite3 "${db}" "SELECT network_port FROM interface_assignments WHERE interface_type='${iface_type}' LIMIT 1;")"
+    if [ -z "${raw}" ]; then
+        return 1
+    fi
+    echo "${raw}" | awk '{print $1}' | tr -cd 'A-Za-z0-9_.:-'
+}
+
+show_iface_config() {
+    iface_type="$1"
+    db="$(db_path)"
+    case "${iface_type}" in
+        LAN) table="lan_config" ;;
+        WAN) table="wan_config" ;;
+        *)
+            echo "smartshield: invalid interface type '${iface_type}'"
+            exit 1
+            ;;
+    esac
+
+    require_sqlite3
+
+    row="$(sqlite3 -separator '|' "${db}" "SELECT COALESCE(ipv4_config_type,''), COALESCE(ipv4_address,''), COALESCE(ipv4_upstream_gateway,'') FROM ${table} WHERE id=1;")"
+    mode="$(echo "${row}" | cut -d'|' -f1)"
+    address="$(echo "${row}" | cut -d'|' -f2)"
+    gateway="$(echo "${row}" | cut -d'|' -f3)"
+    assigned="$(resolve_assigned_interface "${iface_type}" || true)"
+
+    echo "Interface: ${iface_type}"
+    echo "Assigned Port: ${assigned:-<not assigned>}"
+    echo "IPv4 Mode: ${mode:-unknown}"
+    echo "IPv4 Address: ${address:-<empty>}"
+    echo "IPv4 Gateway: ${gateway:-<empty>}"
+}
+
+set_iface_config() {
+    iface_type="$1"
+    mode="$2"
+    cidr="${3:-}"
+    gateway="${4:-}"
+    apply_now="${5:-0}"
+    db="$(db_path)"
+
+    case "${iface_type}" in
+        LAN) table="lan_config" ;;
+        WAN) table="wan_config" ;;
+        *)
+            echo "smartshield: invalid interface type '${iface_type}'"
+            exit 1
+            ;;
+    esac
+
+    require_sqlite3
+    sqlite3 "${db}" "INSERT OR IGNORE INTO ${table} (id) VALUES (1);"
+
+    if [ "${mode}" = "dhcp" ]; then
+        if [ -n "${cidr}" ] || [ -n "${gateway}" ]; then
+            echo "smartshield: DHCP mode does not accept CIDR/gateway arguments"
+            exit 1
+        fi
+        sqlite3 "${db}" "UPDATE ${table} SET ipv4_config_type='dhcp', ipv4_address='', ipv4_upstream_gateway='' WHERE id=1;"
+        echo "smartshield: ${iface_type} set to DHCP in Smart Shield config."
+    elif [ "${mode}" = "static" ]; then
+        if [ -z "${cidr}" ]; then
+            echo "smartshield: static mode requires CIDR (example: 192.168.1.1/24)"
+            exit 1
+        fi
+        normalized_cidr="$(validate_cidr "${cidr}")" || {
+            echo "smartshield: invalid IPv4 CIDR '${cidr}'"
+            exit 1
+        }
+        normalized_gateway=""
+        if [ -n "${gateway}" ]; then
+            normalized_gateway="$(validate_ip "${gateway}")" || {
+                echo "smartshield: invalid IPv4 gateway '${gateway}'"
+                exit 1
+            }
+        fi
+        sqlite3 "${db}" "UPDATE ${table} SET ipv4_config_type='static', ipv4_address='${normalized_cidr}', ipv4_upstream_gateway='${normalized_gateway}' WHERE id=1;"
+        echo "smartshield: ${iface_type} set to static (${normalized_cidr}) in Smart Shield config."
+        if [ -n "${normalized_gateway}" ]; then
+            echo "smartshield: ${iface_type} gateway set to ${normalized_gateway}."
+        fi
+    else
+        echo "smartshield: invalid mode '${mode}' (expected dhcp|static)"
+        exit 1
+    fi
+
+    if [ "${apply_now}" = "1" ]; then
+        iface_name="$(resolve_assigned_interface "${iface_type}" || true)"
+        if [ -z "${iface_name}" ]; then
+            echo "smartshield: ${iface_type} has no assigned interface port; DB updated only."
+            return 0
+        fi
+
+        if [ "${mode}" = "dhcp" ]; then
+            ifconfig "${iface_name}" up
+            dhclient "${iface_name}"
+            echo "smartshield: requested DHCP lease on ${iface_name}."
+        else
+            ifconfig "${iface_name}" inet "${normalized_cidr}" up
+            if [ "${iface_type}" = "WAN" ] && [ -n "${normalized_gateway}" ]; then
+                route -n delete default >/dev/null 2>&1 || true
+                route -n add default "${normalized_gateway}"
+            fi
+            echo "smartshield: applied static IPv4 on ${iface_name}."
+        fi
+    fi
+}
 
 usage() {
     cat <<'EOF'
@@ -34,6 +206,12 @@ Commands:
   enable            Enable service at boot (rc.conf)
   disable           Disable service at boot (rc.conf)
   logs [N]          Tail app log (default N=100)
+  audit [N]         Tail audit log (login + browsing events)
+  filterlog [N]     Tail PF traffic log (if enabled)
+  iface-show [IF]   Show LAN/WAN IPv4 config (default IF=LAN)
+  iface-set IF MODE Configure LAN/WAN IPv4 mode:
+                    MODE=dhcp [--apply]
+                    MODE=static <CIDR> [gateway] [--apply]
   health            HTTP check against local UI endpoint
   menu              Start smartshield-cli
 EOF
@@ -66,6 +244,49 @@ case "${cmd}" in
     logs)
         lines="${1:-100}"
         exec tail -n "${lines}" "${LOG_FILE}"
+        ;;
+    audit)
+        lines="${1:-100}"
+        exec tail -n "${lines}" "${AUDIT_LOG_FILE}"
+        ;;
+    filterlog)
+        lines="${1:-100}"
+        exec tail -n "${lines}" "${FILTER_LOG_FILE}"
+        ;;
+    iface-show)
+        iface="${1:-LAN}"
+        iface="$(echo "${iface}" | tr '[:lower:]' '[:upper:]')"
+        show_iface_config "${iface}"
+        ;;
+    iface-set)
+        iface="$(echo "${1:-}" | tr '[:lower:]' '[:upper:]')"
+        mode="$(echo "${2:-}" | tr '[:upper:]' '[:lower:]')"
+        if [ -z "${iface}" ] || [ -z "${mode}" ]; then
+            echo "smartshield: usage: smartshieldctl iface-set <LAN|WAN> <dhcp|static> ..."
+            exit 1
+        fi
+        shift 2 || true
+
+        apply_now=0
+        cidr=""
+        gateway=""
+        for arg in "$@"; do
+            case "${arg}" in
+                --apply) apply_now=1 ;;
+                *)
+                    if [ -z "${cidr}" ]; then
+                        cidr="${arg}"
+                    elif [ -z "${gateway}" ]; then
+                        gateway="${arg}"
+                    else
+                        echo "smartshield: unexpected argument '${arg}'"
+                        exit 1
+                    fi
+                    ;;
+            esac
+        done
+
+        set_iface_config "${iface}" "${mode}" "${cidr}" "${gateway}" "${apply_now}"
         ;;
     health)
         if command -v fetch >/dev/null 2>&1; then

@@ -52,7 +52,7 @@
                         <tr>
                             <td class="align-middle text-center">
                                 {% if u.profile_picture %}
-                                    <img src="{{ url_for('static', filename=u.profile_picture) }}" alt="{{ u.username }}" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                    <img src="{{ profile_picture_url(u.profile_picture) }}" alt="{{ u.username }}" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
                                 {% else %}
                                     <i class="fa-solid fa-circle-user fa-2x text-secondary"></i>
                                 {% endif %}
@@ -100,7 +100,7 @@
                                         <div class="modal-body">
                                             <div class="text-center mb-4">
                                                 {% if u.profile_picture %}
-                                                    <img src="{{ url_for('static', filename=u.profile_picture) }}" alt="{{ u.username }}" class="rounded-circle mb-2" style="width: 80px; height: 80px; object-fit: cover;">
+                                                    <img src="{{ profile_picture_url(u.profile_picture) }}" alt="{{ u.username }}" class="rounded-circle mb-2" style="width: 80px; height: 80px; object-fit: cover;">
                                                 {% else %}
                                                     <i class="fa-solid fa-circle-user fa-5x text-secondary mb-2"></i>
                                                 {% endif %}

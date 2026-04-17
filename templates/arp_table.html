@@ -1,6 +1,243 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to ARP Table</h1>
-<p>Placeholder for ARP Table.</p>
+<div class="container">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Host Tracking</li>
+                </ol>
+            </nav>
+            <h1>Host Tracking (LAN/WAN)</h1>
+            <p class="lead mb-0">Discover hosts on assigned interfaces and check whether firewall rules cover each host.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button id="refreshHostsBtn" class="btn btn-primary">
+                <i class="fa-solid fa-rotate me-1"></i>Refresh Hosts
+            </button>
+            <button id="reloadCacheBtn" class="btn btn-outline-secondary">Reload Cached</button>
+            <button id="inspectWebBtn" class="btn btn-outline-primary">
+                <i class="fa-solid fa-globe me-1"></i>Inspect Web Activity
+            </button>
+        </div>
+    </div>
+
+    <div id="hostStatusBanner" class="alert alert-secondary mt-3 mb-3" role="status">
+        Loading host inventory...
+    </div>
+
+    <div class="section">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Discovered Hosts</h2>
+            <span id="hostCountBadge" class="badge bg-light text-dark">0 hosts</span>
+        </div>
+        <div class="section-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Interface</th>
+                            <th>Port</th>
+                            <th>IP Address</th>
+                            <th>MAC Address</th>
+                            <th>Hostname</th>
+                            <th>Source</th>
+                            <th>Policy State</th>
+                            <th>Suggestion</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hostsTbody">
+                        <tr>
+                            <td colspan="9" class="text-muted">No hosts loaded yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="section mt-3">
+        <div class="section-header d-flex justify-content-between align-items-center">
+            <h2 class="mb-0">Recent Web Activity (Best Effort)</h2>
+            <span id="webCountBadge" class="badge bg-light text-dark">0 active hosts</span>
+        </div>
+        <div class="section-body">
+            <p class="text-muted mb-2">
+                Shows DNS domains and plain HTTP links by source host. Full HTTPS URLs are encrypted unless TLS interception is configured.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Source Host</th>
+                            <th>Interface</th>
+                            <th>Known Identity</th>
+                            <th>Websites (DNS/Host)</th>
+                            <th>HTTP Links / Requests</th>
+                        </tr>
+                    </thead>
+                    <tbody id="webActivityTbody">
+                        <tr>
+                            <td colspan="5" class="text-muted">Click "Inspect Web Activity" to capture recent host network browsing behavior.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const hostsTbody = document.getElementById('hostsTbody');
+    const webActivityTbody = document.getElementById('webActivityTbody');
+    const hostStatusBanner = document.getElementById('hostStatusBanner');
+    const hostCountBadge = document.getElementById('hostCountBadge');
+    const webCountBadge = document.getElementById('webCountBadge');
+    const refreshHostsBtn = document.getElementById('refreshHostsBtn');
+    const reloadCacheBtn = document.getElementById('reloadCacheBtn');
+    const inspectWebBtn = document.getElementById('inspectWebBtn');
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
+    function policyBadgeClass(state) {
+        const s = (state || '').toLowerCase();
+        if (s === 'blocked') return 'bg-danger';
+        if (s === 'allowed_specific' || s === 'covered_specific') return 'bg-success';
+        if (s === 'allowed_broad' || s === 'default_policy' || s === 'no_match') return 'bg-warning text-dark';
+        if (s === 'no_rules' || s === 'unclassified' || s === 'invalid_ip') return 'bg-secondary';
+        return 'bg-light text-dark';
+    }
+
+    function renderHosts(hosts) {
+        if (!Array.isArray(hosts) || hosts.length === 0) {
+            hostsTbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-muted">No tracked hosts found yet. Use "Refresh Hosts" to discover peers.</td>
+                </tr>
+            `;
+            hostCountBadge.textContent = '0 hosts';
+            return;
+        }
+
+        hostCountBadge.textContent = `${hosts.length} host${hosts.length === 1 ? '' : 's'}`;
+        hostsTbody.innerHTML = hosts.map((host) => `
+            <tr>
+                <td><span class="badge ${host.interface_type === 'LAN' ? 'bg-primary' : (host.interface_type === 'WAN' ? 'bg-info text-dark' : 'bg-secondary')}">${escapeHtml(host.interface_type || 'UNKNOWN')}</span></td>
+                <td>${escapeHtml(host.interface_name || '-')}</td>
+                <td><code>${escapeHtml(host.ip_address || '-')}</code></td>
+                <td><code>${escapeHtml(host.mac_address || '-')}</code></td>
+                <td>${escapeHtml(host.hostname || '-')}</td>
+                <td>${escapeHtml(host.discovered_via || '-')}</td>
+                <td><span class="badge ${policyBadgeClass(host.policy_state)}">${escapeHtml(host.policy_state || 'unknown')}</span><div class="small text-muted mt-1">${escapeHtml(host.policy_note || '-')}</div></td>
+                <td>${escapeHtml(host.suggestion || '-')}</td>
+                <td>${escapeHtml(host.last_seen || '-')}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderWebActivity(rows) {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            webActivityTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-muted">No recent web activity captured in this sample window.</td>
+                </tr>
+            `;
+            webCountBadge.textContent = '0 active hosts';
+            return;
+        }
+
+        webCountBadge.textContent = `${rows.length} active host${rows.length === 1 ? '' : 's'}`;
+        webActivityTbody.innerHTML = rows.map((row) => {
+            const websites = Array.isArray(row.websites) ? row.websites : [];
+            const httpLinks = Array.isArray(row.http_links) ? row.http_links : [];
+            const httpReqs = Array.isArray(row.http_requests) ? row.http_requests : [];
+            const identity = [row.hostname || '', row.mac_address || ''].filter(Boolean).join(' / ') || '-';
+            const websiteHtml = websites.length
+                ? websites.map((site) => `<div><code>${escapeHtml(site)}</code></div>`).join('')
+                : '<span class="text-muted">-</span>';
+            const linkItems = httpLinks.length > 0 ? httpLinks : httpReqs;
+            const linkHtml = linkItems.length
+                ? linkItems.map((link) => `<div><code>${escapeHtml(link)}</code></div>`).join('')
+                : '<span class="text-muted">No plain HTTP link captured</span>';
+
+            return `
+                <tr>
+                    <td><code>${escapeHtml(row.source_ip || '-')}</code></td>
+                    <td>
+                        <span class="badge ${row.interface_type === 'LAN' ? 'bg-primary' : (row.interface_type === 'WAN' ? 'bg-info text-dark' : 'bg-secondary')}">
+                            ${escapeHtml(row.interface_type || 'UNKNOWN')}
+                        </span>
+                        <div class="small text-muted">${escapeHtml(row.interface_name || '-')}</div>
+                    </td>
+                    <td>${escapeHtml(identity)}</td>
+                    <td>${websiteHtml}</td>
+                    <td>${linkHtml}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function setBanner(message, type = 'secondary') {
+        hostStatusBanner.className = `alert alert-${type} mt-3 mb-3`;
+        hostStatusBanner.textContent = message;
+    }
+
+    async function loadHosts(refresh) {
+        const url = refresh ? '/api/network/hosts?refresh=1' : '/api/network/hosts';
+        try {
+            setBanner(refresh ? 'Refreshing host inventory...' : 'Loading cached host inventory...');
+            const response = await fetch(url);
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Failed to load host inventory.');
+            }
+
+            renderHosts(result.data || []);
+            const live = !!result.live_discovery_available;
+            const modeNote = live
+                ? 'Live ARP discovery is enabled on FreeBSD.'
+                : 'Live ARP discovery is unavailable on this OS; showing tracked/static hosts only.';
+            setBanner(`Loaded ${result.count || 0} host(s). ${modeNote}`, live ? 'success' : 'warning');
+        } catch (err) {
+            setBanner(`Host inventory error: ${err.message}`, 'danger');
+        }
+    }
+
+    async function loadWebActivity() {
+        try {
+            setBanner('Capturing recent DNS/HTTP activity from assigned interfaces...');
+            inspectWebBtn.disabled = true;
+            const response = await fetch('/api/network/web-activity?refresh_hosts=1');
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(result.message || 'Failed to capture web activity.');
+            }
+
+            renderWebActivity(result.data || []);
+
+            const interfaceCount = Array.isArray(result.interfaces) ? result.interfaces.length : 0;
+            const dnsEvents = result.dns_events || 0;
+            const httpEvents = result.http_events || 0;
+            const note = result.message || '';
+            setBanner(`Captured on ${interfaceCount} interface(s): DNS=${dnsEvents}, HTTP=${httpEvents}. ${note}`, 'info');
+        } catch (err) {
+            setBanner(`Web activity capture error: ${err.message}`, 'danger');
+        } finally {
+            inspectWebBtn.disabled = false;
+        }
+    }
+
+    refreshHostsBtn.addEventListener('click', () => loadHosts(true));
+    reloadCacheBtn.addEventListener('click', () => loadHosts(false));
+    inspectWebBtn.addEventListener('click', loadWebActivity);
+
+    loadHosts(true);
+</script>
 {% endblock %}
