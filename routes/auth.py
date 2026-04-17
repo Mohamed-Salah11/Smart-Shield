@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from werkzeug.security import check_password_hash
 from app.database import get_db
 from app.audit_log import log_event
+from app.uploads import profile_picture_url
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -31,7 +32,7 @@ def login():
             session["user_id"] = user["id"]
             session["is_superuser"] = bool(user["is_superuser"]) if "is_superuser" in user.keys() else (user["username"] == "admin")
             if user["profile_picture"]:
-                session["user_avatar"] = url_for("static", filename=user["profile_picture"])
+                session["user_avatar"] = profile_picture_url(user["profile_picture"])
             else:
                 session.pop("user_avatar", None)
             log_event(

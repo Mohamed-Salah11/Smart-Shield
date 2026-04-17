@@ -1199,5 +1199,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_static_leases_mac
 ON static_leases(mac_address)
 """)
 
+    # Discovered host inventory (ARP + static leases) for firewall coverage tracking.
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tracked_hosts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interface_type TEXT NOT NULL DEFAULT 'UNKNOWN',
+            interface_name TEXT DEFAULT '',
+            ip_address TEXT NOT NULL,
+            mac_address TEXT DEFAULT '',
+            hostname TEXT DEFAULT '',
+            discovered_via TEXT DEFAULT 'unknown',
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            policy_state TEXT DEFAULT 'unknown',
+            policy_note TEXT DEFAULT ''
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_hosts_iface_ip
+        ON tracked_hosts(interface_type, ip_address)
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_tracked_hosts_last_seen
+        ON tracked_hosts(last_seen)
+        """
+    )
+
     conn.commit()
     conn.close()
