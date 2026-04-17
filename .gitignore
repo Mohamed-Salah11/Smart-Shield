@@ -1,15 +1,67 @@
+# Python bytecode/cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
+*.py[cod]
+
+# Virtual environments
 .venv/
 venv/
-instance/
+env/
+ENV/
+
+# Local environment/config (keep templates)
+.env
+.env.*
+!.env.example
+config.json
+
+# Runtime data/logs/uploads
 *.log
 logs/
+instance/
 static/uploads/
+*.pid
+*.sqlite
+*.sqlite3
+*.db
 data.db
-config.json
+
+# Test/coverage/cache artifacts
 .pytest_cache/
 tests/.tmp/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Build/distribution artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Editor/OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local/generated project artifacts
+edits.txt
+paths.txt
+project steps.txt
+integrations_steps_source.txt
+integrations steps of the vpns ids ips and every other service included in the project.pdf
+smart-shield-transfer-*.tar.gz
+
+# Generic archive outputs
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar

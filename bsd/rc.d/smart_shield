@@ -39,6 +39,8 @@ load_rc_config "${name}"
 : ${smart_shield_env_file:="/usr/local/etc/smart-shield/smart-shield.env"}
 : ${smart_shield_rundir:="/var/run/smart-shield"}
 : ${smart_shield_logdir:="/var/log/smart-shield"}
+: ${smart_shield_datadir:="/var/db/smart-shield"}
+: ${smart_shield_configdir:="/usr/local/etc/smart-shield"}
 : ${smart_shield_pidfile:="/var/run/smart-shield/smart_shield.pid"}
 : ${smart_shield_python:="/usr/local/bin/python3"}
 : ${smart_shield_app:="/usr/local/share/smart-shield/run.py"}
@@ -54,20 +56,42 @@ stop_postcmd="${name}_poststop"
 
 smart_shield_prestart()
 {
-    # Ensure runtime directories exist with correct ownership.
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_rundir}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_logdir}"
-
     # Load optional runtime env values if file exists.
     if [ -f "${smart_shield_env_file}" ]; then
         # shellcheck source=/dev/null
         . "${smart_shield_env_file}"
     fi
 
-    # Export only variables used by app startup logic.
+    # Provide stable defaults unless env file overrides them.
+    : ${SMARTSHIELD_DB_PATH:="${smart_shield_datadir}/data.db"}
+    : ${SMARTSHIELD_CONFIG_PATH:="${smart_shield_configdir}/config.json"}
+    : ${SMARTSHIELD_UPLOAD_DIR:="${smart_shield_datadir}/uploads/profile_pictures"}
+    : ${SMARTSHIELD_AUDIT_LOG_PATH:="${smart_shield_logdir}/audit.log"}
+
+    db_parent="$(dirname "${SMARTSHIELD_DB_PATH}")"
+    cfg_parent="$(dirname "${SMARTSHIELD_CONFIG_PATH}")"
+    upload_dir="${SMARTSHIELD_UPLOAD_DIR}"
+    audit_parent="$(dirname "${SMARTSHIELD_AUDIT_LOG_PATH}")"
+
+    # Ensure runtime/data/config/log directories exist with correct ownership.
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_rundir}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_logdir}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${db_parent}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${cfg_parent}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${upload_dir}"
+    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${audit_parent}"
+
+    touch "${SMARTSHIELD_AUDIT_LOG_PATH}"
+    chown "${smart_shield_user}:${smart_shield_group}" "${SMARTSHIELD_AUDIT_LOG_PATH}"
+
+    # Export variables used by app startup logic.
     export FLASK_DEBUG
     export SECRET_KEY
     export SMARTSHIELD_DB_PATH
+    export SMARTSHIELD_CONFIG_PATH
+    export SMARTSHIELD_UPLOAD_DIR
+    export SMARTSHIELD_AUDIT_LOG_PATH
+    export SMARTSHIELD_ENABLE_NETWORK_APPLY
     export SMARTSHIELD_NETWORK_DRY_RUN
 }
 

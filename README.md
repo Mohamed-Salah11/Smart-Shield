@@ -339,6 +339,10 @@ For actual production use, the project still needs:
 - privilege separation for host operations
 - a hardened reverse proxy/web server in front of Flask
 
+FreeBSD move checklist and appliance bootstrap steps are documented in:
+
+- `bsd/FREEBSD_DEPLOYMENT.md`
+
 ---
 
 ## Current project status
@@ -355,6 +359,12 @@ That means the branch is in a good place to start the FreeBSD port properly, but
 
 - Added a FreeBSD-oriented network service layer in `app/services/network_service.py` and routed `/api/network/apply` through structured command helpers.
 - Added CSRF protection for mutating requests (forms + JSON APIs), including automatic token attachment for frontend fetch calls.
+- Added authenticated browsing audit events (`category=browsing`) so login + page access history can be tracked in System Logs.
+- Added FreeBSD-safe profile-picture serving from `SMARTSHIELD_UPLOAD_DIR` (not only `/static`) and fixed avatar URLs for deployed appliance paths.
+- Expanded FreeBSD service helpers: `smartshieldctl audit` for app audit logs and `smartshieldctl filterlog` for PF traffic logs.
+- Added host tracking inventory via static leases + FreeBSD ARP discovery, with LAN/WAN classification and per-host firewall coverage suggestions exposed through `/api/network/hosts`.
+- Added best-effort per-host web activity sampling on FreeBSD (`/api/network/web-activity`) for DNS domains and plain HTTP links; HTTPS full URLs remain encrypted without TLS interception.
+- Extended FreeBSD console tooling so operators can set LAN/WAN IPv4 mode (`dhcp`/`static`) from `smartshield-cli` and `smartshieldctl iface-set`.
 - Added encrypted-at-rest handling for sensitive VPN secrets and hashed L2TP user passwords.
 - Consolidated duplicate IPsec API behavior by mapping legacy endpoints to the primary `/vpn/api/ipsec/p1` flow.
 - Removed duplicate schema declarations in `app/database.py` (for `ipsec_phase1` and `firewall_schedules`) and added `service_state` for persistent service-side UI state.

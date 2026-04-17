@@ -1,26 +1,31 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, current_app
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-from app.auth_utils import superuser_required
+from app.auth_utils import login_required, superuser_required
 import os
-import sys
 from app.db_utils import db_cursor
+from app.uploads import (
+    ensure_upload_dir,
+    get_upload_dir,
+    profile_picture_url,
+    resolve_profile_picture_path,
+)
 
 users_bp = Blueprint("users", __name__, url_prefix="/system/user-manager")
-
-DEFAULT_UPLOAD_DIR = (
-    "/var/db/smart-shield/uploads/profile_pictures"
-    if sys.platform.startswith("freebsd")
-    else "static/uploads/profile_pictures"
-)
-
-UPLOAD_FOLDER = os.getenv(
-    "SMARTSHIELD_UPLOAD_DIR",
-    DEFAULT_UPLOAD_DIR
-)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ensure_upload_dir()
 
 
 def allowed_file(filename):
@@ -93,6 +98,21 @@ def _permission_catalog():
 def _valid_permission_endpoints(selected_endpoints):
     catalog_endpoints = {entry["endpoint"] for entry in _permission_catalog()}
     return sorted(set(ep for ep in selected_endpoints if ep in catalog_endpoints))
+
+
+@users_bp.route("/profile-picture/<path:filename>", methods=["GET"])
+@login_required
+def profile_picture_file(filename):
+    safe_name = secure_filename(os.path.basename(filename))
+    if not safe_name:
+        abort(404)
+
+    upload_dir = get_upload_dir()
+    file_path = os.path.join(upload_dir, safe_name)
+    if not os.path.isfile(file_path):
+        abort(404)
+
+    return send_from_directory(upload_dir, safe_name, conditional=True, max_age=300)
 
 
 @users_bp.route("/", methods=["GET"])
@@ -194,7 +214,7 @@ def add_user():
         file = request.files["profile_picture"]
         if file and file.filename and allowed_file(file.filename):
             filename = secure_filename(f"{username}_{file.filename}")
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            filepath = os.path.join(get_upload_dir(), filename)
             file.save(filepath)
             profile_picture = f"uploads/profile_pictures/{filename}"
 
@@ -388,7 +408,7 @@ def edit_user(user_id):
             file = request.files["profile_picture"]
             if file and file.filename and allowed_file(file.filename):
                 if profile_picture:
-                    old_path = os.path.join("static", profile_picture.lstrip("/").replace("static/", ""))
+                    old_path = resolve_profile_picture_path(profile_picture)
                     if os.path.exists(old_path):
                         try:
                             os.remove(old_path)
@@ -396,7 +416,7 @@ def edit_user(user_id):
                             pass
 
                 filename = secure_filename(f"{username}_{file.filename}")
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                filepath = os.path.join(get_upload_dir(), filename)
                 file.save(filepath)
                 profile_picture = f"uploads/profile_pictures/{filename}"
 
@@ -422,7 +442,7 @@ def edit_user(user_id):
     if session.get("user_id") == user_id:
         session["username"] = username
         if profile_picture:
-            session["user_avatar"] = url_for("static", filename=profile_picture)
+            session["user_avatar"] = profile_picture_url(profile_picture)
         else:
             session.pop("user_avatar", None)
 
