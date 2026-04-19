@@ -1,6 +1,235 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Backup & Restore</h1>
-<p>Placeholder for Backup & Restore diagnostics.</p>
+<div class="container-fluid">
+    <div class="page-header mb-3">
+        <h2>Diagnostics / Backup &amp; Restore</h2>
+        <p class="text-muted mb-0">
+            <!-- FortiGate-style configuration backup and restore for Smart Shield. -->
+            Current device: <strong>{{ backup_context.hostname }}</strong> ({{ backup_context.timezone }}).
+        </p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-3">
+                {% for category, message in messages %}
+                    {% set alert_class = 'danger' if category in ['error', 'danger'] else category %}
+                    <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% if not backup_context.yaml_available %}
+        <div class="alert alert-danger">
+            YAML backup support is unavailable because PyYAML is not installed on this system.
+        </div>
+    {% endif %}
+
+    <ul class="nav nav-tabs mb-3" id="backupRestoreTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if active_tab != 'restore' else '' }}" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup-pane" type="button" role="tab" aria-controls="backup-pane" aria-selected="{{ 'true' if active_tab != 'restore' else 'false' }}">
+                Backup Configuration
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if active_tab == 'restore' else '' }}" id="restore-tab" data-bs-toggle="tab" data-bs-target="#restore-pane" type="button" role="tab" aria-controls="restore-pane" aria-selected="{{ 'true' if active_tab == 'restore' else 'false' }}">
+                Restore Configuration
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="backupRestoreTabsContent">
+        <div class="tab-pane fade {{ 'show active' if active_tab != 'restore' else '' }}" id="backup-pane" role="tabpanel" aria-labelledby="backup-tab">
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Create Full Snapshot Backup</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_download') }}">
+                        <div class="mb-3 row">
+                            <label class="col-sm-2 col-form-label fw-semibold">Scope</label>
+                            <div class="col-sm-10">
+                                <div class="form-control-plaintext">
+                                    Full system snapshot (database, config file + config directories, uploads, and all configured log directories).
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Backup to</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="backup_target" id="backup_target_local" value="local_pc" checked>
+                                <label class="form-check-label" for="backup_target_local">Local PC (download YAML snapshot)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="backup_target" id="backup_target_usb" value="usb_disk" {{ '' if backup_context.usb_backup_available else 'disabled' }}>
+                                <label class="form-check-label" for="backup_target_usb">
+                                    USB Disk
+                                    {% if backup_context.usb_backup_available %}
+                                        ({{ backup_context.usb_backup_dir }})
+                                    {% else %}
+                                        (not configured)
+                                    {% endif %}
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="file_format">File format</label>
+                            <select class="form-select" id="file_format" name="file_format">
+                                <option value="yaml" selected>YAML</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Password mask</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="mask_passwords" id="mask_passwords">
+                                <label class="form-check-label" for="mask_passwords">
+                                    Replace detected secrets with <code>SmartShieldMask</code> (sharing-only backup)
+                                </label>
+                            </div>
+                            <div class="form-text text-danger">
+                                Masked backups cannot be restored as full snapshots.
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold" for="encryption_password">Encryption (AES-GCM)</label>
+                                <input type="password" class="form-control" id="encryption_password" name="encryption_password" autocomplete="new-password" {{ '' if backup_context.encryption_available else 'disabled' }}>
+                                <div class="form-text">
+                                    {% if backup_context.encryption_available %}
+                                        Leave empty for plain YAML backup. Use at least 8 characters to encrypt.
+                                    {% else %}
+                                        Encryption unavailable because cryptography dependency is missing.
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold" for="encryption_password_confirm">Confirm Password</label>
+                                <input type="password" class="form-control" id="encryption_password_confirm" name="encryption_password_confirm" autocomplete="new-password" {{ '' if backup_context.encryption_available else 'disabled' }}>
+                            </div>
+                        </div>
+
+                        <div class="small text-muted mb-3">
+                            Snapshot targets:
+                            {% for item in backup_context.file_targets %}
+                                <div>File: <code>{{ item.path }}</code></div>
+                            {% endfor %}
+                            {% for item in backup_context.directory_targets %}
+                                <div>Directory: <code>{{ item.path }}</code></div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" {{ '' if backup_context.yaml_available else 'disabled' }}>
+                                <i class="fa-solid fa-download"></i>
+                                Create Snapshot Backup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'restore' else '' }}" id="restore-pane" role="tabpanel" aria-labelledby="restore-tab">
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Restore Full Snapshot</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        Restore applies the full snapshot state (data + logs) and overwrites current files.
+                    </div>
+
+                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_restore') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="backup_file">Backup File</label>
+                            <input class="form-control" type="file" id="backup_file" name="backup_file" accept=".yaml,.yml" required>
+                            <div class="form-text">Maximum upload size: {{ backup_context.max_upload_mb }} MB.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="restore_password">Restore Password (If encrypted)</label>
+                            <input type="password" class="form-control" id="restore_password" name="restore_password" autocomplete="current-password">
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="create_safety_backup" id="create_safety_backup" checked>
+                                <label class="form-check-label" for="create_safety_backup">
+                                    Save local pre-restore safety backup ({{ backup_context.backup_dir }})
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="logout_after_restore" id="logout_after_restore">
+                                <label class="form-check-label" for="logout_after_restore">
+                                    Log out this session after restore
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="confirm_restore" id="confirm_restore" required>
+                                <label class="form-check-label fw-semibold" for="confirm_restore">
+                                    I understand this will overwrite the selected running configuration.
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger" {{ '' if backup_context.yaml_available else 'disabled' }}>
+                                <i class="fa-solid fa-upload"></i>
+                                Restore Snapshot
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#backupRestoreTabsContent.tab-content {
+    display: block !important;
+    background: transparent;
+}
+
+#backupRestoreTabsContent > .tab-pane {
+    display: none;
+}
+
+#backupRestoreTabsContent > .tab-pane.show.active {
+    display: block;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const tabButtons = document.querySelectorAll("#backupRestoreTabs button[data-bs-toggle='tab']");
+    const queryTab = new URLSearchParams(window.location.search).get("tab");
+    const storedTab = localStorage.getItem("backupRestoreActiveTab");
+    const tabTarget = queryTab === "restore" ? "#restore-pane" : (queryTab === "backup" ? "#backup-pane" : storedTab);
+    if (tabTarget) {
+        const targetBtn = document.querySelector(`#backupRestoreTabs button[data-bs-target='${tabTarget}']`);
+        if (targetBtn && window.bootstrap && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(targetBtn).show();
+        }        
+    }
+
+    tabButtons.forEach((btn) => {
+        btn.addEventListener("shown.bs.tab", function(event) {
+            const target = event.target.getAttribute("data-bs-target");
+            if (target) {
+                localStorage.setItem("backupRestoreActiveTab", target);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

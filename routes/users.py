@@ -2,6 +2,7 @@ from flask import (
     Blueprint,
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -10,7 +11,7 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from app.auth_utils import login_required, superuser_required
 import os
@@ -378,14 +379,39 @@ def delete_user(user_id):
 @users_bp.route("/change-password/<int:user_id>", methods=["POST"])
 @superuser_required
 def change_password(user_id):
+    old_password = request.form.get("old_password") or ""
     new_password = request.form.get("new_password") or ""
+    confirm_password = request.form.get("confirm_password") or ""
+
+    if not new_password:
+        flash("New password is required.", "danger")
+        return redirect(url_for("users.user_manager"))
+
+    if new_password != confirm_password:
+        flash("Password confirmation does not match. Password was not changed.", "danger")
+        return redirect(url_for("users.user_manager"))
 
     with db_cursor(commit=True) as (_, cur):
+        cur.execute("SELECT password FROM users WHERE id=?", (user_id,))
+        current_user = cur.fetchone()
+        if not current_user:
+            flash("User was not found. Password was not changed.", "danger")
+            return redirect(url_for("users.user_manager"))
+
+        if not old_password:
+            flash("Current password is required to change password.", "danger")
+            return redirect(url_for("users.user_manager"))
+
+        if not check_password_hash(current_user["password"], old_password):
+            flash("Current password is incorrect. Password was not changed.", "danger")
+            return redirect(url_for("users.user_manager"))
+
         cur.execute(
             "UPDATE users SET password=? WHERE id=?",
             (generate_password_hash(new_password), user_id),
         )
 
+    flash("Password updated successfully.", "success")
     return redirect(url_for("users.user_manager"))
 
 @users_bp.route("/edit/<int:user_id>", methods=["POST"])
@@ -396,13 +422,28 @@ def edit_user(user_id):
     email = request.form.get("email")
     status = request.form.get("status")
     group = request.form.get("groups")
+    old_password = request.form.get("old_password") or ""
+    new_password = request.form.get("new_password") or ""
+    confirm_password = request.form.get("confirm_password") or ""
+
+    if new_password and new_password != confirm_password:
+        flash("Password confirmation does not match. User profile was not updated.", "danger")
+        return redirect(url_for("users.user_manager"))
 
     profile_picture = None
 
     with db_cursor(commit=True) as (_, cur):
-        cur.execute("SELECT profile_picture FROM users WHERE id=?", (user_id,))
+        cur.execute("SELECT profile_picture, password FROM users WHERE id=?", (user_id,))
         current_user = cur.fetchone()
         profile_picture = current_user["profile_picture"] if current_user else None
+
+        if new_password:
+            if not old_password:
+                flash("Current password is required to set a new password.", "danger")
+                return redirect(url_for("users.user_manager"))
+            if not current_user or not check_password_hash(current_user["password"], old_password):
+                flash("Current password is incorrect. Password was not changed.", "danger")
+                return redirect(url_for("users.user_manager"))
 
         if "profile_picture" in request.files:
             file = request.files["profile_picture"]
@@ -439,11 +480,22 @@ def edit_user(user_id):
                     (user_id, group_row["id"]),
                 )
 
+        if new_password:
+            cur.execute(
+                "UPDATE users SET password=? WHERE id=?",
+                (generate_password_hash(new_password), user_id),
+            )
+
     if session.get("user_id") == user_id:
         session["username"] = username
         if profile_picture:
             session["user_avatar"] = profile_picture_url(profile_picture)
         else:
             session.pop("user_avatar", None)
+
+    if new_password:
+        flash("User profile and password updated successfully.", "success")
+    else:
+        flash("User profile updated successfully.", "success")
 
     return redirect(url_for("users.user_manager"))

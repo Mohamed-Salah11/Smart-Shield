@@ -25,6 +25,17 @@
         </li>
     </ul>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-3">
+                {% for category, message in messages %}
+                    {% set alert_class = 'danger' if category in ['error', 'danger'] else category %}
+                    <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <!-- Users Section -->
     <div class="section">
         <div class="section-header d-flex justify-content-between align-items-center">
@@ -206,6 +217,10 @@
                                         </div>
                                         <div class="modal-body">
                                             <p class="text-muted mb-3">Set a new password for <strong>{{ u.username }}</strong></p>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">Current Password</label>
+                                                <input type="password" name="old_password" class="form-control" required>
+                                            </div>
                                             <div class="mb-3">
                                                 <label class="form-label fw-semibold">New Password</label>
                                                 <input type="password" name="new_password" class="form-control" required>
