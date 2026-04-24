@@ -666,9 +666,39 @@ def advanced_system_tunables_delete(index):
 
 @system_bp.route("/certificates")
 @login_required
-
 def certificates():
-    return render_template("certificates.html")
+    active_section = request.args.get("section", "certificates")
+    if active_section not in ("authorities", "certificates", "revocation"):
+        active_section = "certificates"
+    conn = get_db()
+    cur  = conn.cursor()
+    cas = []
+    try:
+        cur.execute("SELECT * FROM certificate_authorities ORDER BY descriptive_name")
+        for row in cur.fetchall():
+            row = dict(row)
+            dn_parts = []
+            if row.get("common_name"):           dn_parts.append(f"CN={row['common_name']}")
+            if row.get("organization"):          dn_parts.append(f"O={row['organization']}")
+            if row.get("organizational_unit"):   dn_parts.append(f"OU={row['organizational_unit']}")
+            if row.get("country_code"):          dn_parts.append(f"C={row['country_code']}")
+            cas.append({
+                "name":               row.get("descriptive_name", "—"),
+                "internal":           True,
+                "issuer":             "Self-signed",
+                "certificates":       0,
+                "distinguished_name": ", ".join(dn_parts) if dn_parts else "—",
+                "in_use":             False,
+            })
+    except Exception:
+        cas = []
+    return render_template(
+        "certificates.html",
+        active_section=active_section,
+        cas=cas,
+        certs=[],
+        crls=[],
+    )
 
 @system_bp.route("/add_ca", methods=["GET", "POST"])
 @login_required

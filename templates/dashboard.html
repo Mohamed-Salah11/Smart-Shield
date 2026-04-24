@@ -1,544 +1,1167 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<style>
+/* ─────────────────────────────────────────────
+   DASHBOARD  ·  Smart Shield
+   Palette: 1 blue accent + semantic status colours
+   Spacing: 8px grid · Typography: Inter
+───────────────────────────────────────────── */
+
+/* ── Toolbar ── */
+.db-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.db-bar-left  { display: flex; align-items: center; gap: 10px; }
+.db-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.db-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--heading-blue);
+  letter-spacing: -.025em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.db-title-icon {
+  width: 32px; height: 32px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: .82rem;
+  box-shadow: 0 2px 8px rgba(37,99,235,.35);
+  flex-shrink: 0;
+}
+
+.db-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  font-size: .8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary);
+  letter-spacing: .01em;
+}
+.db-clock i { color: var(--primary); font-size: .75rem; }
+
+.db-ar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.db-last-update {
+  font-size: .78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Identity Banner ── */
+.db-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #0f172a;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.06);
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+/* Subtle grid texture */
+.db-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: .4;
+  background-image:
+    linear-gradient(rgba(59,130,246,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59,130,246,.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+/* Blue accent line at top */
+.db-banner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary) 0%, rgba(37,99,235,0) 100%);
+}
+
+.db-banner-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16,185,129,.2);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  animation: dbpulse 2.5s ease-in-out infinite;
+}
+@keyframes dbpulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(16,185,129,.2); }
+  50%      { box-shadow: 0 0 0 7px rgba(16,185,129,.06); }
+}
+
+.db-banner-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+.db-banner-hostname {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-banner-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 5px;
+}
+.db-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .78rem;
+  color: rgba(148,163,184,.75);
+}
+.db-meta-item i { font-size: .72rem; color: rgba(59,130,246,.7); }
+.db-meta-item strong { color: rgba(203,213,225,.9); font-weight: 600; }
+
+.db-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  position: relative; z-index: 1;
+  flex-shrink: 0;
+}
+.db-status-chip.online {
+  background: rgba(16,185,129,.12);
+  color: #34d399;
+  border: 1px solid rgba(16,185,129,.25);
+}
+
+/* ── KPI Strip ── */
+.db-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1080px) { .db-kpi-strip { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 560px)  { .db-kpi-strip { grid-template-columns: 1fr; } }
+
+.db-kpi {
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-top: 3px solid var(--kpi-accent, var(--primary));
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  box-shadow: var(--shadow-soft);
+  transition: box-shadow .15s, transform .15s;
+}
+.db-kpi:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.db-kpi-icon {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  background: var(--kpi-icon-bg, rgba(37,99,235,.08));
+  color: var(--kpi-accent, var(--primary));
+  flex-shrink: 0;
+}
+.db-kpi-body { min-width: 0; flex: 1; }
+.db-kpi-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-color);
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+.db-kpi-label {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.db-kpi-note {
+  font-size: .75rem;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.kpi-note-ok   { color: #10b981; }
+.kpi-note-warn { color: #f59e0b; }
+.kpi-note-bad  { color: #ef4444; }
+
+/* ── Main 2-col grid ── */
+.db-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 860px) { .db-grid { grid-template-columns: 1fr; } }
+.db-col-full { grid-column: 1 / -1; }
+
+/* ── Widget card ── */
+.db-card {
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+.db-card:hover { box-shadow: var(--shadow-md); }
+
+.db-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  cursor: grab;
+  user-select: none;
+}
+.db-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(203,213,225,.8);
+}
+.db-card-title i { font-size: .78rem; color: rgba(59,130,246,.9); }
+.db-card-actions { display: flex; gap: 4px; }
+
+.db-icon-btn {
+  width: 24px; height: 24px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255,255,255,.5);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: .7rem;
+  transition: background .12s, color .12s;
+}
+.db-icon-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+.db-card-body { padding: 16px; }
+.db-card-body.no-pad { padding: 0; }
+.db-card.collapsed .db-card-body { display: none; }
+
+/* ── Stat row for session summary ── */
+.db-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.db-stat-cell {
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.db-stat-val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.db-stat-lbl {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.c-ok    { color: #10b981; }
+.c-bad   { color: #ef4444; }
+.c-muted { color: var(--secondary); }
+
+/* ── Policy list ── */
+.db-policy-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.db-policy-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: background .12s;
+}
+.db-policy-row:hover { background: rgba(37,99,235,.04); }
+.db-policy-ico {
+  width: 30px; height: 30px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem;
+  flex-shrink: 0;
+}
+.db-policy-info { min-width: 0; }
+.db-policy-val  { font-size: 1rem; font-weight: 800; color: var(--text-color); line-height: 1; font-variant-numeric: tabular-nums; }
+.db-policy-lbl  { font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 1px; }
+
+/* ── Sysinfo ── */
+.db-sysinfo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.db-si-row {
+  padding: 9px 12px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.db-si-row.full { grid-column: 1 / -1; }
+.db-si-lbl { font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.db-si-val { font-size: .875rem; font-weight: 600; color: var(--text-color); margin-top: 2px; word-break: break-word; }
+
+/* ── Feature flags ── */
+.db-flags { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.db-flag {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.db-flag-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+.db-flag-dot.on  { background: #10b981; box-shadow: 0 0 5px rgba(16,185,129,.4); }
+.db-flag-dot.off { background: var(--border-color); }
+.db-flag-body {}
+.db-flag-name  { font-size: .8rem; font-weight: 600; color: var(--text-color); }
+.db-flag-state { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.db-flag-state.on  { color: #10b981; }
+.db-flag-state.off { color: var(--muted); }
+
+/* ── Data table ── */
+.db-scroll { max-height: 290px; overflow-y: auto; }
+.db-scroll::-webkit-scrollbar       { width: 4px; }
+.db-scroll::-webkit-scrollbar-track { background: transparent; }
+.db-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+.db-tbl { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.db-tbl thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 14px;
+  background: var(--border-color-soft);
+  font-size: .69rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.db-tbl tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+  vertical-align: middle;
+}
+.db-tbl tbody tr:last-child td { border-bottom: none; }
+.db-tbl tbody tr:hover { background: rgba(37,99,235,.03); }
+.td-t  { color: var(--muted); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.td-ip { font-family: ui-monospace, 'JetBrains Mono', monospace; font-size: .79rem; color: var(--secondary); }
+.td-empty { text-align: center; color: var(--muted); padding: 28px 0 !important; font-size: .85rem; }
+
+/* ── Badges ── */
+.db-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 5px;
+  font-size: .69rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  white-space: nowrap;
+}
+.db-b-session  { background: rgba(59,130,246,.1);  color: #3b82f6;  border: 1px solid rgba(59,130,246,.18); }
+.db-b-browsing { background: rgba(100,116,139,.08); color: #94a3b8;  border: 1px solid rgba(100,116,139,.15); }
+.db-b-system   { background: rgba(245,158,11,.1);  color: #f59e0b;  border: 1px solid rgba(245,158,11,.18); }
+.db-b-network  { background: rgba(6,182,212,.1);   color: #06b6d4;  border: 1px solid rgba(6,182,212,.18); }
+.db-b-default  { background: rgba(148,163,184,.08); color: #94a3b8;  border: 1px solid rgba(148,163,184,.15); }
+.db-b-ok       { background: rgba(16,185,129,.1);  color: #10b981;  border: 1px solid rgba(16,185,129,.2); }
+.db-b-fail     { background: rgba(239,68,68,.1);   color: #ef4444;  border: 1px solid rgba(239,68,68,.2); }
+.db-b-logout   { background: rgba(100,116,139,.08); color: #94a3b8;  border: 1px solid rgba(100,116,139,.15); }
+.db-b-blue     { background: rgba(59,130,246,.1);  color: #3b82f6;  border: 1px solid rgba(59,130,246,.18); }
+
+/* ── Quick nav ── */
+.db-ql {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.db-ql-item {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 7px; padding: 14px 8px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  text-decoration: none;
+  color: var(--secondary);
+  font-size: .78rem; font-weight: 600;
+  text-align: center; line-height: 1.3;
+  transition: background .12s, border-color .12s, color .12s, transform .12s;
+}
+.db-ql-item:hover {
+  background: rgba(37,99,235,.05);
+  border-color: rgba(37,99,235,.25);
+  color: var(--primary);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+.db-ql-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--border-color-soft);
+  border: 1px solid var(--border-color);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .875rem;
+  color: var(--secondary);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.db-ql-item:hover .db-ql-icon {
+  background: rgba(37,99,235,.08);
+  color: var(--primary);
+  border-color: rgba(37,99,235,.2);
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] .db-banner     { background: #060a12; border-color: rgba(255,255,255,.04); }
+[data-theme="dark"] .db-card-head  { background: #060a12; border-bottom-color: rgba(255,255,255,.04); }
+[data-theme="dark"] .db-kpi        { background: var(--panel); border-color: var(--border-color); }
+[data-theme="dark"] .db-card       { background: var(--panel); border-color: var(--border-color); }
+[data-theme="dark"] .db-stat-cell  { background: #0d1117; border-color: var(--border-color); }
+[data-theme="dark"] .db-policy-row { background: #0d1117; border-color: var(--border-color); }
+[data-theme="dark"] .db-policy-row:hover { background: rgba(59,130,246,.06); }
+[data-theme="dark"] .db-si-row     { background: #0d1117; border-color: var(--border-color); }
+[data-theme="dark"] .db-flag       { background: #0d1117; border-color: var(--border-color); }
+[data-theme="dark"] .db-tbl thead th { background: #0d1117; }
+[data-theme="dark"] .db-tbl tbody tr:hover { background: rgba(59,130,246,.05); }
+[data-theme="dark"] .db-ql-item    { background: #0d1117; border-color: var(--border-color); }
+[data-theme="dark"] .db-ql-icon    { background: #080c14; border-color: var(--border-color); }
+[data-theme="dark"] .db-ql-item:hover { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.2); }
+[data-theme="dark"] .db-clock      { background: #0d1117; border-color: var(--border-color); }
+
+/* spin on refresh */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .7s linear infinite; display: inline-block; }
+
+/* counter pop */
+@keyframes numPop { 0%{transform:scale(.85);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
+.num-pop { animation: numPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
+</style>
+{% endblock %}
+
 {% block main %}
-<div class="container dashboard-workspace" style="--dash-cols: {{ dashboard_columns }};">
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
-            </ol>
-        </nav>
-        <h1>Dashboard</h1>
-        <p class="lead">Live operational widgets with customizable layout and refresh controls.</p>
-    </div>
+<div style="width:100%;max-width:none;">
 
-    <div class="dashboard-toolbar">
-        <div class="toolbar-actions">
-            <button type="button" class="btn btn-sm btn-primary" id="dashboardRefreshBtn">
-                <i class="fas fa-rotate"></i> Refresh
-            </button>
-            <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#widgetManagerModal">
-                <i class="fas fa-grip"></i> Widget Manager
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-danger" id="dashboardResetBtn">
-                <i class="fas fa-rotate-left"></i> Reset Layout
-            </button>
+  <!-- ── Toolbar ── -->
+  <div class="db-bar">
+    <div class="db-bar-left">
+      <h1 class="db-title">
+        <span class="db-title-icon"><i class="fa-solid fa-gauge-high"></i></span>
+        Dashboard
+      </h1>
+    </div>
+    <div class="db-bar-right">
+      <span class="db-clock"><i class="fa-regular fa-clock"></i><span id="dbClock">--:--:-- UTC</span></span>
+      <label class="db-ar-label">
+        <div class="form-check form-switch m-0">
+          <input class="form-check-input" type="checkbox" id="dbAutoRefresh" role="switch">
         </div>
-        <div class="toolbar-status">
-            <div class="form-check form-switch m-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="dashboardAutoRefresh">
-                <label class="form-check-label" for="dashboardAutoRefresh">Auto Refresh (30s)</label>
-            </div>
-            <small class="text-muted" id="dashboardLastUpdate">Last update: --</small>
+        Auto-refresh
+      </label>
+      <span class="db-last-update" id="dbLastUpdate"></span>
+      <button class="btn btn-sm btn-primary" id="dbRefreshBtn"><i class="fa-solid fa-rotate" id="dbRefreshIco"></i> Refresh</button>
+      <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#dbWidgetModal"><i class="fa-solid fa-sliders"></i> Widgets</button>
+      <button class="btn btn-sm btn-outline-danger" id="dbResetBtn" title="Reset layout"><i class="fa-solid fa-rotate-left"></i></button>
+    </div>
+  </div>
+
+  <!-- ── Identity Banner ── -->
+  <div class="db-banner" id="dbBanner" data-wid="banner" draggable="true">
+    <div class="db-banner-pulse"></div>
+    <div class="db-banner-body">
+      <div class="db-banner-hostname" id="dbHostname">Smart Shield</div>
+      <div class="db-banner-meta">
+        <span class="db-meta-item"><i class="fa-solid fa-globe"></i>Timezone: <strong id="dbTimezone">—</strong></span>
+        <span class="db-meta-item"><i class="fa-solid fa-palette"></i>Theme: <strong id="dbTheme">—</strong></span>
+        <span class="db-meta-item"><i class="fa-solid fa-table-columns"></i>Columns: <strong id="dbColumns">—</strong></span>
+        <span class="db-meta-item"><i class="fa-solid fa-calendar-check"></i>Config: <strong id="dbUpdated">—</strong></span>
+      </div>
+    </div>
+    <span class="db-status-chip online"><i class="fa-solid fa-circle" style="font-size:.5rem;"></i>Online</span>
+  </div>
+
+  <!-- ── KPI Strip ── -->
+  <div class="db-kpi-strip">
+
+    <!-- Firewall Rules -->
+    <div class="db-kpi" data-wid="kpi_rules" draggable="true"
+         style="--kpi-accent:#2563eb; --kpi-icon-bg:rgba(37,99,235,.08);">
+      <div class="db-kpi-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="db-kpi-body">
+        <div class="db-kpi-val" id="kpiRules">—</div>
+        <div class="db-kpi-label">Firewall Rules</div>
+        <div class="db-kpi-note" id="kpiRulesNote">WAN · LAN · Floating</div>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="db-kpi" data-wid="kpi_users" draggable="true"
+         style="--kpi-accent:#10b981; --kpi-icon-bg:rgba(16,185,129,.08);">
+      <div class="db-kpi-icon"><i class="fa-solid fa-users"></i></div>
+      <div class="db-kpi-body">
+        <div class="db-kpi-val" id="kpiUsers">—</div>
+        <div class="db-kpi-label">Users &amp; Groups</div>
+        <div class="db-kpi-note" id="kpiUsersNote">Accounts · Groups</div>
+      </div>
+    </div>
+
+    <!-- VPN -->
+    <div class="db-kpi" data-wid="kpi_vpn" draggable="true"
+         style="--kpi-accent:#0891b2; --kpi-icon-bg:rgba(8,145,178,.08);">
+      <div class="db-kpi-icon"><i class="fa-solid fa-lock"></i></div>
+      <div class="db-kpi-body">
+        <div class="db-kpi-val" id="kpiVpn">—</div>
+        <div class="db-kpi-label">VPN Servers</div>
+        <div class="db-kpi-note">OpenVPN configured</div>
+      </div>
+    </div>
+
+    <!-- Auth events -->
+    <div class="db-kpi" data-wid="kpi_auth" draggable="true"
+         style="--kpi-accent:#f59e0b; --kpi-icon-bg:rgba(245,158,11,.08);">
+      <div class="db-kpi-icon"><i class="fa-solid fa-right-to-bracket"></i></div>
+      <div class="db-kpi-body">
+        <div class="db-kpi-val" id="kpiAuth">—</div>
+        <div class="db-kpi-label">Auth Events</div>
+        <div class="db-kpi-note" id="kpiAuthNote">
+          <span class="kpi-note-ok" id="kpiAuthOk">0 ok</span>
+          &thinsp;·&thinsp;
+          <span id="kpiAuthFail">0 failed</span>
         </div>
+      </div>
     </div>
 
-    <div class="dashboard-grid" id="dashboardGrid">
-        <section class="dashboard-widget" data-widget-id="appliance_status" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-server"></i> Appliance Status</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body">
-                <div class="kpi-row">
-                    <div class="kpi-item"><span>Hostname</span><strong id="dashHostname">-</strong></div>
-                    <div class="kpi-item"><span>Timezone</span><strong id="dashTimezone">-</strong></div>
-                    <div class="kpi-item"><span>Theme</span><strong id="dashTheme">-</strong></div>
-                </div>
-                <div class="kpi-row mt-2">
-                    <div class="kpi-item"><span>Dashboard Cols</span><strong id="dashColumns">-</strong></div>
-                    <div class="kpi-item"><span>Updated</span><strong id="dashUpdated">-</strong></div>
-                </div>
-            </div>
-        </section>
+  </div><!-- /kpi-strip -->
 
-        <section class="dashboard-widget" data-widget-id="session_summary" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-user-shield"></i> Session Summary</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body">
-                <div class="kpi-row">
-                    <div class="kpi-item"><span>Successful</span><strong id="dashLoginSuccess">0</strong></div>
-                    <div class="kpi-item"><span>Failed</span><strong id="dashLoginFailed">0</strong></div>
-                    <div class="kpi-item"><span>Logouts</span><strong id="dashLogouts">0</strong></div>
-                </div>
-                <a class="btn btn-sm btn-primary mt-2" href="{{ url_for('status.system_logs', tab='sessions') }}">Open Session Logs</a>
-            </div>
-        </section>
+  <!-- ── Main grid ── -->
+  <div class="db-grid" id="dbGrid">
 
-        <section class="dashboard-widget" data-widget-id="log_controls" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-file-lines"></i> Log Controls</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body">
-                <div class="kpi-row">
-                    <div class="kpi-item"><span>Widgets</span><strong id="dashWidgetsEnabled">-</strong></div>
-                    <div class="kpi-item"><span>Log Filter</span><strong id="dashLogFilterEnabled">-</strong></div>
-                    <div class="kpi-item"><span>Manage Log</span><strong id="dashManageLogEnabled">-</strong></div>
-                </div>
-                <div class="kpi-row mt-2">
-                    <div class="kpi-item"><span>Monitoring</span><strong id="dashMonitoringEnabled">-</strong></div>
-                </div>
-                <a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('status.system_logs') }}">Open System Logs</a>
+    <!-- Policy & Objects -->
+    <div class="db-card" data-wid="policy_counts" draggable="true">
+      <div class="db-card-head">
+        <div class="db-card-title"><i class="fa-solid fa-layer-group"></i>Policy &amp; Objects</div>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-policy-list">
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(37,99,235,.08);color:#2563eb;"><i class="fa-solid fa-globe"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcWan">0</div>
+              <div class="db-policy-lbl">WAN Rules</div>
             </div>
-        </section>
-
-        <section class="dashboard-widget" data-widget-id="object_counts" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-layer-group"></i> Policy & Object Counts</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body">
-                <div class="kpi-grid-compact">
-                    <div class="kpi-item"><span>Users</span><strong id="dashCountUsers">0</strong></div>
-                    <div class="kpi-item"><span>Groups</span><strong id="dashCountGroups">0</strong></div>
-                    <div class="kpi-item"><span>WAN Rules</span><strong id="dashCountWanRules">0</strong></div>
-                    <div class="kpi-item"><span>LAN Rules</span><strong id="dashCountLanRules">0</strong></div>
-                    <div class="kpi-item"><span>Floating</span><strong id="dashCountFloatingRules">0</strong></div>
-                    <div class="kpi-item"><span>NAT PF</span><strong id="dashCountNatPf">0</strong></div>
-                    <div class="kpi-item"><span>OpenVPN</span><strong id="dashCountOpenvpnServers">0</strong></div>
-                </div>
+          </div>
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(16,185,129,.08);color:#10b981;"><i class="fa-solid fa-network-wired"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcLan">0</div>
+              <div class="db-policy-lbl">LAN Rules</div>
             </div>
-        </section>
-
-        <section class="dashboard-widget widget-wide" data-widget-id="session_activity" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-clock-rotate-left"></i> Recent Session Activity</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body p-0">
-                <div class="widget-table">
-                    <table class="table table-striped mb-0">
-                        <thead>
-                            <tr>
-                                <th>Time (UTC)</th>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>IP</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dashSessionTableBody"></tbody>
-                    </table>
-                </div>
+          </div>
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(100,116,139,.08);color:#64748b;"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcFloat">0</div>
+              <div class="db-policy-lbl">Floating</div>
             </div>
-        </section>
-
-        <section class="dashboard-widget widget-wide" data-widget-id="event_stream" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-stream"></i> Recent Event Stream</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body p-0">
-                <div class="widget-table">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Time (UTC)</th>
-                                <th>Category</th>
-                                <th>Action</th>
-                                <th>User</th>
-                                <th>IP</th>
-                                <th>Activity</th>
-                            </tr>
-                        </thead>
-                        <tbody id="dashEventsTableBody"></tbody>
-                    </table>
-                </div>
+          </div>
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(245,158,11,.08);color:#f59e0b;"><i class="fa-solid fa-arrows-left-right"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcNat">0</div>
+              <div class="db-policy-lbl">NAT Port Fwd</div>
             </div>
-        </section>
-
-        <section class="dashboard-widget" data-widget-id="quick_links" draggable="true">
-            <header class="dashboard-widget-header">
-                <div class="widget-title"><i class="fas fa-link"></i> Quick Links</div>
-                <div class="widget-actions">
-                    <button class="widget-btn" type="button" data-widget-action="collapse" title="Collapse"><i class="fas fa-chevron-up"></i></button>
-                    <button class="widget-btn" type="button" data-widget-action="hide" title="Hide"><i class="fas fa-eye-slash"></i></button>
-                </div>
-            </header>
-            <div class="dashboard-widget-body">
-                <div class="dash-links">
-                    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-outline-primary">Session Logs</a>
-                    <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-outline-primary">System Logs</a>
-                    <a href="{{ url_for('firewall.rules') }}" class="btn btn-sm btn-outline-primary">Firewall Rules</a>
-                    <a href="{{ url_for('services.dns_resolver') }}" class="btn btn-sm btn-outline-primary">DNS Resolver</a>
-                    <a href="{{ url_for('interfaces.interfaces_assignments') }}" class="btn btn-sm btn-outline-primary">Interfaces</a>
-                    <a href="{{ url_for('system.general_setup') }}" class="btn btn-sm btn-outline-primary">General Setup</a>
-                </div>
+          </div>
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(8,145,178,.08);color:#0891b2;"><i class="fa-solid fa-lock"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcVpn">0</div>
+              <div class="db-policy-lbl">OpenVPN Svrs</div>
             </div>
-        </section>
+          </div>
+          <div class="db-policy-row">
+            <div class="db-policy-ico" style="background:rgba(124,58,237,.08);color:#7c3aed;"><i class="fa-solid fa-users"></i></div>
+            <div class="db-policy-info">
+              <div class="db-policy-val" id="pcUsers">0</div>
+              <div class="db-policy-lbl">Users</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Auth Summary + System Info stacked -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Auth Summary -->
+      <div class="db-card" data-wid="auth_summary" draggable="true">
+        <div class="db-card-head">
+          <div class="db-card-title"><i class="fa-solid fa-user-shield"></i>Authentication</div>
+          <div class="db-card-actions">
+            <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+            <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          </div>
+        </div>
+        <div class="db-card-body">
+          <div class="db-stat-row" style="grid-template-columns:repeat(3,1fr);">
+            <div class="db-stat-cell">
+              <div class="db-stat-val c-ok" id="asOk">0</div>
+              <div class="db-stat-lbl">Successful</div>
+            </div>
+            <div class="db-stat-cell">
+              <div class="db-stat-val c-bad" id="asFail">0</div>
+              <div class="db-stat-lbl">Failed</div>
+            </div>
+            <div class="db-stat-cell">
+              <div class="db-stat-val c-muted" id="asOut">0</div>
+              <div class="db-stat-lbl">Logouts</div>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-list"></i> Session Logs</a>
+            <a href="{{ url_for('users.user_manager') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-users"></i> Users</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Info -->
+      <div class="db-card" data-wid="sysinfo" draggable="true">
+        <div class="db-card-head">
+          <div class="db-card-title"><i class="fa-solid fa-server"></i>System</div>
+          <div class="db-card-actions">
+            <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+            <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          </div>
+        </div>
+        <div class="db-card-body">
+          <div class="db-sysinfo">
+            <div class="db-si-row"><div class="db-si-lbl">Hostname</div><div class="db-si-val" id="siHost">—</div></div>
+            <div class="db-si-row"><div class="db-si-lbl">Timezone</div><div class="db-si-val" id="siTz">—</div></div>
+            <div class="db-si-row"><div class="db-si-lbl">Theme</div><div class="db-si-val" id="siTheme">—</div></div>
+            <div class="db-si-row"><div class="db-si-lbl">Columns</div><div class="db-si-val" id="siCols">—</div></div>
+            <div class="db-si-row full"><div class="db-si-lbl">Last Config Update</div><div class="db-si-val" id="siUpd">—</div></div>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <a href="{{ url_for('system.general_setup') }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-gear"></i> General Setup</a>
+            <a href="{{ url_for('system.admin_access') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-shield-halved"></i> Advanced</a>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /stacked col -->
+
+    <!-- Feature Status -->
+    <div class="db-card" data-wid="features" draggable="true">
+      <div class="db-card-head">
+        <div class="db-card-title"><i class="fa-solid fa-toggle-on"></i>Feature Status</div>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-flags">
+          <div class="db-flag">
+            <div class="db-flag-dot" id="fdWidgets"></div>
+            <div class="db-flag-body">
+              <div class="db-flag-name">Widgets</div>
+              <div class="db-flag-state" id="fsWidgets">—</div>
+            </div>
+          </div>
+          <div class="db-flag">
+            <div class="db-flag-dot" id="fdLogFilter"></div>
+            <div class="db-flag-body">
+              <div class="db-flag-name">Log Filter</div>
+              <div class="db-flag-state" id="fsLogFilter">—</div>
+            </div>
+          </div>
+          <div class="db-flag">
+            <div class="db-flag-dot" id="fdManage"></div>
+            <div class="db-flag-body">
+              <div class="db-flag-name">Manage Log</div>
+              <div class="db-flag-state" id="fsManage">—</div>
+            </div>
+          </div>
+          <div class="db-flag">
+            <div class="db-flag-dot" id="fdMonitor"></div>
+            <div class="db-flag-body">
+              <div class="db-flag-name">Monitoring</div>
+              <div class="db-flag-state" id="fsMonitor">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-file-lines"></i> System Logs</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Nav -->
+    <div class="db-card" data-wid="quicknav" draggable="true">
+      <div class="db-card-head">
+        <div class="db-card-title"><i class="fa-solid fa-bolt"></i>Quick Navigation</div>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-ql">
+          <a href="{{ url_for('firewall.rules') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>FW Rules
+          </a>
+          <a href="{{ url_for('firewall.nat') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-arrows-left-right"></i></div>NAT
+          </a>
+          <a href="{{ url_for('firewall.aliases') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-tags"></i></div>Aliases
+          </a>
+          <a href="{{ url_for('interfaces.interfaces_assignments') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-network-wired"></i></div>Interfaces
+          </a>
+          <a href="{{ url_for('vpn.openvpn') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-lock"></i></div>OpenVPN
+          </a>
+          <a href="{{ url_for('vpn.ipsec') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-shield-halved"></i></div>IPsec
+          </a>
+          <a href="{{ url_for('services.dhcp_server') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-server"></i></div>DHCP
+          </a>
+          <a href="{{ url_for('services.dns_resolver') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-magnifying-glass"></i></div>DNS
+          </a>
+          <a href="{{ url_for('routing.routing_index') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-route"></i></div>Routing
+          </a>
+          <a href="{{ url_for('diagnostics.backup_restore') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-database"></i></div>Backup
+          </a>
+          <a href="{{ url_for('status.system_logs') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-file-lines"></i></div>Logs
+          </a>
+          <a href="{{ url_for('status.monitoring') }}" class="db-ql-item">
+            <div class="db-ql-icon"><i class="fa-solid fa-chart-line"></i></div>Monitor
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Activity (full-width) -->
+    <div class="db-card db-col-full" data-wid="sessions" draggable="true">
+      <div class="db-card-head">
+        <div class="db-card-title"><i class="fa-solid fa-clock-rotate-left"></i>Recent Sessions</div>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+      </div>
+      <div class="db-card-body no-pad">
+        <div class="db-scroll">
+          <table class="db-tbl">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Source IP</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="tblSessions"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Stream (full-width) -->
+    <div class="db-card db-col-full" data-wid="events" draggable="true">
+      <div class="db-card-head">
+        <div class="db-card-title"><i class="fa-solid fa-stream"></i>Event Stream</div>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+      </div>
+      <div class="db-card-body no-pad">
+        <div class="db-scroll">
+          <table class="db-tbl">
+            <thead>
+              <tr>
+                <th>Time (UTC)</th>
+                <th>Category</th>
+                <th>Action</th>
+                <th>User</th>
+                <th>IP</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="tblEvents"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /db-grid -->
 </div>
 
-<div class="modal fade" id="widgetManagerModal" tabindex="-1" aria-labelledby="widgetManagerModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="widgetManagerModalLabel">Widget Manager</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted mb-3">Show or hide widgets. Drag widgets on the dashboard to reorder them.</p>
-                <div class="widget-manager-list">
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="appliance_status" checked> <span class="form-check-label">Appliance Status</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="session_summary" checked> <span class="form-check-label">Session Summary</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="log_controls" checked> <span class="form-check-label">Log Controls</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="object_counts" checked> <span class="form-check-label">Policy & Object Counts</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="session_activity" checked> <span class="form-check-label">Recent Session Activity</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="event_stream" checked> <span class="form-check-label">Recent Event Stream</span></label>
-                    <label class="form-check"><input class="form-check-input" type="checkbox" data-widget-checkbox="quick_links" checked> <span class="form-check-label">Quick Links</span></label>
-                </div>
-            </div>
+<!-- Widget Manager Modal -->
+<div class="modal fade" id="dbWidgetModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold"><i class="fa-solid fa-sliders me-2"></i>Widget Visibility</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:.875rem;">
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="banner">       <span class="form-check-label">Identity Banner</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_rules">    <span class="form-check-label">KPI – Firewall Rules</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_users">    <span class="form-check-label">KPI – Users</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_vpn">      <span class="form-check-label">KPI – VPN</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_auth">     <span class="form-check-label">KPI – Auth Events</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="policy_counts"><span class="form-check-label">Policy &amp; Objects</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="auth_summary"> <span class="form-check-label">Authentication</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="sysinfo">      <span class="form-check-label">System Info</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="features">     <span class="form-check-label">Feature Status</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="quicknav">     <span class="form-check-label">Quick Navigation</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="sessions">     <span class="form-check-label">Recent Sessions</span></label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="events">       <span class="form-check-label">Event Stream</span></label>
         </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
 (() => {
-    const initialPayload = {{ dashboard_payload | tojson }};
-    const dataEndpoint = "{{ url_for('system.dashboard_data') }}";
-    const username = {{ session.get('username', 'admin') | tojson }};
-    const keyPrefix = `ss.dashboard.${username}.`;
-    const ORDER_KEY = `${keyPrefix}order`;
-    const HIDDEN_KEY = `${keyPrefix}hidden`;
-    const COLLAPSED_KEY = `${keyPrefix}collapsed`;
-    const AUTO_REFRESH_KEY = `${keyPrefix}auto_refresh`;
+  /* ── Bootstrap ── */
+  const P = {{ dashboard_payload | tojson }};
+  const API = "{{ url_for('system.dashboard_data') }}";
+  const NS = `ss.db.{{ session.get('username','x') }}.`;
 
-    const grid = document.getElementById('dashboardGrid');
-    const refreshBtn = document.getElementById('dashboardRefreshBtn');
-    const resetBtn = document.getElementById('dashboardResetBtn');
-    const autoRefreshToggle = document.getElementById('dashboardAutoRefresh');
-    const lastUpdateEl = document.getElementById('dashboardLastUpdate');
-    const widgets = Array.from(document.querySelectorAll('.dashboard-widget'));
-    const widgetIds = widgets.map((w) => w.dataset.widgetId);
-    let autoRefreshTimer = null;
-    let draggingWidget = null;
+  /* ── Utils ── */
+  const $  = id => document.getElementById(id);
+  const ls = {
+    get: (k, fb) => { try { const v = localStorage.getItem(NS+k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } },
+    set: (k, v)  => localStorage.setItem(NS+k, JSON.stringify(v))
+  };
+  const esc = v => String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fmt = v => v ? String(v).replace('T',' ').slice(0,19) : '—';
 
-    const parseStoredArray = (key, fallback = []) => {
-        try {
-            const raw = localStorage.getItem(key);
-            if (!raw) return fallback;
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : fallback;
-        } catch {
-            return fallback;
-        }
+  /* ── Animated counter ── */
+  const count = (el, to, ms = 550) => {
+    if (!el) return;
+    const from = parseInt(el.textContent) || 0;
+    if (from === to) return;
+    const t0 = performance.now();
+    const tick = now => {
+      const p = Math.min((now - t0) / ms, 1);
+      const e = 1 - Math.pow(1 - p, 3); // cubic ease-out
+      el.textContent = Math.round(from + (to - from) * e);
+      if (p < 1) requestAnimationFrame(tick);
+      else { el.textContent = to; el.classList.add('num-pop'); setTimeout(() => el.classList.remove('num-pop'), 350); }
     };
+    requestAnimationFrame(tick);
+  };
 
-    const saveArray = (key, arr) => {
-        localStorage.setItem(key, JSON.stringify(arr));
-    };
+  /* ── Badges ── */
+  const catBadge = c => {
+    const m = { session:'db-b-session', browsing:'db-b-browsing', system:'db-b-system', network:'db-b-network' };
+    return `<span class="db-badge ${m[c]||'db-b-default'}">${esc(c||'—')}</span>`;
+  };
+  const actBadge = a => {
+    if (!a) return `<span class="db-badge db-b-default">—</span>`;
+    if (/success/i.test(a))         return `<span class="db-badge db-b-ok">${esc(a)}</span>`;
+    if (/fail|error/i.test(a))      return `<span class="db-badge db-b-fail">${esc(a)}</span>`;
+    if (a === 'logout')             return `<span class="db-badge db-b-logout">${esc(a)}</span>`;
+    return `<span class="db-badge db-b-blue">${esc(a)}</span>`;
+  };
 
-    const loadOrder = () => {
-        const stored = parseStoredArray(ORDER_KEY, []);
-        const order = stored.filter((id) => widgetIds.includes(id));
-        widgetIds.forEach((id) => {
-            if (!order.includes(id)) order.push(id);
-        });
-        return order;
-    };
+  const detail = ev => {
+    const d = ev?.details || {};
+    let m = d.activity || (d.method && d.path ? `${d.method} ${d.path}` : '') || d.path || d.reason || '';
+    if (!m && d.discovered_hosts != null) m = `Discovered ${d.discovered_hosts} hosts`;
+    if (!m) m = '—';
+    const bits = [];
+    if (d.status_code) bits.push(`${d.status_code}`);
+    if (d.latency_ms != null) bits.push(`${d.latency_ms} ms`);
+    if (Array.isArray(d.payload_keys) && d.payload_keys.length) bits.push(d.payload_keys.join(', '));
+    const sub = bits.length ? `<span style="color:var(--muted);font-size:.75rem;display:block;margin-top:1px;">${esc(bits.join(' · '))}</span>` : '';
+    return `${esc(m)}${sub}`;
+  };
 
-    const applyOrder = (order) => {
-        order.forEach((id) => {
-            const widget = grid.querySelector(`[data-widget-id="${id}"]`);
-            if (widget) grid.appendChild(widget);
-        });
-    };
+  /* ── Render ── */
+  const txt = (id, v) => { const e = $(id); if (e) e.textContent = v; };
 
-    const getHiddenSet = () => new Set(parseStoredArray(HIDDEN_KEY, []));
-    const getCollapsedSet = () => new Set(parseStoredArray(COLLAPSED_KEY, []));
+  const flag = (dotId, stateId, on) => {
+    const dot = $(dotId), st = $(stateId);
+    if (dot)  { dot.className = 'db-flag-dot ' + (on ? 'on' : 'off'); }
+    if (st)   { st.textContent = on ? 'Enabled' : 'Disabled'; st.className = 'db-flag-state ' + (on ? 'on' : 'off'); }
+  };
 
-    const applyVisibility = () => {
-        const hidden = getHiddenSet();
-        widgets.forEach((widget) => {
-            const id = widget.dataset.widgetId;
-            widget.classList.toggle('is-hidden', hidden.has(id));
-        });
-        document.querySelectorAll('[data-widget-checkbox]').forEach((cb) => {
-            cb.checked = !hidden.has(cb.dataset.widgetCheckbox);
-        });
-    };
+  const renderSessions = rows => {
+    const tb = $('tblSessions'); if (!tb) return;
+    if (!rows?.length) { tb.innerHTML = '<tr><td colspan="5" class="td-empty">No session records yet.</td></tr>'; return; }
+    tb.innerHTML = rows.map(r =>
+      `<tr>
+        <td class="td-t">${esc(fmt(r.timestamp))}</td>
+        <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
+        <td>${actBadge(r.action)}</td>
+        <td class="td-ip">${esc(r.remote_addr||'—')}</td>
+        <td style="font-size:.82rem;">${esc(r.details?.reason||'—')}</td>
+      </tr>`).join('');
+  };
 
-    const applyCollapsedState = () => {
-        const collapsed = getCollapsedSet();
-        widgets.forEach((widget) => {
-            const id = widget.dataset.widgetId;
-            const isCollapsed = collapsed.has(id);
-            widget.classList.toggle('collapsed', isCollapsed);
-            const icon = widget.querySelector('[data-widget-action="collapse"] i');
-            if (icon) {
-                icon.classList.toggle('fa-chevron-down', isCollapsed);
-                icon.classList.toggle('fa-chevron-up', !isCollapsed);
-            }
-        });
-    };
+  const renderEvents = rows => {
+    const tb = $('tblEvents'); if (!tb) return;
+    if (!rows?.length) { tb.innerHTML = '<tr><td colspan="6" class="td-empty">No events logged yet.</td></tr>'; return; }
+    tb.innerHTML = rows.map(r =>
+      `<tr>
+        <td class="td-t">${esc(fmt(r.timestamp))}</td>
+        <td>${catBadge(r.category)}</td>
+        <td>${actBadge(r.action)}</td>
+        <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
+        <td class="td-ip">${esc(r.remote_addr||'—')}</td>
+        <td style="font-size:.82rem;">${detail(r)}</td>
+      </tr>`).join('');
+  };
 
-    const formatTimestamp = (value) => {
-        if (!value) return '-';
-        return value.replace('T', ' ').slice(0, 19);
-    };
+  const render = p => {
+    if (!p) return;
+    const oc = p.object_counts || {};
+    const ss = p.session_summary || {};
 
-    const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
-    };
+    /* Banner */
+    txt('dbHostname', p.hostname || 'Smart Shield');
+    txt('dbTimezone', p.timezone  || '—');
+    txt('dbTheme',    p.theme     || '—');
+    txt('dbColumns',  p.dashboard_columns ?? '—');
+    txt('dbUpdated',  fmt(p.generated_at));
 
-    const boolLabel = (value) => (value ? 'Enabled' : 'Disabled');
-    const escapeHtml = (value) => String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    /* KPIs */
+    const wan = oc.wan_rules||0, lan = oc.lan_rules||0, flt = oc.floating_rules||0;
+    const total = wan + lan + flt;
+    count($('kpiRules'), total);
+    txt('kpiRulesNote', `${wan} WAN · ${lan} LAN · ${flt} Floating`);
 
-    const summarizeEventActivity = (event) => {
-        const details = event?.details || {};
-        const activity = details.activity || '';
-        const method = details.method || '';
-        const path = details.path || '';
-        const statusCode = details.status_code || '';
-        const latency = details.latency_ms ?? '';
-        const payloadKeys = Array.isArray(details.payload_keys) ? details.payload_keys : [];
-        const discoveredHosts = details.discovered_hosts;
-        const reason = details.reason || '';
+    const u = oc.users||0, g = oc.groups||0;
+    count($('kpiUsers'), u);
+    txt('kpiUsersNote', `${u} user${u!==1?'s':''} · ${g} group${g!==1?'s':''}`);
 
-        let main = activity;
-        if (!main && method && path) {
-            main = `${method} ${path}`;
-        } else if (!main && path) {
-            main = path;
-        } else if (!main && reason) {
-            main = reason;
-        } else if (!main && discoveredHosts !== undefined) {
-            main = `Host refresh discovered ${discoveredHosts} host(s)`;
-        }
-        if (!main) {
-            main = '-';
-        }
+    count($('kpiVpn'), oc.openvpn_servers||0);
 
-        const extraParts = [];
-        if (statusCode) extraParts.push(`status=${statusCode}`);
-        if (latency !== '') extraParts.push(`latency=${latency}ms`);
-        if (payloadKeys.length > 0) extraParts.push(`keys=${payloadKeys.join(',')}`);
+    const ok = ss.successful_logins||0, fail = ss.failed_logins||0, out = ss.logouts||0;
+    count($('kpiAuth'), ok+fail+out);
+    txt('kpiAuthOk',   `${ok} ok`);
+    const failEl = $('kpiAuthFail');
+    if (failEl) { failEl.textContent = `${fail} failed`; failEl.className = fail > 0 ? 'kpi-note-warn' : ''; }
 
-        const extra = extraParts.length > 0 ? `<div class="small text-muted">${escapeHtml(extraParts.join(' | '))}</div>` : '';
-        return `${escapeHtml(main)}${extra}`;
-    };
+    /* Auth summary */
+    count($('asOk'), ok); count($('asFail'), fail); count($('asOut'), out);
 
-    const renderSessionTable = (rows) => {
-        const tbody = document.getElementById('dashSessionTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        if (!rows || rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No session activity recorded yet.</td></tr>';
-            return;
-        }
-        rows.forEach((event) => {
-            const details = event?.details?.reason ? event.details.reason : '-';
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${escapeHtml(formatTimestamp(event.timestamp))}</td>
-                <td>${escapeHtml(event.username || '-')}</td>
-                <td><span class="badge bg-primary">${escapeHtml(event.action || '-')}</span></td>
-                <td>${escapeHtml(event.remote_addr || '-')}</td>
-                <td>${escapeHtml(details)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    };
+    /* Policy counts */
+    count($('pcWan'),   wan);  count($('pcLan'),   lan);    count($('pcFloat'), flt);
+    count($('pcNat'),   oc.nat_port_forwards||0);
+    count($('pcVpn'),   oc.openvpn_servers||0);
+    count($('pcUsers'), oc.users||0);
 
-    const renderEventsTable = (rows) => {
-        const tbody = document.getElementById('dashEventsTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        if (!rows || rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No logs available yet.</td></tr>';
-            return;
-        }
-        rows.forEach((event) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${escapeHtml(formatTimestamp(event.timestamp))}</td>
-                <td>${escapeHtml(event.category || '-')}</td>
-                <td>${escapeHtml(event.action || '-')}</td>
-                <td>${escapeHtml(event.username || '-')}</td>
-                <td>${escapeHtml(event.remote_addr || '-')}</td>
-                <td>${summarizeEventActivity(event)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    };
+    /* Sysinfo */
+    txt('siHost',  p.hostname || '—'); txt('siTz',    p.timezone || '—');
+    txt('siTheme', p.theme    || '—'); txt('siCols',  p.dashboard_columns ?? '—');
+    txt('siUpd',   fmt(p.generated_at));
 
-    const renderPayload = (payload) => {
-        if (!payload) return;
-        setText('dashHostname', payload.hostname || 'Smart Shield');
-        setText('dashTimezone', payload.timezone || 'Etc/UTC');
-        setText('dashTheme', payload.theme || 'Smart Shield');
-        setText('dashColumns', String(payload.dashboard_columns || 2));
-        setText('dashUpdated', formatTimestamp(payload.generated_at));
+    /* Feature flags */
+    flag('fdWidgets', 'fsWidgets', !!p.widgets_enabled);
+    flag('fdLogFilter','fsLogFilter', !!p.log_filter_enabled);
+    flag('fdManage',  'fsManage',  !!p.manage_log_enabled);
+    flag('fdMonitor', 'fsMonitor', !!p.monitoring_enabled);
 
-        setText('dashLoginSuccess', String(payload.session_summary?.successful_logins ?? 0));
-        setText('dashLoginFailed', String(payload.session_summary?.failed_logins ?? 0));
-        setText('dashLogouts', String(payload.session_summary?.logouts ?? 0));
+    /* Tables */
+    renderSessions(p.recent_session_events || []);
+    renderEvents(p.recent_events || []);
 
-        setText('dashWidgetsEnabled', boolLabel(Boolean(payload.widgets_enabled)));
-        setText('dashLogFilterEnabled', boolLabel(Boolean(payload.log_filter_enabled)));
-        setText('dashManageLogEnabled', boolLabel(Boolean(payload.manage_log_enabled)));
-        setText('dashMonitoringEnabled', boolLabel(Boolean(payload.monitoring_enabled)));
+    /* Last update */
+    const lu = $('dbLastUpdate');
+    if (lu) lu.textContent = `Updated ${fmt(p.generated_at)}`;
+  };
 
-        setText('dashCountUsers', String(payload.object_counts?.users ?? 0));
-        setText('dashCountGroups', String(payload.object_counts?.groups ?? 0));
-        setText('dashCountWanRules', String(payload.object_counts?.wan_rules ?? 0));
-        setText('dashCountLanRules', String(payload.object_counts?.lan_rules ?? 0));
-        setText('dashCountFloatingRules', String(payload.object_counts?.floating_rules ?? 0));
-        setText('dashCountNatPf', String(payload.object_counts?.nat_port_forwards ?? 0));
-        setText('dashCountOpenvpnServers', String(payload.object_counts?.openvpn_servers ?? 0));
+  /* ── Fetch ── */
+  let busy = false;
+  const refresh = async () => {
+    if (busy) return; busy = true;
+    const btn = $('dbRefreshBtn'), ico = $('dbRefreshIco');
+    if (btn) btn.disabled = true;
+    if (ico) ico.classList.add('spin');
+    try {
+      const r = await fetch(API, { cache: 'no-store' });
+      const b = await r.json();
+      if (b.status === 'success') render(b.data);
+    } catch(e) { console.error('Dashboard refresh', e); }
+    finally {
+      busy = false;
+      if (btn) btn.disabled = false;
+      if (ico) ico.classList.remove('spin');
+    }
+  };
 
-        renderSessionTable(payload.recent_session_events || []);
-        renderEventsTable(payload.recent_events || []);
+  /* ── Widget visibility / collapse ── */
+  const allWids = ['banner','kpi_rules','kpi_users','kpi_vpn','kpi_auth',
+    'policy_counts','auth_summary','sysinfo','features','quicknav','sessions','events'];
 
-        if (lastUpdateEl) {
-            lastUpdateEl.textContent = `Last update: ${formatTimestamp(payload.generated_at)}`;
-        }
-    };
+  const byWid = id => document.querySelector(`[data-wid="${id}"]`);
 
-    const fetchLatestData = async () => {
-        refreshBtn.disabled = true;
-        try {
-            const response = await fetch(dataEndpoint, { cache: 'no-store' });
-            const body = await response.json();
-            if (body.status === 'success') {
-                renderPayload(body.data);
-            }
-        } catch (err) {
-            console.error('Dashboard refresh failed:', err);
-        } finally {
-            refreshBtn.disabled = false;
-        }
-    };
+  const getHidden    = () => new Set(ls.get('hidden', []));
+  const getCollapsed = () => new Set(ls.get('collapsed', []));
 
-    const persistOrderFromDom = () => {
-        const order = Array.from(grid.querySelectorAll('.dashboard-widget')).map((w) => w.dataset.widgetId);
-        saveArray(ORDER_KEY, order);
-    };
+  const applyVis = () => {
+    const h = getHidden();
+    allWids.forEach(id => { const el = byWid(id); if (el) el.style.display = h.has(id) ? 'none' : ''; });
+    document.querySelectorAll('[data-wchk]').forEach(cb => { cb.checked = !h.has(cb.dataset.wchk); });
+  };
 
-    const setAutoRefresh = (enabled) => {
-        localStorage.setItem(AUTO_REFRESH_KEY, enabled ? '1' : '0');
-        if (autoRefreshTimer) {
-            clearInterval(autoRefreshTimer);
-            autoRefreshTimer = null;
-        }
-        if (enabled) {
-            autoRefreshTimer = setInterval(fetchLatestData, 30000);
-        }
-    };
-
-    widgets.forEach((widget) => {
-        widget.addEventListener('dragstart', () => {
-            draggingWidget = widget;
-            widget.classList.add('dragging');
-        });
-        widget.addEventListener('dragend', () => {
-            widget.classList.remove('dragging');
-            draggingWidget = null;
-            persistOrderFromDom();
-        });
-        widget.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-        widget.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (!draggingWidget || draggingWidget === widget) return;
-            grid.insertBefore(draggingWidget, widget);
-            persistOrderFromDom();
-        });
+  const applyCol = () => {
+    const c = getCollapsed();
+    allWids.forEach(id => {
+      const el = byWid(id); if (!el) return;
+      const body = el.querySelector('.db-card-body');
+      const ico  = el.querySelector('[data-wa="collapse"] i');
+      const on = c.has(id);
+      if (body) body.style.display = on ? 'none' : '';
+      if (ico)  ico.className = on ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
     });
+  };
 
-    document.querySelectorAll('[data-widget-action]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const widget = btn.closest('.dashboard-widget');
-            if (!widget) return;
-            const widgetId = widget.dataset.widgetId;
-            const action = btn.dataset.widgetAction;
-
-            if (action === 'hide') {
-                const hidden = getHiddenSet();
-                hidden.add(widgetId);
-                saveArray(HIDDEN_KEY, Array.from(hidden));
-                applyVisibility();
-                return;
-            }
-
-            if (action === 'collapse') {
-                const collapsed = getCollapsedSet();
-                if (collapsed.has(widgetId)) {
-                    collapsed.delete(widgetId);
-                } else {
-                    collapsed.add(widgetId);
-                }
-                saveArray(COLLAPSED_KEY, Array.from(collapsed));
-                applyCollapsedState();
-            }
-        });
+  /* Widget action buttons */
+  document.querySelectorAll('[data-wa]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const w = btn.closest('[data-wid]'); if (!w) return;
+      const id = w.dataset.wid, act = btn.dataset.wa;
+      if (act === 'hide') {
+        const h = getHidden(); h.add(id); ls.set('hidden', [...h]); applyVis();
+      }
+      if (act === 'collapse') {
+        const c = getCollapsed(); c.has(id) ? c.delete(id) : c.add(id); ls.set('collapsed', [...c]); applyCol();
+      }
     });
+  });
 
-    document.querySelectorAll('[data-widget-checkbox]').forEach((checkbox) => {
-        checkbox.addEventListener('change', () => {
-            const widgetId = checkbox.dataset.widgetCheckbox;
-            const hidden = getHiddenSet();
-            if (checkbox.checked) {
-                hidden.delete(widgetId);
-            } else {
-                hidden.add(widgetId);
-            }
-            saveArray(HIDDEN_KEY, Array.from(hidden));
-            applyVisibility();
-        });
+  /* Widget manager checkboxes */
+  document.querySelectorAll('[data-wchk]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = cb.dataset.wchk, h = getHidden();
+      cb.checked ? h.delete(id) : h.add(id);
+      ls.set('hidden', [...h]); applyVis();
     });
+  });
 
-    refreshBtn.addEventListener('click', fetchLatestData);
-
-    resetBtn.addEventListener('click', () => {
-        localStorage.removeItem(ORDER_KEY);
-        localStorage.removeItem(HIDDEN_KEY);
-        localStorage.removeItem(COLLAPSED_KEY);
-        localStorage.removeItem(AUTO_REFRESH_KEY);
-        location.reload();
+  /* ── Drag & drop ── */
+  let drag = null;
+  document.querySelectorAll('[data-wid]').forEach(w => {
+    w.addEventListener('dragstart', () => { drag = w; w.classList.add('dragging'); });
+    w.addEventListener('dragend',   () => { w.classList.remove('dragging'); drag = null; });
+    w.addEventListener('dragover',  e => e.preventDefault());
+    w.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!drag || drag === w) return;
+      const p = w.parentNode; if (p) p.insertBefore(drag, w);
     });
+  });
 
-    const order = loadOrder();
-    applyOrder(order);
-    applyVisibility();
-    applyCollapsedState();
-    renderPayload(initialPayload);
+  /* ── Auto-refresh ── */
+  let timer = null;
+  const setAR = on => {
+    ls.set('ar', on ? 1 : 0);
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) timer = setInterval(refresh, 30000);
+  };
+  const arEl = $('dbAutoRefresh');
+  const arOn = ls.get('ar', 1) !== 0;
+  arEl.checked = arOn; setAR(arOn);
+  arEl.addEventListener('change', () => setAR(arEl.checked));
 
-    const autoRefreshEnabled = localStorage.getItem(AUTO_REFRESH_KEY) !== '0';
-    autoRefreshToggle.checked = autoRefreshEnabled;
-    setAutoRefresh(autoRefreshEnabled);
-    autoRefreshToggle.addEventListener('change', () => {
-        setAutoRefresh(autoRefreshToggle.checked);
-    });
+  /* ── Buttons ── */
+  $('dbRefreshBtn').addEventListener('click', refresh);
+  $('dbResetBtn').addEventListener('click', () => {
+    ['hidden','collapsed','ar'].forEach(k => localStorage.removeItem(NS+k));
+    location.reload();
+  });
+
+  /* ── Live clock ── */
+  const pad = n => String(n).padStart(2,'0');
+  const tick = () => {
+    const n = new Date();
+    const el = $('dbClock');
+    if (el) el.textContent = `${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())} UTC`;
+  };
+  tick(); setInterval(tick, 1000);
+
+  /* ── Init ── */
+  applyVis(); applyCol(); render(P);
 })();
 </script>
 {% endblock %}
