@@ -80,7 +80,10 @@ def openvpn_wizards_step3():
 @vpn_bp.route("/ipsec", methods=['GET', 'POST'])
 @login_required
 def ipsec():
-    return render_template("ipsec.html")
+    active_tab = request.args.get("tab", "tunnels")
+    if active_tab not in ("tunnels", "mobile_clients", "psk", "advanced"):
+        active_tab = "tunnels"
+    return render_template("ipsec.html", active_tab=active_tab)
 
 
 # ----------------------------

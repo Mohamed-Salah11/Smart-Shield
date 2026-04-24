@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>
@@ -116,7 +119,7 @@
         <nav class="sidebar-nav">
             <!-- System -->
             <details class="side-group">
-                <summary><span class="label">System</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-shield-halved sg-icon"></i><span class="label">System</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
                     <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">Advanced</a></li>
@@ -134,7 +137,7 @@
 
             <!-- Interfaces -->
             <details class="side-group">
-                <summary><span class="label">Interfaces</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-network-wired sg-icon"></i><span class="label">Interfaces</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('interfaces.interfaces_lan') }}">LAN</a></li>
                     <li><a href="{{ url_for('interfaces.interfaces_wan') }}">WAN</a></li>
@@ -144,7 +147,7 @@
 
             <!-- Firewall -->
             <details class="side-group">
-                <summary><span class="label">Firewall</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-fire-flame-curved sg-icon"></i><span class="label">Firewall</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('firewall.rules') }}">Rules</a></li>
                     <li><a href="{{ url_for('firewall.nat') }}">NAT</a></li>
@@ -157,7 +160,7 @@
 
             <!-- Services -->
             <details class="side-group">
-                <summary><span class="label">Services</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-server sg-icon"></i><span class="label">Services</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('services.auto_config_backup') }}">Auto Config Backup</a></li>
                     <li><a href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
@@ -180,7 +183,7 @@
 
             <!-- VPN -->
             <details class="side-group">
-                <summary><span class="label">VPN</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-lock sg-icon"></i><span class="label">VPN</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
                     <li><a href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
@@ -190,7 +193,7 @@
 
             <!-- Status -->
             <details class="side-group">
-                <summary><span class="label">Status</span> <span class="chev">▾</span></summary>
+                <summary><i class="fa-solid fa-chart-line sg-icon"></i><span class="label">Status</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('status.status_home') }}">Overview</a></li>
                     <li><a href="{{ url_for('status.carp_failover') }}">CARP (failover)</a></li>
