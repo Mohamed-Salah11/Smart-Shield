@@ -1,36 +1,49 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firewall Login</title>
+    <title>Smart Shield — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body>
 
     <div class="login-box">
         <div class="logo">
-            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Logo" width="120">
+            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield">
         </div>
 
-        <h2>Firewall Login</h2>
+        <h2>Smart Shield</h2>
+        <p class="login-subtitle">Firewall Management Portal</p>
 
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
 
-        <!-- FIXED FORM ACTION -->
         <form method="POST" action="{{ url_for('auth.login') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
+
+            <div class="input-wrapper">
+                <i class="fa-solid fa-user input-icon"></i>
+                <input type="text" name="username" placeholder="Username" required autocomplete="username">
+            </div>
+
+            <div class="input-wrapper">
+                <i class="fa-solid fa-lock input-icon"></i>
+                <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+            </div>
+
+            <div class="login-btn-wrap">
+                <button type="submit">Sign In</button>
+            </div>
         </form>
     </div>
 
-    <footer>(c) 2025 Smart Shield Portal</footer>
+    <footer>&copy; 2025 Smart Shield Portal</footer>
 
 </body>
 </html>
-
-

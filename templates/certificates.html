@@ -1,19 +1,14 @@
 {% extends 'base.html' %}
+{% set active_section = active_section if active_section is defined and active_section else 'certificates' %}
 
 {% block main %}
 
 <div class="container">
     <!-- Page Header -->
     <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Certificates</li>
-            </ol>
-        </nav>
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Certificate Manager</h1>
-            <button type="button" class="btn btn-outline-secondary" onclick="toggleSearch()" title="Search Certificates">
+            <h1><i class="fa-solid fa-certificate me-2" style="color:var(--primary);font-size:1.1rem;"></i>Certificate Manager</h1>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSearch()" title="Search Certificates">
                 <i class="fa-solid fa-search"></i>
             </button>
         </div>
@@ -22,13 +17,25 @@
     <!-- Navigation Tabs -->
     <ul class="nav nav-tabs">
         <li class="nav-item">
-            <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}" href="#" onclick="showSection('authorities'); return false;">Authorities</a>
+            <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}"
+               href="{{ url_for('system.certificates', section='authorities') }}"
+               onclick="showSection('authorities', this); return false;">
+               <i class="fa-solid fa-building-columns me-1"></i>Authorities
+            </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}" href="#" onclick="showSection('certificates'); return false;">Certificates</a>
+            <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}"
+               href="{{ url_for('system.certificates', section='certificates') }}"
+               onclick="showSection('certificates', this); return false;">
+               <i class="fa-solid fa-file-certificate me-1"></i>Certificates
+            </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}" href="#" onclick="showSection('revocation'); return false;">Revocation</a>
+            <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}"
+               href="{{ url_for('system.certificates', section='revocation') }}"
+               onclick="showSection('revocation', this); return false;">
+               <i class="fa-solid fa-ban me-1"></i>Revocation
+            </a>
         </li>
     </ul>
 
@@ -264,33 +271,37 @@
 </div>
 
 <script>
-    function showSection(section) {
-        // Hide all sections
+    function showSection(section, linkEl) {
+        // Hide all content sections (not the search bar)
         document.querySelectorAll('.section[id$="-section"]').forEach(s => {
-            if (s.id !== 'search-section') {
-                s.style.display = 'none';
-            }
+            if (s.id !== 'search-section') s.style.display = 'none';
         });
-        // Show selected section
-        document.getElementById(section + '-section').style.display = 'block';
-        // Update active tab
-        document.querySelectorAll('.nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
-        event.target.classList.add('active');
+        // Show the selected section
+        const target = document.getElementById(section + '-section');
+        if (target) target.style.display = 'block';
+        // Update active tab highlight
+        document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+        if (linkEl) linkEl.classList.add('active');
     }
 
     function toggleSearch() {
-        const searchSection = document.getElementById('search-section');
-        if (searchSection.style.display === 'none') {
-            searchSection.style.display = 'block';
-        } else {
-            searchSection.style.display = 'none';
-        }
+        const s = document.getElementById('search-section');
+        s.style.display = s.style.display === 'none' ? 'block' : 'none';
     }
 
     function clearSearch() {
-        document.querySelector('#search-section input[name="search_term"]').value = '';
-        document.querySelector('#search-section select[name="search_type"]').selectedIndex = 0;
+        const inp = document.querySelector('#search-section input[name="search_term"]');
+        const sel = document.querySelector('#search-section select[name="search_type"]');
+        if (inp) inp.value = '';
+        if (sel) sel.selectedIndex = 0;
     }
+
+    // On load: ensure the server-chosen section is visible
+    document.addEventListener('DOMContentLoaded', () => {
+        const active = '{{ active_section }}';
+        const link = document.querySelector(`.nav-tabs .nav-link[onclick*="${active}"]`);
+        showSection(active, link);
+    });
 </script>
 
 {% endblock %}
