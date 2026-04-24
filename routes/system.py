@@ -741,6 +741,25 @@ def package_manager():
 
 
 # ----------------------------
+# PREFLIGHT / SYSTEM HEALTH
+# ----------------------------
+
+@system_bp.route("/preflight")
+@login_required
+def preflight():
+    from app.services.freebsd_setup import preflight_check
+    report = preflight_check()
+    return render_template("preflight.html", report=report)
+
+
+@system_bp.route("/api/preflight", methods=["GET"])
+@login_required
+def preflight_api():
+    from app.services.freebsd_setup import preflight_check
+    return jsonify(preflight_check())
+
+
+# ----------------------------
 # SETUP WIZARD
 # ----------------------------
 

@@ -838,17 +838,33 @@
       </div>
     </div>
 
-    <!-- Event Stream (full-width) -->
+    <!-- Event Stream — live polling widget (full-width) -->
     <div class="db-card db-col-full" data-wid="events" draggable="true">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-stream"></i>Event Stream</div>
-        <div class="db-card-actions">
+        <div class="db-card-title">
+          <span id="evStreamDot" style="
+            width:7px;height:7px;border-radius:50%;background:#10b981;
+            box-shadow:0 0 0 2px rgba(16,185,129,.2);flex-shrink:0;
+            animation:dbpulse 2.5s ease-in-out infinite;
+          "></span>
+          <i class="fa-solid fa-stream"></i>Live Event Stream
+        </div>
+        <div class="db-card-actions" style="gap:8px;">
+          <span id="evNewCount" style="
+            display:none;padding:1px 7px;border-radius:99px;
+            font-size:.68rem;font-weight:700;
+            background:rgba(59,130,246,.2);color:#93c5fd;
+          "></span>
+          <a href="{{ url_for('status.system_logs') }}" style="
+            color:rgba(203,213,225,.6);font-size:.72rem;font-weight:600;
+            text-decoration:none;padding:2px 6px;border-radius:4px;
+          " title="Open full log monitor">Monitor ↗</a>
           <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
           <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
         </div>
       </div>
       <div class="db-card-body no-pad">
-        <div class="db-scroll">
+        <div class="db-scroll" id="evScrollWrap">
           <table class="db-tbl">
             <thead>
               <tr>

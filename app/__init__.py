@@ -151,6 +151,10 @@ def create_app():
 
         return response
 
+    # Ensure all required directories exist before the DB is opened.
+    from .services.freebsd_setup import ensure_dirs
+    ensure_dirs()
+
     init_db()
 
     from routes.auth import auth_bp
@@ -164,6 +168,7 @@ def create_app():
     from routes.status import status_bp
     from routes.diagnostics import diagnostics_bp
     from routes.network_api import network_api_bp
+    from routes.ids import ids_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
@@ -176,5 +181,6 @@ def create_app():
     app.register_blueprint(status_bp)
     app.register_blueprint(diagnostics_bp)
     app.register_blueprint(network_api_bp)
+    app.register_blueprint(ids_bp)
 
     return app
