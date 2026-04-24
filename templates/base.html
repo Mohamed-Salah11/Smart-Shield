@@ -127,6 +127,7 @@
                     <li><a href="{{ url_for('system.general_setup') }}">General Setup</a></li>
                     <li><a href="{{ url_for('system.high_availability') }}">High Availability</a></li>
                     <li><a href="{{ url_for('system.package_manager') }}">Package Manager</a></li>
+                    <li><a href="{{ url_for('system.preflight') }}">Preflight Check</a></li>
                     <li><a href="{{ url_for('routing.routing_index') }}">Routing</a></li>
                     <li><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
                     {% if session.get('is_superuser') %}
@@ -188,6 +189,16 @@
                     <li><a href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
                     <li><a href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
                     <li><a href="{{ url_for('vpn.l2tp') }}">L2TP</a></li>
+                </ul>
+            </details>
+
+            <!-- IDS / IPS -->
+            <details class="side-group">
+                <summary><i class="fa-solid fa-shield-virus sg-icon"></i><span class="label">IDS / IPS</span><span class="chev">▾</span></summary>
+                <ul class="side-links">
+                    <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">Overview</a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='config') }}">Configuration</a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='rules') }}">Rulesets</a></li>
                 </ul>
             </details>
 

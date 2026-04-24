@@ -1,125 +1,595 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<style>
+/* ═══════════════════════════════════════════════════
+   LIVE LOG MONITOR
+═══════════════════════════════════════════════════ */
+
+/* ── Toolbar ── */
+.lm-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px 10px 0 0;
+  border-bottom: none;
+}
+.lm-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+  height: 34px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--border-color-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
+  color: var(--text-color);
+  font-size: .875rem;
+  font-family: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+.lm-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background-color: var(--panel); }
+
+/* Category filter pills */
+.lm-cats { display: flex; gap: 5px; flex-wrap: wrap; }
+.lm-cat {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--border-color-soft);
+  color: var(--secondary);
+  transition: background .12s, color .12s, border-color .12s;
+  user-select: none;
+}
+.lm-cat:hover           { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.lm-cat.active          { background: var(--primary); color: #fff; border-color: var(--primary); }
+.lm-cat[data-cat="session"].active   { background: #3b82f6; border-color: #3b82f6; }
+.lm-cat[data-cat="system"].active    { background: #f59e0b; border-color: #f59e0b; }
+.lm-cat[data-cat="security"].active  { background: #ef4444; border-color: #ef4444; }
+.lm-cat[data-cat="browsing"].active  { background: #64748b; border-color: #64748b; }
+.lm-cat[data-cat="ids"].active       { background: #8b5cf6; border-color: #8b5cf6; }
+
+/* Right controls */
+.lm-controls { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
+.lm-live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16,185,129,.2);
+  flex-shrink: 0;
+}
+.lm-live-dot.paused  { background: var(--muted); box-shadow: none; }
+.lm-live-dot.active  { animation: lm-pulse 1.8s ease-in-out infinite; }
+@keyframes lm-pulse  { 0%,100%{box-shadow:0 0 0 2px rgba(16,185,129,.2)} 50%{box-shadow:0 0 0 5px rgba(16,185,129,.06)} }
+
+.lm-live-label { font-size: .78rem; font-weight: 600; color: var(--muted); }
+
+/* ── Stats bar ── */
+.lm-stats {
+  display: flex;
+  gap: 0;
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-bottom: none;
+  padding: 6px 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.lm-stat-item { display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+.lm-stat-dot  { width: 7px; height: 7px; border-radius: 50%; }
+.lm-stat-val  { font-weight: 700; color: var(--text-color); font-variant-numeric: tabular-nums; }
+.lm-stat-lbl  { color: var(--muted); font-weight: 500; }
+
+/* ── Log viewport ── */
+.lm-viewport {
+  background: #0a0e1a;
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  position: relative;
+}
+.lm-scroll {
+  height: 580px;
+  overflow-y: auto;
+  font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: .8rem;
+  line-height: 1.55;
+}
+.lm-scroll::-webkit-scrollbar       { width: 6px; }
+.lm-scroll::-webkit-scrollbar-track { background: #0a0e1a; }
+.lm-scroll::-webkit-scrollbar-thumb { background: #1e2d45; border-radius: 3px; }
+
+/* ── Log rows ── */
+.lm-row {
+  display: grid;
+  grid-template-columns: 158px 80px 160px 110px 120px 1fr;
+  gap: 0;
+  padding: 4px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+  align-items: baseline;
+  cursor: pointer;
+  transition: background .1s;
+}
+.lm-row:hover     { background: rgba(255,255,255,.04); }
+.lm-row.lm-new    { animation: lm-slide-in .25s ease; }
+@keyframes lm-slide-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+
+/* Row type accents */
+.lm-row.cat-session  { border-left: 2px solid #3b82f6; }
+.lm-row.cat-system   { border-left: 2px solid #f59e0b; }
+.lm-row.cat-security { border-left: 2px solid #ef4444; background: rgba(239,68,68,.04); }
+.lm-row.cat-browsing { border-left: 2px solid #334155; }
+.lm-row.cat-ids      { border-left: 2px solid #8b5cf6; background: rgba(139,92,246,.04); }
+
+/* Columns */
+.lm-ts   { color: #475569; font-size: .75rem; padding-right: 8px; white-space: nowrap; }
+.lm-cat-col {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding-right: 8px; white-space: nowrap;
+}
+.cat-col-session  { color: #3b82f6; }
+.cat-col-system   { color: #f59e0b; }
+.cat-col-security { color: #ef4444; }
+.cat-col-browsing { color: #64748b; }
+.cat-col-ids      { color: #8b5cf6; }
+.cat-col-default  { color: #94a3b8; }
+
+.lm-action { color: #e2e8f0; font-weight: 600; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-user   { color: #93c5fd; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-ip     { color: #94a3b8; padding-right: 8px; font-size: .75rem; }
+.lm-detail { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-detail .lm-hi { color: #cbd5e1; }
+
+/* Expanded detail panel */
+.lm-expanded {
+  display: none;
+  padding: 8px 14px 10px 14px;
+  background: rgba(255,255,255,.025);
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.lm-expanded pre {
+  margin: 0;
+  color: #94a3b8;
+  font-size: .77rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lm-row.open + .lm-expanded { display: block; }
+
+/* Empty state */
+.lm-empty {
+  padding: 60px 0;
+  text-align: center;
+  color: #475569;
+  font-size: .85rem;
+}
+.lm-empty i { font-size: 2.5rem; margin-bottom: 12px; display: block; opacity: .4; }
+
+/* Pause overlay */
+.lm-pause-overlay {
+  position: absolute;
+  top: 10px; right: 14px;
+  background: rgba(15,23,41,.85);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: .75rem;
+  font-weight: 600;
+  color: #f59e0b;
+  display: none;
+  pointer-events: none;
+}
+.lm-viewport.paused .lm-pause-overlay { display: block; }
+
+/* ── Light mode overrides ── */
+:root:not([data-theme="dark"]) .lm-viewport  { background: #0f172a; }
+:root:not([data-theme="dark"]) .lm-scroll::-webkit-scrollbar-track { background: #0f172a; }
+:root:not([data-theme="dark"]) .lm-bar       { background: var(--panel); }
+:root:not([data-theme="dark"]) .lm-stats     { background: var(--panel); }
+</style>
+{% endblock %}
+
 {% block main %}
-<div class="container">
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('status.status_home') }}">Status</a></li>
-                <li class="breadcrumb-item active" aria-current="page">System Logs</li>
-            </ol>
-        </nav>
-        <h1>System Logs</h1>
-        <p class="lead">Track login, browsing, and system events from one page.</p>
+<div style="width:100%;max-width:none;">
+
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h1><i class="fa-solid fa-terminal me-2" style="color:var(--primary);font-size:1rem;"></i>Live Log Monitor</h1>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <select id="refreshRate" class="form-select form-select-sm" style="width:auto;">
+          <option value="2000">2s refresh</option>
+          <option value="5000" selected>5s refresh</option>
+          <option value="10000">10s refresh</option>
+          <option value="30000">30s refresh</option>
+          <option value="0">Paused</option>
+        </select>
+        <button class="btn btn-sm btn-secondary" id="btnExport"><i class="fa-solid fa-download"></i> Export</button>
+        <button class="btn btn-sm btn-outline-danger" id="btnClear"><i class="fa-solid fa-trash-can"></i> Clear View</button>
+      </div>
+    </div>
+    <p class="lead">Real-time event stream — auto-polls every 5 s. Click any row to expand details.</p>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="lm-bar">
+    <input type="text" class="lm-search" id="searchInput" placeholder="Search action, user, IP, details…">
+
+    <div class="lm-cats" id="catFilters">
+      <span class="lm-cat active" data-cat="">All</span>
+      <span class="lm-cat" data-cat="session">Session</span>
+      <span class="lm-cat" data-cat="system">System</span>
+      <span class="lm-cat" data-cat="security">Security</span>
+      <span class="lm-cat" data-cat="browsing">Browsing</span>
+      <span class="lm-cat" data-cat="ids">IDS/IPS</span>
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'system' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='system') }}">System</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'sessions' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='sessions') }}">Sessions</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'security' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='security') }}">Security</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'browsing' %}active{% endif %}" href="{{ url_for('status.system_logs', tab='browsing') }}">Browsing</a>
-        </li>
-    </ul>
-
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>
-                {% if active_tab == 'sessions' %}
-                Session Log Events
-                {% elif active_tab == 'security' %}
-                Security Log Events
-                {% elif active_tab == 'browsing' %}
-                Browsing Log Events
-                {% else %}
-                System Log Events
-                {% endif %}
-            </h2>
-            <span class="badge bg-light text-dark">
-                {% if active_tab == 'sessions' %}
-                {{ session_events|length }}
-                {% elif active_tab == 'security' %}
-                {{ security_events|length }}
-                {% elif active_tab == 'browsing' %}
-                {{ browsing_events|length }}
-                {% else %}
-                {{ system_events|length }}
-                {% endif %}
-                entries
-            </span>
-        </div>
-        <div class="section-body p-0">
-            <div class="table-responsive">
-                <table class="table table-striped mb-0">
-                    <thead>
-                        <tr>
-                            <th>Time (UTC)</th>
-                            <th>Category</th>
-                            <th>Action</th>
-                            <th>User</th>
-                            <th>IP</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if active_tab == 'sessions' %}
-                        {% set rows = session_events %}
-                        {% elif active_tab == 'security' %}
-                        {% set rows = security_events %}
-                        {% elif active_tab == 'browsing' %}
-                        {% set rows = browsing_events %}
-                        {% else %}
-                        {% set rows = system_events %}
-                        {% endif %}
-                        {% for event in rows %}
-                        <tr>
-                            <td>{{ event.timestamp.replace('T', ' ')[:19] if event.timestamp else '-' }}</td>
-                            <td>{{ event.category or '-' }}</td>
-                            <td><span class="badge bg-primary">{{ event.action or '-' }}</span></td>
-                            <td>{{ event.username or '-' }}</td>
-                            <td>{{ event.remote_addr or '-' }}</td>
-                            <td>
-                                {% if event.details and event.details.reason %}
-                                {{ event.details.reason }}
-                                {% elif event.details and event.details.activity %}
-                                {{ event.details.activity }}
-                                {% if event.details.query_string %}
-                                <div class="small text-muted">query={{ event.details.query_string }}</div>
-                                {% endif %}
-                                {% if event.details.payload_keys %}
-                                <div class="small text-muted">keys={{ event.details.payload_keys | join(',') }}</div>
-                                {% endif %}
-                                {% elif event.details and event.details.path %}
-                                <code>{{ event.details.method or '-' }} {{ event.details.path }}</code>
-                                <div class="small text-muted">
-                                    status={{ event.details.status_code or '-' }},
-                                    latency={{ event.details.latency_ms or 0 }}ms
-                                </div>
-                                {% elif event.details and event.details.user_id %}
-                                user_id={{ event.details.user_id }}
-                                {% elif event.details %}
-                                {{ event.details | tojson }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-muted">No log entries available for this tab yet.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="lm-controls">
+      <div class="lm-live-dot active" id="liveDot"></div>
+      <span class="lm-live-label" id="liveLabel">Live</span>
+      <span class="text-muted" style="font-size:.75rem;" id="lastPoll"></span>
     </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="lm-stats" id="statsBar">
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#3b82f6;"></div>
+      <span class="lm-stat-val" id="sc-session">—</span>
+      <span class="lm-stat-lbl">Session</span>
+    </div>
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#f59e0b;"></div>
+      <span class="lm-stat-val" id="sc-system">—</span>
+      <span class="lm-stat-lbl">System</span>
+    </div>
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#ef4444;"></div>
+      <span class="lm-stat-val" id="sc-security">—</span>
+      <span class="lm-stat-lbl">Security</span>
+    </div>
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#64748b;"></div>
+      <span class="lm-stat-val" id="sc-browsing">—</span>
+      <span class="lm-stat-lbl">Browsing</span>
+    </div>
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#8b5cf6;"></div>
+      <span class="lm-stat-val" id="sc-ids">—</span>
+      <span class="lm-stat-lbl">IDS</span>
+    </div>
+    <div class="lm-stat-item" style="margin-left:auto;">
+      <span class="lm-stat-val" id="sc-total">—</span>
+      <span class="lm-stat-lbl">Total events</span>
+    </div>
+  </div>
+
+  <!-- Log viewport -->
+  <div class="lm-viewport" id="viewport">
+    <div class="lm-pause-overlay"><i class="fa-solid fa-pause me-1"></i>Auto-scroll paused</div>
+    <div class="lm-scroll" id="logScroll">
+      <div class="lm-empty" id="emptyState">
+        <i class="fa-solid fa-hourglass-half"></i>
+        Waiting for events…
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:0 2px;">
+    <span class="text-muted" style="font-size:.75rem;" id="rowCountLabel">0 events shown</span>
+    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="text-muted"
+       style="font-size:.75rem;">← Legacy static view</a>
+  </div>
+
 </div>
+
+<script>
+(() => {
+/* ── Config ── */
+const POLL_URL  = "{{ url_for('status.api_logs') }}";
+const STATS_URL = "{{ url_for('status.api_logs_stats') }}";
+const MAX_ROWS  = 1000;       // DOM row limit to prevent memory bloat
+
+/* ── State ── */
+let latestTs     = "";        // ISO timestamp of newest fetched event
+let allRows      = [];        // full buffer (newest first)
+let activeFilter = "";        // category filter "" = all
+let searchText   = "";        // live search string
+let pollTimer    = null;
+let pollInterval = 5000;
+let autoScroll   = true;
+let paused       = false;     // auto-scroll paused because user scrolled up
+
+/* ── DOM ── */
+const scroll     = document.getElementById("logScroll");
+const viewport   = document.getElementById("viewport");
+const empty      = document.getElementById("emptyState");
+const liveDot    = document.getElementById("liveDot");
+const liveLabel  = document.getElementById("liveLabel");
+const lastPoll   = document.getElementById("lastPoll");
+const rowLabel   = document.getElementById("rowCountLabel");
+
+/* ── Helpers ── */
+const esc = s => String(s??'')
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const fmtTs = ts => (ts||'').replace('T',' ').slice(0,19);
+
+const catClass = c => ({
+  session:'cat-col-session', system:'cat-col-system',
+  security:'cat-col-security', browsing:'cat-col-browsing',
+  ids:'cat-col-ids',
+}[c] || 'cat-col-default');
+
+const rowClass = c => ({
+  session:'cat-session', system:'cat-system',
+  security:'cat-security', browsing:'cat-browsing',
+  ids:'cat-ids',
+}[c] || '');
+
+const detailSummary = e => {
+  const d = e.details || {};
+  if (d.reason)     return esc(d.reason);
+  if (d.activity)   return `<span class="lm-hi">${esc(d.activity)}</span>`;
+  if (d.method && d.path) return `<span class="lm-hi">${esc(d.method)}</span> ${esc(d.path)}` +
+                             (d.status_code ? ` <span style="color:#94a3b8;">${d.status_code}</span>` : '') +
+                             (d.latency_ms  ? ` <span style="color:#475569;">${d.latency_ms}ms</span>` : '');
+  const keys = Object.keys(d);
+  if (keys.length) return esc(keys.slice(0,4).map(k=>`${k}=${JSON.stringify(d[k])}`).join(' '));
+  return '';
+};
+
+/* ── Build a single row ── */
+function makeRow(e, isNew) {
+  const wrapper = document.createElement('div');
+
+  const row = document.createElement('div');
+  row.className = `lm-row ${rowClass(e.category)} ${isNew ? 'lm-new' : ''}`;
+  row.dataset.ts  = e.timestamp || '';
+  row.dataset.cat = e.category  || '';
+  row.dataset.raw = JSON.stringify(e);
+
+  row.innerHTML = `
+    <span class="lm-ts">${esc(fmtTs(e.timestamp))}</span>
+    <span class="lm-cat-col ${catClass(e.category)}">${esc(e.category||'?')}</span>
+    <span class="lm-action">${esc(e.action||'—')}</span>
+    <span class="lm-user">${esc(e.username||'—')}</span>
+    <span class="lm-ip">${esc(e.remote_addr||'—')}</span>
+    <span class="lm-detail">${detailSummary(e)}</span>
+  `;
+
+  const detail = document.createElement('div');
+  detail.className = 'lm-expanded';
+  detail.innerHTML = `<pre>${esc(JSON.stringify(e, null, 2))}</pre>`;
+
+  row.addEventListener('click', () => {
+    row.classList.toggle('open');
+  });
+
+  wrapper.appendChild(row);
+  wrapper.appendChild(detail);
+  return wrapper;
+}
+
+/* ── Render: filter + rebuild visible rows ── */
+function renderVisible() {
+  const visible = allRows.filter(e => {
+    if (activeFilter && e.category !== activeFilter) return false;
+    if (searchText) {
+      const hay = [e.action,e.username,e.remote_addr,e.category,
+                   JSON.stringify(e.details||{})].join(' ').toLowerCase();
+      if (!hay.includes(searchText)) return false;
+    }
+    return true;
+  });
+
+  scroll.innerHTML = '';
+  if (!visible.length) {
+    scroll.appendChild(empty);
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    visible.forEach(e => scroll.appendChild(makeRow(e, false)));
+  }
+
+  rowLabel.textContent = `${visible.length.toLocaleString()} event${visible.length!==1?'s':''} shown`;
+  if (autoScroll && !paused) scroll.scrollTop = 0; // newest at top
+}
+
+/* ── Prepend new events (already newest-first from API) ── */
+function prependEvents(events) {
+  if (!events.length) return;
+
+  events.forEach(e => allRows.unshift(e));
+
+  // Trim buffer
+  if (allRows.length > MAX_ROWS) allRows.splice(MAX_ROWS);
+
+  // Update latestTs
+  if (events[0] && events[0].timestamp > latestTs) {
+    latestTs = events[0].timestamp;
+  }
+
+  // Rebuild DOM only when not doing a full reload
+  const matches = events.filter(e => {
+    if (activeFilter && e.category !== activeFilter) return false;
+    if (searchText) {
+      const hay = [e.action,e.username,e.remote_addr,e.category,
+                   JSON.stringify(e.details||{})].join(' ').toLowerCase();
+      return hay.includes(searchText);
+    }
+    return true;
+  });
+
+  if (!matches.length) return;
+
+  // Remove empty state
+  const emptyEl = scroll.querySelector('.lm-empty');
+  if (emptyEl) emptyEl.remove();
+
+  // Insert at top
+  const frag = document.createDocumentFragment();
+  matches.forEach(e => frag.appendChild(makeRow(e, true)));
+  scroll.prepend(frag);
+
+  // Trim DOM rows
+  const rows = scroll.querySelectorAll('.lm-row');
+  if (rows.length > MAX_ROWS) {
+    for (let i = MAX_ROWS; i < rows.length; i++) {
+      rows[i].closest('div')?.remove();
+    }
+  }
+
+  rowLabel.textContent = `${Math.min(allRows.length, MAX_ROWS).toLocaleString()} events shown`;
+  if (!paused) scroll.scrollTop = 0;
+}
+
+/* ── Poll ── */
+async function poll() {
+  liveDot.classList.remove('active');
+  try {
+    const cat   = activeFilter ? `&categories=${encodeURIComponent(activeFilter)}` : '';
+    const srch  = searchText   ? `&search=${encodeURIComponent(searchText)}` : '';
+    const since = latestTs     ? `&since=${encodeURIComponent(latestTs)}` : '';
+
+    const res  = await fetch(`${POLL_URL}?limit=200${since}${cat}${srch}`, {cache:'no-store'});
+    const body = await res.json();
+
+    if (body.ok && body.events?.length) {
+      prependEvents(body.events);
+    }
+    if (body.latest_ts) latestTs = body.latest_ts;
+
+    lastPoll.textContent = `updated ${new Date().toLocaleTimeString()}`;
+    liveDot.classList.add('active');
+    liveDot.style.background = '#10b981';
+  } catch(err) {
+    liveDot.style.background = '#ef4444';
+    lastPoll.textContent = 'poll failed';
+  }
+}
+
+/* ── Stats poll (every 15s) ── */
+async function pollStats() {
+  try {
+    const body = await fetch(STATS_URL, {cache:'no-store'}).then(r=>r.json());
+    document.getElementById('sc-session').textContent  = (body.session  || 0).toLocaleString();
+    document.getElementById('sc-system').textContent   = (body.system   || 0).toLocaleString();
+    document.getElementById('sc-security').textContent = (body.security || 0).toLocaleString();
+    document.getElementById('sc-browsing').textContent = (body.browsing || 0).toLocaleString();
+    document.getElementById('sc-ids').textContent      = (body.ids      || 0).toLocaleString();
+    document.getElementById('sc-total').textContent    = (body._total   || 0).toLocaleString();
+  } catch(_) {}
+}
+
+/* ── Auto-scroll pause detection ── */
+scroll.addEventListener('scroll', () => {
+  // If user scrolled down (away from top), pause
+  const atTop = scroll.scrollTop < 80;
+  if (!atTop && !paused) {
+    paused = true;
+    viewport.classList.add('paused');
+    liveDot.classList.add('paused');
+    liveLabel.textContent = 'Paused';
+  } else if (atTop && paused) {
+    paused = false;
+    viewport.classList.remove('paused');
+    liveDot.classList.remove('paused');
+    liveLabel.textContent = 'Live';
+  }
+});
+
+/* ── Category filter ── */
+document.querySelectorAll('.lm-cat').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.lm-cat').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.cat;
+    // Full re-render from buffer
+    latestTs = '';           // reset so next poll fetches everything for this filter
+    allRows  = [];
+    scroll.innerHTML = '';
+    scroll.appendChild(empty);
+    empty.style.display = '';
+    poll();
+  });
+});
+
+/* ── Search ── */
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchText = this.value.toLowerCase().trim();
+    latestTs = '';
+    allRows  = [];
+    scroll.innerHTML = '';
+    scroll.appendChild(empty);
+    empty.style.display = '';
+    poll();
+  }, 400);
+});
+
+/* ── Refresh rate ── */
+document.getElementById('refreshRate').addEventListener('change', function() {
+  pollInterval = parseInt(this.value);
+  startPoller();
+  if (pollInterval === 0) {
+    liveDot.classList.add('paused');
+    liveLabel.textContent = 'Paused';
+  } else {
+    liveDot.classList.remove('paused');
+    liveLabel.textContent = 'Live';
+  }
+});
+
+function startPoller() {
+  if (pollTimer) clearInterval(pollTimer);
+  if (pollInterval > 0) {
+    pollTimer = setInterval(poll, pollInterval);
+  }
+}
+
+/* ── Export ── */
+document.getElementById('btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(allRows, null, 2)], {type:'application/json'});
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `smart-shield-logs-${new Date().toISOString().slice(0,10)}.json`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* ── Clear view ── */
+document.getElementById('btnClear').addEventListener('click', () => {
+  allRows = [];
+  latestTs = '';
+  scroll.innerHTML = '';
+  scroll.appendChild(empty);
+  empty.style.display = '';
+  rowLabel.textContent = '0 events shown';
+});
+
+/* ── Init ── */
+poll();
+startPoller();
+pollStats();
+setInterval(pollStats, 15000);
+
+})();
+</script>
 {% endblock %}

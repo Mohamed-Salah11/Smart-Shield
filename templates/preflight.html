@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style>
+.pf-section { margin-bottom: 24px; }
+.pf-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: .875rem;
+}
+.pf-row:last-child { border-bottom: none; }
+.pf-icon { font-size: .9rem; width: 20px; text-align: center; flex-shrink: 0; margin-top: 1px; }
+.pf-ok    { color: #10b981; }
+.pf-warn  { color: #f59e0b; }
+.pf-err   { color: #ef4444; }
+.pf-name  { font-weight: 600; flex: 1; min-width: 0; color: var(--text-color); }
+.pf-meta  { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+.pf-pkg   { font-family: ui-monospace, monospace; font-size: .78rem; color: var(--secondary); flex-shrink: 0; white-space: nowrap; }
+.pf-badge {
+  padding: 2px 8px; border-radius: 5px;
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; white-space: nowrap; flex-shrink: 0;
+}
+.badge-ok      { background: rgba(16,185,129,.12); color: #10b981; border: 1px solid rgba(16,185,129,.2); }
+.badge-missing { background: rgba(239,68,68,.1);   color: #ef4444; border: 1px solid rgba(239,68,68,.2); }
+.badge-optional{ background: rgba(245,158,11,.1);  color: #f59e0b; border: 1px solid rgba(245,158,11,.2); }
+.badge-created { background: rgba(59,130,246,.1);  color: #3b82f6; border: 1px solid rgba(59,130,246,.2); }
+.summary-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border: 1px solid;
+}
+.summary-bar.ok    { background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.2); }
+.summary-bar.error { background: rgba(239,68,68,.08);  border-color: rgba(239,68,68,.2); }
+.summary-title { font-size: 1rem; font-weight: 700; }
+.summary-title.ok    { color: #10b981; }
+.summary-title.error { color: #ef4444; }
+[data-theme="dark"] .pf-row { border-color: var(--border-color); }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h1><i class="fa-solid fa-stethoscope me-2" style="color:var(--primary);font-size:1.1rem;"></i>System Preflight</h1>
+      <a href="{{ url_for('system.preflight') }}" class="btn btn-sm btn-secondary">
+        <i class="fa-solid fa-rotate me-1"></i>Re-run
+      </a>
+    </div>
+    <p class="lead">Verifies that all required directories exist and every external tool is installed.</p>
+  </div>
+
+  <!-- Summary bar -->
+  {% set overall_ok = report.overall_ok %}
+  <div class="summary-bar {{ 'ok' if overall_ok else 'error' }}">
+    <i class="fa-solid fa-{{ 'circle-check' if overall_ok else 'circle-exclamation' }} fa-lg
+              {{ 'pf-ok' if overall_ok else 'pf-err' }}"></i>
+    <div class="summary-title {{ 'ok' if overall_ok else 'error' }}">
+      {% if overall_ok %}All checks passed — system is ready.
+      {% else %}
+        {{ report.missing_required|length }} required tool(s) missing,
+        {{ report.dir_errors|length }} directory error(s).
+      {% endif %}
+    </div>
+    {% if not overall_ok and report.missing_required %}
+    <div style="font-size:.82rem;color:var(--secondary);">
+      Missing: <strong>{{ report.missing_required | join(', ') }}</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Directory checks -->
+  <div class="pf-section">
+    <div class="section">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-folder-open me-2"></i>Directory Checks</h2>
+      </div>
+      {% for d in report.dirs %}
+      <div class="pf-row">
+        <span class="pf-icon {% if d.ok %}pf-ok{% else %}pf-err{% endif %}">
+          <i class="fa-solid fa-{{ 'check' if d.ok else 'xmark' }}"></i>
+        </span>
+        <div style="flex:1;min-width:0;">
+          <div class="pf-name" style="font-family:ui-monospace,monospace;font-size:.82rem;">{{ d.path }}</div>
+          {% if d.error %}<div class="pf-meta pf-err">{{ d.error }}</div>{% endif %}
+        </div>
+        {% if not d.ok %}
+        <span class="pf-badge badge-missing">Error</span>
+        {% elif d.created %}
+        <span class="pf-badge badge-created">Created</span>
+        {% else %}
+        <span class="pf-badge badge-ok">Exists</span>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="pf-row"><span class="pf-icon pf-warn"><i class="fa-solid fa-circle-info"></i></span>
+        <div class="pf-name">Non-FreeBSD host — only app-data directories were checked.</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Tool checks -->
+  {% if report.tools %}
+  <div class="pf-section">
+    <div class="section">
+      <div class="section-header d-flex justify-content-between align-items-center">
+        <h2><i class="fa-solid fa-wrench me-2"></i>Tool / Package Checks</h2>
+        <span style="font-size:.78rem;color:rgba(255,255,255,.6);">
+          {{ report.tools|selectattr('present')|list|length }} / {{ report.tools|length }} present
+        </span>
+      </div>
+      {% for t in report.tools %}
+      <div class="pf-row">
+        <span class="pf-icon {% if t.present %}pf-ok{% elif t.optional %}pf-warn{% else %}pf-err{% endif %}">
+          <i class="fa-solid fa-{{ 'check' if t.present else 'xmark' }}"></i>
+        </span>
+        <div style="flex:1;min-width:0;">
+          <div class="pf-name">{{ t.name }}</div>
+          <div class="pf-meta">{{ t.description }}</div>
+        </div>
+        {% if t.pkg %}
+        <span class="pf-pkg">pkg install {{ t.pkg }}</span>
+        {% endif %}
+        {% if t.present %}
+        <span class="pf-badge badge-ok">Installed</span>
+        {% elif t.optional %}
+        <span class="pf-badge badge-optional">Optional</span>
+        {% else %}
+        <span class="pf-badge badge-missing">Missing</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Install command helper for missing packages -->
+  {% set missing = report.tools | selectattr('present', 'equalto', false) | selectattr('optional', 'equalto', false) | list %}
+  {% set missing_opt = report.tools | selectattr('present', 'equalto', false) | selectattr('optional', 'equalto', true) | list %}
+
+  {% if missing or missing_opt %}
+  <div class="pf-section">
+    <div class="section">
+      <div class="section-header"><h2><i class="fa-solid fa-terminal me-2"></i>Install Commands</h2></div>
+      <div class="section-body">
+        {% if missing %}
+        <p class="text-muted mb-2" style="font-size:.85rem;"><strong>Required packages (must install):</strong></p>
+        <pre>pkg update
+pkg install -y {% for t in missing %}{% if t.pkg and 'pip' not in t.pkg %}{{ t.pkg }} {% endif %}{% endfor %}
+</pre>
+        {% endif %}
+        {% if missing_opt %}
+        <p class="text-muted mb-2 mt-3" style="font-size:.85rem;"><strong>Optional packages (install as needed):</strong></p>
+        <pre>pkg install -y {% for t in missing_opt %}{% if t.pkg and 'pip' not in t.pkg %}{{ t.pkg }} {% endif %}{% endfor %}
+</pre>
+        {% endif %}
+        <p class="text-muted mb-2 mt-3" style="font-size:.85rem;"><strong>Python packages (via pip inside venv):</strong></p>
+        <pre>cd /usr/local/share/smart-shield
+python3 -m venv .venv
+. .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt</pre>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="alert alert-info">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    Tool checks only run on FreeBSD. On this host only directory creation was performed.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

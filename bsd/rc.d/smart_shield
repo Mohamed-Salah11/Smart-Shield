@@ -42,14 +42,24 @@ load_rc_config "${name}"
 : ${smart_shield_datadir:="/var/db/smart-shield"}
 : ${smart_shield_configdir:="/usr/local/etc/smart-shield"}
 : ${smart_shield_pidfile:="/var/run/smart-shield/smart_shield.pid"}
-: ${smart_shield_python:="/usr/local/bin/python3"}
-: ${smart_shield_app:="/usr/local/share/smart-shield/run.py"}
+: ${smart_shield_python:="/usr/local/share/smart-shield/.venv/bin/python3"}
+: ${smart_shield_gunicorn:="/usr/local/share/smart-shield/.venv/bin/gunicorn"}
+: ${smart_shield_wsgi:="wsgi:app"}
+: ${smart_shield_bind:="0.0.0.0:5000"}
+: ${smart_shield_workers:="2"}
 
-required_files="${smart_shield_app}"
+required_files="${smart_shield_gunicorn}"
 pidfile="${smart_shield_pidfile}"
-procname="${smart_shield_python}"
+procname="${smart_shield_gunicorn}"
 command="/usr/sbin/daemon"
-command_args="-f -P ${pidfile} -o ${smart_shield_logdir}/app.log ${smart_shield_python} ${smart_shield_app}"
+command_args="-f -P ${pidfile} -o ${smart_shield_logdir}/app.log \
+    ${smart_shield_gunicorn} \
+    --workers ${smart_shield_workers} \
+    --bind ${smart_shield_bind} \
+    --chdir ${smart_shield_app_root} \
+    --access-logfile ${smart_shield_logdir}/access.log \
+    --error-logfile ${smart_shield_logdir}/error.log \
+    ${smart_shield_wsgi}"
 
 start_precmd="${name}_prestart"
 stop_postcmd="${name}_poststop"
