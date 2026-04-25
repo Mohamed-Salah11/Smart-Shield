@@ -1,6 +1,94 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to DHCP Leases</h1>
-<p>Placeholder for DHCP Leases status.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">DHCP Leases</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-network-wired me-2 text-primary"></i>DHCP Leases</h1>
+    <p class="lead">Active address pools and static lease assignments.</p>
+  </div>
+
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-server me-2"></i>Address Pools</h2>
+      <span class="badge bg-primary">{{ pools|length }} pool{{ 's' if pools|length != 1 }}</span>
+    </div>
+    <div class="section-body p-0">
+      {% if pools %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Interface</th><th>Subnet</th><th>Range Start</th>
+              <th>Range End</th><th>Gateway</th><th>DNS Servers</th><th>Lease Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pool in pools %}
+            <tr>
+              <td><span class="badge" style="background:var(--primary)">{{ pool.interface_type|upper }}</span></td>
+              <td><code>{{ pool.subnet or '—' }}</code></td>
+              <td><code>{{ pool.range_start or '—' }}</code></td>
+              <td><code>{{ pool.range_end or '—' }}</code></td>
+              <td><code>{{ pool.gateway or '—' }}</code></td>
+              <td><code>{{ pool.dns_servers or '—' }}</code></td>
+              <td>{{ pool.lease_time or '86400' }}s</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        No DHCP pools configured.
+        <a href="{{ url_for('services.dhcp_server') }}" class="d-block mt-1">Configure DHCP →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-thumbtack me-2"></i>Static Mappings</h2>
+      <span class="badge bg-secondary">{{ static_leases|length }} static</span>
+    </div>
+    <div class="section-body p-0">
+      {% if static_leases %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Interface</th><th>MAC Address</th><th>IP Address</th>
+              <th>Hostname</th><th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lease in static_leases %}
+            <tr>
+              <td><span class="badge" style="background:var(--secondary)">{{ lease.interface_type|upper }}</span></td>
+              <td><code>{{ lease.mac_address or '—' }}</code></td>
+              <td><code class="text-primary">{{ lease.ip_address or '—' }}</code></td>
+              <td>{{ lease.hostname or '—' }}</td>
+              <td class="text-muted small">{{ lease.description or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        No static mappings defined.
+        <a href="{{ url_for('services.dhcp_server') }}" class="d-block mt-1">Add Mapping →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

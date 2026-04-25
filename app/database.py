@@ -95,6 +95,29 @@ def init_db():
     if "is_superuser" not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN is_superuser INTEGER DEFAULT 0")
 
+    # Migration: add assigned_port to lan_config / wan_config if missing.
+    cursor.execute("PRAGMA table_info(lan_config)")
+    lan_columns = {row["name"] for row in cursor.fetchall()}
+    if "assigned_port" not in lan_columns:
+        cursor.execute("ALTER TABLE lan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
+
+    cursor.execute("PRAGMA table_info(wan_config)")
+    wan_columns = {row["name"] for row in cursor.fetchall()}
+    if "assigned_port" not in wan_columns:
+        cursor.execute("ALTER TABLE wan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
+
+    # Keep lan_config/wan_config assigned_port in sync with interface_assignments.
+    cursor.execute(
+        "SELECT interface_type, network_port FROM interface_assignments WHERE network_port IS NOT NULL"
+    )
+    for row in cursor.fetchall():
+        itype = (row[0] or "").upper()
+        port  = row[1] or ""
+        if itype == "LAN" and port:
+            cursor.execute("UPDATE lan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+        elif itype == "WAN" and port:
+            cursor.execute("UPDATE wan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+
     # Group-level page whitelist permissions.
     cursor.execute(
         """
@@ -120,6 +143,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         enable_interface INTEGER DEFAULT 1,
         description TEXT DEFAULT 'LAN',
+        assigned_port TEXT DEFAULT '',
         ipv4_config_type TEXT DEFAULT 'static',
         ipv6_config_type TEXT DEFAULT 'none',
         mac_address TEXT DEFAULT '',
@@ -139,6 +163,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         enable_interface INTEGER DEFAULT 1,
         description TEXT DEFAULT 'WAN',
+        assigned_port TEXT DEFAULT '',
         ipv4_config_type TEXT DEFAULT 'dhcp',
         ipv6_config_type TEXT DEFAULT 'none',
         mac_address TEXT DEFAULT '',

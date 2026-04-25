@@ -129,8 +129,6 @@ def reload_all_services(conn) -> dict:
     Inspect the DB for enabled services and reload/start each one.
     Returns a summary dict with per-service results.
     """
-    from app.database import get_db
-
     results = []
 
     # Always reload PF first

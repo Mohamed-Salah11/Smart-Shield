@@ -1,6 +1,80 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Test Port</h1>
-<p>Placeholder for Test Port diagnostics.</p>
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">Test TCP Port</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-plug me-2 text-primary"></i>Test TCP Port</h1>
+    <p class="lead">Attempt a TCP connection to verify port accessibility.</p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="section">
+        <div class="section-header"><h2 class="mb-0">Parameters</h2></div>
+        <div class="section-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Host / IP</label>
+            <input type="text" id="pt-host" class="form-control" placeholder="192.168.1.1 or example.com" autocomplete="off">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Port</label>
+            <input type="number" id="pt-port" class="form-control" placeholder="443" min="1" max="65535">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Timeout (seconds)</label>
+            <select id="pt-timeout" class="form-select">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="10">10</option>
+            </select>
+          </div>
+          <button id="btn-test" class="btn btn-primary w-100">
+            <i class="fa fa-plug me-2"></i>Test Connection
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="section h-100">
+        <div class="section-header"><h2 class="mb-0">Result</h2></div>
+        <div class="section-body">
+          <div id="pt-result" class="text-muted">Enter a host and port then click Test.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('btn-test').addEventListener('click', function () {
+  const host    = document.getElementById('pt-host').value.trim();
+  const port    = parseInt(document.getElementById('pt-port').value);
+  const timeout = parseInt(document.getElementById('pt-timeout').value);
+  if (!host || !port) { alert('Enter a host and port.'); return; }
+  const out = document.getElementById('pt-result');
+  out.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Connecting…';
+  this.disabled = true;
+  fetch('/diagnostics/api/test-port', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ host, port, timeout })
+  })
+  .then(r => r.json())
+  .then(d => {
+    out.innerHTML = d.open
+      ? `<div class="alert alert-success mb-0"><i class="fa fa-circle-check me-2"></i><strong>${host}:${port}</strong> is reachable. (${d.elapsed_ms}ms)</div>`
+      : `<div class="alert alert-danger mb-0"><i class="fa fa-circle-xmark me-2"></i><strong>${host}:${port}</strong> is unreachable. ${d.error || ''}</div>`;
+  })
+  .catch(e => { out.innerHTML = `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`; })
+  .finally(() => { document.getElementById('btn-test').disabled = false; });
+});
+</script>
 {% endblock %}

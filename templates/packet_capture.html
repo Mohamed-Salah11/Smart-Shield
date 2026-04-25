@@ -1,7 +1,106 @@
 {% extends 'base.html' %}
 
-{% block content %}
 {% block main %}
-<h1>Welcome to Packet Capture</h1>
-<p>Placeholder for Packet Capture diagnostics.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">Packet Capture</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-binoculars me-2 text-primary"></i>Packet Capture</h1>
+    <p class="lead">Run a brief tcpdump capture on any interface.</p>
+  </div>
+
+  {% if not on_freebsd %}
+  <div class="alert alert-warning">
+    <i class="fa fa-triangle-exclamation me-2"></i>
+    Packet capture requires FreeBSD. This page is in simulation mode.
+  </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="section">
+        <div class="section-header"><h2 class="mb-0">Capture Options</h2></div>
+        <div class="section-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Interface</label>
+            <select id="cap-iface" class="form-select">
+              {% for iface in interfaces %}
+              <option value="{{ iface }}">{{ iface }}</option>
+              {% else %}
+              <option value="em0">em0</option>
+              <option value="em1">em1</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Packet Count</label>
+            <select id="cap-count" class="form-select">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Filter Expression <small class="text-muted">(optional BPF)</small></label>
+            <input type="text" id="cap-filter" class="form-control font-monospace" placeholder="host 8.8.8.8 or port 80">
+          </div>
+          <button id="btn-capture" class="btn btn-primary w-100" {% if not on_freebsd %}disabled{% endif %}>
+            <i class="fa fa-circle-dot me-2"></i>Start Capture
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="section h-100">
+        <div class="section-header d-flex justify-content-between align-items-center">
+          <h2 class="mb-0">Output</h2>
+          <button id="btn-copy" class="btn btn-sm btn-outline-secondary d-none">
+            <i class="fa fa-copy me-1"></i>Copy
+          </button>
+        </div>
+        <div class="section-body p-0">
+          <pre id="cap-output" style="
+            min-height:280px;background:var(--bg);color:var(--text-color);
+            font-size:.78rem;padding:1rem;margin:0;white-space:pre-wrap;overflow:auto;
+            font-family:'Courier New',monospace;border-radius:0 0 8px 8px;
+          ">Waiting for capture…</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('btn-capture')?.addEventListener('click', function () {
+  const iface  = document.getElementById('cap-iface').value;
+  const count  = parseInt(document.getElementById('cap-count').value);
+  const filter = document.getElementById('cap-filter').value.trim();
+  const out    = document.getElementById('cap-output');
+  out.textContent = 'Capturing ' + count + ' packets on ' + iface + '…';
+  this.disabled = true;
+  document.getElementById('btn-copy').classList.add('d-none');
+  fetch('/diagnostics/api/packet-capture', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ interface: iface, count, filter })
+  })
+  .then(r => r.json())
+  .then(d => {
+    out.textContent = d.output || d.error || 'No output.';
+    document.getElementById('btn-copy').classList.remove('d-none');
+  })
+  .catch(e => { out.textContent = 'Request failed: ' + e.message; })
+  .finally(() => { document.getElementById('btn-capture').disabled = false; });
+});
+document.getElementById('btn-copy')?.addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('cap-output').textContent).catch(() => {});
+});
+</script>
 {% endblock %}
