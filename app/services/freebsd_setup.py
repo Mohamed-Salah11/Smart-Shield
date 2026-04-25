@@ -108,8 +108,16 @@ _FREEBSD_DIRS: List[DirSpec] = [
     DirSpec("/var/log/openvpn",
             description="OpenVPN status + access logs"),
 
+    # ── L2TP / mpd5 ──────────────────────────────────────────────────────
+    DirSpec("/usr/local/etc/mpd5",
+            description="mpd5 L2TP/PPP configuration"),
+    DirSpec("/var/run/mpd5",
+            description="mpd5 runtime PIDs/sockets"),
+
     # ── IPsec / strongSwan ────────────────────────────────────────────────
     # ipsec.conf + ipsec.secrets go to /usr/local/etc — dir already exists
+    DirSpec("/var/run/openvpn",
+            description="OpenVPN PID files"),
 
     # ── Suricata IDS/IPS ──────────────────────────────────────────────────
     DirSpec("/usr/local/etc/suricata",
@@ -212,6 +220,19 @@ _TOOLS: List[ToolSpec] = [
              optional=True,
              alt_binary="/usr/local/sbin/ipsec",
              description="strongSwan IKEv2 daemon"),
+    ToolSpec("ipsec (swanctl)",
+             "/usr/local/sbin/swanctl",
+             "strongswan",
+             optional=True,
+             alt_binary="/usr/local/sbin/ipsec",
+             description="strongSwan control tool"),
+
+    # ── L2TP ──────────────────────────────────────────────────────────────
+    ToolSpec("mpd5",
+             "/usr/local/sbin/mpd5",
+             "mpd5",
+             optional=True,
+             description="Multi-link PPP daemon for L2TP/IPsec"),
 
     # ── IDS/IPS ───────────────────────────────────────────────────────────
     ToolSpec("suricata",

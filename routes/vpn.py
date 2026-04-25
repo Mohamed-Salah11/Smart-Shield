@@ -1275,3 +1275,217 @@ def delete_wizard_ca(ca_id):
         return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VPN APPLY & STATUS — FreeBSD service control
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── OpenVPN ───────────────────────────────────────────────────────────────────
+
+@vpn_bp.route("/api/openvpn/apply", methods=["POST"])
+@login_required
+def openvpn_apply():
+    """Write all OpenVPN configs and restart the service on FreeBSD."""
+    try:
+        from app.services.openvpn_writer import apply_openvpn
+        from app.audit_log import log_event
+        conn = get_db()
+        result = apply_openvpn(conn)
+        log_event(category="system", action="openvpn_apply",
+                  username=request.values.get("username"),
+                  remote_addr=request.remote_addr,
+                  details={"ok": result["ok"], "message": result["message"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/status", methods=["GET"])
+@login_required
+def openvpn_status():
+    """Return running state of OpenVPN instances."""
+    try:
+        from app.services.openvpn_writer import get_openvpn_status
+        return jsonify(get_openvpn_status())
+    except Exception as exc:
+        return jsonify({"running": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/generate-config/<int:server_id>", methods=["GET"])
+@login_required
+def openvpn_generate_config(server_id):
+    """Return generated .conf text for a specific server (preview)."""
+    try:
+        from app.services.openvpn_writer import generate_server_conf
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM openvpn_servers WHERE id=?", (server_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Server not found"}), 404
+        conf = generate_server_conf(dict(row))
+        return jsonify({"ok": True, "conf": conf})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ── IPsec ─────────────────────────────────────────────────────────────────────
+
+@vpn_bp.route("/api/ipsec/apply", methods=["POST"])
+@login_required
+def ipsec_apply():
+    """Write ipsec.conf + ipsec.secrets and reload strongSwan."""
+    try:
+        from app.services.ipsec_writer import apply_ipsec
+        from app.audit_log import log_event
+        conn = get_db()
+        result = apply_ipsec(conn)
+        log_event(category="system", action="ipsec_apply",
+                  username=request.values.get("username"),
+                  remote_addr=request.remote_addr,
+                  details={"ok": result["ok"], "message": result["message"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@vpn_bp.route("/api/ipsec/status", methods=["GET"])
+@login_required
+def ipsec_status():
+    """Return live IPsec tunnel states from 'ipsec statusall'."""
+    try:
+        from app.services.ipsec_writer import get_ipsec_status
+        return jsonify(get_ipsec_status())
+    except Exception as exc:
+        return jsonify({"running": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/ipsec/preview", methods=["GET"])
+@login_required
+def ipsec_preview():
+    """Return generated ipsec.conf text for review."""
+    try:
+        from app.services.ipsec_writer import generate_ipsec_conf, generate_ipsec_secrets
+        conn = get_db()
+        return jsonify({
+            "ok": True,
+            "conf": generate_ipsec_conf(conn),
+            "secrets": "[hidden — contains PSKs]",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/ipsec/p2", methods=["GET"])
+@login_required
+def ipsec_p2_list():
+    """List Phase 2 (child SA) entries for a given phase1_id."""
+    try:
+        p1_id = request.args.get("p1_id", type=int)
+        conn = get_db()
+        cur = conn.cursor()
+        if p1_id:
+            cur.execute("SELECT * FROM ipsec_phase2 WHERE phase1_id=? ORDER BY id", (p1_id,))
+        else:
+            cur.execute("SELECT * FROM ipsec_phase2 ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+        return jsonify({"success": True, "entries": rows})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/ipsec/p2", methods=["POST"])
+@login_required
+def ipsec_p2_create():
+    """Create or update a Phase 2 child SA."""
+    try:
+        data  = request.get_json() or {}
+        p1_id = data.get("phase1_id")
+        if not p1_id:
+            return jsonify({"success": False, "error": "phase1_id required"}), 400
+        conn = get_db()
+        cur = conn.cursor()
+        rid = data.get("id")
+        fields = {
+            "phase1_id":             p1_id,
+            "description":           data.get("description", ""),
+            "disabled":              1 if data.get("disabled") else 0,
+            "mode":                  data.get("mode", "tunnel"),
+            "local_network":         data.get("local_network", ""),
+            "remote_network":        data.get("remote_network", ""),
+            "protocol":              data.get("protocol", "esp"),
+            "encryption_algorithms": data.get("encryption_algorithms", "aes256"),
+            "hash_algorithms":       data.get("hash_algorithms", "sha256"),
+            "pfs_key_group":         data.get("pfs_key_group", "14"),
+            "lifetime":              data.get("lifetime", 3600),
+        }
+        if rid:
+            sets = ", ".join(f"{k}=?" for k in fields)
+            cur.execute(f"UPDATE ipsec_phase2 SET {sets} WHERE id=?",
+                        list(fields.values()) + [rid])
+            conn.commit()
+            return jsonify({"success": True, "id": rid})
+        cols = ", ".join(fields.keys())
+        vals = ", ".join("?" * len(fields))
+        cur.execute(f"INSERT INTO ipsec_phase2 ({cols}) VALUES ({vals})",
+                    list(fields.values()))
+        conn.commit()
+        return jsonify({"success": True, "id": cur.lastrowid})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/ipsec/p2/<int:p2_id>", methods=["DELETE"])
+@login_required
+def ipsec_p2_delete(p2_id):
+    try:
+        conn = get_db()
+        conn.execute("DELETE FROM ipsec_phase2 WHERE id=?", (p2_id,))
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+# ── L2TP ─────────────────────────────────────────────────────────────────────
+
+@vpn_bp.route("/api/l2tp/apply", methods=["POST"])
+@login_required
+def l2tp_apply():
+    """Write mpd5 config and restart L2TP service."""
+    try:
+        from app.services.l2tp_writer import apply_l2tp
+        from app.audit_log import log_event
+        conn = get_db()
+        result = apply_l2tp(conn)
+        log_event(category="system", action="l2tp_apply",
+                  username=request.values.get("username"),
+                  remote_addr=request.remote_addr,
+                  details={"ok": result["ok"], "message": result["message"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@vpn_bp.route("/api/l2tp/status", methods=["GET"])
+@login_required
+def l2tp_status():
+    """Return mpd5 running state and active sessions."""
+    try:
+        from app.services.l2tp_writer import get_l2tp_status
+        return jsonify(get_l2tp_status())
+    except Exception as exc:
+        return jsonify({"running": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/l2tp/preview", methods=["GET"])
+@login_required
+def l2tp_preview():
+    """Return generated mpd.conf text for review."""
+    try:
+        from app.services.l2tp_writer import generate_mpd_conf
+        conn = get_db()
+        return jsonify({"ok": True, "conf": generate_mpd_conf(conn)})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500

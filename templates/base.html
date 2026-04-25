@@ -476,6 +476,29 @@
         });
     }
 })();
+
+// ── Display Advanced toggle (global) ─────────────────────────────────────────
+// Usage in any template:
+//   <button data-advanced="my-section-id" class="btn btn-outline-secondary btn-sm">
+//     <i class="fa fa-gear me-1"></i>Display Advanced
+//   </button>
+//   <div id="my-section-id" class="d-none advanced-panel mt-3">
+//     ... advanced fields ...
+//   </div>
+(function () {
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-advanced]');
+        if (!btn) return;
+        const targetId = btn.dataset.advanced;
+        const panel = document.getElementById(targetId);
+        if (!panel) return;
+        const nowHidden = panel.classList.toggle('d-none');
+        const icon = '<i class="fa fa-gear me-1"></i>';
+        btn.innerHTML = nowHidden
+            ? icon + 'Display Advanced'
+            : icon + 'Hide Advanced';
+    });
+})();
 </script>
 </body>
 </html>

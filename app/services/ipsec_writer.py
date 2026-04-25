@@ -37,21 +37,39 @@ def generate_ipsec_conf(conn) -> str:
         "# ============================================================",
         "",
         "config setup",
-        "    charondebug=\"ike 1, knl 1, cfg 0\"",
+        '    charondebug="ike 1, knl 1, cfg 0, net 1"',
         "    uniqueids=no",
         "",
     ]
 
     phase1s = _rows(conn, "SELECT * FROM ipsec_phase1 WHERE disabled=0 ORDER BY id")
     for p1 in phase1s:
-        p1id    = p1["id"]
+        p1id      = p1["id"]
         conn_name = f"tunnel_{p1id}"
-        remote  = _val(p1, "remote_gateway")
-        ike_ver = _val(p1, "ike_version", "ikev2")
-        left_id = _val(p1, "my_identifier", "%defaultroute")
-        right_id = _val(p1, "peer_identifier", "%any")
-        lifetime = _val(p1, "p1_life_time", "28800")
-        desc = _val(p1, "description")
+        remote    = _val(p1, "remote_gateway")
+        ike_ver   = _val(p1, "ike_version", "ikev2")
+        auth_meth = _val(p1, "auth_method", "mutual-psk")
+        left_id   = _val(p1, "my_identifier", "%defaultroute")
+        right_id  = _val(p1, "peer_identifier", "%any")
+        lifetime  = _val(p1, "p1_life_time", "28800")
+        dpd_en    = bool(p1.get("dpd_enable", 1))
+        dpd_delay = p1.get("dpd_delay") or 10
+        dpd_fail  = p1.get("dpd_max_failures") or 5
+        nat_trav  = _val(p1, "nat_traversal", "auto")
+        desc      = _val(p1, "description")
+
+        # Map auth_method → strongSwan leftauth/rightauth
+        if "psk" in auth_meth:
+            left_auth, right_auth = "psk", "psk"
+        elif "cert" in auth_meth or "rsa" in auth_meth:
+            left_auth, right_auth = "pubkey", "pubkey"
+        elif "xauth" in auth_meth:
+            left_auth, right_auth = "psk", "xauth"
+        else:
+            left_auth, right_auth = "psk", "psk"
+
+        left_id_str  = "%defaultroute" if left_id  in ("my-ip","myaddress","%defaultroute","") else left_id
+        right_id_str = "%any"          if right_id in ("peer-ip","any","%any","")              else right_id
 
         # Pull algorithms for this phase1
         algs = _rows(conn, """
@@ -70,7 +88,7 @@ def generate_ipsec_conf(conn) -> str:
 
         ike_str = ",".join(ike_proposals) if ike_proposals else "aes256-sha256-modp2048"
 
-        # Phase 2 entries for this tunnel
+        # Phase 2 child SAs
         phase2s = _rows(conn, """
             SELECT * FROM ipsec_phase2 WHERE phase1_id=? AND disabled=0 ORDER BY id
         """, (p1id,))
@@ -81,24 +99,40 @@ def generate_ipsec_conf(conn) -> str:
             f"conn {conn_name}",
             f"    keyexchange={ike_ver}",
             f"    left=%defaultroute",
-            f"    leftid={left_id}",
+            f"    leftid={left_id_str}",
+            f"    leftauth={left_auth}",
             f"    right={remote}",
-            f"    rightid={right_id}",
+            f"    rightid={right_id_str}",
+            f"    rightauth={right_auth}",
             f"    ike={ike_str}!",
             f"    ikelifetime={lifetime}s",
+            "    keyingtries=3",
             "    auto=start",
         ]
 
+        if nat_trav == "force":
+            lines.append("    forceencaps=yes")
+        elif nat_trav == "disable":
+            lines.append("    forceencaps=no")
+
+        if dpd_en:
+            lines += [
+                f"    dpddelay={dpd_delay}s",
+                f"    dpdtimeout={dpd_delay * dpd_fail}s",
+                "    dpdaction=restart",
+            ]
+
         if phase2s:
-            p2 = phase2s[0]
+            p2          = phase2s[0]
             local_net   = _val(p2, "local_network",  "0.0.0.0/0")
             remote_net  = _val(p2, "remote_network", "0.0.0.0/0")
-            p2_lifetime = _val(p2, "lifetime", "3600")
-            proto_esp   = _val(p2, "protocol", "esp").lower()
+            p2_lifetime = p2.get("lifetime") or 3600
             enc_algs    = _val(p2, "encryption_algorithms", "aes256")
             hash_algs   = _val(p2, "hash_algorithms", "sha256")
             pfs_group   = _val(p2, "pfs_key_group", "14")
-            esp_str = f"{enc_algs}-{hash_algs}-modp{pfs_group}!" if pfs_group != "0" else f"{enc_algs}-{hash_algs}!"
+            esp_str     = (f"{enc_algs}-{hash_algs}-modp{pfs_group}!"
+                           if pfs_group and pfs_group != "0"
+                           else f"{enc_algs}-{hash_algs}!")
             lines += [
                 f"    leftsubnet={local_net}",
                 f"    rightsubnet={remote_net}",
@@ -120,13 +154,38 @@ def generate_ipsec_secrets(conn) -> str:
         "",
     ]
 
+    seen = set()
+
+    # 1. Inline PSKs stored per phase1 tunnel (auth_method contains 'psk')
+    phase1s = _rows(conn, """
+        SELECT remote_gateway, pre_shared_key, my_identifier, peer_identifier
+        FROM ipsec_phase1
+        WHERE disabled=0 AND pre_shared_key != '' AND pre_shared_key IS NOT NULL
+    """)
+    for p1 in phase1s:
+        left  = (p1.get("my_identifier") or "%any").strip()
+        right = (p1.get("remote_gateway") or "%any").strip()
+        psk   = (p1.get("pre_shared_key") or "").strip()
+        if not psk:
+            continue
+        left_str  = "%any" if left  in ("my-ip","myaddress","%defaultroute","") else left
+        right_str = right or "%any"
+        key = (left_str, right_str)
+        if key not in seen:
+            seen.add(key)
+            lines.append(f"{left_str} {right_str} : PSK \"{psk}\"")
+
+    # 2. Dedicated PSK table entries
     psks = _rows(conn, "SELECT * FROM ipsec_pre_shared_keys ORDER BY id")
     for psk in psks:
         identifier = (psk.get("identifier") or "%any").strip()
-        secret = (psk.get("pre_shared_key") or "").strip()
+        secret     = (psk.get("pre_shared_key") or "").strip()
         if not secret:
             continue
-        lines.append(f"{identifier} : PSK \"{secret}\"")
+        key = (identifier, "")
+        if key not in seen:
+            seen.add(key)
+            lines.append(f"{identifier} : PSK \"{secret}\"")
 
     lines.append("")
     return "\n".join(lines)
@@ -157,3 +216,42 @@ def write_ipsec_conf(conn) -> dict:
     if errors:
         return {"ok": False, "message": "; ".join(errors), "conf": conf}
     return {"ok": True, "message": "ipsec.conf + ipsec.secrets written.", "conf": conf}
+
+
+def apply_ipsec(conn) -> dict:
+    """Write config files then reload strongSwan (ipsec reload)."""
+    result = write_ipsec_conf(conn)
+    if not result["ok"] or not sys.platform.startswith("freebsd"):
+        return result
+    try:
+        from app.services.network_service import run_command
+        # Try 'ipsec reload' first; fall back to full restart
+        r = run_command(["ipsec", "reload"], check=False)
+        if r.returncode != 0:
+            r = run_command(["service", "strongswan", "restart"], check=False)
+        ok = r.returncode == 0
+        return {"ok": ok,
+                "message": result["message"] + " | ipsec reload: " + (r.stdout or r.stderr or "").strip()}
+    except Exception as exc:
+        return {"ok": False, "message": f"Config written but reload failed: {exc}"}
+
+
+def get_ipsec_status() -> dict:
+    """Return running tunnel status from 'ipsec statusall'."""
+    if not sys.platform.startswith("freebsd"):
+        return {"running": False, "tunnels": [], "message": "Not on FreeBSD"}
+    try:
+        from app.services.network_service import run_command
+        r = run_command(["ipsec", "statusall"], check=False)
+        output = (r.stdout or "").strip()
+        tunnels = []
+        for line in output.splitlines():
+            if "ESTABLISHED" in line or "INSTALLED" in line:
+                tunnels.append(line.strip())
+        return {
+            "running": r.returncode == 0,
+            "tunnels": tunnels,
+            "raw": output[:4000],
+        }
+    except Exception as exc:
+        return {"running": False, "tunnels": [], "message": str(exc)}

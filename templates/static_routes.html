@@ -19,13 +19,13 @@
     <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
-            <a class="nav-link" href="/system/routing">Gateways</a>
+            <a class="nav-link" href="{{ url_for('routing.routing_index') }}">Gateways</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link active" href="/system/routing/static">Static Routes</a>
+            <a class="nav-link active" href="{{ url_for('routing.static_routes_page') }}">Static Routes</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="/system/routing/groups">Gateway Groups</a>
+            <a class="nav-link" href="{{ url_for('routing.gateway_groups_page') }}">Gateway Groups</a>
         </li>
     </ul>
 
@@ -33,7 +33,7 @@
     <div class="section">
         <div class="section-header d-flex justify-content-between align-items-center">
             <h2>Static Routes</h2>
-            <a href="/system/routing/static/edit" class="btn btn-success btn-sm">
+            <a href="{{ url_for('routing.static_route_edit') }}" class="btn btn-success btn-sm">
                 <i class="fa-solid fa-plus me-1"></i>Add Route
             </a>
         </div>
@@ -64,12 +64,16 @@
                                 </td>
                                 <td class="align-middle">{{ r.description }}</td>
                                 <td class="align-middle text-end">
-                                    <a class="btn btn-outline-primary btn-sm" href="/system/routing/static/edit/{{ loop.index0 }}" title="Edit">
-                                        <i class="fa-solid fa-pen"></i>
+                                    <a class="btn btn-outline-primary btn-sm"
+                                       href="{{ url_for('routing.static_route_edit', route_id=r.id) }}" title="Edit">
+                                        <i class="fa fa-pen"></i>
                                     </a>
-                                    <form method="post" action="/system/routing/static/delete/{{ loop.index0 }}" style="display: inline;">
+                                    <form method="post"
+                                          action="{{ url_for('routing.static_route_delete', route_id=r.id) }}"
+                                          style="display:inline"
+                                          onsubmit="return confirm('Delete route to {{ r.destination }}?')">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
-                                            <i class="fa-solid fa-trash"></i>
+                                            <i class="fa fa-trash"></i>
                                         </button>
                                     </form>
                                 </td>
