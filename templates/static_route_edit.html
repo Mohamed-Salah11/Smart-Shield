@@ -23,37 +23,36 @@
             <h2>Static Route Configuration</h2>
         </div>
         <div class="section-body" style="padding: 20px;">
-            <form method="post">
+            <form method="post" action="{{ url_for('routing.static_route_edit', route_id=route_id) if route_id else url_for('routing.static_route_edit') }}">
                 <div class="mb-3 row align-items-center">
                     <label for="destination" class="col-sm-3 col-form-label fw-semibold">Destination Network</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="destination" name="destination" 
-                               value="{{ route.destination if route else '' }}" placeholder="e.g. 192.168.1.0/24">
-                        <small class="text-muted">The destination network in CIDR notation</small>
+                        <input type="text" class="form-control" id="destination" name="destination"
+                               value="{{ route.destination if route else '' }}" placeholder="e.g. 192.168.2.0/24" required>
+                        <small class="text-muted">Destination network in CIDR notation</small>
                     </div>
                 </div>
 
                 <div class="mb-3 row align-items-center">
-                    <label for="gateway" class="col-sm-3 col-form-label fw-semibold">Gateway</label>
+                    <label for="gateway_id" class="col-sm-3 col-form-label fw-semibold">Gateway</label>
                     <div class="col-sm-9">
-                        <select class="form-select" id="gateway" name="gateway">
-                            <option value="">-- Select Gateway --</option>
+                        <select class="form-select" id="gateway_id" name="gateway_id">
+                            <option value="">— Select Gateway —</option>
                             {% for gw in gateways %}
-                            <option value="{{ gw.name }}" {% if route and route.gateway == gw.name %}selected{% endif %}>
-                                {{ gw.name }} ({{ gw.gateway }})
+                            <option value="{{ gw.id }}" {% if route and route.gateway_id == gw.id %}selected{% endif %}>
+                                {{ gw.name }} ({{ gw.gateway }}) — {{ gw.interface }}
                             </option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Choose a configured gateway for this route</small>
+                        <small class="text-muted">Select a configured gateway for this route</small>
                     </div>
                 </div>
 
                 <div class="mb-3 row align-items-center">
                     <label for="description" class="col-sm-3 col-form-label fw-semibold">Description</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="description" name="description" 
+                        <input type="text" class="form-control" id="description" name="description"
                                value="{{ route.description if route else '' }}" placeholder="Optional description">
-                        <small class="text-muted">A brief description for reference</small>
                     </div>
                 </div>
 
@@ -64,17 +63,16 @@
                             <input type="checkbox" class="form-check-input" id="disabled" name="disabled"
                                    {% if route and route.disabled %}checked{% endif %}>
                             <label class="form-check-label" for="disabled">Disabled</label>
-                            <small class="text-muted d-block">Check to disable this route without deleting it</small>
+                            <small class="text-muted d-block">Disable without deleting</small>
                         </div>
                     </div>
                 </div>
 
                 <hr>
-
                 <div class="d-flex justify-content-end gap-2">
-                    <a href="/system/routing/static" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="{{ url_for('routing.static_routes_page') }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-save me-1"></i>Save
+                        <i class="fa fa-floppy-disk me-1"></i>Save
                     </button>
                 </div>
             </form>

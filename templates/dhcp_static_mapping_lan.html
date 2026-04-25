@@ -133,33 +133,73 @@
         </div>
 
         <div class="form-group">
-            <label for="dynamic_dns">Dynamic DNS</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>Dynamic DNS</label>
+            <button type="button" data-advanced="sml-ddns" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-ddns" class="d-none mt-2">
+                <input type="text" class="form-control mb-1" name="ddns_domain" placeholder="DDNS Domain">
+                <input type="text" class="form-control mb-1" name="ddns_keyname" placeholder="Key Name">
+                <input type="text" class="form-control"      name="ddns_key"     placeholder="Key">
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="ntp">NTP</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>NTP</label>
+            <button type="button" data-advanced="sml-ntp" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-ntp" class="d-none mt-2">
+                <input type="text" class="form-control mb-1" name="ntp1" placeholder="NTP Server 1">
+                <input type="text" class="form-control"      name="ntp2" placeholder="NTP Server 2">
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="tftp">TFTP</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>TFTP</label>
+            <button type="button" data-advanced="sml-tftp" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-tftp" class="d-none mt-2">
+                <input type="text" class="form-control" name="tftp_server" placeholder="TFTP Server IP">
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="ldap">LDAP</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>LDAP</label>
+            <button type="button" data-advanced="sml-ldap" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-ldap" class="d-none mt-2">
+                <input type="text" class="form-control" name="ldap_uri" placeholder="ldap://192.168.1.1/dc=example,dc=com">
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="network_booting">Network Booting</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>Network Booting</label>
+            <button type="button" data-advanced="sml-netboot" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-netboot" class="d-none mt-2">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" name="netboot_enable" id="sml_netboot_en">
+                    <label class="form-check-label" for="sml_netboot_en">Enable Network Booting</label>
+                </div>
+                <input type="text" class="form-control mb-1" name="next_server" placeholder="Next Server IP">
+                <input type="text" class="form-control mb-1" name="filename"    placeholder="Boot Filename">
+                <input type="text" class="form-control"      name="root_path"   placeholder="Root Path">
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="custom_dhcp">Custom DHCP Options</label>
-            <button class="btn-advanced">Display Advanced</button>
+            <label>Custom DHCP Options</label>
+            <button type="button" data-advanced="sml-custom" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="sml-custom" class="d-none mt-2">
+                <textarea class="form-control font-monospace" name="custom_options" rows="4"
+                          placeholder="option domain-name-servers 8.8.8.8;"></textarea>
+            </div>
         </div>
     </div>
 

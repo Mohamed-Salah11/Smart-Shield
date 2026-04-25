@@ -1309,5 +1309,51 @@ ON static_leases(mac_address)
             ],
         )
 
+    # ── Routing: Gateways ─────────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gateways (
+        id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled                 INTEGER DEFAULT 0,
+        name                     TEXT NOT NULL,
+        interface                TEXT DEFAULT 'WAN',
+        address_family           TEXT DEFAULT 'IPv4',
+        gateway                  TEXT NOT NULL,
+        monitor                  TEXT DEFAULT '',
+        disable_monitoring       INTEGER DEFAULT 0,
+        disable_monitoring_action INTEGER DEFAULT 0,
+        force_state              INTEGER DEFAULT 0,
+        state_killing            TEXT DEFAULT 'global',
+        is_default_v4            INTEGER DEFAULT 0,
+        is_default_v6            INTEGER DEFAULT 0,
+        description              TEXT DEFAULT '',
+        created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ── Routing: Static Routes ────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS static_routes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled    INTEGER DEFAULT 0,
+        destination TEXT NOT NULL,
+        gateway_id  INTEGER,
+        description TEXT DEFAULT '',
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(gateway_id) REFERENCES gateways(id) ON DELETE SET NULL
+    )
+    """)
+
+    # ── Routing: Gateway Groups ───────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gateway_groups (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        name          TEXT NOT NULL UNIQUE,
+        trigger_level TEXT DEFAULT 'down',
+        description   TEXT DEFAULT '',
+        members_json  TEXT DEFAULT '[]',
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     conn.commit()
     conn.close()

@@ -275,49 +275,110 @@
     <div class="form-group">
         <label>Dynamic DNS</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-ddns" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-ddns" class="d-none mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold">DDNS Domain</label>
+                    <input type="text" name="ddns_domain" class="form-control" placeholder="example.com"></div>
+                <div class="mb-2"><label class="form-label fw-semibold">DDNS Key Name</label>
+                    <input type="text" name="ddns_keyname" class="form-control"></div>
+                <div class="mb-2"><label class="form-label fw-semibold">DDNS Key</label>
+                    <input type="text" name="ddns_key" class="form-control"></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>MAC Address Control</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-mac" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-mac" class="d-none mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold">Allowed MACs</label>
+                    <textarea name="mac_allow" class="form-control font-monospace" rows="3"
+                              placeholder="One MAC per line"></textarea></div>
+                <div class="mb-2"><label class="form-label fw-semibold">Denied MACs</label>
+                    <textarea name="mac_deny" class="form-control font-monospace" rows="3"
+                              placeholder="One MAC per line"></textarea></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>NTP</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-ntp" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-ntp" class="d-none mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold">NTP Server 1</label>
+                    <input type="text" name="ntp1" class="form-control" placeholder="pool.ntp.org"></div>
+                <div class="mb-2"><label class="form-label fw-semibold">NTP Server 2</label>
+                    <input type="text" name="ntp2" class="form-control"></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>TFTP</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-tftp" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-tftp" class="d-none mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold">TFTP Server</label>
+                    <input type="text" name="tftp_server" class="form-control" placeholder="192.168.1.10"></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>LDAP</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-ldap" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-ldap" class="d-none mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold">LDAP URI</label>
+                    <input type="text" name="ldap_uri" class="form-control" placeholder="ldap://192.168.1.1/dc=example,dc=com"></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>Network Booting</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-netboot" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-netboot" class="d-none mt-3">
+                <div class="mb-2 form-check">
+                    <input type="checkbox" class="form-check-input" name="netboot_enable" id="netboot_enable_lan">
+                    <label class="form-check-label" for="netboot_enable_lan">Enable Network Booting</label>
+                </div>
+                <div class="mb-2"><label class="form-label fw-semibold">Next Server</label>
+                    <input type="text" name="next_server" class="form-control" placeholder="192.168.1.100"></div>
+                <div class="mb-2"><label class="form-label fw-semibold">Boot Filename</label>
+                    <input type="text" name="filename" class="form-control" placeholder="pxelinux.0"></div>
+                <div class="mb-2"><label class="form-label fw-semibold">Root Path</label>
+                    <input type="text" name="root_path" class="form-control" placeholder="/tftpboot"></div>
+            </div>
         </div>
     </div>
 
     <div class="form-group">
         <label>Custom DHCP Options</label>
         <div class="form-group-content">
-            <button class="btn btn-info">Display Advanced</button>
+            <button type="button" data-advanced="dhcp-lan-custom" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-gear me-1"></i>Display Advanced
+            </button>
+            <div id="dhcp-lan-custom" class="d-none mt-3">
+                <textarea name="custom_options" class="form-control font-monospace" rows="5"
+                          placeholder="option domain-name-servers 8.8.8.8;"></textarea>
+                <small class="text-muted">Raw ISC DHCP options, one per line.</small>
+            </div>
         </div>
     </div>
 </div>

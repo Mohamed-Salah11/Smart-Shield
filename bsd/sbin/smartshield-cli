@@ -1,178 +1,439 @@
 #!/bin/sh
-# Smart Shield console menu for appliance-style local administration.
+# =============================================================================
+# smartshield-cli — Smart Shield interactive console (pfSense-style)
+# =============================================================================
+# Install: install -m 0555 smartshield-cli /usr/local/sbin/smartshield-cli
+# Launch:  smartshield-cli   (or via: smartshieldctl menu)
 #
-# What to do with this file:
-# 1) Copy to: /usr/local/sbin/smartshield-cli
-# 2) Make executable: chmod 555 /usr/local/sbin/smartshield-cli
-# 3) Run manually on console, or configure admin shell/login profile
-#    to launch it automatically on tty for pfSense-style workflow.
-#
-# Typical integration approaches:
-# - Keep root shell default and run smartshield-cli manually.
-# - Create dedicated admin user with login shell wrapper that launches
-#   smartshield-cli after authentication.
-# - Use /etc/gettytab + /etc/ttys automation carefully for kiosk console.
-#
-# This menu intentionally delegates service actions to smartshieldctl.
-# Extend options here as smartshieldctl gains apply/rollback subcommands.
+# To auto-launch on console login, add to /root/.profile:
+#   [ "$(tty)" = "/dev/ttyv0" ] && exec /usr/local/sbin/smartshield-cli
+# =============================================================================
 set -eu
 
-pause() {
-    printf "\nPress Enter to continue..."
-    read -r _
+CTL="${CTL:-smartshieldctl}"
+APP_ROOT="${SMARTSHIELD_APP_ROOT:-/usr/local/share/smart-shield}"
+ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smart-shield/smart-shield.env}"
+
+# ── Display helpers ───────────────────────────────────────────────────────────
+_bold()  { printf "\033[1m%s\033[0m" "$1"; }
+_green() { printf "\033[0;32m%s\033[0m" "$1"; }
+_red()   { printf "\033[0;31m%s\033[0m" "$1"; }
+_cyan()  { printf "\033[0;36m%s\033[0m" "$1"; }
+_yellow(){ printf "\033[0;33m%s\033[0m" "$1"; }
+
+_pause() {
+    printf "\n$(_yellow 'Press Enter to return to menu...')"; read -r _
 }
 
-run_ctl() {
-    if smartshieldctl "$@"; then
-        :
+_run() {
+    "${CTL}" "$@" || true
+    _pause
+}
+
+_confirm() {
+    # _confirm "message" → returns 0 if y, 1 otherwise
+    printf "%s [y/N]: " "$1"
+    read -r _yn
+    case "${_yn}" in y|Y) return 0 ;; *) return 1 ;; esac
+}
+
+# ── Status line shown in menu header ─────────────────────────────────────────
+_svc_state() {
+    if service smart_shield status >/dev/null 2>&1; then
+        _green "RUNNING"
     else
-        echo "Command failed: smartshieldctl $*"
+        _red "STOPPED"
     fi
-    pause
 }
 
-configure_interface() {
-    iface="$1"
-    mode=""
-    cidr=""
-    gateway=""
-    apply_now=""
+_pf_state() {
+    if pfctl -s info >/dev/null 2>&1; then
+        _green "ENABLED"
+    else
+        _yellow "OFF/UNAVAIL"
+    fi
+}
 
-    echo "Current ${iface} settings:"
-    smartshieldctl iface-show "${iface}" || true
-    echo
+_wan_ip() {
+    if command -v smartshieldctl >/dev/null 2>&1; then
+        "${CTL}" iface-show WAN 2>/dev/null | grep "^Live IP" | awk '{print $3}' || echo "?"
+    else
+        echo "?"
+    fi
+}
 
-    printf "Set ${iface} IPv4 mode [dhcp/static]: "
+_lan_ip() {
+    if command -v smartshieldctl >/dev/null 2>&1; then
+        "${CTL}" iface-show LAN 2>/dev/null | grep "^Live IP" | awk '{print $3}' || echo "?"
+    else
+        echo "?"
+    fi
+}
+
+# ── Sub-menus ─────────────────────────────────────────────────────────────────
+
+_menu_assign_interfaces() {
+    while :; do
+        clear
+        printf "$(_bold '=== Assign Network Interfaces ===')\n\n"
+        echo "Physical NICs on this system:"
+        "${CTL}" list-nics 2>/dev/null || ifconfig -l | tr ' ' '\n' | grep -v '^lo'
+        echo ""
+        echo "Current assignments:"
+        "${CTL}" iface-show WAN 2>/dev/null | grep -E "Physical Port|Live IP|IPv4 Address" | sed 's/^/  WAN > /'
+        "${CTL}" iface-show LAN 2>/dev/null | grep -E "Physical Port|Live IP|IPv4 Address" | sed 's/^/  LAN > /'
+        echo ""
+        echo "  1) Assign WAN interface"
+        echo "  2) Assign LAN interface"
+        echo "  b) Back"
+        printf "\nSelect: "
+        read -r c
+        case "${c}" in
+            1)
+                printf "Enter WAN physical port (e.g. em0): "
+                read -r port
+                [ -n "${port}" ] && "${CTL}" assign WAN "${port}" || echo "Cancelled."
+                _pause
+                ;;
+            2)
+                printf "Enter LAN physical port (e.g. em1): "
+                read -r port
+                [ -n "${port}" ] && "${CTL}" assign LAN "${port}" || echo "Cancelled."
+                _pause
+                ;;
+            b|B) return ;;
+        esac
+    done
+}
+
+_menu_set_ip() {
+    itype="$1"   # LAN or WAN
+    clear
+    printf "$(_bold "=== Set ${itype} IPv4 Address ===")\n\n"
+    echo "Current settings:"
+    "${CTL}" iface-show "${itype}" 2>/dev/null
+    echo ""
+    printf "Mode [dhcp/static]: "
     read -r mode
     mode="$(echo "${mode}" | tr '[:upper:]' '[:lower:]')"
-
     case "${mode}" in
         dhcp)
-            printf "Apply now on assigned interface? [y/N]: "
-            read -r apply_now
-            case "${apply_now}" in
-                y|Y) run_ctl iface-set "${iface}" dhcp --apply ;;
-                *) run_ctl iface-set "${iface}" dhcp ;;
-            esac
+            if _confirm "Apply DHCP now on the assigned interface?"; then
+                "${CTL}" iface-set "${itype}" dhcp --apply
+            else
+                "${CTL}" iface-set "${itype}" dhcp
+            fi
             ;;
         static)
-            printf "Enter static IPv4 CIDR (example 192.168.1.1/24): "
+            printf "IPv4 CIDR (e.g. 192.168.1.1/24): "
             read -r cidr
-            if [ -z "${cidr}" ]; then
-                echo "CIDR is required for static mode."
-                pause
-                return
-            fi
-            printf "Enter gateway IPv4 (optional): "
-            read -r gateway
-            printf "Apply now on assigned interface? [y/N]: "
-            read -r apply_now
-
-            if [ -n "${gateway}" ]; then
-                case "${apply_now}" in
-                    y|Y) run_ctl iface-set "${iface}" static "${cidr}" "${gateway}" --apply ;;
-                    *) run_ctl iface-set "${iface}" static "${cidr}" "${gateway}" ;;
-                esac
+            [ -z "${cidr}" ] && { echo "Cancelled."; _pause; return; }
+            printf "Gateway (leave blank if none): "
+            read -r gw
+            if _confirm "Apply now on the assigned interface?"; then
+                if [ -n "${gw}" ]; then
+                    "${CTL}" iface-set "${itype}" static "${cidr}" "${gw}" --apply
+                else
+                    "${CTL}" iface-set "${itype}" static "${cidr}" --apply
+                fi
             else
-                case "${apply_now}" in
-                    y|Y) run_ctl iface-set "${iface}" static "${cidr}" --apply ;;
-                    *) run_ctl iface-set "${iface}" static "${cidr}" ;;
-                esac
+                if [ -n "${gw}" ]; then
+                    "${CTL}" iface-set "${itype}" static "${cidr}" "${gw}"
+                else
+                    "${CTL}" iface-set "${itype}" static "${cidr}"
+                fi
             fi
             ;;
-        *)
-            echo "Invalid mode. Use 'dhcp' or 'static'."
-            pause
-            ;;
+        *) echo "Invalid mode — enter 'dhcp' or 'static'." ;;
     esac
+    _pause
 }
 
+_menu_logs() {
+    while :; do
+        clear
+        printf "$(_bold '=== System Logs ===')\n\n"
+        echo "  1) App log (last 50 lines)"
+        echo "  2) App log — follow live (Ctrl+C to stop)"
+        echo "  3) Audit log (last 50 lines)"
+        echo "  4) Access log (last 30 lines)"
+        echo "  5) PF state table"
+        echo "  b) Back"
+        printf "\nSelect: "
+        read -r c
+        case "${c}" in
+            1) clear; "${CTL}" logs 50; _pause ;;
+            2) clear; echo "Following log — press Ctrl+C to stop"; tail -f /var/log/smart-shield/app.log ;;
+            3) clear; "${CTL}" audit 50; _pause ;;
+            4) clear; "${CTL}" access 30; _pause ;;
+            5) clear; "${CTL}" pf-status; _pause ;;
+            b|B) return ;;
+        esac
+    done
+}
+
+_menu_vpn() {
+    clear
+    printf "$(_bold '=== VPN Status ===')\n\n"
+    "${CTL}" vpn-status 2>/dev/null || echo "VPN status unavailable."
+    _pause
+}
+
+_menu_diag() {
+    while :; do
+        clear
+        printf "$(_bold '=== Diagnostics ===')\n\n"
+        echo "  1) Ping a host"
+        echo "  2) DNS lookup"
+        echo "  3) PF rules & state table"
+        echo "  4) Interface status (all NICs)"
+        echo "  5) DHCP leases"
+        echo "  6) VPN status"
+        echo "  7) Preflight check (dirs + tools)"
+        echo "  8) System info (CPU/RAM/disk)"
+        echo "  9) Web UI health check"
+        echo "  b) Back"
+        printf "\nSelect: "
+        read -r c
+        case "${c}" in
+            1)
+                printf "Host to ping [8.8.8.8]: "
+                read -r h; h="${h:-8.8.8.8}"
+                printf "Count [4]: "
+                read -r n; n="${n:-4}"
+                clear; "${CTL}" ping "${h}" "${n}" || true; _pause
+                ;;
+            2)
+                printf "Hostname to resolve: "
+                read -r h
+                [ -z "${h}" ] && { _pause; continue; }
+                clear
+                host "${h}" 2>/dev/null || nslookup "${h}" 2>/dev/null || echo "DNS resolution failed."
+                _pause
+                ;;
+            3) clear; "${CTL}" pf-status; _pause ;;
+            4) clear; ifconfig; _pause ;;
+            5) clear; "${CTL}" dhcp-status; _pause ;;
+            6) clear; "${CTL}" vpn-status; _pause ;;
+            7) clear; "${CTL}" preflight; _pause ;;
+            8) clear; "${CTL}" sysinfo; _pause ;;
+            9) clear; "${CTL}" health; _pause ;;
+            b|B) return ;;
+        esac
+    done
+}
+
+_menu_admin() {
+    while :; do
+        clear
+        printf "$(_bold '=== Administration ===')\n\n"
+        echo "  1) Reset admin password"
+        echo "  2) Apply firewall rules (pfctl reload)"
+        echo "  3) Enable SSH"
+        echo "  4) Disable SSH"
+        echo "  5) Factory reset (WIPE ALL CONFIG)"
+        echo "  b) Back"
+        printf "\nSelect: "
+        read -r c
+        case "${c}" in
+            1) clear; "${CTL}" passwd; _pause ;;
+            2) clear; "${CTL}" apply-pf; _pause ;;
+            3) clear; "${CTL}" ssh enable; _pause ;;
+            4) clear; "${CTL}" ssh disable; _pause ;;
+            5)
+                clear
+                echo "WARNING: All firewall rules, VPN tunnels, DHCP/DNS settings"
+                echo "and interface config will be permanently deleted."
+                echo ""
+                "${CTL}" factory-reset || true
+                _pause
+                ;;
+            b|B) return ;;
+        esac
+    done
+}
+
+# ── Main menu ─────────────────────────────────────────────────────────────────
 while :; do
     clear
-    cat <<'EOF'
-=========================================
- Smart Shield Console (FreeBSD Appliance)
-=========================================
-1) Service status
-2) Start service
-3) Stop service
-4) Restart service
-5) Tail logs
-6) Tail audit log
-7) Tail PF filter log
-8) Enable service at boot
-9) Disable service at boot
-10) Configure LAN IPv4 mode
-11) Configure WAN IPv4 mode
-n) Network apply reminder
-r) Reboot system
-0) Shutdown system
-q) Quit to shell
-EOF
 
-    printf "\nSelect option: "
-    read -r choice
+    # Header
+    printf "\033[1;34m"
+    cat <<'BANNER'
+  ╔═══════════════════════════════════════════════════╗
+  ║         Smart Shield — Firewall Console           ║
+  ║              FreeBSD Appliance CLI                ║
+  ╚═══════════════════════════════════════════════════╝
+BANNER
+    printf "\033[0m"
 
-    case "${choice}" in
-        1) run_ctl status ;;
-        2) run_ctl start ;;
-        3) run_ctl stop ;;
-        4) run_ctl restart ;;
-        5)
-            printf "Tail how many lines? [100]: "
-            read -r n
-            n="${n:-100}"
-            run_ctl logs "${n}"
-            ;;
-        8)
-            run_ctl enable
-            ;;
-        9)
-            run_ctl disable
-            ;;
-        10)
-            configure_interface "LAN"
-            ;;
-        11)
-            configure_interface "WAN"
-            ;;
-        6)
-            printf "Tail how many audit lines? [100]: "
-            read -r n
-            n="${n:-100}"
-            run_ctl audit "${n}"
-            ;;
-        7)
-            printf "Tail how many PF filter lines? [100]: "
-            read -r n
-            n="${n:-100}"
-            run_ctl filterlog "${n}"
-            ;;
-        n|N)
-            echo "Use Web UI actions for config apply (CSRF-protected API)."
-            echo "In future, wire smartshieldctl apply-* commands to backend workers."
-            pause
-            ;;
-        r|R)
-            printf "Reboot now? [y/N]: "
-            read -r yn
-            case "${yn}" in
-                y|Y) reboot ;;
-                *) ;;
-            esac
-            ;;
+    # Status line
+    printf "  Service: %-12s  PF: %-12s\n" "$(_svc_state)" "$(_pf_state)"
+    printf "  WAN IP : %-18s  LAN IP: %s\n" "$(_wan_ip)" "$(_lan_ip)"
+    echo ""
+
+    # Menu options
+    printf "  $(_bold ' 0)') Logout / Exit to shell\n"
+    printf "  $(_bold ' 1)') Assign Network Interfaces\n"
+    printf "  $(_bold ' 2)') Set WAN IP address\n"
+    printf "  $(_bold ' 3)') Set LAN IP address\n"
+    printf "  $(_bold ' 4)') Reset admin password\n"
+    printf "  $(_bold ' 5)') Reset to factory defaults\n"
+    printf "  $(_bold ' 6)') Reboot system\n"
+    printf "  $(_bold ' 7)') Halt / Power off system\n"
+    printf "  $(_bold ' 8)') Ping host\n"
+    printf "  $(_bold ' 9)') Shell\n"
+    printf "  $(_bold '10)') PF status (rules + states)\n"
+    printf "  $(_bold '11)') System logs\n"
+    printf "  $(_bold '12)') Restart Smart Shield\n"
+    printf "  $(_bold '13)') Enable / Disable SSH\n"
+    printf "  $(_bold '14)') Preflight check\n"
+    printf "  $(_bold '15)') Apply firewall rules\n"
+    printf "  $(_bold '16)') VPN status\n"
+    printf "  $(_bold '17)') DHCP leases\n"
+    printf "  $(_bold '18)') Diagnostics\n"
+    printf "  $(_bold '19)') System info\n"
+    printf "  $(_bold '20)') Administration menu\n"
+    echo ""
+    printf "  Select option: "
+    read -r opt
+
+    case "${opt}" in
+
         0)
-            printf "Shutdown now? [y/N]: "
-            read -r yn
-            case "${yn}" in
-                y|Y) shutdown -p now ;;
-                *) ;;
+            echo "Exiting to shell."
+            exec /bin/sh
+            ;;
+
+        1) _menu_assign_interfaces ;;
+
+        2) _menu_set_ip WAN ;;
+
+        3) _menu_set_ip LAN ;;
+
+        4)
+            clear
+            printf "$(_bold '=== Reset Admin Password ===')\n\n"
+            printf "Username [admin]: "
+            read -r u; u="${u:-admin}"
+            "${CTL}" passwd "${u}" || true
+            _pause
+            ;;
+
+        5)
+            clear
+            printf "$(_bold '=== Factory Reset ===')\n\n"
+            "${CTL}" factory-reset || true
+            _pause
+            ;;
+
+        6)
+            if _confirm "Reboot the system now?"; then
+                echo "Rebooting…"
+                reboot
+            fi
+            ;;
+
+        7)
+            if _confirm "Halt (power off) the system now?"; then
+                echo "Halting…"
+                shutdown -p now
+            fi
+            ;;
+
+        8)
+            clear
+            printf "Host to ping [8.8.8.8]: "
+            read -r h; h="${h:-8.8.8.8}"
+            printf "Count [4]: "
+            read -r n; n="${n:-4}"
+            clear
+            "${CTL}" ping "${h}" "${n}" || true
+            _pause
+            ;;
+
+        9)
+            echo "Type 'exit' to return to Smart Shield console."
+            /bin/sh || true
+            ;;
+
+        10)
+            clear
+            printf "$(_bold '=== PF Status ===')\n\n"
+            "${CTL}" pf-status || echo "PF not available."
+            _pause
+            ;;
+
+        11) _menu_logs ;;
+
+        12)
+            clear
+            if _confirm "Restart Smart Shield service?"; then
+                _run restart
+            fi
+            ;;
+
+        13)
+            clear
+            printf "$(_bold '=== SSH Control ===')\n\n"
+            "${CTL}" ssh status || true
+            echo ""
+            echo "  1) Enable SSH"
+            echo "  2) Disable SSH"
+            echo "  b) Back"
+            printf "\nSelect: "
+            read -r s
+            case "${s}" in
+                1) "${CTL}" ssh enable; _pause ;;
+                2) "${CTL}" ssh disable; _pause ;;
             esac
             ;;
-        q|Q) exit 0 ;;
-        *)
-            echo "Invalid option."
-            pause
+
+        14)
+            clear
+            printf "$(_bold '=== Preflight Check ===')\n\n"
+            "${CTL}" preflight || true
+            _pause
             ;;
+
+        15)
+            clear
+            printf "$(_bold '=== Apply Firewall Rules ===')\n\n"
+            if _confirm "Regenerate pf.conf from DB and reload pfctl?"; then
+                "${CTL}" apply-pf || true
+            fi
+            _pause
+            ;;
+
+        16)
+            clear
+            printf "$(_bold '=== VPN Status ===')\n\n"
+            "${CTL}" vpn-status || true
+            _pause
+            ;;
+
+        17)
+            clear
+            printf "$(_bold '=== DHCP Leases ===')\n\n"
+            "${CTL}" dhcp-status || true
+            _pause
+            ;;
+
+        18) _menu_diag ;;
+
+        19)
+            clear
+            printf "$(_bold '=== System Information ===')\n\n"
+            "${CTL}" sysinfo || true
+            _pause
+            ;;
+
+        20) _menu_admin ;;
+
+        *)
+            printf "$(_red 'Invalid option: %s')\n" "${opt}"
+            sleep 1
+            ;;
+
     esac
 done
