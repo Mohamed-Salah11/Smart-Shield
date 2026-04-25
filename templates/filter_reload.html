@@ -1,6 +1,98 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Filter Reload</h1>
-<p>Placeholder for Filter Reload status.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Filter Reload</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-fire-flame-curved me-2 text-primary"></i>Filter Reload Status</h1>
+    <p class="lead">Reload firewall rules into the pf(4) packet filter.</p>
+  </div>
+
+  <!-- Rule counts -->
+  <div class="row g-3 mb-4">
+    <div class="col-sm-4">
+      <div class="section text-center p-3">
+        <div class="fs-2 fw-bold text-primary">{{ wan_count }}</div>
+        <div class="text-muted small mt-1">WAN Rules Active</div>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="section text-center p-3">
+        <div class="fs-2 fw-bold text-success">{{ lan_count }}</div>
+        <div class="text-muted small mt-1">LAN Rules Active</div>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="section text-center p-3">
+        <div class="fs-2 fw-bold text-warning">{{ float_count }}</div>
+        <div class="text-muted small mt-1">Floating Rules Active</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2 class="mb-0"><i class="fa fa-rotate me-2"></i>Apply Firewall Rules</h2>
+    </div>
+    <div class="section-body">
+      {% if pf_enabled %}
+      <p>Clicking <strong>Apply</strong> will regenerate <code>pf.conf</code> from the current rule database and reload it via <code>pfctl -f</code>.</p>
+      <div id="reload-result" class="alert d-none mb-3"></div>
+      <button id="btn-apply" class="btn btn-danger">
+        <i class="fa fa-bolt me-2"></i>Apply &amp; Reload Rules
+      </button>
+      {% else %}
+      <div class="alert alert-warning">
+        <i class="fa fa-triangle-exclamation me-2"></i>
+        <strong>pf not available.</strong>
+        This interface is running outside FreeBSD — rule reload is disabled.
+        Rules can still be edited in <a href="{{ url_for('firewall.rules') }}">Firewall → Rules</a>.
+      </div>
+      {% endif %}
+
+      <div class="mt-4">
+        <h3 class="fs-6 fw-semibold mb-2">Quick Links</h3>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('firewall.rules') }}" class="btn btn-sm btn-outline-primary">
+            <i class="fa fa-list me-1"></i>Edit WAN Rules
+          </a>
+          <a href="{{ url_for('status.gateways') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="fa fa-route me-1"></i>Gateway Status
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('btn-apply')?.addEventListener('click', function () {
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Reloading…';
+  fetch('/status/filter-reload/apply', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      const el = document.getElementById('reload-result');
+      el.classList.remove('d-none', 'alert-success', 'alert-danger');
+      el.classList.add(data.ok ? 'alert-success' : 'alert-danger');
+      el.textContent = data.message || (data.ok ? 'Rules reloaded successfully.' : 'Reload failed.');
+    })
+    .catch(() => {
+      const el = document.getElementById('reload-result');
+      el.classList.remove('d-none');
+      el.classList.add('alert-danger');
+      el.textContent = 'Request failed — check server logs.';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-bolt me-2"></i>Apply &amp; Reload Rules';
+    });
+});
+</script>
 {% endblock %}

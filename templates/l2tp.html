@@ -1,90 +1,370 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / L2TP
-</div>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">L2TP</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-network-wired me-2 text-primary"></i>L2TP Server</h1>
+    <p class="lead">L2TP/IPsec VPN via mpd5 — configuration and user management.</p>
+  </div>
 
-<ul class="nav nav-tabs">
-	<li class="nav-item">
-		<a class="nav-link active" href="{{ url_for('vpn.l2tp') }}">Configuration</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link" href="{{ url_for('vpn.l2tp_users') }}">Users</a>
-	</li>
-</ul>
+  <!-- Status bar -->
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-circle-dot me-2"></i>Service Status</h2>
+      <div class="d-flex gap-2">
+        <span id="l2tp-status-badge" class="badge bg-secondary">Checking…</span>
+        <button class="btn btn-sm btn-success" id="btn-apply">
+          <i class="fa fa-bolt me-1"></i>Apply &amp; Restart
+        </button>
+      </div>
+    </div>
+    <div class="section-body">
+      <div id="apply-result" class="d-none alert mb-0"></div>
+      <div id="l2tp-sessions" class="mt-2 text-muted small"></div>
+    </div>
+  </div>
 
-<div class="settings-section">
-	<h5 class="openvpn-section-title">L2TP Configuration</h5>
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link active" href="#" data-tab="config">
+        <i class="fa fa-gear me-1"></i>Configuration
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="#" data-tab="users">
+        <i class="fa fa-users me-1"></i>Users
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="#" data-tab="preview">
+        <i class="fa fa-file-code me-1"></i>Config Preview
+      </a>
+    </li>
+  </ul>
 
-	<div class="openvpn-section-body">
-		<div class="openvpn-form-section">
-			<div class="openvpn-form-section-title">Enable L2TP</div>
+  <!-- Configuration tab -->
+  <div id="tab-config">
+    <div class="section mb-4">
+      <div class="section-header"><h2 class="mb-0">Server Settings</h2></div>
+      <div class="section-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Enable L2TP Server</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="l2tp_enabled" checked>
+              <label class="form-check-label" for="l2tp_enabled">Enable mpd5 L2TP daemon</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Interface</label>
+            <select class="form-select" id="l2tp_interface">
+              <option value="wan">WAN</option>
+              <option value="lan">LAN</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Server IP Address</label>
+            <input type="text" class="form-control" id="l2tp_server_address"
+                   placeholder="192.168.1.1" autocomplete="off">
+            <div class="form-text">Local IP assigned to the L2TP tunnel interface.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Client IP Pool Start</label>
+            <input type="text" class="form-control" id="l2tp_remote_address"
+                   placeholder="192.168.1.200" autocomplete="off">
+            <div class="form-text">First IP assigned to clients (50 addresses allocated).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Subnet Mask</label>
+            <input type="text" class="form-control" id="l2tp_subnet_mask"
+                   placeholder="255.255.255.0" autocomplete="off">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Authentication</label>
+            <select class="form-select" id="l2tp_authentication">
+              <option value="chap">MS-CHAPv2 (recommended)</option>
+              <option value="pap">PAP</option>
+              <option value="radius">RADIUS</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">DNS Server 1</label>
+            <input type="text" class="form-control" id="l2tp_dns1" placeholder="8.8.8.8" autocomplete="off">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">DNS Server 2</label>
+            <input type="text" class="form-control" id="l2tp_dns2" placeholder="8.8.4.4" autocomplete="off">
+          </div>
+        </div>
+        <div class="mt-4">
+          <button class="btn btn-primary" id="btn-save-config">
+            <i class="fa fa-floppy-disk me-1"></i>Save Configuration
+          </button>
+        </div>
+        <div id="save-result" class="d-none alert mt-3 mb-0"></div>
+      </div>
+    </div>
+    <div class="alert alert-info">
+      <i class="fa fa-circle-info me-2"></i>
+      <strong>IPsec note:</strong> L2TP/IPsec requires a matching IPsec Phase 1 on the
+      <a href="{{ url_for('vpn.ipsec') }}">IPsec page</a> with
+      <code>rightsubnet=0.0.0.0/0</code> and <code>rightauth=psk</code>.
+    </div>
+  </div>
 
-			<div class="row align-items-center mb-3">
-				<div class="col-md-3 fw-semibold">Enable</div>
-				<div class="col-md-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="l2tpEnable" checked>
-						<label class="form-check-label" for="l2tpEnable">Enable L2TP server</label>
-					</div>
-				</div>
-			</div>
+  <!-- Users tab -->
+  <div id="tab-users" class="d-none">
+    <div class="section mb-4">
+      <div class="section-header d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">L2TP Users</h2>
+        <button class="btn btn-sm btn-primary" id="btn-add-user">
+          <i class="fa fa-plus me-1"></i>Add User
+        </button>
+      </div>
+      <div class="section-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Username</th><th>Assigned IP</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="3" class="text-center text-muted py-3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
-			<div class="mt-4">
-					<button type="button" class="btn btn-primary" id="l2tpSaveBtn">Save</button>
-			</div>
-		</div>
+  <!-- Preview tab -->
+  <div id="tab-preview" class="d-none">
+    <div class="section">
+      <div class="section-header d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">mpd.conf Preview</h2>
+        <button class="btn btn-sm btn-outline-primary" id="btn-refresh-preview">
+          <i class="fa fa-rotate me-1"></i>Refresh
+        </button>
+      </div>
+      <div class="section-body p-0">
+        <pre id="conf-preview" style="background:var(--bg);color:var(--text-color);
+          font-family:monospace;font-size:.8rem;padding:1rem;margin:0;
+          min-height:200px;white-space:pre-wrap;border-radius:0 0 8px 8px;">
+Click Refresh to load…</pre>
+      </div>
+    </div>
+  </div>
 
-		<div class="alert alert-info mt-4" role="alert">
-			Don't forget to add a firewall rule to permit traffic from L2TP clients.
-		</div>
-	</div>
+  <!-- User modal -->
+  <div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="userModalTitle">Add L2TP User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="modal-user-id">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Username</label>
+            <input type="text" class="form-control" id="modal-username" autocomplete="off">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="password" class="form-control" id="modal-password" autocomplete="new-password">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Assigned IP <small class="text-muted">(optional)</small></label>
+            <input type="text" class="form-control" id="modal-ip" placeholder="192.168.1.210" autocomplete="off">
+          </div>
+          <div id="modal-error" class="alert alert-danger d-none mb-0"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="btn-save-user">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-	loadL2tpSettings();
-	const btn = document.getElementById('l2tpSaveBtn');
-	if (btn) btn.addEventListener('click', saveL2tpSettings);
+// ─── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('[data-tab]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const t = a.dataset.tab;
+    document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    ['config','users','preview'].forEach(id =>
+      document.getElementById('tab-'+id).classList.add('d-none'));
+    document.getElementById('tab-'+t).classList.remove('d-none');
+    if (t === 'users')   loadUsers();
+    if (t === 'preview') loadPreview();
+  });
 });
 
-function loadL2tpSettings() {
-	fetch('/vpn/api/l2tp/settings')
-		.then(r => {
-			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			return r.json();
-		})
-		.then(json => {
-			if (!json.success) throw new Error(json.error || 'Failed to load L2TP settings');
-			const enabled = (json.settings && typeof json.settings.enabled !== 'undefined') ? json.settings.enabled : 1;
-			const cb = document.getElementById('l2tpEnable');
-			if (cb) cb.checked = !!enabled;
-		})
-		.catch(err => console.error('Load L2TP settings failed:', err));
+// ─── Status ───────────────────────────────────────────────────────────────────
+function loadStatus() {
+  fetch('/vpn/api/l2tp/status').then(r=>r.json()).then(d => {
+    const b = document.getElementById('l2tp-status-badge');
+    b.textContent = d.running ? 'Running' : 'Stopped';
+    b.className   = 'badge ' + (d.running ? 'bg-success' : 'bg-danger');
+    const s = document.getElementById('l2tp-sessions');
+    s.textContent = d.running ? (d.sessions && d.sessions.length ? d.sessions.length+' session(s)' : 'No active sessions.') : '';
+  }).catch(() => {
+    document.getElementById('l2tp-status-badge').textContent = 'Unknown';
+  });
+}
+loadStatus();
+
+// ─── Apply ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-apply').addEventListener('click', function () {
+  const res = document.getElementById('apply-result');
+  this.disabled = true;
+  this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Applying…';
+  fetch('/vpn/api/l2tp/apply', {method:'POST'}).then(r=>r.json()).then(d => {
+    res.className = 'alert '+(d.ok?'alert-success':'alert-danger');
+    res.textContent = d.message || (d.ok?'Applied.':'Failed.');
+    res.classList.remove('d-none');
+    setTimeout(loadStatus, 1500);
+  }).catch(e => {
+    res.className = 'alert alert-danger';
+    res.textContent = 'Request failed: '+e.message;
+    res.classList.remove('d-none');
+  }).finally(() => {
+    this.disabled = false;
+    this.innerHTML = '<i class="fa fa-bolt me-1"></i>Apply &amp; Restart';
+  });
+});
+
+// ─── Load / Save config ───────────────────────────────────────────────────────
+fetch('/vpn/api/l2tp/get-config').then(r=>r.json()).then(d => {
+  if (!d.success || !d.config) return;
+  const c = d.config;
+  document.getElementById('l2tp_enabled').checked       = !!c.enabled;
+  document.getElementById('l2tp_interface').value       = c.interface        || 'wan';
+  document.getElementById('l2tp_server_address').value  = c.server_address   || '';
+  document.getElementById('l2tp_remote_address').value  = c.remote_address_range || '';
+  document.getElementById('l2tp_subnet_mask').value     = c.subnet_mask      || '';
+  document.getElementById('l2tp_authentication').value  = c.authentication   || 'chap';
+  document.getElementById('l2tp_dns1').value            = c.dns_server1      || '';
+  document.getElementById('l2tp_dns2').value            = c.dns_server2      || '';
+}).catch(() => {});
+
+document.getElementById('btn-save-config').addEventListener('click', function () {
+  const payload = {
+    enabled:              document.getElementById('l2tp_enabled').checked ? 1 : 0,
+    interface:            document.getElementById('l2tp_interface').value,
+    server_address:       document.getElementById('l2tp_server_address').value,
+    remote_address_range: document.getElementById('l2tp_remote_address').value,
+    subnet_mask:          document.getElementById('l2tp_subnet_mask').value,
+    authentication:       document.getElementById('l2tp_authentication').value,
+    dns_server1:          document.getElementById('l2tp_dns1').value,
+    dns_server2:          document.getElementById('l2tp_dns2').value,
+  };
+  const res = document.getElementById('save-result');
+  this.disabled = true;
+  fetch('/vpn/api/l2tp/save-config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  }).then(r=>r.json()).then(d => {
+    const ok = d.success || d.ok;
+    res.className = 'alert '+(ok?'alert-success':'alert-danger');
+    res.textContent = d.message || (ok?'Saved.':'Save failed.');
+    res.classList.remove('d-none');
+  }).catch(e => {
+    res.className='alert alert-danger';
+    res.textContent='Request failed: '+e.message;
+    res.classList.remove('d-none');
+  }).finally(() => { this.disabled=false; });
+});
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+function loadUsers() {
+  fetch('/vpn/api/l2tp/get-users').then(r=>r.json()).then(d => {
+    const tbody = document.getElementById('users-tbody');
+    const users = d.users || [];
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No users defined.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td><i class="fa fa-user me-2 text-muted"></i>${u.username}</td>
+        <td>${u.ip_address || '<span class="text-muted">Dynamic</span>'}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary me-1"
+            onclick="openEditUser(${u.id},'${u.username}','${u.ip_address||''}')">
+            <i class="fa fa-pen"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})">
+            <i class="fa fa-trash"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+  }).catch(() => {});
 }
 
-function saveL2tpSettings() {
-	const cb = document.getElementById('l2tpEnable');
-	const payload = { enabled: cb ? !!cb.checked : true };
+document.getElementById('btn-add-user').addEventListener('click', () => {
+  ['modal-user-id','modal-username','modal-password','modal-ip'].forEach(id =>
+    document.getElementById(id).value = '');
+  document.getElementById('userModalTitle').textContent = 'Add L2TP User';
+  document.getElementById('modal-error').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('userModal')).show();
+});
 
-	fetch('/vpn/api/l2tp/settings', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(payload)
-	})
-		.then(r => r.json())
-		.then(json => {
-			if (!json.success) {
-				alert(json.error || 'Failed to save');
-				return;
-			}
-			alert('Saved successfully');
-		})
-		.catch(err => {
-			console.error(err);
-			alert(err.message || String(err));
-		});
+function openEditUser(id, username, ip) {
+  document.getElementById('modal-user-id').value  = id;
+  document.getElementById('modal-username').value = username;
+  document.getElementById('modal-password').value = '';
+  document.getElementById('modal-ip').value       = ip;
+  document.getElementById('userModalTitle').textContent = 'Edit User';
+  document.getElementById('modal-error').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('userModal')).show();
 }
+
+document.getElementById('btn-save-user').addEventListener('click', function () {
+  const uid  = document.getElementById('modal-user-id').value;
+  const user = document.getElementById('modal-username').value.trim();
+  const pass = document.getElementById('modal-password').value;
+  const ip   = document.getElementById('modal-ip').value.trim();
+  const err  = document.getElementById('modal-error');
+  if (!user) { err.textContent='Username required.'; err.classList.remove('d-none'); return; }
+  if (!uid && !pass) { err.textContent='Password required for new users.'; err.classList.remove('d-none'); return; }
+  const url    = uid ? `/vpn/api/l2tp/update-user/${uid}` : '/vpn/api/l2tp/save-user';
+  const method = uid ? 'PUT' : 'POST';
+  const body   = {username: user, ip_address: ip};
+  if (pass) body.password = pass;
+  this.disabled = true;
+  fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(r=>r.json()).then(d => {
+      if (!d.success && !d.ok) { err.textContent=d.message||d.error||'Save failed.'; err.classList.remove('d-none'); return; }
+      bootstrap.Modal.getInstance(document.getElementById('userModal'))?.hide();
+      loadUsers();
+    }).catch(e => { err.textContent='Request failed: '+e.message; err.classList.remove('d-none'); })
+    .finally(() => { this.disabled=false; });
+});
+
+function deleteUser(id) {
+  if (!confirm('Delete this user?')) return;
+  fetch(`/vpn/api/l2tp/delete-user/${id}`, {method:'DELETE'})
+    .then(()=>loadUsers()).catch(()=>{});
+}
+
+// ─── Preview ─────────────────────────────────────────────────────────────────
+function loadPreview() {
+  document.getElementById('conf-preview').textContent = 'Loading…';
+  fetch('/vpn/api/l2tp/preview').then(r=>r.json()).then(d => {
+    document.getElementById('conf-preview').textContent = d.conf || 'No config.';
+  }).catch(e => {
+    document.getElementById('conf-preview').textContent = 'Error: '+e.message;
+  });
+}
+document.getElementById('btn-refresh-preview').addEventListener('click', loadPreview);
 </script>
 {% endblock %}

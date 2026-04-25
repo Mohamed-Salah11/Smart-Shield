@@ -1,6 +1,55 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Queues</h1>
-<p>Placeholder for Queues status.</p>
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">System Queues</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-layer-group me-2 text-primary"></i>Traffic Shaping Queues</h1>
+    <p class="lead">Active ALTQ/HFSC queues from the traffic shaper.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-sliders me-2"></i>Queues</h2>
+      <span class="badge bg-primary">{{ shapers|length }} queue{{ 's' if shapers|length != 1 }}</span>
+    </div>
+    <div class="section-body p-0">
+      {% if shapers %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th><th>Interface</th><th>Bandwidth</th>
+              <th>Priority</th><th>Scheduler</th><th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in shapers %}
+            <tr>
+              <td class="fw-semibold">{{ q.name or '—' }}</td>
+              <td><code>{{ q.interface_type or '—' }}</code></td>
+              <td>{{ q.bandwidth or '—' }}{% if q.bandwidth_unit %} {{ q.bandwidth_unit }}{% endif %}</td>
+              <td>{{ q.priority if q.priority is not none else '—' }}</td>
+              <td><span class="badge bg-secondary">{{ q.scheduler or 'HFSC' }}</span></td>
+              <td class="text-muted small">{{ q.description or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        No traffic shaping queues configured.
+        <a href="{{ url_for('firewall.rules') }}" class="d-block mt-1">Configure Traffic Shaper →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

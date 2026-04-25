@@ -2,248 +2,227 @@
 {% set title = "System - Routing" %}
 
 {% block main %}
-
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Gateways</li>
-            </ol>
-        </nav>
-        <h1>Routing</h1>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Routing — Gateways</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-route me-2 text-primary"></i>Routing</h1>
+    <p class="lead">Manage gateways, static routes, and gateway groups.</p>
+  </div>
+
+  <ul class="nav nav-pills mb-4">
+    <li class="nav-item">
+      <a class="nav-link active" href="{{ url_for('routing.routing_index') }}">Gateways</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('routing.static_routes_page') }}">Static Routes</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('routing.gateway_groups_page') }}">Gateway Groups</a>
+    </li>
+  </ul>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Gateways table -->
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-server me-2"></i>Gateways</h2>
+      <a href="{{ url_for('routing.gateway_edit') }}" class="btn btn-success btn-sm">
+        <i class="fa fa-plus me-1"></i>Add Gateway
+      </a>
     </div>
-
-    <!-- Navigation Pills -->
-    <ul class="nav nav-pills mb-4">
-        <li class="nav-item">
-            <a class="nav-link active" href="/system/routing">Gateways</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="/system/routing/static">Static Routes</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="/system/routing/groups">Gateway Groups</a>
-        </li>
-    </ul>
-
-    <!-- Gateways Section -->
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Gateways</h2>
-            <button id="addGatewayBtn" type="button" class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i>Add Gateway
-            </button>
-        </div>
-        <div class="section-body" style="padding: 0;">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll"></th>
-                            <th>Name</th>
-                            <th>Default</th>
-                            <th>Interface</th>
-                            <th>Gateway</th>
-                            <th>Monitor IP</th>
-                            <th>Description</th>
-                            <th style="width: 120px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr data-index="0">
-                            <td class="align-middle"><input type="checkbox" class="form-check-input select-gateway" checked></td>
-                            <td class="align-middle name">
-                                <strong>WAN_DHCP</strong>
-                                <i class="fa-solid fa-globe text-primary ms-1" title="External"></i>
-                            </td>
-                            <td class="align-middle default"></td>
-                            <td class="align-middle interface"><span class="badge bg-info">WAN</span></td>
-                            <td class="align-middle gateway">8.8.8.8</td>
-                            <td class="align-middle monitor">8.8.8.8</td>
-                            <td class="align-middle description">Interface WAN_DHCP Gateway</td>
-                            <td class="align-middle text-end">
-                                <button type="button" class="btn btn-outline-primary btn-sm edit-row" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm duplicate-row" title="Duplicate">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm delete-row" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        <tr data-index="1">
-                            <td class="align-middle"><input type="checkbox" class="form-check-input select-gateway"></td>
-                            <td class="align-middle name"><strong>WAN_DHCP6</strong></td>
-                            <td class="align-middle default"></td>
-                            <td class="align-middle interface"><span class="badge bg-info">WAN</span></td>
-                            <td class="align-middle gateway"><span class="text-muted">dynamic</span></td>
-                            <td class="align-middle monitor"><span class="text-muted">dynamic</span></td>
-                            <td class="align-middle description">Interface WAN_DHCP6 Gateway</td>
-                            <td class="align-middle text-end">
-                                <button type="button" class="btn btn-outline-primary btn-sm edit-row" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm duplicate-row" title="Duplicate">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm delete-row" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        <tr data-index="2">
-                            <td class="align-middle"><input type="checkbox" class="form-check-input select-gateway"></td>
-                            <td class="align-middle name">
-                                <strong>WANGW</strong>
-                                <i class="fa-solid fa-globe text-primary ms-1" title="External"></i>
-                            </td>
-                            <td class="align-middle default"><span class="badge bg-success">Default (IPv4)</span></td>
-                            <td class="align-middle interface"><span class="badge bg-info">WAN</span></td>
-                            <td class="align-middle gateway">8.8.8.8</td>
-                            <td class="align-middle monitor">8.8.8.8</td>
-                            <td class="align-middle description">Interface wan Gateway</td>
-                            <td class="align-middle text-end">
-                                <button type="button" class="btn btn-outline-primary btn-sm edit-row" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm duplicate-row" title="Duplicate">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm delete-row" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="section-body p-0">
+      {% if gateways %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Default</th>
+              <th>Interface</th>
+              <th>Gateway IP</th>
+              <th>Monitor IP</th>
+              <th>Family</th>
+              <th>Description</th>
+              <th style="width:160px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in gateways %}
+            <tr class="{{ 'table-secondary opacity-75' if g.disabled }}">
+              <td>
+                <strong>{{ g.name }}</strong>
+                {% if g.disabled %}<span class="badge bg-secondary ms-1">Disabled</span>{% endif %}
+              </td>
+              <td>
+                {% if g.is_default_v4 %}<span class="badge bg-success me-1">IPv4 Default</span>{% endif %}
+                {% if g.is_default_v6 %}<span class="badge bg-info">IPv6 Default</span>{% endif %}
+              </td>
+              <td><span class="badge bg-primary">{{ g.interface }}</span></td>
+              <td><code>{{ g.gateway }}</code></td>
+              <td><code class="text-muted">{{ g.monitor or g.gateway }}</code></td>
+              <td><span class="badge bg-secondary">{{ g.address_family }}</span></td>
+              <td class="text-muted small">{{ g.description or '' }}</td>
+              <td class="text-end">
+                <a href="{{ url_for('routing.gateway_edit', gw_id=g.id) }}"
+                   class="btn btn-outline-primary btn-sm" title="Edit">
+                  <i class="fa fa-pen"></i>
+                </a>
+                <button class="btn btn-outline-success btn-sm btn-apply-gw"
+                        data-id="{{ g.id }}" data-name="{{ g.name }}" title="Apply to OS">
+                  <i class="fa fa-bolt"></i>
+                </button>
+                <form method="post"
+                      action="{{ url_for('routing.gateway_delete', gw_id=g.id) }}"
+                      style="display:inline"
+                      onsubmit="return confirm('Delete gateway {{ g.name }}?')">
+                  <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-5 text-center text-muted">
+        <i class="fa fa-route fa-3x mb-3 d-block"></i>
+        No gateways configured.
+        <a href="{{ url_for('routing.gateway_edit') }}" class="d-block mt-2">Add your first gateway →</a>
+      </div>
+      {% endif %}
     </div>
+  </div>
 
-    <!-- Default Gateway Section -->
-    <div class="section">
-        <div class="section-header">
-            <h2>Default Gateway</h2>
+  <!-- Set Default Gateway -->
+  <div class="section mb-4">
+    <div class="section-header"><h2 class="mb-0">Default Gateway</h2></div>
+    <div class="section-body">
+      <form method="post" action="{{ url_for('routing.gateway_set_default') }}">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Default IPv4 Gateway</label>
+            <select name="default_ipv4" class="form-select">
+              <option value="">Automatic</option>
+              {% for g in gateways if g.address_family in ('IPv4', 'Both') and not g.disabled %}
+                <option value="{{ g.name }}" {{ 'selected' if g.name == default_ipv4 }}>
+                  {{ g.name }} — {{ g.gateway }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Default IPv6 Gateway</label>
+            <select name="default_ipv6" class="form-select">
+              <option value="">Automatic</option>
+              {% for g in gateways if g.address_family in ('IPv6', 'Both') and not g.disabled %}
+                <option value="{{ g.name }}" {{ 'selected' if g.name == default_ipv6 }}>
+                  {{ g.name }} — {{ g.gateway }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-        <div class="section-body" style="padding: 20px;">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="default_ipv4" class="form-label fw-semibold">Default Gateway IPv4</label>
-                        <select id="default_ipv4" class="form-select">
-                            <option value="">Automatic</option>
-                            {% for g in gateways %}
-                                {% if not g.address_family or g.address_family == 'IPv4' or g.address_family == 'Both' %}
-                                    <option value="{{ g.name }}" {% if g.name == default_ipv4 %}selected{% endif %}>{{ g.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                            <option value="None" {% if default_ipv4 == 'None' %}selected{% endif %}>None</option>
-                        </select>
-                        <small class="text-muted">Select a gateway or failover gateway group to use as the default IPv4 gateway.</small>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label for="default_ipv6" class="form-label fw-semibold">Default Gateway IPv6</label>
-                        <select id="default_ipv6" class="form-select">
-                            <option value="">Automatic</option>
-                            {% for g in gateways %}
-                                {% if not g.address_family or g.address_family == 'IPv6' or g.address_family == 'Both' %}
-                                    <option value="{{ g.name }}" {% if g.name == default_ipv6 %}selected{% endif %}>{{ g.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                            <option value="None" {% if default_ipv6 == 'None' %}selected{% endif %}>None</option>
-                        </select>
-                        <small class="text-muted">Select a gateway or failover gateway group to use as the default IPv6 gateway.</small>
-                    </div>
-                </div>
-            </div>
+        <div class="mt-3">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa fa-floppy-disk me-1"></i>Save Defaults
+          </button>
         </div>
+      </form>
     </div>
+  </div>
 
-    <!-- Action Buttons -->
-    <form id="saveForm" method="post" action="/system/routing/save">
-        <input type="hidden" name="gateways" id="gatewaysInput">
-        <input type="hidden" name="default_ipv4" id="defaultIpv4Input">
-        <input type="hidden" name="default_ipv6" id="defaultIpv6Input">
-        <div class="d-flex justify-content-end gap-2 mb-4">
-            <button id="saveBtn" type="button" class="btn btn-primary">
-                <i class="fa-solid fa-save me-1"></i>Save
-            </button>
-        </div>
-    </form>
+  <!-- Live route table -->
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-table me-2"></i>Live OS Route Table</h2>
+      <button class="btn btn-sm btn-outline-primary" id="btn-refresh-routes">
+        <i class="fa fa-rotate me-1"></i>Refresh
+      </button>
+    </div>
+    <div class="section-body p-0" id="live-routes-wrap">
+      <div class="p-3 text-muted text-center">
+        <i class="fa fa-spinner fa-spin me-2"></i>Loading…
+      </div>
+    </div>
+  </div>
 
+  <div id="apply-result" class="alert d-none mt-3"></div>
 </div>
 
 <script>
-window.addEventListener('load', function(){
-    const addBtn = document.getElementById('addGatewayBtn');
-    const table = document.querySelector('table.table tbody');
-    const saveBtn = document.getElementById('saveBtn');
-    const selectAll = document.getElementById('selectAll');
-
-    function gotoEdit(index){
-        if(typeof index === 'number' || String(index).match(/^\d+$/)){
-            window.location.href = '/system/routing/gateway/edit/' + index;
-        } else {
-            window.location.href = '/system/routing/gateway/edit';
-        }
-    }
-
-    // Select all checkboxes
-    selectAll.addEventListener('change', function(){
-        const checkboxes = document.querySelectorAll('.select-gateway');
-        checkboxes.forEach(cb => cb.checked = selectAll.checked);
-    });
-
-    // Row actions (edit/delete/duplicate)
-    table.addEventListener('click', function(e){
-        if(e.target.closest('.edit-row')){
-            const tr = e.target.closest('tr');
-            const idx = tr.getAttribute('data-index');
-            gotoEdit(idx);
-        } else if(e.target.closest('.delete-row')){
-            const tr = e.target.closest('tr');
-            tr.remove();
-        } else if(e.target.closest('.duplicate-row')){
-            const tr = e.target.closest('tr');
-            const clone = tr.cloneNode(true);
-            const lastIndex = table.querySelectorAll('tr').length;
-            clone.setAttribute('data-index', lastIndex);
-            clone.querySelector('.select-gateway').checked = false;
-            table.appendChild(clone);
-        }
-    });
-
-    addBtn.addEventListener('click', function(){
-        gotoEdit();
-    });
-
-    saveBtn.addEventListener('click', function(){
-        // Collect gateways from table
-        const rows = table.querySelectorAll('tr');
-        const data = [];
-        rows.forEach(function(r){
-            data.push({
-                name: r.querySelector('.name')?.textContent.trim() || '',
-                interface: r.querySelector('.interface')?.textContent.trim() || '',
-                gateway: r.querySelector('.gateway')?.textContent.trim() || '',
-                monitor: r.querySelector('.monitor')?.textContent.trim() || '',
-                description: r.querySelector('.description')?.textContent.trim() || '',
-            });
-        });
-
-        document.getElementById('gatewaysInput').value = JSON.stringify(data);
-        document.getElementById('defaultIpv4Input').value = document.getElementById('default_ipv4').value || '';
-        document.getElementById('defaultIpv6Input').value = document.getElementById('default_ipv6').value || '';
-        document.getElementById('saveForm').submit();
-    });
+// ── Apply gateway to OS ───────────────────────────────────────────────────────
+document.querySelectorAll('.btn-apply-gw').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const id   = this.dataset.id;
+    const name = this.dataset.name;
+    const res  = document.getElementById('apply-result');
+    if (!confirm(`Apply gateway "${name}" as default route now?`)) return;
+    this.disabled = true;
+    fetch(`/system/routing/gateway/apply/${id}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        res.className = 'alert ' + (d.ok ? 'alert-success' : 'alert-danger');
+        res.textContent = d.message || (d.ok ? 'Applied.' : 'Failed.');
+        res.classList.remove('d-none');
+        loadRoutes();
+      })
+      .catch(e => {
+        res.className = 'alert alert-danger';
+        res.textContent = 'Request failed: ' + e.message;
+        res.classList.remove('d-none');
+      })
+      .finally(() => { this.disabled = false; });
+  });
 });
-</script>
 
+// ── Live route table ──────────────────────────────────────────────────────────
+function loadRoutes() {
+  fetch('/system/routing/api/live-routes')
+    .then(r => r.json())
+    .then(d => {
+      const wrap = document.getElementById('live-routes-wrap');
+      if (!d.on_freebsd) {
+        wrap.innerHTML = '<div class="p-3 text-center text-muted">Live route table only available on FreeBSD.</div>';
+        return;
+      }
+      if (!d.routes || !d.routes.length) {
+        wrap.innerHTML = '<div class="p-3 text-center text-muted">No routes found.</div>';
+        return;
+      }
+      const rows = d.routes.map(r => `
+        <tr>
+          <td><code>${r.destination}</code></td>
+          <td><code>${r.gateway}</code></td>
+          <td><span class="badge bg-secondary font-monospace">${r.flags}</span></td>
+          <td><code>${r.iface}</code></td>
+        </tr>`).join('');
+      wrap.innerHTML = `<div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Destination</th><th>Gateway</th><th>Flags</th><th>Interface</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    })
+    .catch(() => {
+      document.getElementById('live-routes-wrap').innerHTML =
+        '<div class="p-3 text-muted text-center">Could not load route table.</div>';
+    });
+}
+
+loadRoutes();
+document.getElementById('btn-refresh-routes').addEventListener('click', loadRoutes);
+</script>
 {% endblock %}

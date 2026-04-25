@@ -154,15 +154,38 @@
 			<div class="form-group">
 				<label>Statistics Logging</label>
 				<div class="form-group-content">
-					<button type="button" class="btn btn-info">Display Advanced</button>
+					<button type="button" data-advanced="ntp-stats-panel" class="btn btn-outline-secondary btn-sm">
+						<i class="fa fa-gear me-1"></i>Display Advanced
+					</button>
+					<div id="ntp-stats-panel" class="d-none mt-3">
+						<div class="form-check mb-2">
+							<input type="checkbox" class="form-check-input" name="stats_loopstats" id="loopstats">
+							<label class="form-check-label" for="loopstats">Log loop statistics (loopstats)</label>
+						</div>
+						<div class="form-check mb-2">
+							<input type="checkbox" class="form-check-input" name="stats_peerstats" id="peerstats">
+							<label class="form-check-label" for="peerstats">Log peer statistics (peerstats)</label>
+						</div>
+						<div class="form-check">
+							<input type="checkbox" class="form-check-input" name="stats_clockstats" id="clockstats">
+							<label class="form-check-label" for="clockstats">Log clock statistics (clockstats)</label>
+						</div>
+					</div>
 				</div>
 			</div>
 
 			<div class="form-group">
 				<label>Leap seconds</label>
 				<div class="form-group-content">
-					<button type="button" class="btn btn-info">Display Advanced</button>
-					<div class="help-text">Leap seconds may be added or subtracted at the end of June or December. If the leap second is important to your network services, it is good practice to download and add the leap second file at least a day in advance of any time correction.</div>
+					<button type="button" data-advanced="ntp-leap-panel" class="btn btn-outline-secondary btn-sm">
+						<i class="fa fa-gear me-1"></i>Display Advanced
+					</button>
+					<div class="help-text">Leap seconds may be added or subtracted at the end of June or December.</div>
+					<div id="ntp-leap-panel" class="d-none mt-3">
+						<label class="form-label fw-semibold">Leap Seconds File Path</label>
+						<input type="text" name="leap_file" class="form-control" placeholder="/var/db/ntpd.leap-seconds">
+						<small class="text-muted">Download from IANA and specify path. Leave blank to use system default.</small>
+					</div>
 				</div>
 			</div>
 
@@ -428,7 +451,15 @@ GLL</textarea>
 			<div class="form-group">
 				<label>GPS Initialization</label>
 				<div class="form-group-content">
-					<button type="button" class="btn btn-info">Display Advanced</button>
+					<button type="button" data-advanced="ntp-gps-init-panel" class="btn btn-outline-secondary btn-sm">
+						<i class="fa fa-gear me-1"></i>Display Advanced
+					</button>
+					<div id="ntp-gps-init-panel" class="d-none mt-3">
+						<label class="form-label fw-semibold">GPS Initialization Commands</label>
+						<textarea name="gps_init_commands" class="form-control font-monospace" rows="4"
+						          placeholder="$PUBX,40,GSV,0,0,0,0*59&#10;$PUBX,40,GLL,0,0,0,0*5C"></textarea>
+						<small class="text-muted">NMEA sentences sent at startup to configure the GPS receiver.</small>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -19,13 +19,13 @@
     <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
-            <a class="nav-link" href="/system/routing">Gateways</a>
+            <a class="nav-link" href="{{ url_for('routing.routing_index') }}">Gateways</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="/system/routing/static">Static Routes</a>
+            <a class="nav-link" href="{{ url_for('routing.static_routes_page') }}">Static Routes</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link active" href="/system/routing/groups">Gateway Groups</a>
+            <a class="nav-link active" href="{{ url_for('routing.gateway_groups_page') }}">Gateway Groups</a>
         </li>
     </ul>
 
@@ -33,7 +33,7 @@
     <div class="section">
         <div class="section-header d-flex justify-content-between align-items-center">
             <h2>Gateway Groups</h2>
-            <a href="/system/routing/group/edit" class="btn btn-success btn-sm">
+            <a href="{{ url_for('routing.gateway_group_edit') }}" class="btn btn-success btn-sm">
                 <i class="fa-solid fa-plus me-1"></i>Add Group
             </a>
         </div>
@@ -62,12 +62,16 @@
                                 <td class="align-middle"><span class="badge bg-info">{{ g.priority }}</span></td>
                                 <td class="align-middle">{{ g.description }}</td>
                                 <td class="align-middle text-end">
-                                    <a class="btn btn-outline-primary btn-sm" href="/system/routing/group/edit/{{ loop.index0 }}" title="Edit">
-                                        <i class="fa-solid fa-pen"></i>
+                                    <a class="btn btn-outline-primary btn-sm"
+                                       href="{{ url_for('routing.gateway_group_edit', group_id=g.id) }}" title="Edit">
+                                        <i class="fa fa-pen"></i>
                                     </a>
-                                    <form method="post" action="/system/routing/group/delete/{{ loop.index0 }}" style="display: inline;">
+                                    <form method="post"
+                                          action="{{ url_for('routing.gateway_group_delete', group_id=g.id) }}"
+                                          style="display:inline"
+                                          onsubmit="return confirm('Delete group {{ g.name }}?')">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
-                                            <i class="fa-solid fa-trash"></i>
+                                            <i class="fa fa-trash"></i>
                                         </button>
                                     </form>
                                 </td>

@@ -23,12 +23,12 @@
             <h2>Gateway Group Configuration</h2>
         </div>
         <div class="section-body" style="padding: 20px;">
-            <form method="post">
+            <form method="post" action="{{ url_for('routing.gateway_group_edit', group_id=group_id) if group_id else url_for('routing.gateway_group_edit') }}">
                 <div class="mb-3 row align-items-center">
                     <label for="name" class="col-sm-3 col-form-label fw-semibold">Group Name</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="name" name="name" 
-                               value="{{ group.name if group else '' }}" placeholder="e.g. LoadBalanceGroup">
+                        <input type="text" class="form-control" id="name" name="name"
+                               value="{{ group.name if group else '' }}" placeholder="e.g. FailoverGroup" required>
                         <small class="text-muted">Unique name for this gateway group</small>
                     </div>
                 </div>
@@ -36,78 +36,63 @@
                 <div class="mb-3 row align-items-center">
                     <label for="description" class="col-sm-3 col-form-label fw-semibold">Description</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="description" name="description" 
-                               value="{{ group.description if group else '' }}" placeholder="Optional description">
-                        <small class="text-muted">A brief description for reference</small>
+                        <input type="text" class="form-control" id="description" name="description"
+                               value="{{ group.description if group else '' }}" placeholder="Optional">
                     </div>
                 </div>
 
                 <hr>
-
-                <h5 class="mb-3">Gateway Priority</h5>
-                <p class="text-muted small mb-3">Assign gateways to different priority tiers. Tier 1 has highest priority. Use "Never" to exclude a gateway.</p>
+                <h5 class="mb-3">Gateway Priority Tiers</h5>
+                <p class="text-muted small mb-3">Tier 1 = highest priority. Use <strong>Never</strong> to exclude a gateway from this group.</p>
 
                 <div class="table-responsive mb-4">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Gateway</th>
-                                <th>Interface</th>
-                                <th>Tier</th>
-                                <th>Virtual IP</th>
-                            </tr>
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr><th>Gateway</th><th>Interface</th><th>Gateway IP</th><th>Tier</th></tr>
                         </thead>
                         <tbody>
                             {% for gw in gateways %}
+                            {% set mem = group_members.get(gw.name, {}) %}
                             <tr>
-                                <td class="align-middle"><strong>{{ gw.name }}</strong></td>
-                                <td class="align-middle">{{ gw.interface }}</td>
-                                <td class="align-middle">
-                                    <select class="form-select form-select-sm" name="tier_{{ gw.name }}" style="width: auto;">
-                                        <option value="never">Never</option>
-                                        <option value="1" {% if group and gw.name in group.gateways %}selected{% endif %}>Tier 1</option>
-                                        <option value="2">Tier 2</option>
-                                        <option value="3">Tier 3</option>
-                                        <option value="4">Tier 4</option>
-                                        <option value="5">Tier 5</option>
-                                    </select>
-                                </td>
-                                <td class="align-middle">
-                                    <select class="form-select form-select-sm" name="vip_{{ gw.name }}" style="width: auto;">
-                                        <option value="">Interface Address</option>
+                                <td><strong>{{ gw.name }}</strong></td>
+                                <td><span class="badge bg-primary">{{ gw.interface }}</span></td>
+                                <td><code>{{ gw.gateway }}</code></td>
+                                <td>
+                                    <select class="form-select form-select-sm" name="tier_{{ gw.name }}" style="width:110px">
+                                        <option value="never" {{ 'selected' if not mem }}>Never</option>
+                                        {% for t in range(1, 6) %}
+                                        <option value="{{ t }}" {{ 'selected' if mem.get('tier') == t }}>Tier {{ t }}</option>
+                                        {% endfor %}
                                     </select>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr>
-                                <td colspan="4" class="text-center text-muted py-3">No gateways available</td>
-                            </tr>
+                            <tr><td colspan="4" class="text-center text-muted py-3">
+                              No gateways — <a href="{{ url_for('routing.gateway_edit') }}">add one first</a>.
+                            </td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
-                <hr>
-
                 <div class="mb-3 row align-items-center">
                     <label for="trigger" class="col-sm-3 col-form-label fw-semibold">Trigger Level</label>
                     <div class="col-sm-9">
                         <select class="form-select" id="trigger" name="trigger">
-                            <option value="down">Member Down</option>
-                            <option value="highloss">Packet Loss</option>
-                            <option value="highlatency">High Latency</option>
-                            <option value="both">Packet Loss or High Latency</option>
+                            <option value="down" {{ 'selected' if not group or group.trigger_level == 'down' }}>Member Down</option>
+                            <option value="highloss" {{ 'selected' if group and group.trigger_level == 'highloss' }}>Packet Loss</option>
+                            <option value="highlatency" {{ 'selected' if group and group.trigger_level == 'highlatency' }}>High Latency</option>
+                            <option value="both" {{ 'selected' if group and group.trigger_level == 'both' }}>Packet Loss or High Latency</option>
                         </select>
-                        <small class="text-muted">Condition that triggers failover to next tier</small>
+                        <small class="text-muted">Condition that triggers failover to the next tier</small>
                     </div>
                 </div>
 
                 <hr>
-
                 <div class="d-flex justify-content-end gap-2">
-                    <a href="/system/routing/groups" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="{{ url_for('routing.gateway_groups_page') }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-save me-1"></i>Save
+                        <i class="fa fa-floppy-disk me-1"></i>Save
                     </button>
                 </div>
             </form>

@@ -497,6 +497,9 @@
 /* counter pop */
 @keyframes numPop { 0%{transform:scale(.85);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
 .num-pop { animation: numPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
+
+/* event stream row slide-in */
+@keyframes dbEvSlide { from{opacity:0;background:rgba(59,130,246,.12)} to{opacity:1;background:transparent} }
 </style>
 {% endblock %}
 
@@ -838,17 +841,33 @@
       </div>
     </div>
 
-    <!-- Event Stream (full-width) -->
+    <!-- Event Stream — live polling widget (full-width) -->
     <div class="db-card db-col-full" data-wid="events" draggable="true">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-stream"></i>Event Stream</div>
-        <div class="db-card-actions">
+        <div class="db-card-title">
+          <span id="evStreamDot" style="
+            width:7px;height:7px;border-radius:50%;background:#10b981;
+            box-shadow:0 0 0 2px rgba(16,185,129,.2);flex-shrink:0;
+            animation:dbpulse 2.5s ease-in-out infinite;
+          "></span>
+          <i class="fa-solid fa-stream"></i>Live Event Stream
+        </div>
+        <div class="db-card-actions" style="gap:8px;">
+          <span id="evNewCount" style="
+            display:none;padding:1px 7px;border-radius:99px;
+            font-size:.68rem;font-weight:700;
+            background:rgba(59,130,246,.2);color:#93c5fd;
+          "></span>
+          <a href="{{ url_for('status.system_logs') }}" style="
+            color:rgba(203,213,225,.6);font-size:.72rem;font-weight:600;
+            text-decoration:none;padding:2px 6px;border-radius:4px;
+          " title="Open full log monitor">Monitor ↗</a>
           <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
           <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
         </div>
       </div>
       <div class="db-card-body no-pad">
-        <div class="db-scroll">
+        <div class="db-scroll" id="evScrollWrap">
           <table class="db-tbl">
             <thead>
               <tr>
@@ -977,19 +996,95 @@
       </tr>`).join('');
   };
 
-  const renderEvents = rows => {
-    const tb = $('tblEvents'); if (!tb) return;
-    if (!rows?.length) { tb.innerHTML = '<tr><td colspan="6" class="td-empty">No events logged yet.</td></tr>'; return; }
-    tb.innerHTML = rows.map(r =>
-      `<tr>
-        <td class="td-t">${esc(fmt(r.timestamp))}</td>
-        <td>${catBadge(r.category)}</td>
-        <td>${actBadge(r.action)}</td>
-        <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
-        <td class="td-ip">${esc(r.remote_addr||'—')}</td>
-        <td style="font-size:.82rem;">${detail(r)}</td>
-      </tr>`).join('');
+  /* ── Live event stream (independent 5-second poller) ── */
+  const EV_API   = "{{ url_for('status.api_logs') }}";
+  const EV_LIMIT = 40;          // rows to show in dashboard widget
+  const EV_MAX   = 200;         // max DOM rows before trimming
+  let evLatestTs = '';          // ISO timestamp of newest fetched event
+  let evNewCount = 0;           // unseen new events since last interaction
+  let evRows     = 0;           // total rows in DOM
+
+  const evMakeRow = (r, animate) => `
+    <tr style="${animate ? 'animation:dbEvSlide .25s ease' : ''}">
+      <td class="td-t">${esc(fmt(r.timestamp))}</td>
+      <td>${catBadge(r.category)}</td>
+      <td>${actBadge(r.action)}</td>
+      <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
+      <td class="td-ip">${esc(r.remote_addr||'—')}</td>
+      <td style="font-size:.82rem;">${detail(r)}</td>
+    </tr>`;
+
+  const evUpdateBadge = () => {
+    const badge = $('evNewCount');
+    if (!badge) return;
+    if (evNewCount > 0) {
+      badge.textContent = `+${evNewCount} new`;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
   };
+
+  const evTrimRows = tb => {
+    const rows = tb.querySelectorAll('tr');
+    if (rows.length > EV_MAX) {
+      for (let i = EV_MAX; i < rows.length; i++) rows[i].remove();
+    }
+    evRows = tb.querySelectorAll('tr').length;
+  };
+
+  const evPoll = async (initial = false) => {
+    const tb = $('tblEvents'); if (!tb) return;
+    try {
+      const since = (evLatestTs && !initial) ? `&since=${encodeURIComponent(evLatestTs)}` : '';
+      const limit = initial ? EV_LIMIT : 50;
+      const res  = await fetch(`${EV_API}?limit=${limit}${since}`, { cache: 'no-store' });
+      const body = await res.json();
+      const events = body.events || [];
+      if (!events.length) return;
+
+      // Update latest timestamp
+      if (body.latest_ts && body.latest_ts > evLatestTs) evLatestTs = body.latest_ts;
+
+      if (initial) {
+        // First load: replace placeholder with full table
+        tb.innerHTML = events.map(r => evMakeRow(r, false)).join('');
+        evRows = events.length;
+      } else {
+        // Incremental: prepend new rows
+        const wrap = $('evScrollWrap');
+        const atTop = wrap ? wrap.scrollTop < 40 : true;
+
+        const frag = document.createDocumentFragment();
+        events.forEach(r => {
+          const tr = document.createElement('template');
+          tr.innerHTML = evMakeRow(r, true);
+          frag.appendChild(tr.content);
+        });
+        tb.prepend(frag);
+        evTrimRows(tb);
+
+        if (!atTop) {
+          evNewCount += events.length;
+          evUpdateBadge();
+        }
+      }
+    } catch(e) { /* silent fail in widget */ }
+  };
+
+  // Reset new-event badge when user scrolls up (to top)
+  const evScrollWrap = $('evScrollWrap');
+  if (evScrollWrap) {
+    evScrollWrap.addEventListener('scroll', () => {
+      if (evScrollWrap.scrollTop < 40 && evNewCount > 0) {
+        evNewCount = 0;
+        evUpdateBadge();
+      }
+    });
+  }
+
+  // Deprecate static renderEvents — events now handled by evPoll
+  const renderEvents = _rows => { /* no-op: live poller handles this */ };
 
   const render = p => {
     if (!p) return;
@@ -1041,9 +1136,9 @@
     flag('fdManage',  'fsManage',  !!p.manage_log_enabled);
     flag('fdMonitor', 'fsMonitor', !!p.monitoring_enabled);
 
-    /* Tables */
+    /* Session table (still pulled from dashboard payload) */
     renderSessions(p.recent_session_events || []);
-    renderEvents(p.recent_events || []);
+    /* Event stream is driven by its own live poller — renderEvents is a no-op */
 
     /* Last update */
     const lu = $('dbLastUpdate');
@@ -1162,6 +1257,10 @@
 
   /* ── Init ── */
   applyVis(); applyCol(); render(P);
+
+  // Start independent event stream poller (5-second cadence)
+  evPoll(true);                           // initial load
+  setInterval(() => evPoll(false), 5000); // incremental updates
 })();
 </script>
 {% endblock %}

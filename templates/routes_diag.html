@@ -1,8 +1,59 @@
 {% extends 'base.html' %}
 
-{% block content %}
 {% block main %}
-<h1>Routes</h1>
-<p>Placeholder for routes diagnostics.</p>
-{% endblock %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">Routes</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-route me-2 text-primary"></i>Routing Table</h1>
+    <p class="lead">IPv4 routing table from <code>netstat -rn</code>.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0">IPv4 Routes</h2>
+      <div class="d-flex gap-2 align-items-center">
+        {% if on_freebsd %}
+        <span class="badge bg-success">Live</span>
+        {% else %}
+        <span class="badge bg-secondary">Simulation</span>
+        {% endif %}
+        <a href="{{ request.url }}" class="btn btn-sm btn-outline-primary">
+          <i class="fa fa-rotate me-1"></i>Refresh
+        </a>
+      </div>
+    </div>
+    <div class="section-body p-0">
+      {% if routes %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Destination</th><th>Gateway</th><th>Flags</th><th>Interface</th></tr>
+          </thead>
+          <tbody>
+            {% for r in routes %}
+            <tr>
+              <td><code>{{ r.destination }}</code></td>
+              <td><code>{{ r.gateway }}</code></td>
+              <td><span class="badge bg-secondary font-monospace">{{ r.flags }}</span></td>
+              <td><code>{{ r.iface }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        {% if on_freebsd %}No routes found.{% else %}Route table only available on FreeBSD.{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

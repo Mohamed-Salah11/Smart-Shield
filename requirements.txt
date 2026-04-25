@@ -13,3 +13,5 @@ packaging==26.0
 PyYAML==6.0.3
 Werkzeug==3.1.3
 python-dotenv
+# Production WSGI server (FreeBSD deployment)
+gunicorn==22.0.0
