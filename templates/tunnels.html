@@ -1,6 +1,133 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Tunnels</h1>
-<p>Placeholder for Tunnels diagnostics.</p>
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">VPN Tunnels</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-lock me-2 text-primary"></i>VPN Tunnel Status</h1>
+    <p class="lead">Active OpenVPN, IPsec, and L2TP tunnel states.</p>
+  </div>
+
+  <!-- OpenVPN -->
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-shield-halved me-2"></i>OpenVPN</h2>
+      <span class="badge bg-primary">{{ openvpn|length }}</span>
+    </div>
+    <div class="section-body p-0">
+      {% if openvpn %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Name</th><th>Mode</th><th>Port</th><th>Protocol</th><th>Network</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for t in openvpn %}
+            <tr>
+              <td class="fw-semibold">{{ t.description or t.id }}</td>
+              <td><span class="badge bg-secondary">{{ t.mode or 'server' }}</span></td>
+              <td>{{ t.port or 1194 }}</td>
+              <td>{{ t.protocol or 'UDP' }}</td>
+              <td><code>{{ t.tunnel_network or '—' }}</code></td>
+              <td>
+                <span class="badge {{ 'bg-success' if not t.disabled else 'bg-secondary' }}">
+                  {{ 'Active' if not t.disabled else 'Disabled' }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>No OpenVPN servers configured.
+        <a href="{{ url_for('vpn.openvpn') }}" class="d-block mt-1">Configure OpenVPN →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- IPsec -->
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-key me-2"></i>IPsec</h2>
+      <span class="badge bg-primary">{{ ipsec|length }}</span>
+    </div>
+    <div class="section-body p-0">
+      {% if ipsec %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Description</th><th>Remote</th><th>Local Net</th><th>Remote Net</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for t in ipsec %}
+            <tr>
+              <td>{{ t.description or '—' }}</td>
+              <td><code>{{ t.remote_gateway or '—' }}</code></td>
+              <td><code>{{ t.local_network or '—' }}</code></td>
+              <td><code>{{ t.remote_network or '—' }}</code></td>
+              <td>
+                <span class="badge {{ 'bg-success' if not t.disabled else 'bg-secondary' }}">
+                  {{ 'Active' if not t.disabled else 'Disabled' }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>No IPsec tunnels configured.
+        <a href="{{ url_for('vpn.ipsec') }}" class="d-block mt-1">Configure IPsec →</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- L2TP -->
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-network-wired me-2"></i>L2TP</h2>
+      <span class="badge bg-primary">{{ l2tp|length }}</span>
+    </div>
+    <div class="section-body p-0">
+      {% if l2tp %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Interface</th><th>Server IP</th><th>Remote Net</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for t in l2tp %}
+            <tr>
+              <td><code>{{ t.interface or '—' }}</code></td>
+              <td><code>{{ t.l2tp_server_ip or '—' }}</code></td>
+              <td><code>{{ t.remote_net or '—' }}</code></td>
+              <td>
+                <span class="badge {{ 'bg-success' if t.enabled else 'bg-secondary' }}">
+                  {{ 'Active' if t.enabled else 'Disabled' }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>No L2TP tunnels configured.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

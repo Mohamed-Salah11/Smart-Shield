@@ -127,6 +127,7 @@
                     <li><a href="{{ url_for('system.general_setup') }}">General Setup</a></li>
                     <li><a href="{{ url_for('system.high_availability') }}">High Availability</a></li>
                     <li><a href="{{ url_for('system.package_manager') }}">Package Manager</a></li>
+                    <li><a href="{{ url_for('system.preflight') }}">Preflight Check</a></li>
                     <li><a href="{{ url_for('routing.routing_index') }}">Routing</a></li>
                     <li><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
                     {% if session.get('is_superuser') %}
@@ -191,6 +192,16 @@
                 </ul>
             </details>
 
+            <!-- IDS / IPS -->
+            <details class="side-group">
+                <summary><i class="fa-solid fa-shield-virus sg-icon"></i><span class="label">IDS / IPS</span><span class="chev">▾</span></summary>
+                <ul class="side-links">
+                    <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">Overview</a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='config') }}">Configuration</a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='rules') }}">Rulesets</a></li>
+                </ul>
+            </details>
+
             <!-- Status -->
             <details class="side-group">
                 <summary><i class="fa-solid fa-chart-line sg-icon"></i><span class="label">Status</span><span class="chev">▾</span></summary>
@@ -202,7 +213,7 @@
                     <li><a href="{{ url_for('status.queues') }}">Queues</a></li>
                     <li><a href="{{ url_for('status.traffic_graph') }}">Traffic Graph</a></li>
                     <li><a href="{{ url_for('status.dhcp_leases') }}">DHCP Leases</a></li>
-                    <li><a href="{{ url_for('status.system_logs') }}">System Logs</a></li>
+                    <li><a href="{{ url_for('status.system_logs') }}"><i class="fa-solid fa-circle" style="color:#10b981;font-size:.45rem;vertical-align:middle;margin-right:4px;"></i>Live Log Monitor</a></li>
                     <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">Session Logs</a></li>
                 </ul>
             </details>
@@ -464,6 +475,29 @@
             }
         });
     }
+})();
+
+// ── Display Advanced toggle (global) ─────────────────────────────────────────
+// Usage in any template:
+//   <button data-advanced="my-section-id" class="btn btn-outline-secondary btn-sm">
+//     <i class="fa fa-gear me-1"></i>Display Advanced
+//   </button>
+//   <div id="my-section-id" class="d-none advanced-panel mt-3">
+//     ... advanced fields ...
+//   </div>
+(function () {
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-advanced]');
+        if (!btn) return;
+        const targetId = btn.dataset.advanced;
+        const panel = document.getElementById(targetId);
+        if (!panel) return;
+        const nowHidden = panel.classList.toggle('d-none');
+        const icon = '<i class="fa fa-gear me-1"></i>';
+        btn.innerHTML = nowHidden
+            ? icon + 'Display Advanced'
+            : icon + 'Hide Advanced';
+    });
 })();
 </script>
 </body>

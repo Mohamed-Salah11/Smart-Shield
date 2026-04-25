@@ -1,9 +1,128 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Traffic Graph</h1>
-<p>Placeholder for Traffic Graph.</p>
 {% block main %}
-<h1>Traffic Graph</h1>
-<p>Placeholder for traffic graph.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Traffic Graph</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-chart-area me-2 text-primary"></i>Real-Time Traffic Graph</h1>
+    <p class="lead">Live bandwidth utilisation across all interfaces.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-wave-square me-2"></i>Bandwidth</h2>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success" id="live-badge">
+          <i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live
+        </span>
+        <button id="btn-pause" class="btn btn-sm btn-outline-secondary">
+          <i class="fa fa-pause me-1"></i>Pause
+        </button>
+      </div>
+    </div>
+    <div class="section-body">
+      <canvas id="trafficChart" style="width:100%;height:320px;"></canvas>
+    </div>
+  </div>
+
+  <div class="section mt-4">
+    <div class="section-header"><h2 class="mb-0">Interface Summary</h2></div>
+    <div class="section-body p-0">
+      <div id="iface-summary">
+        <div class="p-3 text-muted text-center">
+          <i class="fa fa-spinner fa-spin me-2"></i>Loading…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const MAX_POINTS = 60;
+  const labels = [];
+  const rxData = [];
+  const txData = [];
+  let lastStats = {};
+  let paused = false;
+
+  const ctx = document.getElementById('trafficChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'RX (pkts/s)', data: rxData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', tension: 0.4, fill: true, pointRadius: 0 },
+        { label: 'TX (pkts/s)', data: txData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.08)', tension: 0.4, fill: true, pointRadius: 0 },
+      ]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#94a3b8', maxTicksLimit: 10 } },
+        y: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+      },
+      plugins: { legend: { labels: { color: '#94a3b8' } } }
+    }
+  });
+
+  function tick() {
+    if (paused) return;
+    fetch('/status/api/interface-stats')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.ok) return;
+        let totalRx = 0, totalTx = 0;
+        d.stats.forEach(s => {
+          const prev = lastStats[s.name];
+          if (prev) {
+            totalRx += Math.max(0, s.rx_pkts - prev.rx_pkts);
+            totalTx += Math.max(0, s.tx_pkts - prev.tx_pkts);
+          }
+          lastStats[s.name] = s;
+        });
+        const now = new Date().toLocaleTimeString();
+        labels.push(now); rxData.push(totalRx); txData.push(totalTx);
+        if (labels.length > MAX_POINTS) { labels.shift(); rxData.shift(); txData.shift(); }
+        chart.update('none');
+        updateSummary(d.stats);
+      })
+      .catch(() => {});
+  }
+
+  function updateSummary(stats) {
+    if (!stats.length) { document.getElementById('iface-summary').innerHTML = '<div class="p-3 text-muted text-center">No data.</div>'; return; }
+    const rows = stats.map(s => `<tr>
+      <td><code>${s.name}</code></td>
+      <td class="text-end">${s.rx_pkts.toLocaleString()}</td>
+      <td class="text-end">${s.tx_pkts.toLocaleString()}</td>
+      <td class="text-end text-danger">${s.rx_errs + s.tx_errs}</td>
+    </tr>`).join('');
+    document.getElementById('iface-summary').innerHTML = `
+      <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Interface</th><th class="text-end">RX pkts</th><th class="text-end">TX pkts</th><th class="text-end">Errors</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  }
+
+  setInterval(tick, 2000);
+  tick();
+
+  document.getElementById('btn-pause').addEventListener('click', function () {
+    paused = !paused;
+    this.innerHTML = paused
+      ? '<i class="fa fa-play me-1"></i>Resume'
+      : '<i class="fa fa-pause me-1"></i>Pause';
+    document.getElementById('live-badge').style.opacity = paused ? '0.4' : '1';
+  });
+})();
+</script>
 {% endblock %}

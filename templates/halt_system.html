@@ -1,9 +1,112 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to Halt System</h1>
-<p>Placeholder for Halt System diagnostics.</p>
 {% block main %}
-<h1>Welcome to Halt System</h1>
-<p>Placeholder for Halt System diagnostics.</p>
+<div class="container" style="max-width:680px">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">Halt / Reboot</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-power-off me-2 text-danger"></i>Halt / Reboot System</h1>
+    <p class="lead">Gracefully shut down or restart the firewall appliance.</p>
+  </div>
+
+  <div class="row g-3">
+    <!-- Reboot -->
+    <div class="col-sm-6">
+      <div class="section">
+        <div class="section-header">
+          <h2 class="mb-0"><i class="fa fa-rotate me-2"></i>Reboot</h2>
+        </div>
+        <div class="section-body">
+          <p class="text-muted">Reboot the system. Connectivity will be lost briefly while the OS restarts.</p>
+          <button id="btn-reboot" class="btn btn-warning w-100">
+            <i class="fa fa-rotate me-2"></i>Reboot Now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Halt -->
+    <div class="col-sm-6">
+      <div class="section">
+        <div class="section-header">
+          <h2 class="mb-0"><i class="fa fa-power-off me-2"></i>Halt</h2>
+        </div>
+        <div class="section-body">
+          <p class="text-muted">Power off the system cleanly. All network traffic will stop.</p>
+          <button id="btn-halt" class="btn btn-danger w-100">
+            <i class="fa fa-power-off me-2"></i>Halt System
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="action-status" class="mt-3 d-none"></div>
+
+  <!-- Confirm Modal -->
+  <div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-title">Confirm Action</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="modal-body">Are you sure?</div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="btn-confirm" class="btn btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let pendingAction = null;
+const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+function confirmAction(action, label, color) {
+  pendingAction = action;
+  document.getElementById('modal-title').textContent = 'Confirm ' + label;
+  document.getElementById('modal-body').textContent =
+    'This will ' + label.toLowerCase() + ' the appliance. All active connections will be terminated. Continue?';
+  document.getElementById('btn-confirm').className = 'btn btn-' + color;
+  document.getElementById('btn-confirm').textContent = label;
+  modal.show();
+}
+
+document.getElementById('btn-reboot').addEventListener('click', () => confirmAction('reboot', 'Reboot', 'warning'));
+document.getElementById('btn-halt').addEventListener('click', ()   => confirmAction('halt',   'Halt',   'danger'));
+
+document.getElementById('btn-confirm').addEventListener('click', function () {
+  modal.hide();
+  const btn = pendingAction === 'reboot'
+    ? document.getElementById('btn-reboot')
+    : document.getElementById('btn-halt');
+  btn.disabled = true;
+  const status = document.getElementById('action-status');
+  status.innerHTML = `<div class="alert alert-info"><i class="fa fa-spinner fa-spin me-2"></i>Sending ${pendingAction} command…</div>`;
+  status.classList.remove('d-none');
+  fetch('/diagnostics/halt-system/execute', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action: pendingAction })
+  })
+  .then(r => r.json())
+  .then(d => {
+    status.innerHTML = d.ok
+      ? `<div class="alert alert-success"><i class="fa fa-check me-2"></i>${d.message || 'Command sent.'}</div>`
+      : `<div class="alert alert-danger"><i class="fa fa-xmark me-2"></i>${d.error || 'Command failed.'}</div>`;
+  })
+  .catch(e => {
+    status.innerHTML = `<div class="alert alert-danger"><i class="fa fa-xmark me-2"></i>Request failed: ${e.message}</div>`;
+    btn.disabled = false;
+  });
+});
+</script>
 {% endblock %}

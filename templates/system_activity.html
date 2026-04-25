@@ -1,6 +1,75 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Welcome to System Activity</h1>
-<p>Placeholder for System Activity diagnostics.</p>
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">System Activity</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-list-check me-2 text-primary"></i>System Activity</h1>
+    <p class="lead">Aggregated audit log — recent actions across all categories.</p>
+  </div>
+
+  <!-- Stats bar -->
+  {% if stats %}
+  <div class="row g-2 mb-4">
+    {% set stat_items = [
+      ('Total Events', stats._total, 'fa-bolt', 'primary'),
+      ('Sessions', stats.session, 'fa-user', 'info'),
+      ('System', stats.system, 'fa-gear', 'secondary'),
+      ('Security', stats.security, 'fa-shield-halved', 'warning'),
+      ('Login Failures', stats._login_failed, 'fa-xmark-circle', 'danger'),
+    ] %}
+    {% for label, val, icon, color in stat_items %}
+    <div class="col-6 col-sm-4 col-lg-2">
+      <div class="section text-center py-2 px-3">
+        <i class="fa {{ icon }} text-{{ color }} mb-1 d-block"></i>
+        <div class="fw-bold">{{ val or 0 }}</div>
+        <div class="text-muted" style="font-size:.72rem">{{ label }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0">Recent Events</h2>
+      <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-outline-primary">
+        <i class="fa fa-terminal me-1"></i>Live Monitor
+      </a>
+    </div>
+    <div class="section-body p-0">
+      {% if events %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Time</th><th>Category</th><th>Action</th><th>User</th><th>IP</th></tr>
+          </thead>
+          <tbody>
+            {% for e in events %}
+            <tr>
+              <td class="text-muted small font-monospace">{{ e.timestamp[:19] if e.timestamp else '—' }}</td>
+              <td>
+                <span class="badge bg-secondary">{{ e.category or '—' }}</span>
+              </td>
+              <td>{{ e.action or '—' }}</td>
+              <td>{{ e.username or '—' }}</td>
+              <td><code class="small">{{ e.remote_addr or '—' }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>No activity recorded yet.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

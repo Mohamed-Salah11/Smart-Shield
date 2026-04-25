@@ -1,6 +1,107 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Gateways</h1>
-<p>Placeholder for Gateways status.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Gateways</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-route me-2 text-primary"></i>Gateway Status</h1>
+    <p class="lead">WAN/LAN gateway configuration and live route table.</p>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <!-- WAN -->
+    <div class="col-md-6">
+      <div class="section h-100">
+        <div class="section-header">
+          <h2 class="mb-0"><i class="fa fa-globe me-2"></i>WAN Gateway</h2>
+        </div>
+        <div class="section-body">
+          {% if wan %}
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Interface</dt>
+            <dd class="col-sm-8"><code>{{ wan.assigned_port or '—' }}</code></dd>
+            <dt class="col-sm-4">IP Address</dt>
+            <dd class="col-sm-8"><code>{{ wan.ipv4_address or '—' }}</code></dd>
+            <dt class="col-sm-4">Gateway</dt>
+            <dd class="col-sm-8"><code>{{ wan.ipv4_gateway or '—' }}</code></dd>
+            <dt class="col-sm-4">Type</dt>
+            <dd class="col-sm-8">{{ wan.config_type or 'Static' }}</dd>
+            <dt class="col-sm-4">Description</dt>
+            <dd class="col-sm-8">{{ wan.description or '—' }}</dd>
+          </dl>
+          {% else %}
+          <p class="text-muted mb-0">WAN not configured.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <!-- LAN -->
+    <div class="col-md-6">
+      <div class="section h-100">
+        <div class="section-header">
+          <h2 class="mb-0"><i class="fa fa-network-wired me-2"></i>LAN Gateway</h2>
+        </div>
+        <div class="section-body">
+          {% if lan %}
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Interface</dt>
+            <dd class="col-sm-8"><code>{{ lan.assigned_port or '—' }}</code></dd>
+            <dt class="col-sm-4">IP Address</dt>
+            <dd class="col-sm-8"><code>{{ lan.ipv4_address or '—' }}</code></dd>
+            <dt class="col-sm-4">Subnet Mask</dt>
+            <dd class="col-sm-8"><code>{{ lan.subnet_mask or '—' }}</code></dd>
+            <dt class="col-sm-4">Description</dt>
+            <dd class="col-sm-8">{{ lan.description or '—' }}</dd>
+          </dl>
+          {% else %}
+          <p class="text-muted mb-0">LAN not configured.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Table -->
+  <div class="section">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-table me-2"></i>Route Table</h2>
+      {% if on_freebsd %}
+      <span class="badge bg-success"><i class="fa fa-circle me-1" style="font-size:.6rem"></i>Live</span>
+      {% else %}
+      <span class="badge bg-secondary">Simulation Mode</span>
+      {% endif %}
+    </div>
+    <div class="section-body p-0">
+      {% if routes %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Destination</th><th>Gateway</th><th>Flags</th><th>Interface</th></tr>
+          </thead>
+          <tbody>
+            {% for r in routes %}
+            <tr>
+              <td><code>{{ r.destination }}</code></td>
+              <td><code>{{ r.gateway }}</code></td>
+              <td><span class="badge bg-secondary font-monospace">{{ r.flags }}</span></td>
+              <td><code>{{ r.iface }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        {% if on_freebsd %}No routes found.{% else %}Route table only available on FreeBSD.{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

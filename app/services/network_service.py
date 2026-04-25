@@ -299,6 +299,266 @@ def capture_http_activity(interface_name: str, limit: int = 80):
     return events
 
 
+# ---------------------------------------------------------------------------
+# Phase 3 — Physical NIC discovery + live interface state read-back
+# ---------------------------------------------------------------------------
+
+_IFCONFIG_IFACE_RE = re.compile(r"^(\S+):")
+_IFCONFIG_INET_RE  = re.compile(r"inet\s+(\S+)\s+netmask\s+(\S+)(?:\s+broadcast\s+(\S+))?")
+_IFCONFIG_STATUS_RE = re.compile(r"\bstatus:\s+(\S+)")
+_IFCONFIG_MEDIA_RE  = re.compile(r"\bmedia:\s+(.+)")
+_IFCONFIG_ETHER_RE  = re.compile(r"\bether\s+(\S+)")
+
+
+def _hex_netmask_to_cidr(hex_mask: str) -> int:
+    """Convert '0xffffff00' → 24."""
+    try:
+        mask_int = int(hex_mask, 16)
+        return bin(mask_int).count("1")
+    except ValueError:
+        return 32
+
+
+def list_physical_nics() -> list:
+    """
+    Return a list of physical (non-loopback, non-virtual) network interfaces
+    detected via `ifconfig -l`.  On non-FreeBSD returns an empty list.
+
+    Each entry: {"name": str, "flags": str, "inet": str, "cidr": str,
+                 "ether": str, "status": str, "media": str}
+    """
+    if not sys.platform.startswith("freebsd"):
+        return []
+
+    # Get names first
+    result = run_command(["ifconfig", "-l"], check=False)
+    if result.returncode != 0:
+        return []
+
+    names = result.stdout.strip().split()
+    skip_prefixes = ("lo", "pflog", "pfsync", "enc", "gif", "gre", "faith",
+                     "stf", "lagg", "bridge", "vlan", "tun", "tap")
+    names = [n for n in names if not any(n.startswith(p) for p in skip_prefixes)]
+
+    nics = []
+    for name in names:
+        info = get_interface_state(name)
+        if info:
+            nics.append(info)
+    return nics
+
+
+def get_interface_state(iface_name: str) -> dict:
+    """
+    Return live state for a single interface as a dict:
+      name, inet, cidr, ether, status, media, flags, mtu
+
+    On non-FreeBSD returns a dict with empty/placeholder values.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {
+            "name":   iface_name,
+            "inet":   "",
+            "cidr":   "",
+            "ether":  "",
+            "status": "unknown",
+            "media":  "",
+            "flags":  "",
+            "mtu":    "",
+        }
+
+    result = run_command(["ifconfig", iface_name], check=False)
+    if result.returncode != 0:
+        return {}
+
+    text  = result.stdout
+    inet  = ""
+    cidr  = ""
+    ether = ""
+    status = "unknown"
+    media  = ""
+    flags  = ""
+    mtu    = ""
+
+    for line in text.splitlines():
+        # inet address
+        m = _IFCONFIG_INET_RE.search(line)
+        if m:
+            inet = m.group(1)
+            hex_mask = m.group(2)
+            cidr = str(_hex_netmask_to_cidr(hex_mask)) if hex_mask.startswith("0x") else hex_mask
+
+        # MAC address
+        m = _IFCONFIG_ETHER_RE.search(line)
+        if m:
+            ether = m.group(1)
+
+        # Link status
+        m = _IFCONFIG_STATUS_RE.search(line)
+        if m:
+            status = m.group(1)
+
+        # Media
+        m = _IFCONFIG_MEDIA_RE.search(line)
+        if m:
+            media = m.group(1).strip()
+
+        # Flags + MTU on first line
+        if "<" in line and ">" in line and not flags:
+            flags_m = re.search(r"<([^>]+)>", line)
+            if flags_m:
+                flags = flags_m.group(1)
+            mtu_m = re.search(r"\bmtu\s+(\d+)", line)
+            if mtu_m:
+                mtu = mtu_m.group(1)
+
+    return {
+        "name":   iface_name,
+        "inet":   inet,
+        "cidr":   f"{inet}/{cidr}" if inet and cidr else "",
+        "ether":  ether,
+        "status": status,
+        "media":  media,
+        "flags":  flags,
+        "mtu":    mtu,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Interface assignment with live apply + rollback
+# ---------------------------------------------------------------------------
+
+_PING_TIMEOUT_SEC = 4   # seconds to wait for ping reply
+_VERIFY_ATTEMPTS  = 3   # number of ping packets to send
+
+
+def _ping(host: str) -> bool:
+    """Return True if host answers ping within _PING_TIMEOUT_SEC."""
+    if not host or not sys.platform.startswith("freebsd"):
+        return True  # skip verification on non-FreeBSD
+    result = run_command(
+        ["ping", "-c", str(_VERIFY_ATTEMPTS), "-W", str(_PING_TIMEOUT_SEC * 1000), host],
+        check=False,
+        timeout_seconds=_PING_TIMEOUT_SEC + 5,
+    )
+    return result.returncode == 0
+
+
+def apply_interface_with_rollback(
+    iface_name: str,
+    new_cidr: str,
+    new_gateway: str = "",
+    verify_host: str = "",
+) -> dict:
+    """
+    Apply a new IPv4 address (CIDR) and optional default gateway to an interface.
+    If connectivity verification fails, the old configuration is automatically
+    restored.
+
+    Parameters
+    ----------
+    iface_name   : FreeBSD interface name, e.g. "em0"
+    new_cidr     : New address in CIDR notation, e.g. "192.168.1.1/24"
+    new_gateway  : Default gateway IP (optional). Leave blank to skip.
+    verify_host  : IP/hostname to ping after applying to verify reachability.
+                   Falls back to new_gateway if empty.
+
+    Returns
+    -------
+    dict with keys:
+        ok          : bool
+        message     : str
+        rolled_back : bool
+        old_state   : dict (interface state before apply)
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {
+            "ok": True,
+            "message": f"Non-FreeBSD — apply skipped for {iface_name} {new_cidr}",
+            "rolled_back": False,
+            "old_state": {},
+        }
+
+    # 1. Capture current state for potential rollback
+    old_state = get_interface_state(iface_name)
+    old_cidr    = old_state.get("cidr", "")
+    old_ip      = old_state.get("inet", "")
+    old_netmask = ""
+    if old_cidr and "/" in old_cidr:
+        try:
+            import ipaddress as _ip
+            old_netmask = str(_ip.ip_interface(old_cidr).network.netmask)
+        except Exception:
+            pass
+
+    def _restore_old():
+        """Best-effort restore of previous address."""
+        if not old_ip or not old_netmask:
+            return
+        try:
+            run_command(
+                ["ifconfig", iface_name, "inet", old_ip, "netmask", old_netmask],
+                check=False,
+            )
+        except Exception:
+            pass
+
+    # 2. Apply new address
+    try:
+        apply_interface_ipv4(iface_name, new_cidr)
+    except FreeBSDNetworkError as exc:
+        return {
+            "ok": False,
+            "message": f"Failed to apply {new_cidr} to {iface_name}: {exc}",
+            "rolled_back": False,
+            "old_state": old_state,
+        }
+
+    # 3. Apply new gateway (if provided)
+    if new_gateway:
+        try:
+            set_default_gateway(new_gateway)
+        except FreeBSDNetworkError as exc:
+            # Gateway failed — restore old address and abort
+            _restore_old()
+            return {
+                "ok": False,
+                "message": f"Gateway apply failed ({exc}) — interface address rolled back.",
+                "rolled_back": True,
+                "old_state": old_state,
+            }
+
+    # 4. Verify connectivity
+    target = verify_host or new_gateway
+    if target:
+        reachable = _ping(target)
+        if not reachable:
+            # Restore old address
+            _restore_old()
+            if old_state.get("inet"):
+                # Also restore old gateway if we know it
+                try:
+                    run_command(["route", "-n", "delete", "default"], check=False)
+                except Exception:
+                    pass
+            return {
+                "ok": False,
+                "message": (
+                    f"Connectivity check failed — {target} unreachable after apply. "
+                    "Configuration rolled back to previous state."
+                ),
+                "rolled_back": True,
+                "old_state": old_state,
+            }
+
+    return {
+        "ok": True,
+        "message": f"Applied {new_cidr} to {iface_name}" + (f" via {new_gateway}" if new_gateway else ""),
+        "rolled_back": False,
+        "old_state": old_state,
+    }
+
+
 def normalize_interface_payload(data, interface_type):
     interface_type = interface_type.upper()
 

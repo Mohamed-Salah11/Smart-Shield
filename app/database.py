@@ -95,6 +95,29 @@ def init_db():
     if "is_superuser" not in user_columns:
         cursor.execute("ALTER TABLE users ADD COLUMN is_superuser INTEGER DEFAULT 0")
 
+    # Migration: add assigned_port to lan_config / wan_config if missing.
+    cursor.execute("PRAGMA table_info(lan_config)")
+    lan_columns = {row["name"] for row in cursor.fetchall()}
+    if "assigned_port" not in lan_columns:
+        cursor.execute("ALTER TABLE lan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
+
+    cursor.execute("PRAGMA table_info(wan_config)")
+    wan_columns = {row["name"] for row in cursor.fetchall()}
+    if "assigned_port" not in wan_columns:
+        cursor.execute("ALTER TABLE wan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
+
+    # Keep lan_config/wan_config assigned_port in sync with interface_assignments.
+    cursor.execute(
+        "SELECT interface_type, network_port FROM interface_assignments WHERE network_port IS NOT NULL"
+    )
+    for row in cursor.fetchall():
+        itype = (row[0] or "").upper()
+        port  = row[1] or ""
+        if itype == "LAN" and port:
+            cursor.execute("UPDATE lan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+        elif itype == "WAN" and port:
+            cursor.execute("UPDATE wan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+
     # Group-level page whitelist permissions.
     cursor.execute(
         """
@@ -120,6 +143,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         enable_interface INTEGER DEFAULT 1,
         description TEXT DEFAULT 'LAN',
+        assigned_port TEXT DEFAULT '',
         ipv4_config_type TEXT DEFAULT 'static',
         ipv6_config_type TEXT DEFAULT 'none',
         mac_address TEXT DEFAULT '',
@@ -139,6 +163,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         enable_interface INTEGER DEFAULT 1,
         description TEXT DEFAULT 'WAN',
+        assigned_port TEXT DEFAULT '',
         ipv4_config_type TEXT DEFAULT 'dhcp',
         ipv6_config_type TEXT DEFAULT 'none',
         mac_address TEXT DEFAULT '',
@@ -1229,6 +1254,106 @@ ON static_leases(mac_address)
         ON tracked_hosts(last_seen)
         """
     )
+
+    # ----------------------------
+    # IDS / IPS (Suricata)
+    # ----------------------------
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ids_config (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        enabled     INTEGER DEFAULT 0,
+        mode        TEXT    DEFAULT 'ids',
+        interface   TEXT    DEFAULT '',
+        home_net    TEXT    DEFAULT '192.168.0.0/16',
+        external_net TEXT   DEFAULT '!$HOME_NET',
+        block_list_enabled  INTEGER DEFAULT 1,
+        eve_json_enabled    INTEGER DEFAULT 1,
+        fast_log_enabled    INTEGER DEFAULT 1,
+        max_pending_packets INTEGER DEFAULT 1024,
+        stats_interval      INTEGER DEFAULT 8,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute(
+        "INSERT OR IGNORE INTO ids_config (id) VALUES (1)"
+    )
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ids_rulesets (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL UNIQUE,
+        enabled     INTEGER DEFAULT 1,
+        url         TEXT    DEFAULT '',
+        local_path  TEXT    DEFAULT '',
+        description TEXT    DEFAULT '',
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Seed default rulesets if none exist
+    cursor.execute("SELECT COUNT(*) AS c FROM ids_rulesets")
+    if cursor.fetchone()["c"] == 0:
+        cursor.executemany(
+            "INSERT OR IGNORE INTO ids_rulesets (name, enabled, url, description) VALUES (?,?,?,?)",
+            [
+                ("Emerging Threats Open", 1,
+                 "https://rules.emergingthreats.net/open/suricata/emerging.rules.tar.gz",
+                 "Community-maintained detection rules covering current threats"),
+                ("ET Pro Telemetry Edition", 0,
+                 "https://rules.emergingthreatspro.com/open-nogpl/suricata/emerging.rules.tar.gz",
+                 "Enhanced ruleset with telemetry (free with registration)"),
+                ("Abuse.ch SSL Blacklist", 1,
+                 "https://sslbl.abuse.ch/blacklist/sslipblacklist.rules",
+                 "Blocks SSL connections to known malware C2 servers"),
+            ],
+        )
+
+    # ── Routing: Gateways ─────────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gateways (
+        id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled                 INTEGER DEFAULT 0,
+        name                     TEXT NOT NULL,
+        interface                TEXT DEFAULT 'WAN',
+        address_family           TEXT DEFAULT 'IPv4',
+        gateway                  TEXT NOT NULL,
+        monitor                  TEXT DEFAULT '',
+        disable_monitoring       INTEGER DEFAULT 0,
+        disable_monitoring_action INTEGER DEFAULT 0,
+        force_state              INTEGER DEFAULT 0,
+        state_killing            TEXT DEFAULT 'global',
+        is_default_v4            INTEGER DEFAULT 0,
+        is_default_v6            INTEGER DEFAULT 0,
+        description              TEXT DEFAULT '',
+        created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ── Routing: Static Routes ────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS static_routes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        disabled    INTEGER DEFAULT 0,
+        destination TEXT NOT NULL,
+        gateway_id  INTEGER,
+        description TEXT DEFAULT '',
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(gateway_id) REFERENCES gateways(id) ON DELETE SET NULL
+    )
+    """)
+
+    # ── Routing: Gateway Groups ───────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gateway_groups (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        name          TEXT NOT NULL UNIQUE,
+        trigger_level TEXT DEFAULT 'down',
+        description   TEXT DEFAULT '',
+        members_json  TEXT DEFAULT '[]',
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
     conn.commit()
     conn.close()

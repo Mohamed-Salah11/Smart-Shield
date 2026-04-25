@@ -1,6 +1,81 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Factory Defaults</h1>
-<p>Placeholder for Factory Defaults diagnostics.</p>
+<div class="container" style="max-width:680px">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">Factory Defaults</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-trash-can me-2 text-danger"></i>Reset to Factory Defaults</h1>
+    <p class="lead">Erase all configuration and return to a clean state.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2 class="mb-0"><i class="fa fa-triangle-exclamation me-2 text-danger"></i>Danger Zone</h2>
+    </div>
+    <div class="section-body">
+      <div class="alert alert-danger">
+        <strong>Warning:</strong> This action will permanently delete all firewall rules, interface config,
+        VPN tunnels, DHCP/DNS settings, and user accounts. <strong>This cannot be undone.</strong>
+      </div>
+      <p>The following tables will be cleared:</p>
+      <ul class="text-muted small">
+        <li>Firewall rules (WAN, LAN, Floating, NAT)</li>
+        <li>Interface assignments (WAN, LAN)</li>
+        <li>DHCP pools and static leases</li>
+        <li>DNS resolver / forwarder overrides</li>
+        <li>OpenVPN, IPsec, L2TP tunnels</li>
+        <li>Aliases, certificates</li>
+      </ul>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Type <code>RESET</code> to confirm</label>
+        <input type="text" id="reset-confirm-text" class="form-control" placeholder="RESET" autocomplete="off">
+      </div>
+
+      <button id="btn-reset" class="btn btn-danger" disabled>
+        <i class="fa fa-trash-can me-2"></i>Reset to Defaults
+      </button>
+    </div>
+  </div>
+
+  <div id="reset-status" class="mt-3 d-none"></div>
+</div>
+
+<script>
+document.getElementById('reset-confirm-text').addEventListener('input', function () {
+  document.getElementById('btn-reset').disabled = (this.value.trim() !== 'RESET');
+});
+
+document.getElementById('btn-reset').addEventListener('click', function () {
+  if (!confirm('Last chance — this will wipe all configuration. Are you absolutely sure?')) return;
+  this.disabled = true;
+  this.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Resetting…';
+  const status = document.getElementById('reset-status');
+  status.classList.remove('d-none');
+  status.innerHTML = '<div class="alert alert-info"><i class="fa fa-spinner fa-spin me-2"></i>Clearing configuration…</div>';
+  fetch('/diagnostics/factory-defaults/reset', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ confirmed: true })
+  })
+  .then(r => r.json())
+  .then(d => {
+    status.innerHTML = d.ok
+      ? '<div class="alert alert-success"><i class="fa fa-check me-2"></i>Configuration reset. Please reconfigure the appliance.</div>'
+      : `<div class="alert alert-danger"><i class="fa fa-xmark me-2"></i>${d.error || 'Reset failed.'}</div>`;
+    if (d.ok) setTimeout(() => { window.location.href = '/'; }, 3000);
+  })
+  .catch(e => {
+    status.innerHTML = `<div class="alert alert-danger"><i class="fa fa-xmark me-2"></i>Request failed: ${e.message}</div>`;
+    document.getElementById('btn-reset').disabled = false;
+    document.getElementById('btn-reset').innerHTML = '<i class="fa fa-trash-can me-2"></i>Reset to Defaults';
+  });
+});
+</script>
 {% endblock %}

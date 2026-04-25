@@ -22,7 +22,7 @@
             <h2>Gateway Configuration</h2>
         </div>
         <div class="section-body" style="padding: 20px;">
-            <form method="post">
+            <form method="post" action="{{ url_for('routing.gateway_edit', gw_id=gw_id) if gw_id else url_for('routing.gateway_edit') }}">
                 <div class="mb-3 row">
                     <div class="col-sm-3"></div>
                     <div class="col-sm-9">
@@ -143,9 +143,72 @@
                 </div>
 
                 <div class="mb-3">
-                    <button type="button" id="displayAdvancedBtn" class="btn btn-outline-secondary btn-sm">
-                        <i class="fa-solid fa-gear me-1"></i>Display Advanced
+                    <button type="button" data-advanced="gw-advanced-panel" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa fa-gear me-1"></i>Display Advanced
                     </button>
+                </div>
+
+                <!-- Advanced options (hidden by default) -->
+                <div id="gw-advanced-panel" class="d-none">
+                    <hr>
+                    <h5 class="mb-3 text-muted">Advanced Options</h5>
+
+                    <div class="mb-3 row align-items-center">
+                        <label class="col-sm-3 col-form-label fw-semibold">Weight</label>
+                        <div class="col-sm-9">
+                            <input type="number" name="weight" class="form-control" style="max-width:100px"
+                                   min="1" max="30" value="{{ gateway.weight if gateway and gateway.weight else 1 }}">
+                            <small class="text-muted">Relative weight for load balancing (1–30). Higher = more traffic.</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row align-items-center">
+                        <label class="col-sm-3 col-form-label fw-semibold">Latency thresholds</label>
+                        <div class="col-sm-9 d-flex gap-2 align-items-center">
+                            <input type="number" name="latency_low" class="form-control" style="max-width:90px"
+                                   placeholder="Low" value="{{ gateway.latency_low if gateway and gateway.latency_low else 200 }}">
+                            <span class="text-muted">to</span>
+                            <input type="number" name="latency_high" class="form-control" style="max-width:90px"
+                                   placeholder="High" value="{{ gateway.latency_high if gateway and gateway.latency_high else 500 }}">
+                            <span class="text-muted">ms</span>
+                        </div>
+                        <div class="col-sm-9 offset-sm-3">
+                            <small class="text-muted">Gateway is considered down above the high threshold.</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row align-items-center">
+                        <label class="col-sm-3 col-form-label fw-semibold">Packet loss thresholds</label>
+                        <div class="col-sm-9 d-flex gap-2 align-items-center">
+                            <input type="number" name="loss_low" class="form-control" style="max-width:90px"
+                                   placeholder="Low" value="{{ gateway.loss_low if gateway and gateway.loss_low else 10 }}">
+                            <span class="text-muted">to</span>
+                            <input type="number" name="loss_high" class="form-control" style="max-width:90px"
+                                   placeholder="High" value="{{ gateway.loss_high if gateway and gateway.loss_high else 20 }}">
+                            <span class="text-muted">%</span>
+                        </div>
+                        <div class="col-sm-9 offset-sm-3">
+                            <small class="text-muted">Mark gateway down above high packet loss %.</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row align-items-center">
+                        <label class="col-sm-3 col-form-label fw-semibold">Probe Interval</label>
+                        <div class="col-sm-9">
+                            <input type="number" name="interval" class="form-control" style="max-width:100px"
+                                   value="{{ gateway.interval if gateway and gateway.interval else 500 }}">
+                            <small class="text-muted">ms between ICMP probes.</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row align-items-center">
+                        <label class="col-sm-3 col-form-label fw-semibold">Down Time</label>
+                        <div class="col-sm-9">
+                            <input type="number" name="down_time" class="form-control" style="max-width:100px"
+                                   value="{{ gateway.down_time if gateway and gateway.down_time else 10 }}">
+                            <small class="text-muted">Seconds before gateway is considered down.</small>
+                        </div>
+                    </div>
                 </div>
 
                 <hr>
@@ -153,7 +216,7 @@
                 <div class="d-flex justify-content-end gap-2">
                     <a href="{{ url_for('routing.routing_index') }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-save me-1"></i>Save
+                        <i class="fa fa-floppy-disk me-1"></i>Save
                     </button>
                 </div>
             </form>

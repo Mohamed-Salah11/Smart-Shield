@@ -1,6 +1,113 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>Monitoring</h1>
-<p>Monitoring page placeholder.</p>
+{% block main %}
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Monitoring</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-chart-line me-2 text-primary"></i>Interface Monitoring</h1>
+    <p class="lead">Live packet and error counters per network interface.</p>
+  </div>
+
+  <div class="section mb-4">
+    <div class="section-header d-flex justify-content-between align-items-center">
+      <h2 class="mb-0"><i class="fa fa-signal me-2"></i>Interface Statistics</h2>
+      {% if on_freebsd %}
+      <button id="btn-refresh" class="btn btn-sm btn-outline-primary">
+        <i class="fa fa-rotate me-1"></i>Refresh
+      </button>
+      {% endif %}
+    </div>
+    <div class="section-body p-0">
+      <div id="iface-table-wrap">
+        {% if on_freebsd %}
+        <div class="p-4 text-center text-muted">
+          <i class="fa fa-spinner fa-spin fa-2x mb-2 d-block"></i>Loading statistics…
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+          Live statistics only available on FreeBSD.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Configured interfaces reference -->
+  {% if interfaces %}
+  <div class="section">
+    <div class="section-header">
+      <h2 class="mb-0"><i class="fa fa-ethernet me-2"></i>Configured Interfaces</h2>
+    </div>
+    <div class="section-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th>Port</th><th>Description</th><th>IP Address</th></tr>
+          </thead>
+          <tbody>
+            {% for iface in interfaces %}
+            {% if iface %}
+            <tr>
+              <td><code>{{ iface.assigned_port or '—' }}</code></td>
+              <td>{{ iface.description or '—' }}</td>
+              <td><code>{{ iface.ipv4_address or '—' }}</code></td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function renderIfaceTable(stats) {
+  if (!stats || !stats.length) {
+    document.getElementById('iface-table-wrap').innerHTML =
+      '<div class="p-4 text-center text-muted"><i class="fa fa-circle-info fa-2x mb-2 d-block"></i>No interface data.</div>';
+    return;
+  }
+  let rows = stats.map(s => `
+    <tr>
+      <td><code>${s.name}</code></td>
+      <td>${s.mtu}</td>
+      <td class="text-end">${s.rx_pkts.toLocaleString()}</td>
+      <td class="text-end text-danger">${s.rx_errs}</td>
+      <td class="text-end">${s.tx_pkts.toLocaleString()}</td>
+      <td class="text-end text-danger">${s.tx_errs}</td>
+    </tr>`).join('');
+  document.getElementById('iface-table-wrap').innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr>
+          <th>Interface</th><th>MTU</th>
+          <th class="text-end">RX Packets</th><th class="text-end">RX Errors</th>
+          <th class="text-end">TX Packets</th><th class="text-end">TX Errors</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function loadStats() {
+  fetch('/status/api/interface-stats')
+    .then(r => r.json())
+    .then(d => { if (d.ok) renderIfaceTable(d.stats); })
+    .catch(() => {});
+}
+
+{% if on_freebsd %}
+loadStats();
+document.getElementById('btn-refresh')?.addEventListener('click', loadStats);
+setInterval(loadStats, 10000);
+{% endif %}
+</script>
 {% endblock %}
