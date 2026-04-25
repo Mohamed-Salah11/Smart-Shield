@@ -23,21 +23,21 @@ def _rows(conn, sql, params=()):
 
 
 def _load_service_state(conn, key: str) -> dict:
-    rows = _rows(conn, "SELECT state_json FROM service_state WHERE service_key=?", (key,))
+    rows = _rows(conn, "SELECT value_json FROM service_state WHERE key_name=?", (key,))
     if not rows:
         return {}
     try:
-        return json.loads(rows[0]["state_json"] or "{}")
+        return json.loads(rows[0]["value_json"] or "{}")
     except (json.JSONDecodeError, KeyError):
         return {}
 
 
 def _load_general_config(conn) -> dict:
     """Pull hostname + domain from config table or return defaults."""
-    rows = _rows(conn, "SELECT settings_json FROM service_state WHERE service_key='general_config' LIMIT 1")
+    rows = _rows(conn, "SELECT value_json FROM service_state WHERE key_name='general_config' LIMIT 1")
     if rows:
         try:
-            return json.loads(rows[0]["state_json"] or "{}")
+            return json.loads(rows[0]["value_json"] or "{}")
         except Exception:
             pass
     return {"hostname": "smartshield", "domain": "home.arpa"}
@@ -48,7 +48,7 @@ def generate_unbound_conf(conn) -> str:
     forwarder = _load_service_state(conn, "dns_forwarder")
 
     # Pull DNS servers from general config
-    general_rows = _rows(conn, "SELECT * FROM service_state WHERE service_key='general_config' LIMIT 1")
+    general_rows = _rows(conn, "SELECT * FROM service_state WHERE key_name='general_config' LIMIT 1")
     upstream_dns = []
 
     # Also check general_setup config.json stored via system.py

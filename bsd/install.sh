@@ -146,7 +146,8 @@ FLASK_DEBUG=0
 SMARTSHIELD_ENABLE_NETWORK_APPLY=0
 SMARTSHIELD_NETWORK_DRY_RUN=0
 EOF
-        info "Created: ${ENV_FILE} (SECRET_KEY set automatically)"
+        chmod 0600 "${ENV_FILE}"
+        info "Created: ${ENV_FILE} (SECRET_KEY set automatically, mode 0600)"
         warn "Edit ${ENV_FILE} to set BOOTSTRAP_ADMIN_PASSWORD before first run."
     else
         warn "No .env.example found — creating minimal env file."
@@ -163,10 +164,12 @@ SMARTSHIELD_NETWORK_DRY_RUN=0
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=changeme
 EOF
+        chmod 0600 "${ENV_FILE}"
         warn "Set a strong BOOTSTRAP_ADMIN_PASSWORD in ${ENV_FILE} before starting."
     fi
 else
     info "Env file already exists: ${ENV_FILE}"
+    chmod 0600 "${ENV_FILE}"
 fi
 
 CONFIG_FILE="${ETC_DIR}/config.json"

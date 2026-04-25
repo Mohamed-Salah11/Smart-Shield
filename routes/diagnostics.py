@@ -1149,6 +1149,32 @@ def dns_lookup():
     return render_template("dns_lookup.html")
 
 
+@diagnostics_bp.route("/api/dns-lookup", methods=["POST"])
+@login_required
+def api_dns_lookup():
+    import socket
+    data    = request.get_json(silent=True) or {}
+    host    = (data.get("host") or "").strip()
+    rtype   = (data.get("type") or "A").strip().upper()
+    if not host:
+        return jsonify({"ok": False, "message": "Host is required"}), 400
+    results = []
+    try:
+        if rtype in ("A", "ANY"):
+            for ai in socket.getaddrinfo(host, None, socket.AF_INET):
+                ip = ai[4][0]
+                if ip not in results:
+                    results.append({"type": "A", "value": ip})
+        if rtype in ("AAAA", "ANY"):
+            for ai in socket.getaddrinfo(host, None, socket.AF_INET6):
+                ip = ai[4][0]
+                if not any(r["value"] == ip for r in results):
+                    results.append({"type": "AAAA", "value": ip})
+    except socket.gaierror as e:
+        return jsonify({"ok": False, "message": str(e), "results": []})
+    return jsonify({"ok": True, "host": host, "results": results})
+
+
 # --------------------------------------------------
 # FILE EDITOR
 # --------------------------------------------------
@@ -1169,6 +1195,33 @@ def factory_defaults():
     return render_template("factory_defaults.html")
 
 
+@diagnostics_bp.route("/factory-defaults/reset", methods=["POST"])
+@login_required
+def factory_defaults_reset():
+    """Wipe all firewall rules, NAT, VPN config — keep users."""
+    from flask import current_app
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    tables_to_clear = [
+        "firewall_rules_wan", "firewall_rules_lan", "firewall_rules_floating",
+        "firewall_aliases", "firewall_schedules", "nat_pf", "nat_1to1",
+        "nat_outbound", "nat_npt", "openvpn_servers", "openvpn_clients",
+        "ipsec_phase1", "ipsec_phase2", "ipsec_pre_shared_keys",
+        "l2tp_config", "dhcp_pools", "static_leases",
+    ]
+    for t in tables_to_clear:
+        try:
+            cur.execute(f"DELETE FROM {t}")
+        except Exception:
+            pass
+    conn.commit()
+    log_event(category="system", action="factory_reset",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"tables_cleared": tables_to_clear})
+    return jsonify({"ok": True, "message": "Factory defaults applied. Firewall rules and VPN config cleared."})
+
+
 # --------------------------------------------------
 # SHUTDOWN / HALT SYSTEM
 # --------------------------------------------------
@@ -1179,6 +1232,27 @@ def halt_system():
     return render_template("halt_system.html")
 
 
+@diagnostics_bp.route("/halt-system/execute", methods=["POST"])
+@login_required
+def halt_system_execute():
+    import sys
+    data   = request.get_json(silent=True) or {}
+    action = (data.get("action") or "halt").lower()
+    if action not in ("halt", "reboot"):
+        return jsonify({"ok": False, "message": "Invalid action"}), 400
+    log_event(category="system", action=f"system_{action}",
+              username=session.get("username"), remote_addr=request.remote_addr)
+    if not sys.platform.startswith("freebsd"):
+        return jsonify({"ok": True, "message": f"Non-FreeBSD: {action} would run here."})
+    try:
+        from app.services.network_service import run_command
+        cmd = ["shutdown", "-r", "now"] if action == "reboot" else ["shutdown", "-h", "now"]
+        run_command(cmd, check=False, timeout_seconds=5)
+        return jsonify({"ok": True, "message": f"System {action} initiated."})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)})
+
+
 # --------------------------------------------------
 # LIMITER INFO
 # --------------------------------------------------
@@ -1186,7 +1260,15 @@ def halt_system():
 @diagnostics_bp.route("/limiter-info")
 @login_required
 def limiter_info():
-    return render_template("limiter_info.html")
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM limiters_configs ORDER BY name")
+        limiters = [dict(r) for r in cur.fetchall()]
+    except Exception:
+        limiters = []
+    return render_template("limiter_info.html", limiters=limiters)
 
 
 # --------------------------------------------------
@@ -1196,7 +1278,24 @@ def limiter_info():
 @diagnostics_bp.route("/ndp-table")
 @login_required
 def ndp_table():
-    return render_template("ndp_table.html")
+    import sys, re
+    neighbors = []
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["ndp", "-an"], check=False)
+            for line in (r.stdout or "").splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and not line.startswith("Neighbor"):
+                    neighbors.append({
+                        "ip": parts[0].rstrip("%0"), "mac": parts[1],
+                        "iface": parts[2] if len(parts) > 2 else "",
+                        "state": parts[3] if len(parts) > 3 else "",
+                    })
+        except Exception:
+            pass
+    return render_template("ndp_table.html", neighbors=neighbors, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1206,7 +1305,43 @@ def ndp_table():
 @diagnostics_bp.route("/packet-capture")
 @login_required
 def packet_capture():
-    return render_template("packet_capture.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    ifaces = []
+    cur.execute("SELECT assigned_port, description FROM lan_config LIMIT 1")
+    lan = cur.fetchone()
+    cur.execute("SELECT assigned_port, description FROM wan_config LIMIT 1")
+    wan = cur.fetchone()
+    if lan and lan["assigned_port"]: ifaces.append({"name": lan["assigned_port"], "label": "LAN"})
+    if wan and wan["assigned_port"]: ifaces.append({"name": wan["assigned_port"], "label": "WAN"})
+    if not ifaces:
+        ifaces = [{"name": "em0", "label": "WAN"}, {"name": "em1", "label": "LAN"}]
+    return render_template("packet_capture.html", interfaces=ifaces,
+                           on_freebsd=sys.platform.startswith("freebsd"))
+
+
+@diagnostics_bp.route("/api/packet-capture", methods=["POST"])
+@login_required
+def api_packet_capture():
+    import sys
+    data    = request.get_json(silent=True) or {}
+    iface   = (data.get("interface") or "em0").strip()
+    count   = min(int(data.get("count") or 50), 200)
+    filt    = (data.get("filter") or "").strip()
+    if not sys.platform.startswith("freebsd"):
+        return jsonify({"ok": True, "lines": ["Non-FreeBSD host — packet capture not available."]})
+    try:
+        from app.services.network_service import run_command
+        cmd = ["tcpdump", "-nn", "-l", "-c", str(count), "-i", iface]
+        if filt:
+            cmd += filt.split()
+        r = run_command(cmd, check=False, timeout_seconds=15)
+        lines = [l for l in (r.stdout or "").splitlines() if l.strip()]
+        return jsonify({"ok": True, "lines": lines})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e), "lines": []})
 
 
 # --------------------------------------------------
@@ -1216,7 +1351,17 @@ def packet_capture():
 @diagnostics_bp.route("/pfinfo")
 @login_required
 def pfinfo():
-    return render_template("pfinfo.html")
+    import sys
+    pf_output = ""
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["pfctl", "-s", "info"], check=False)
+            pf_output = r.stdout or ""
+        except Exception:
+            pass
+    return render_template("pfinfo.html", pf_output=pf_output, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1226,7 +1371,20 @@ def pfinfo():
 @diagnostics_bp.route("/pftop")
 @login_required
 def pftop():
-    return render_template("pftop.html")
+    import sys
+    states = []
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["pfctl", "-s", "states"], check=False)
+            for line in (r.stdout or "").splitlines():
+                line = line.strip()
+                if line:
+                    states.append(line)
+        except Exception:
+            pass
+    return render_template("pftop.html", states=states[:200], on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1237,6 +1395,33 @@ def pftop():
 @login_required
 def ping_diag():
     return render_template("ping_diag.html")
+
+
+@diagnostics_bp.route("/api/ping", methods=["POST"])
+@login_required
+def api_ping():
+    import sys, re
+    data  = request.get_json(silent=True) or {}
+    host  = (data.get("host") or "").strip()
+    count = min(int(data.get("count") or 4), 10)
+    if not host:
+        return jsonify({"ok": False, "message": "Host is required"}), 400
+    # Validate: only allow hostnames/IPs (no shell injection)
+    if not re.match(r'^[a-zA-Z0-9.\-:]+$', host):
+        return jsonify({"ok": False, "message": "Invalid host"}), 400
+    try:
+        from app.services.network_service import run_command
+        if sys.platform.startswith("freebsd"):
+            cmd = ["ping", "-c", str(count), "-W", "3000", host]
+        elif sys.platform.startswith("win"):
+            cmd = ["ping", "-n", str(count), host]
+        else:
+            cmd = ["ping", "-c", str(count), "-W", "3", host]
+        r = run_command(cmd, check=False, timeout_seconds=count * 4 + 5)
+        lines = (r.stdout or r.stderr or "no output").splitlines()
+        return jsonify({"ok": r.returncode == 0, "lines": lines, "host": host})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e), "lines": []})
 
 
 # --------------------------------------------------
@@ -1250,13 +1435,35 @@ def reboot():
 
 
 # --------------------------------------------------
-# ROUTES
+# ROUTES TABLE
 # --------------------------------------------------
 
 @diagnostics_bp.route("/routes")
 @login_required
 def routes_diag():
-    return render_template("routes_diag.html")
+    import sys
+    routes = []
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["netstat", "-rn"], check=False)
+            section = ""
+            for line in (r.stdout or "").splitlines():
+                if line.startswith("Internet"):
+                    section = "IPv4"
+                elif line.startswith("Internet6"):
+                    section = "IPv6"
+                parts = line.split()
+                if len(parts) >= 4 and not line.startswith(("Routing", "Internet", "Destination")):
+                    routes.append({
+                        "proto": section, "destination": parts[0],
+                        "gateway": parts[1], "flags": parts[2],
+                        "iface": parts[-1],
+                    })
+        except Exception:
+            pass
+    return render_template("routes_diag.html", routes=routes, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1266,7 +1473,11 @@ def routes_diag():
 @diagnostics_bp.route("/smart-status")
 @login_required
 def smart_status():
-    return render_template("smart_status.html")
+    import sys
+    from app.services.freebsd_setup import preflight_check
+    report = preflight_check()
+    return render_template("smart_status.html", report=report,
+                           on_freebsd=sys.platform.startswith("freebsd"))
 
 
 # --------------------------------------------------
@@ -1276,17 +1487,55 @@ def smart_status():
 @diagnostics_bp.route("/sockets")
 @login_required
 def sockets():
-    return render_template("sockets.html")
+    import sys
+    connections = []
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["sockstat", "-46"], check=False)
+            for line in (r.stdout or "").splitlines():
+                parts = line.split()
+                if len(parts) >= 6 and not line.startswith("USER"):
+                    connections.append({
+                        "user": parts[0], "command": parts[1], "pid": parts[2],
+                        "proto": parts[4], "local": parts[5],
+                        "remote": parts[6] if len(parts) > 6 else "—",
+                    })
+        except Exception:
+            pass
+    return render_template("sockets.html", connections=connections, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
-# STATES
+# PF STATES
 # --------------------------------------------------
 
 @diagnostics_bp.route("/states")
 @login_required
 def states():
-    return render_template("states.html")
+    import sys
+    states_list = []
+    state_count = 0
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["pfctl", "-s", "states"], check=False)
+            for line in (r.stdout or "").splitlines():
+                line = line.strip()
+                if line:
+                    parts = line.split()
+                    states_list.append({
+                        "proto": parts[0] if parts else "",
+                        "direction": parts[1] if len(parts) > 1 else "",
+                        "detail": " ".join(parts[2:]) if len(parts) > 2 else line,
+                    })
+            state_count = len(states_list)
+        except Exception:
+            pass
+    return render_template("states.html", states=states_list[:500],
+                           state_count=state_count, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1296,7 +1545,21 @@ def states():
 @diagnostics_bp.route("/status-summary")
 @login_required
 def status_summary():
-    return render_template("status_summary.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    counts = {}
+    for tbl in ["firewall_rules_wan", "firewall_rules_lan", "firewall_rules_floating",
+                "nat_pf", "openvpn_servers", "ipsec_phase1", "users"]:
+        try:
+            cur.execute(f"SELECT COUNT(*) AS c FROM {tbl} WHERE disabled=0")
+            row = cur.fetchone()
+            counts[tbl] = (row or {}).get("c", 0)
+        except Exception:
+            counts[tbl] = 0
+    return render_template("status_summary.html", counts=counts,
+                           on_freebsd=sys.platform.startswith("freebsd"))
 
 
 # --------------------------------------------------
@@ -1306,17 +1569,41 @@ def status_summary():
 @diagnostics_bp.route("/system-activity")
 @login_required
 def system_activity():
-    return render_template("system_activity.html")
+    from app.audit_log import tail_events, log_stats
+    events = tail_events(limit=100)
+    stats  = log_stats()
+    return render_template("system_activity.html", events=events, stats=stats)
 
 
 # --------------------------------------------------
-# TABLES
+# PF TABLES
 # --------------------------------------------------
 
 @diagnostics_bp.route("/tables")
 @login_required
 def tables():
-    return render_template("tables.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT name, type, alias_values, description FROM firewall_aliases ORDER BY name")
+    aliases = [dict(r) for r in cur.fetchall()]
+    pf_tables = []
+    on_freebsd = sys.platform.startswith("freebsd")
+    if on_freebsd:
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["pfctl", "-s", "Tables"], check=False)
+            for line in (r.stdout or "").splitlines():
+                tname = line.strip()
+                if tname:
+                    r2 = run_command(["pfctl", "-t", tname, "-T", "show"], check=False)
+                    entries = [e.strip() for e in (r2.stdout or "").splitlines() if e.strip()]
+                    pf_tables.append({"name": tname, "entries": entries})
+        except Exception:
+            pass
+    return render_template("tables.html", aliases=aliases,
+                           pf_tables=pf_tables, on_freebsd=on_freebsd)
 
 
 # --------------------------------------------------
@@ -1329,11 +1616,41 @@ def test_port():
     return render_template("test_port.html")
 
 
+@diagnostics_bp.route("/api/test-port", methods=["POST"])
+@login_required
+def api_test_port():
+    import socket, re
+    data = request.get_json(silent=True) or {}
+    host = (data.get("host") or "").strip()
+    port = int(data.get("port") or 80)
+    if not host or not re.match(r'^[a-zA-Z0-9.\-:]+$', host):
+        return jsonify({"ok": False, "message": "Invalid host"}), 400
+    if not (1 <= port <= 65535):
+        return jsonify({"ok": False, "message": "Invalid port"}), 400
+    try:
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.close()
+        return jsonify({"ok": True, "message": f"Port {port} on {host} is open."})
+    except OSError as e:
+        return jsonify({"ok": False, "message": f"Port {port} on {host} is closed or unreachable: {e}"})
+
+
 # --------------------------------------------------
-# TUNNELS
+# TUNNELS / VPN STATUS
 # --------------------------------------------------
 
 @diagnostics_bp.route("/tunnels")
 @login_required
 def tunnels():
-    return render_template("tunnels.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT id, description, disabled, protocol, local_port, tunnel_network FROM openvpn_servers ORDER BY id")
+    ovpn = [dict(r) for r in cur.fetchall()]
+    cur.execute("SELECT id, description, disabled, remote_gateway, ike_version, auth_method FROM ipsec_phase1 ORDER BY id")
+    ipsec = [dict(r) for r in cur.fetchall()]
+    cur.execute("SELECT * FROM l2tp_config LIMIT 1")
+    l2tp = dict(cur.fetchone() or {})
+    return render_template("tunnels.html", openvpn=ovpn, ipsec=ipsec, l2tp=l2tp,
+                           on_freebsd=sys.platform.startswith("freebsd"))

@@ -33,6 +33,8 @@ load_rc_config "${name}"
 : ${smart_shield_enable:="NO"}
 : ${smart_shield_user:="root"}
 : ${smart_shield_group:="wheel"}
+# NOTE: root is required for pfctl, sysrc, and service management.
+# This is standard for dedicated firewall appliances (pfSense also runs as root).
 # App root where run.py/wsgi.py live in deployed system.
 : ${smart_shield_app_root:="/usr/local/share/smart-shield"}
 # Environment file containing SECRET_KEY and DB path vars.

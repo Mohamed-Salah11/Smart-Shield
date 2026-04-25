@@ -1,6 +1,91 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to DNS Lookup</h1>
-<p>Placeholder for DNS Lookup diagnostics.</p>
+<div class="container">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
+        <li class="breadcrumb-item active">DNS Lookup</li>
+      </ol>
+    </nav>
+    <h1><i class="fa fa-magnifying-glass me-2 text-primary"></i>DNS Lookup</h1>
+    <p class="lead">Resolve hostnames to IP addresses via the system resolver.</p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="section">
+        <div class="section-header"><h2 class="mb-0">Query</h2></div>
+        <div class="section-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Hostname</label>
+            <input type="text" id="dns-host" class="form-control" placeholder="example.com" autocomplete="off">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Record Type</label>
+            <select id="dns-type" class="form-select">
+              <option value="A">A (IPv4)</option>
+              <option value="AAAA">AAAA (IPv6)</option>
+              <option value="MX">MX</option>
+              <option value="TXT">TXT</option>
+              <option value="CNAME">CNAME</option>
+            </select>
+          </div>
+          <button id="btn-lookup" class="btn btn-primary w-100">
+            <i class="fa fa-search me-2"></i>Resolve
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="section h-100">
+        <div class="section-header"><h2 class="mb-0">Results</h2></div>
+        <div class="section-body p-0">
+          <div id="dns-result" style="min-height:220px;padding:1rem;">
+            <span class="text-muted">Enter a hostname and click Resolve.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('btn-lookup').addEventListener('click', function () {
+  const host = document.getElementById('dns-host').value.trim();
+  const type = document.getElementById('dns-type').value;
+  if (!host) { alert('Enter a hostname.'); return; }
+  const out = document.getElementById('dns-result');
+  out.innerHTML = '<span class="text-muted"><i class="fa fa-spinner fa-spin me-2"></i>Resolving…</span>';
+  this.disabled = true;
+  fetch('/diagnostics/api/dns-lookup', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ host, type })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) {
+      out.innerHTML = `<div class="alert alert-danger mb-0"><i class="fa fa-xmark me-2"></i>${d.error}</div>`;
+      return;
+    }
+    const rows = (d.results || []).map(r =>
+      `<tr><td><code>${r.address || r}</code></td><td class="text-muted">${r.type || type}</td></tr>`
+    ).join('');
+    out.innerHTML = rows
+      ? `<div class="table-responsive"><table class="table table-hover mb-0">
+           <thead><tr><th>Address</th><th>Type</th></tr></thead>
+           <tbody>${rows}</tbody></table></div>`
+      : '<div class="alert alert-warning mb-0">No records found.</div>';
+  })
+  .catch(e => { out.innerHTML = `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`; })
+  .finally(() => { document.getElementById('btn-lookup').disabled = false; });
+});
+document.getElementById('dns-host').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-lookup').click();
+});
+</script>
 {% endblock %}

@@ -33,7 +33,14 @@ def carp_failover():
 @status_bp.route("/dhcp-leases")
 @login_required
 def dhcp_leases():
-    return render_template("dhcp_leases.html")
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM dhcp_pools ORDER BY interface_type")
+    pools = [dict(r) for r in cur.fetchall()]
+    cur.execute("SELECT * FROM static_leases ORDER BY interface_type, ip_address")
+    static = [dict(r) for r in cur.fetchall()]
+    return render_template("dhcp_leases.html", pools=pools, static_leases=static)
 
 
 # --------------------------------------------------
@@ -53,7 +60,43 @@ def dhcpv6_leases():
 @status_bp.route("/filter-reload")
 @login_required
 def filter_reload():
-    return render_template("filter_reload.html")
+    import sys, os
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order LIMIT 1")
+    has_wan = cur.fetchone() is not None
+    cur.execute("SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order LIMIT 1")
+    has_lan = cur.fetchone() is not None
+    cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_wan WHERE disabled=0")
+    wan_count = (cur.fetchone() or {}).get("c", 0)
+    cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_lan WHERE disabled=0")
+    lan_count = (cur.fetchone() or {}).get("c", 0)
+    cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_floating WHERE disabled=0")
+    float_count = (cur.fetchone() or {}).get("c", 0)
+    pf_enabled = sys.platform.startswith("freebsd") and os.path.exists("/dev/pf")
+    return render_template("filter_reload.html",
+        wan_count=wan_count, lan_count=lan_count,
+        float_count=float_count, pf_enabled=pf_enabled)
+
+
+# --------------------------------------------------
+# FILTER RELOAD — APPLY (POST)
+# --------------------------------------------------
+
+@status_bp.route("/filter-reload/apply", methods=["POST"])
+@login_required
+def filter_reload_apply():
+    from app.database import get_db
+    from app.services.pf_generator import reload_pf_rules
+    from app.audit_log import log_event
+    conn = get_db()
+    result = reload_pf_rules(conn)
+    log_event(category="system", action="pf_reload",
+              username=request.values.get("username"),
+              remote_addr=request.remote_addr,
+              details=result)
+    return jsonify(result)
 
 
 # --------------------------------------------------
@@ -63,7 +106,33 @@ def filter_reload():
 @status_bp.route("/gateways")
 @login_required
 def gateways():
-    return render_template("gateways.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM wan_config LIMIT 1")
+    wan = dict(cur.fetchone() or {})
+    cur.execute("SELECT * FROM lan_config LIMIT 1")
+    lan = dict(cur.fetchone() or {})
+
+    # Live route table on FreeBSD
+    routes = []
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["netstat", "-rn", "-f", "inet"], check=False)
+            for line in (r.stdout or "").splitlines():
+                parts = line.split()
+                if len(parts) >= 4 and parts[0] not in ("Destination", "Internet:"):
+                    routes.append({
+                        "destination": parts[0], "gateway": parts[1],
+                        "flags": parts[2], "iface": parts[-1],
+                    })
+        except Exception:
+            pass
+
+    return render_template("gateways.html", wan=wan, lan=lan, routes=routes,
+                           on_freebsd=sys.platform.startswith("freebsd"))
 
 
 # --------------------------------------------------
@@ -73,7 +142,46 @@ def gateways():
 @status_bp.route("/monitoring")
 @login_required
 def monitoring():
-    return render_template("monitoring.html")
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT assigned_port, description, ipv4_address FROM lan_config LIMIT 1")
+    lan = dict(cur.fetchone() or {})
+    cur.execute("SELECT assigned_port, description, ipv4_address FROM wan_config LIMIT 1")
+    wan = dict(cur.fetchone() or {})
+    interfaces = [lan, wan]
+    return render_template("monitoring.html", interfaces=interfaces,
+                           on_freebsd=sys.platform.startswith("freebsd"))
+
+
+# --------------------------------------------------
+# MONITORING — LIVE INTERFACE STATS API
+# --------------------------------------------------
+
+@status_bp.route("/api/interface-stats")
+@login_required
+def api_interface_stats():
+    import sys, re
+    stats = []
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["netstat", "-ibn"], check=False)
+            for line in (r.stdout or "").splitlines():
+                parts = line.split()
+                if len(parts) >= 8 and not line.startswith("Name"):
+                    try:
+                        stats.append({
+                            "name": parts[0], "mtu": parts[1],
+                            "rx_pkts": int(parts[4]), "rx_errs": int(parts[5]),
+                            "tx_pkts": int(parts[6]), "tx_errs": int(parts[7]),
+                        })
+                    except (ValueError, IndexError):
+                        pass
+        except Exception:
+            pass
+    return jsonify({"ok": True, "stats": stats, "on_freebsd": sys.platform.startswith("freebsd")})
 
 
 # --------------------------------------------------
@@ -83,7 +191,12 @@ def monitoring():
 @status_bp.route("/queues")
 @login_required
 def queues():
-    return render_template("queues.html")
+    from app.database import get_db
+    conn = get_db()
+    cur  = conn.cursor()
+    cur.execute("SELECT * FROM traffic_shaper_configs ORDER BY interface_type, name")
+    shapers = [dict(r) for r in cur.fetchall()]
+    return render_template("queues.html", shapers=shapers)
 
 
 # --------------------------------------------------
