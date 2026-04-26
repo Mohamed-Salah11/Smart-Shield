@@ -1,884 +1,512 @@
 {% extends 'base.html' %}
-
 {% block head %}
 <style>
-/* ─────────────────────────────────────────────
-   DASHBOARD  ·  Smart Shield
-   Palette: 1 blue accent + semantic status colours
-   Spacing: 8px grid · Typography: Inter
-───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   PRO DASHBOARD — Smart Shield
+═══════════════════════════════════════════ */
 
 /* ── Toolbar ── */
-.db-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.db-bar-left  { display: flex; align-items: center; gap: 10px; }
-.db-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.db-bar { display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px; }
+.db-bar-left  { display:flex;align-items:center;gap:10px; }
+.db-bar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+.db-title { margin:0;font-size:1.15rem;font-weight:800;color:var(--text-color);letter-spacing:-.02em; }
+.db-clock { padding:5px 12px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:7px;font-size:.8rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--secondary); }
 
-.db-title {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: var(--heading-blue);
-  letter-spacing: -.025em;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.db-title-icon {
-  width: 32px; height: 32px;
-  background: var(--primary);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: .82rem;
-  box-shadow: 0 2px 8px rgba(37,99,235,.35);
-  flex-shrink: 0;
-}
-
-.db-clock {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 7px;
-  font-size: .8rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--secondary);
-  letter-spacing: .01em;
-}
-.db-clock i { color: var(--primary); font-size: .75rem; }
-
-.db-ar-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: .82rem;
-  font-weight: 500;
-  color: var(--secondary);
-  cursor: pointer;
-  user-select: none;
-}
-.db-last-update {
-  font-size: .78rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* ── Identity Banner ── */
+/* ── Status banner ── */
 .db-banner {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
-  background: #0f172a;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,.06);
-  margin-bottom: 16px;
-  position: relative;
-  overflow: hidden;
+  display:flex;align-items:center;gap:16px;padding:16px 20px;
+  background:var(--panel);border:1px solid var(--border-color);
+  border-left:4px solid var(--primary);border-radius:10px;
+  margin-bottom:14px;box-shadow:var(--shadow-soft);
 }
-/* Subtle grid texture */
-.db-banner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: .4;
-  background-image:
-    linear-gradient(rgba(59,130,246,.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59,130,246,.07) 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events: none;
-}
-/* Blue accent line at top */
-.db-banner::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--primary) 0%, rgba(37,99,235,0) 100%);
-}
-
-.db-banner-pulse {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16,185,129,.2);
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-  animation: dbpulse 2.5s ease-in-out infinite;
-}
-@keyframes dbpulse {
-  0%,100% { box-shadow: 0 0 0 3px rgba(16,185,129,.2); }
-  50%      { box-shadow: 0 0 0 7px rgba(16,185,129,.06); }
-}
-
-.db-banner-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
-.db-banner-hostname {
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #f1f5f9;
-  letter-spacing: -.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.db-banner-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 5px;
-}
-.db-meta-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: .78rem;
-  color: rgba(148,163,184,.75);
-}
-.db-meta-item i { font-size: .72rem; color: rgba(59,130,246,.7); }
-.db-meta-item strong { color: rgba(203,213,225,.9); font-weight: 600; }
-
-.db-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border-radius: 99px;
-  font-size: .72rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  position: relative; z-index: 1;
-  flex-shrink: 0;
-}
-.db-status-chip.online {
-  background: rgba(16,185,129,.12);
-  color: #34d399;
-  border: 1px solid rgba(16,185,129,.25);
-}
+.db-banner-pulse { width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2);flex-shrink:0;animation:dbpulse 2.5s ease-in-out infinite; }
+@keyframes dbpulse { 0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.2)} 50%{box-shadow:0 0 0 7px rgba(16,185,129,.06)} }
+.db-banner-hostname { font-size:1.05rem;font-weight:800;color:var(--text-color); }
+.db-banner-meta { display:flex;flex-wrap:wrap;gap:18px;margin-top:4px; }
+.db-meta-item { font-size:.78rem;color:var(--muted); }
+.db-meta-item strong { color:var(--text-color);font-weight:600; }
+.db-status-chip { display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:99px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;flex-shrink:0; }
+.db-status-chip.online { background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25); }
 
 /* ── KPI Strip ── */
-.db-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-@media (max-width: 1080px) { .db-kpi-strip { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 560px)  { .db-kpi-strip { grid-template-columns: 1fr; } }
+.db-kpi-strip { display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px; }
+@media(max-width:1200px){.db-kpi-strip{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px) {.db-kpi-strip{grid-template-columns:repeat(2,1fr)}}
+.db-kpi { background:var(--panel);border:1px solid var(--border-color);border-top:3px solid var(--kpi-accent,var(--primary));border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-shadow:var(--shadow-soft);transition:box-shadow .15s,transform .15s; }
+.db-kpi:hover { box-shadow:var(--shadow-md);transform:translateY(-2px); }
+.db-kpi-val { font-size:1.7rem;font-weight:800;line-height:1;color:var(--text-color);font-variant-numeric:tabular-nums; }
+.db-kpi-label { font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:4px; }
+.db-kpi-note  { font-size:.74rem;color:var(--muted);margin-top:4px;line-height:1.35; }
 
-.db-kpi {
-  background: var(--panel);
-  border: 1px solid var(--border-color);
-  border-top: 3px solid var(--kpi-accent, var(--primary));
-  border-radius: 10px;
-  padding: 16px 18px;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  box-shadow: var(--shadow-soft);
-  transition: box-shadow .15s, transform .15s;
-}
-.db-kpi:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-.db-kpi-icon {
-  width: 42px; height: 42px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
-  background: var(--kpi-icon-bg, rgba(37,99,235,.08));
-  color: var(--kpi-accent, var(--primary));
-  flex-shrink: 0;
-}
-.db-kpi-body { min-width: 0; flex: 1; }
-.db-kpi-val {
-  font-size: 1.8rem;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--text-color);
-  letter-spacing: -.035em;
-  font-variant-numeric: tabular-nums;
-}
-.db-kpi-label {
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--muted);
-  margin-top: 4px;
-}
-.db-kpi-note {
-  font-size: .75rem;
-  color: var(--muted);
-  margin-top: 5px;
-  line-height: 1.4;
-}
-.kpi-note-ok   { color: #10b981; }
-.kpi-note-warn { color: #f59e0b; }
-.kpi-note-bad  { color: #ef4444; }
-
-/* ── Main 2-col grid ── */
-.db-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-@media (max-width: 860px) { .db-grid { grid-template-columns: 1fr; } }
-.db-col-full { grid-column: 1 / -1; }
+/* ── Widget grid ── */
+.db-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+@media(max-width:1100px){.db-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px) {.db-grid{grid-template-columns:1fr}}
+.db-col-full { grid-column:1/-1; }
+.db-col-2    { grid-column:span 2; }
 
 /* ── Widget card ── */
-.db-card {
-  background: var(--panel);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: var(--shadow-soft);
-}
-.db-card:hover { box-shadow: var(--shadow-md); }
+.db-card { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-soft);transition:box-shadow .15s; }
+.db-card:hover { box-shadow:var(--shadow-md); }
+.db-card-head { display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--border-color-soft);border-bottom:1px solid var(--border-color); }
+.db-card-title { font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted); }
+.db-card-actions { display:flex;gap:4px; }
+.db-icon-btn { width:22px;height:22px;border:1px solid var(--border-color);border-radius:5px;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.65rem;transition:background .12s,color .12s; }
+.db-icon-btn:hover { background:var(--border-color);color:var(--text-color); }
+.db-card-body { padding:14px; }
+.db-card-body.no-pad { padding:0; }
 
-.db-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: #0f172a;
-  border-bottom: 1px solid rgba(255,255,255,.05);
-  cursor: grab;
-  user-select: none;
-}
-.db-card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  color: rgba(203,213,225,.8);
-}
-.db-card-title i { font-size: .78rem; color: rgba(59,130,246,.9); }
-.db-card-actions { display: flex; gap: 4px; }
+/* ── Stat rows ── */
+.db-stat-row { display:grid;gap:8px;margin-bottom:12px; }
+.db-stat-row.cols-3 { grid-template-columns:repeat(3,1fr); }
+.db-stat-row.cols-2 { grid-template-columns:repeat(2,1fr); }
+.db-stat-cell { background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px;padding:10px 12px;text-align:center; }
+.db-stat-val { font-size:1.5rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums; }
+.db-stat-lbl { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:3px; }
+.c-ok   { color:#10b981; }
+.c-bad  { color:#ef4444; }
+.c-warn { color:#f59e0b; }
+.c-muted{ color:var(--secondary); }
+.c-blue { color:var(--primary); }
 
-.db-icon-btn {
-  width: 24px; height: 24px;
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 5px;
-  background: transparent;
-  color: rgba(255,255,255,.5);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  font-size: .7rem;
-  transition: background .12s, color .12s;
-}
-.db-icon-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
+/* ── Info rows ── */
+.db-info-grid { display:grid;grid-template-columns:1fr 1fr;gap:7px; }
+.db-info-row  { padding:8px 11px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px; }
+.db-info-row.full { grid-column:1/-1; }
+.db-info-lbl  { font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted); }
+.db-info-val  { font-size:.84rem;font-weight:600;color:var(--text-color);margin-top:2px;word-break:break-word; }
 
-.db-card-body { padding: 16px; }
-.db-card-body.no-pad { padding: 0; }
-.db-card.collapsed .db-card-body { display: none; }
+/* ── Flag list ── */
+.db-flags { display:grid;grid-template-columns:1fr 1fr;gap:7px; }
+.db-flag  { display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px; }
+.db-flag-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+.db-flag-dot.on  { background:#10b981;box-shadow:0 0 5px rgba(16,185,129,.4); }
+.db-flag-dot.off { background:var(--border-color); }
+.db-flag-name  { font-size:.8rem;font-weight:600;color:var(--text-color);line-height:1.2; }
+.db-flag-state { font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:1px; }
+.db-flag-state.on  { color:#10b981; }
+.db-flag-state.off { color:var(--muted); }
 
-/* ── Stat row for session summary ── */
-.db-stat-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.db-stat-cell {
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px 14px;
-  text-align: center;
-}
-.db-stat-val {
-  font-size: 1.6rem;
-  font-weight: 800;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.db-stat-lbl {
-  font-size: .7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--muted);
-  margin-top: 4px;
-}
-.c-ok    { color: #10b981; }
-.c-bad   { color: #ef4444; }
-.c-muted { color: var(--secondary); }
-
-/* ── Policy list ── */
-.db-policy-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.db-policy-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: background .12s;
-}
-.db-policy-row:hover { background: rgba(37,99,235,.04); }
-.db-policy-ico {
-  width: 30px; height: 30px;
-  border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: .8rem;
-  flex-shrink: 0;
-}
-.db-policy-info { min-width: 0; }
-.db-policy-val  { font-size: 1rem; font-weight: 800; color: var(--text-color); line-height: 1; font-variant-numeric: tabular-nums; }
-.db-policy-lbl  { font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 1px; }
-
-/* ── Sysinfo ── */
-.db-sysinfo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.db-si-row {
-  padding: 9px 12px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-.db-si-row.full { grid-column: 1 / -1; }
-.db-si-lbl { font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.db-si-val { font-size: .875rem; font-weight: 600; color: var(--text-color); margin-top: 2px; word-break: break-word; }
-
-/* ── Feature flags ── */
-.db-flags { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.db-flag {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 12px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-.db-flag-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--muted);
-}
-.db-flag-dot.on  { background: #10b981; box-shadow: 0 0 5px rgba(16,185,129,.4); }
-.db-flag-dot.off { background: var(--border-color); }
-.db-flag-body {}
-.db-flag-name  { font-size: .8rem; font-weight: 600; color: var(--text-color); }
-.db-flag-state { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.db-flag-state.on  { color: #10b981; }
-.db-flag-state.off { color: var(--muted); }
-
-/* ── Data table ── */
-.db-scroll { max-height: 290px; overflow-y: auto; }
-.db-scroll::-webkit-scrollbar       { width: 4px; }
-.db-scroll::-webkit-scrollbar-track { background: transparent; }
-.db-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
-
-.db-tbl { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.db-tbl thead th {
-  position: sticky; top: 0; z-index: 1;
-  padding: 8px 14px;
-  background: var(--border-color-soft);
-  font-size: .69rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border-color);
-  white-space: nowrap;
-}
-.db-tbl tbody td {
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-color);
-  vertical-align: middle;
-}
-.db-tbl tbody tr:last-child td { border-bottom: none; }
-.db-tbl tbody tr:hover { background: rgba(37,99,235,.03); }
-.td-t  { color: var(--muted); font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.td-ip { font-family: ui-monospace, 'JetBrains Mono', monospace; font-size: .79rem; color: var(--secondary); }
-.td-empty { text-align: center; color: var(--muted); padding: 28px 0 !important; font-size: .85rem; }
-
-/* ── Badges ── */
-.db-badge {
-  display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: 5px;
-  font-size: .69rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .04em;
-  white-space: nowrap;
-}
-.db-b-session  { background: rgba(59,130,246,.1);  color: #3b82f6;  border: 1px solid rgba(59,130,246,.18); }
-.db-b-browsing { background: rgba(100,116,139,.08); color: #94a3b8;  border: 1px solid rgba(100,116,139,.15); }
-.db-b-system   { background: rgba(245,158,11,.1);  color: #f59e0b;  border: 1px solid rgba(245,158,11,.18); }
-.db-b-network  { background: rgba(6,182,212,.1);   color: #06b6d4;  border: 1px solid rgba(6,182,212,.18); }
-.db-b-default  { background: rgba(148,163,184,.08); color: #94a3b8;  border: 1px solid rgba(148,163,184,.15); }
-.db-b-ok       { background: rgba(16,185,129,.1);  color: #10b981;  border: 1px solid rgba(16,185,129,.2); }
-.db-b-fail     { background: rgba(239,68,68,.1);   color: #ef4444;  border: 1px solid rgba(239,68,68,.2); }
-.db-b-logout   { background: rgba(100,116,139,.08); color: #94a3b8;  border: 1px solid rgba(100,116,139,.15); }
-.db-b-blue     { background: rgba(59,130,246,.1);  color: #3b82f6;  border: 1px solid rgba(59,130,246,.18); }
+/* ── Count list ── */
+.db-count-list { display:grid;grid-template-columns:1fr 1fr;gap:6px; }
+.db-count-row  { display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:7px;gap:8px; }
+.db-count-lbl  { font-size:.78rem;font-weight:500;color:var(--text-color); }
+.db-count-val  { font-size:.85rem;font-weight:800;color:var(--text-color);font-variant-numeric:tabular-nums;flex-shrink:0; }
 
 /* ── Quick nav ── */
-.db-ql {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 8px;
-}
-.db-ql-item {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 7px; padding: 14px 8px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  border-radius: 9px;
-  text-decoration: none;
-  color: var(--secondary);
-  font-size: .78rem; font-weight: 600;
-  text-align: center; line-height: 1.3;
-  transition: background .12s, border-color .12s, color .12s, transform .12s;
-}
-.db-ql-item:hover {
-  background: rgba(37,99,235,.05);
-  border-color: rgba(37,99,235,.25);
-  color: var(--primary);
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-.db-ql-icon {
-  width: 34px; height: 34px;
-  border-radius: 8px;
-  background: var(--border-color-soft);
-  border: 1px solid var(--border-color);
-  display: flex; align-items: center; justify-content: center;
-  font-size: .875rem;
-  color: var(--secondary);
-  transition: background .12s, color .12s, border-color .12s;
-}
-.db-ql-item:hover .db-ql-icon {
-  background: rgba(37,99,235,.08);
-  color: var(--primary);
-  border-color: rgba(37,99,235,.2);
-}
+.db-ql { display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:7px; }
+.db-ql-item { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px 6px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:9px;text-decoration:none;color:var(--secondary);font-size:.75rem;font-weight:600;text-align:center;line-height:1.3;transition:background .12s,border-color .12s,color .12s,transform .12s; }
+.db-ql-item:hover { background:rgba(37,99,235,.05);border-color:rgba(37,99,235,.3);color:var(--primary);transform:translateY(-2px);text-decoration:none; }
 
-/* ── Dark mode ── */
-[data-theme="dark"] .db-banner     { background: #060a12; border-color: rgba(255,255,255,.04); }
-[data-theme="dark"] .db-card-head  { background: #060a12; border-bottom-color: rgba(255,255,255,.04); }
-[data-theme="dark"] .db-kpi        { background: var(--panel); border-color: var(--border-color); }
-[data-theme="dark"] .db-card       { background: var(--panel); border-color: var(--border-color); }
-[data-theme="dark"] .db-stat-cell  { background: #0d1117; border-color: var(--border-color); }
-[data-theme="dark"] .db-policy-row { background: #0d1117; border-color: var(--border-color); }
-[data-theme="dark"] .db-policy-row:hover { background: rgba(59,130,246,.06); }
-[data-theme="dark"] .db-si-row     { background: #0d1117; border-color: var(--border-color); }
-[data-theme="dark"] .db-flag       { background: #0d1117; border-color: var(--border-color); }
-[data-theme="dark"] .db-tbl thead th { background: #0d1117; }
-[data-theme="dark"] .db-tbl tbody tr:hover { background: rgba(59,130,246,.05); }
-[data-theme="dark"] .db-ql-item    { background: #0d1117; border-color: var(--border-color); }
-[data-theme="dark"] .db-ql-icon    { background: #080c14; border-color: var(--border-color); }
-[data-theme="dark"] .db-ql-item:hover { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.2); }
-[data-theme="dark"] .db-clock      { background: #0d1117; border-color: var(--border-color); }
+/* ── Table ── */
+.db-scroll { max-height:280px;overflow-y:auto; }
+.db-scroll::-webkit-scrollbar { width:4px; }
+.db-scroll::-webkit-scrollbar-thumb { background:var(--border-color);border-radius:3px; }
+.db-tbl { width:100%;border-collapse:collapse;font-size:.81rem; }
+.db-tbl thead th { position:sticky;top:0;z-index:1;padding:8px 12px;background:var(--border-color-soft);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border-color);white-space:nowrap; }
+.db-tbl tbody td { padding:8px 12px;border-bottom:1px solid var(--border-color);color:var(--text-color);vertical-align:middle; }
+.db-tbl tbody tr:last-child td { border-bottom:none; }
+.db-tbl tbody tr:hover { background:rgba(37,99,235,.03); }
+.td-t  { color:var(--muted);font-size:.75rem;white-space:nowrap;font-variant-numeric:tabular-nums; }
+.td-ip { font-family:monospace;font-size:.78rem;color:var(--secondary); }
+.td-empty { text-align:center;color:var(--muted);padding:24px 0!important;font-size:.84rem; }
 
-/* spin on refresh */
-@keyframes spin { to { transform: rotate(360deg); } }
-.spin { animation: spin .7s linear infinite; display: inline-block; }
+/* ── Badges ── */
+.db-badge { display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap; }
+.db-b-session  { background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.18); }
+.db-b-browsing { background:rgba(100,116,139,.08);color:#94a3b8;border:1px solid rgba(100,116,139,.15); }
+.db-b-system   { background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.18); }
+.db-b-network  { background:rgba(6,182,212,.1);color:#06b6d4;border:1px solid rgba(6,182,212,.18); }
+.db-b-ok       { background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2); }
+.db-b-fail     { background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2); }
+.db-b-blue     { background:rgba(59,130,246,.1);color:#3b82f6;border:1px solid rgba(59,130,246,.18); }
+.db-b-default  { background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.15); }
 
-/* counter pop */
+/* ── Widget picker modal ── */
+.wp-modal .modal-dialog { max-width:820px; }
+.wp-modal .modal-body   { padding:0;display:flex;min-height:480px; }
+.wp-cats  { width:180px;flex-shrink:0;border-right:1px solid var(--border-color);padding:12px 0;background:var(--border-color-soft); }
+.wp-cat-btn { display:block;width:100%;text-align:left;padding:9px 16px;border:none;background:transparent;font-size:.8rem;font-weight:600;color:var(--muted);cursor:pointer;transition:background .12s,color .12s;border-left:3px solid transparent; }
+.wp-cat-btn.active { color:var(--primary);background:var(--panel);border-left-color:var(--primary); }
+.wp-widgets-panel { flex:1;padding:16px;overflow-y:auto;max-height:520px; }
+.wp-section-title { font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px; }
+.wp-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px; }
+.wp-item { display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px;cursor:pointer;transition:border-color .12s; }
+.wp-item:hover { border-color:var(--primary); }
+.wp-item input { flex-shrink:0; }
+.wp-item-info { min-width:0; }
+.wp-item-name { font-size:.82rem;font-weight:600;color:var(--text-color); }
+.wp-item-desc { font-size:.71rem;color:var(--muted);margin-top:1px; }
+
+/* ── Animations ── */
+@keyframes spin { to{transform:rotate(360deg)} }
+.spin { animation:spin .7s linear infinite;display:inline-block; }
 @keyframes numPop { 0%{transform:scale(.85);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
-.num-pop { animation: numPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
-
-/* event stream row slide-in */
-@keyframes dbEvSlide { from{opacity:0;background:rgba(59,130,246,.12)} to{opacity:1;background:transparent} }
+.num-pop { animation:numPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
+@keyframes dbEvSlide { from{opacity:0;background:rgba(59,130,246,.1)} to{opacity:1;background:transparent} }
 </style>
 {% endblock %}
 
 {% block main %}
 <div style="width:100%;max-width:none;">
 
-  <!-- ── Toolbar ── -->
+  <!-- Toolbar -->
   <div class="db-bar">
     <div class="db-bar-left">
-      <h1 class="db-title">
-        <span class="db-title-icon"><i class="fa-solid fa-gauge-high"></i></span>
-        Dashboard
-      </h1>
+      <h1 class="db-title">Dashboard</h1>
     </div>
     <div class="db-bar-right">
-      <span class="db-clock"><i class="fa-regular fa-clock"></i><span id="dbClock">--:--:-- UTC</span></span>
-      <label class="db-ar-label">
+      <span class="db-clock" id="dbClock">--:--:-- UTC</span>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:var(--secondary);cursor:pointer;">
         <div class="form-check form-switch m-0">
           <input class="form-check-input" type="checkbox" id="dbAutoRefresh" role="switch">
         </div>
         Auto-refresh
       </label>
-      <span class="db-last-update" id="dbLastUpdate"></span>
-      <button class="btn btn-sm btn-primary" id="dbRefreshBtn"><i class="fa-solid fa-rotate" id="dbRefreshIco"></i> Refresh</button>
-      <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#dbWidgetModal"><i class="fa-solid fa-sliders"></i> Widgets</button>
-      <button class="btn btn-sm btn-outline-danger" id="dbResetBtn" title="Reset layout"><i class="fa-solid fa-rotate-left"></i></button>
+      <button class="btn btn-sm btn-primary" id="dbRefreshBtn"><span id="dbRefreshIco">↻</span> Refresh</button>
+      <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#wpModal">Widgets</button>
+      <a href="{{ url_for('system.theme_editor') }}" class="btn btn-sm btn-outline-secondary">Theme Editor</a>
+      <button class="btn btn-sm btn-outline-danger" id="dbResetBtn" title="Reset layout">Reset</button>
     </div>
   </div>
 
-  <!-- ── Identity Banner ── -->
-  <div class="db-banner" id="dbBanner" data-wid="banner" draggable="true">
+  <!-- Identity Banner -->
+  <div class="db-banner" data-wid="banner">
     <div class="db-banner-pulse"></div>
-    <div class="db-banner-body">
+    <div style="flex:1;min-width:0;">
       <div class="db-banner-hostname" id="dbHostname">Smart Shield</div>
       <div class="db-banner-meta">
-        <span class="db-meta-item"><i class="fa-solid fa-globe"></i>Timezone: <strong id="dbTimezone">—</strong></span>
-        <span class="db-meta-item"><i class="fa-solid fa-palette"></i>Theme: <strong id="dbTheme">—</strong></span>
-        <span class="db-meta-item"><i class="fa-solid fa-table-columns"></i>Columns: <strong id="dbColumns">—</strong></span>
-        <span class="db-meta-item"><i class="fa-solid fa-calendar-check"></i>Config: <strong id="dbUpdated">—</strong></span>
+        <span class="db-meta-item">Timezone: <strong id="dbTimezone">—</strong></span>
+        <span class="db-meta-item">Theme: <strong id="dbTheme">—</strong></span>
+        <span class="db-meta-item">Updated: <strong id="dbUpdated">—</strong></span>
       </div>
     </div>
-    <span class="db-status-chip online"><i class="fa-solid fa-circle" style="font-size:.5rem;"></i>Online</span>
+    <span class="db-status-chip online">● Online</span>
   </div>
 
-  <!-- ── KPI Strip ── -->
+  <!-- KPI Strip -->
   <div class="db-kpi-strip">
-
-    <!-- Firewall Rules -->
-    <div class="db-kpi" data-wid="kpi_rules" draggable="true"
-         style="--kpi-accent:#2563eb; --kpi-icon-bg:rgba(37,99,235,.08);">
-      <div class="db-kpi-icon"><i class="fa-solid fa-shield-halved"></i></div>
-      <div class="db-kpi-body">
+    <div class="db-kpi" data-wid="kpi_rules" style="--kpi-accent:#2563eb;">
+      <div>
         <div class="db-kpi-val" id="kpiRules">—</div>
         <div class="db-kpi-label">Firewall Rules</div>
         <div class="db-kpi-note" id="kpiRulesNote">WAN · LAN · Floating</div>
       </div>
     </div>
-
-    <!-- Users -->
-    <div class="db-kpi" data-wid="kpi_users" draggable="true"
-         style="--kpi-accent:#10b981; --kpi-icon-bg:rgba(16,185,129,.08);">
-      <div class="db-kpi-icon"><i class="fa-solid fa-users"></i></div>
-      <div class="db-kpi-body">
+    <div class="db-kpi" data-wid="kpi_vpn" style="--kpi-accent:#0891b2;">
+      <div>
+        <div class="db-kpi-val" id="kpiVpn">—</div>
+        <div class="db-kpi-label">VPN Servers</div>
+        <div class="db-kpi-note" id="kpiVpnNote">OpenVPN configured</div>
+      </div>
+    </div>
+    <div class="db-kpi" data-wid="kpi_users" style="--kpi-accent:#10b981;">
+      <div>
         <div class="db-kpi-val" id="kpiUsers">—</div>
         <div class="db-kpi-label">Users &amp; Groups</div>
         <div class="db-kpi-note" id="kpiUsersNote">Accounts · Groups</div>
       </div>
     </div>
-
-    <!-- VPN -->
-    <div class="db-kpi" data-wid="kpi_vpn" draggable="true"
-         style="--kpi-accent:#0891b2; --kpi-icon-bg:rgba(8,145,178,.08);">
-      <div class="db-kpi-icon"><i class="fa-solid fa-lock"></i></div>
-      <div class="db-kpi-body">
-        <div class="db-kpi-val" id="kpiVpn">—</div>
-        <div class="db-kpi-label">VPN Servers</div>
-        <div class="db-kpi-note">OpenVPN configured</div>
+    <div class="db-kpi" data-wid="kpi_security" style="--kpi-accent:#7c3aed;">
+      <div>
+        <div class="db-kpi-val" id="kpiSecurity">—</div>
+        <div class="db-kpi-label">Security Rules</div>
+        <div class="db-kpi-note">DNS · Web · App filters</div>
       </div>
     </div>
-
-    <!-- Auth events -->
-    <div class="db-kpi" data-wid="kpi_auth" draggable="true"
-         style="--kpi-accent:#f59e0b; --kpi-icon-bg:rgba(245,158,11,.08);">
-      <div class="db-kpi-icon"><i class="fa-solid fa-right-to-bracket"></i></div>
-      <div class="db-kpi-body">
+    <div class="db-kpi" data-wid="kpi_auth" style="--kpi-accent:#f59e0b;">
+      <div>
         <div class="db-kpi-val" id="kpiAuth">—</div>
         <div class="db-kpi-label">Auth Events</div>
-        <div class="db-kpi-note" id="kpiAuthNote">
-          <span class="kpi-note-ok" id="kpiAuthOk">0 ok</span>
-          &thinsp;·&thinsp;
-          <span id="kpiAuthFail">0 failed</span>
-        </div>
+        <div class="db-kpi-note"><span class="c-ok" id="kpiAuthOk">0 ok</span> · <span id="kpiAuthFail">0 failed</span></div>
       </div>
     </div>
+  </div>
 
-  </div><!-- /kpi-strip -->
-
-  <!-- ── Main grid ── -->
+  <!-- Widget grid -->
   <div class="db-grid" id="dbGrid">
 
-    <!-- Policy & Objects -->
-    <div class="db-card" data-wid="policy_counts" draggable="true">
+    <!-- Firewall Policy -->
+    <div class="db-card" data-wid="policy">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-layer-group"></i>Policy &amp; Objects</div>
+        <span class="db-card-title">Firewall Policy</span>
         <div class="db-card-actions">
-          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          <button class="db-icon-btn" data-wa="collapse" title="Collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide" title="Hide">✕</button>
         </div>
       </div>
       <div class="db-card-body">
-        <div class="db-policy-list">
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(37,99,235,.08);color:#2563eb;"><i class="fa-solid fa-globe"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcWan">0</div>
-              <div class="db-policy-lbl">WAN Rules</div>
-            </div>
-          </div>
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(16,185,129,.08);color:#10b981;"><i class="fa-solid fa-network-wired"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcLan">0</div>
-              <div class="db-policy-lbl">LAN Rules</div>
-            </div>
-          </div>
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(100,116,139,.08);color:#64748b;"><i class="fa-solid fa-layer-group"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcFloat">0</div>
-              <div class="db-policy-lbl">Floating</div>
-            </div>
-          </div>
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(245,158,11,.08);color:#f59e0b;"><i class="fa-solid fa-arrows-left-right"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcNat">0</div>
-              <div class="db-policy-lbl">NAT Port Fwd</div>
-            </div>
-          </div>
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(8,145,178,.08);color:#0891b2;"><i class="fa-solid fa-lock"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcVpn">0</div>
-              <div class="db-policy-lbl">OpenVPN Svrs</div>
-            </div>
-          </div>
-          <div class="db-policy-row">
-            <div class="db-policy-ico" style="background:rgba(124,58,237,.08);color:#7c3aed;"><i class="fa-solid fa-users"></i></div>
-            <div class="db-policy-info">
-              <div class="db-policy-val" id="pcUsers">0</div>
-              <div class="db-policy-lbl">Users</div>
-            </div>
-          </div>
+        <div class="db-count-list">
+          <div class="db-count-row"><span class="db-count-lbl">WAN Rules</span><span class="db-count-val c-blue" id="pcWan">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">LAN Rules</span><span class="db-count-val c-ok" id="pcLan">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">Floating Rules</span><span class="db-count-val c-muted" id="pcFloat">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">Aliases</span><span class="db-count-val" id="pcAliases">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">NAT Port Fwd</span><span class="db-count-val" id="pcNat">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">NAT Outbound</span><span class="db-count-val" id="pcNatOut">0</span></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('firewall.rules') }}" class="btn btn-sm btn-primary">Rules</a>
+          <a href="{{ url_for('firewall.nat') }}" class="btn btn-sm btn-secondary">NAT</a>
+          <a href="{{ url_for('firewall.aliases') }}" class="btn btn-sm btn-secondary">Aliases</a>
         </div>
       </div>
     </div>
 
-    <!-- Auth Summary + System Info stacked -->
-    <div style="display:flex;flex-direction:column;gap:12px;">
-
-      <!-- Auth Summary -->
-      <div class="db-card" data-wid="auth_summary" draggable="true">
-        <div class="db-card-head">
-          <div class="db-card-title"><i class="fa-solid fa-user-shield"></i>Authentication</div>
-          <div class="db-card-actions">
-            <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-            <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
-          </div>
-        </div>
-        <div class="db-card-body">
-          <div class="db-stat-row" style="grid-template-columns:repeat(3,1fr);">
-            <div class="db-stat-cell">
-              <div class="db-stat-val c-ok" id="asOk">0</div>
-              <div class="db-stat-lbl">Successful</div>
-            </div>
-            <div class="db-stat-cell">
-              <div class="db-stat-val c-bad" id="asFail">0</div>
-              <div class="db-stat-lbl">Failed</div>
-            </div>
-            <div class="db-stat-cell">
-              <div class="db-stat-val c-muted" id="asOut">0</div>
-              <div class="db-stat-lbl">Logouts</div>
-            </div>
-          </div>
-          <div class="d-flex gap-2">
-            <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-list"></i> Session Logs</a>
-            <a href="{{ url_for('users.user_manager') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-users"></i> Users</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- System Info -->
-      <div class="db-card" data-wid="sysinfo" draggable="true">
-        <div class="db-card-head">
-          <div class="db-card-title"><i class="fa-solid fa-server"></i>System</div>
-          <div class="db-card-actions">
-            <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-            <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
-          </div>
-        </div>
-        <div class="db-card-body">
-          <div class="db-sysinfo">
-            <div class="db-si-row"><div class="db-si-lbl">Hostname</div><div class="db-si-val" id="siHost">—</div></div>
-            <div class="db-si-row"><div class="db-si-lbl">Timezone</div><div class="db-si-val" id="siTz">—</div></div>
-            <div class="db-si-row"><div class="db-si-lbl">Theme</div><div class="db-si-val" id="siTheme">—</div></div>
-            <div class="db-si-row"><div class="db-si-lbl">Columns</div><div class="db-si-val" id="siCols">—</div></div>
-            <div class="db-si-row full"><div class="db-si-lbl">Last Config Update</div><div class="db-si-val" id="siUpd">—</div></div>
-          </div>
-          <div class="d-flex gap-2 mt-3">
-            <a href="{{ url_for('system.general_setup') }}" class="btn btn-sm btn-primary"><i class="fa-solid fa-gear"></i> General Setup</a>
-            <a href="{{ url_for('system.admin_access') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-shield-halved"></i> Advanced</a>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /stacked col -->
-
-    <!-- Feature Status -->
-    <div class="db-card" data-wid="features" draggable="true">
+    <!-- Authentication -->
+    <div class="db-card" data-wid="auth_summary">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-toggle-on"></i>Feature Status</div>
+        <span class="db-card-title">Authentication</span>
         <div class="db-card-actions">
-          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
         </div>
       </div>
       <div class="db-card-body">
-        <div class="db-flags">
-          <div class="db-flag">
-            <div class="db-flag-dot" id="fdWidgets"></div>
-            <div class="db-flag-body">
-              <div class="db-flag-name">Widgets</div>
-              <div class="db-flag-state" id="fsWidgets">—</div>
-            </div>
-          </div>
-          <div class="db-flag">
-            <div class="db-flag-dot" id="fdLogFilter"></div>
-            <div class="db-flag-body">
-              <div class="db-flag-name">Log Filter</div>
-              <div class="db-flag-state" id="fsLogFilter">—</div>
-            </div>
-          </div>
-          <div class="db-flag">
-            <div class="db-flag-dot" id="fdManage"></div>
-            <div class="db-flag-body">
-              <div class="db-flag-name">Manage Log</div>
-              <div class="db-flag-state" id="fsManage">—</div>
-            </div>
-          </div>
-          <div class="db-flag">
-            <div class="db-flag-dot" id="fdMonitor"></div>
-            <div class="db-flag-body">
-              <div class="db-flag-name">Monitoring</div>
-              <div class="db-flag-state" id="fsMonitor">—</div>
-            </div>
-          </div>
+        <div class="db-stat-row cols-3">
+          <div class="db-stat-cell"><div class="db-stat-val c-ok" id="asOk">0</div><div class="db-stat-lbl">Logins</div></div>
+          <div class="db-stat-cell"><div class="db-stat-val c-bad" id="asFail">0</div><div class="db-stat-lbl">Failed</div></div>
+          <div class="db-stat-cell"><div class="db-stat-val c-muted" id="asOut">0</div><div class="db-stat-lbl">Logouts</div></div>
         </div>
-        <div class="mt-3">
-          <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-secondary"><i class="fa-solid fa-file-lines"></i> System Logs</a>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-primary">Session Logs</a>
+          <a href="{{ url_for('users.user_manager') }}" class="btn btn-sm btn-secondary">Users</a>
         </div>
       </div>
     </div>
 
-    <!-- Quick Nav -->
-    <div class="db-card" data-wid="quicknav" draggable="true">
+    <!-- Interface Status -->
+    <div class="db-card" data-wid="interfaces">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-bolt"></i>Quick Navigation</div>
+        <span class="db-card-title">Interface Status</span>
         <div class="db-card-actions">
-          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-info-grid">
+          <div class="db-info-row"><div class="db-info-lbl">WAN Port</div><div class="db-info-val" id="ifWanPort">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">WAN Mode</div><div class="db-info-val" id="ifWanMode">—</div></div>
+          <div class="db-info-row full"><div class="db-info-lbl">WAN Address</div><div class="db-info-val" id="ifWanAddr">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">LAN Port</div><div class="db-info-val" id="ifLanPort">—</div></div>
+          <div class="db-info-row full"><div class="db-info-lbl">LAN Address</div><div class="db-info-val" id="ifLanAddr">—</div></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('interfaces.interfaces_wan') }}" class="btn btn-sm btn-primary">WAN</a>
+          <a href="{{ url_for('interfaces.interfaces_lan') }}" class="btn btn-sm btn-secondary">LAN</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- VPN -->
+    <div class="db-card" data-wid="vpn">
+      <div class="db-card-head">
+        <span class="db-card-title">VPN</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-count-list">
+          <div class="db-count-row"><span class="db-count-lbl">OpenVPN Servers</span><span class="db-count-val c-blue" id="vpnOvpnSrv">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">OpenVPN Clients</span><span class="db-count-val" id="vpnOvpnCli">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">IPsec Tunnels</span><span class="db-count-val" id="vpnIpsec">0</span></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('vpn.openvpn') }}" class="btn btn-sm btn-primary">OpenVPN</a>
+          <a href="{{ url_for('vpn.ipsec') }}" class="btn btn-sm btn-secondary">IPsec</a>
+          <a href="{{ url_for('vpn.l2tp') }}" class="btn btn-sm btn-secondary">L2TP</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Routing & Gateways -->
+    <div class="db-card" data-wid="routing">
+      <div class="db-card-head">
+        <span class="db-card-title">Routing &amp; Gateways</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-count-list">
+          <div class="db-count-row"><span class="db-count-lbl">Gateways</span><span class="db-count-val c-blue" id="rtGw">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">Static Routes</span><span class="db-count-val" id="rtStatic">0</span></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('routing.routing_index') }}" class="btn btn-sm btn-primary">Gateways</a>
+          <a href="{{ url_for('routing.static_routes_page') }}" class="btn btn-sm btn-secondary">Static Routes</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Services (DHCP / DNS) -->
+    <div class="db-card" data-wid="services">
+      <div class="db-card-head">
+        <span class="db-card-title">Services</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-count-list">
+          <div class="db-count-row"><span class="db-count-lbl">DHCP Pools</span><span class="db-count-val" id="svcDhcpPools">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">DHCP Enabled</span><span class="db-count-val c-ok" id="svcDhcpEnabled">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">Static Leases</span><span class="db-count-val" id="svcStaticLeases">0</span></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('services.dhcp_server') }}" class="btn btn-sm btn-primary">DHCP</a>
+          <a href="{{ url_for('services.dns_resolver') }}" class="btn btn-sm btn-secondary">DNS</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Profiles -->
+    <div class="db-card" data-wid="security_profiles">
+      <div class="db-card-head">
+        <span class="db-card-title">Security Profiles</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-count-list">
+          <div class="db-count-row"><span class="db-count-lbl">DNS Filter Rules</span><span class="db-count-val c-blue" id="spDns">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">Web Filter Rules</span><span class="db-count-val" id="spWeb">0</span></div>
+          <div class="db-count-row"><span class="db-count-lbl">App Filter Rules</span><span class="db-count-val" id="spApp">0</span></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('filters.dns_filter_page') }}" class="btn btn-sm btn-primary">DNS Filter</a>
+          <a href="{{ url_for('filters.web_filter_page') }}" class="btn btn-sm btn-secondary">Web Filter</a>
+          <a href="{{ url_for('filters.app_filter_page') }}" class="btn btn-sm btn-secondary">App Filter</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- IDS / IPS -->
+    <div class="db-card" data-wid="ids">
+      <div class="db-card-head">
+        <span class="db-card-title">IDS / IPS</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-info-grid">
+          <div class="db-info-row"><div class="db-info-lbl">Status</div><div class="db-info-val" id="idsStatus">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">Mode</div><div class="db-info-val" id="idsMode">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">Interface</div><div class="db-info-val" id="idsIface">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">Rulesets</div><div class="db-info-val" id="idsRules">—</div></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('ids.ids_index') }}" class="btn btn-sm btn-primary">IDS Overview</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Info -->
+    <div class="db-card" data-wid="sysinfo">
+      <div class="db-card-head">
+        <span class="db-card-title">System</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-info-grid">
+          <div class="db-info-row"><div class="db-info-lbl">Hostname</div><div class="db-info-val" id="siHost">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">Timezone</div><div class="db-info-val" id="siTz">—</div></div>
+          <div class="db-info-row full"><div class="db-info-lbl">Config Updated</div><div class="db-info-val" id="siUpd">—</div></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('system.general_setup') }}" class="btn btn-sm btn-primary">General Setup</a>
+          <a href="{{ url_for('system.preflight') }}" class="btn btn-sm btn-secondary">Preflight</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Navigation -->
+    <div class="db-card db-col-full" data-wid="quicknav">
+      <div class="db-card-head">
+        <span class="db-card-title">Quick Navigation</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
         </div>
       </div>
       <div class="db-card-body">
         <div class="db-ql">
-          <a href="{{ url_for('firewall.rules') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>FW Rules
-          </a>
-          <a href="{{ url_for('firewall.nat') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-arrows-left-right"></i></div>NAT
-          </a>
-          <a href="{{ url_for('firewall.aliases') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-tags"></i></div>Aliases
-          </a>
-          <a href="{{ url_for('interfaces.interfaces_assignments') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-network-wired"></i></div>Interfaces
-          </a>
-          <a href="{{ url_for('vpn.openvpn') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-lock"></i></div>OpenVPN
-          </a>
-          <a href="{{ url_for('vpn.ipsec') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-shield-halved"></i></div>IPsec
-          </a>
-          <a href="{{ url_for('services.dhcp_server') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-server"></i></div>DHCP
-          </a>
-          <a href="{{ url_for('services.dns_resolver') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-magnifying-glass"></i></div>DNS
-          </a>
-          <a href="{{ url_for('routing.routing_index') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-route"></i></div>Routing
-          </a>
-          <a href="{{ url_for('diagnostics.backup_restore') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-database"></i></div>Backup
-          </a>
-          <a href="{{ url_for('status.system_logs') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-file-lines"></i></div>Logs
-          </a>
-          <a href="{{ url_for('status.monitoring') }}" class="db-ql-item">
-            <div class="db-ql-icon"><i class="fa-solid fa-chart-line"></i></div>Monitor
-          </a>
+          <a href="{{ url_for('firewall.rules') }}"              class="db-ql-item">FW Rules</a>
+          <a href="{{ url_for('firewall.nat') }}"               class="db-ql-item">NAT</a>
+          <a href="{{ url_for('firewall.aliases') }}"           class="db-ql-item">Aliases</a>
+          <a href="{{ url_for('firewall.schedules') }}"         class="db-ql-item">Schedules</a>
+          <a href="{{ url_for('firewall.traffic_shaper') }}"    class="db-ql-item">Traffic Shaper</a>
+          <a href="{{ url_for('interfaces.interfaces_assignments') }}" class="db-ql-item">Interfaces</a>
+          <a href="{{ url_for('interfaces.interfaces_wan') }}"  class="db-ql-item">WAN</a>
+          <a href="{{ url_for('interfaces.interfaces_lan') }}"  class="db-ql-item">LAN</a>
+          <a href="{{ url_for('routing.routing_index') }}"      class="db-ql-item">Gateways</a>
+          <a href="{{ url_for('routing.static_routes_page') }}" class="db-ql-item">Routes</a>
+          <a href="{{ url_for('vpn.openvpn') }}"               class="db-ql-item">OpenVPN</a>
+          <a href="{{ url_for('vpn.ipsec') }}"                 class="db-ql-item">IPsec</a>
+          <a href="{{ url_for('vpn.l2tp') }}"                  class="db-ql-item">L2TP</a>
+          <a href="{{ url_for('services.dhcp_server') }}"      class="db-ql-item">DHCP</a>
+          <a href="{{ url_for('services.dns_resolver') }}"     class="db-ql-item">DNS</a>
+          <a href="{{ url_for('services.ntp') }}"              class="db-ql-item">NTP</a>
+          <a href="{{ url_for('ids.ids_index') }}"             class="db-ql-item">IDS/IPS</a>
+          <a href="{{ url_for('filters.dns_filter_page') }}"   class="db-ql-item">DNS Filter</a>
+          <a href="{{ url_for('filters.web_filter_page') }}"   class="db-ql-item">Web Filter</a>
+          <a href="{{ url_for('filters.app_filter_page') }}"   class="db-ql-item">App Filter</a>
+          <a href="{{ url_for('status.system_logs') }}"        class="db-ql-item">System Logs</a>
+          <a href="{{ url_for('status.monitoring') }}"         class="db-ql-item">Monitoring</a>
+          <a href="{{ url_for('diagnostics.backup_restore') }}" class="db-ql-item">Backup</a>
+          <a href="{{ url_for('system.preflight') }}"          class="db-ql-item">Preflight</a>
         </div>
       </div>
     </div>
 
-    <!-- Session Activity (full-width) -->
-    <div class="db-card db-col-full" data-wid="sessions" draggable="true">
+    <!-- Recent Sessions (full-width) -->
+    <div class="db-card db-col-full" data-wid="sessions">
       <div class="db-card-head">
-        <div class="db-card-title"><i class="fa-solid fa-clock-rotate-left"></i>Recent Sessions</div>
+        <span class="db-card-title">Recent Sessions</span>
         <div class="db-card-actions">
-          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
         </div>
       </div>
       <div class="db-card-body no-pad">
         <div class="db-scroll">
           <table class="db-tbl">
-            <thead>
-              <tr>
-                <th>Time (UTC)</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Source IP</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Time (UTC)</th><th>User</th><th>Action</th><th>Source IP</th><th>Detail</th></tr></thead>
             <tbody id="tblSessions"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- Event Stream — live polling widget (full-width) -->
-    <div class="db-card db-col-full" data-wid="events" draggable="true">
+    <!-- Live Event Stream (full-width) -->
+    <div class="db-card db-col-full" data-wid="events">
       <div class="db-card-head">
-        <div class="db-card-title">
-          <span id="evStreamDot" style="
-            width:7px;height:7px;border-radius:50%;background:#10b981;
-            box-shadow:0 0 0 2px rgba(16,185,129,.2);flex-shrink:0;
-            animation:dbpulse 2.5s ease-in-out infinite;
-          "></span>
-          <i class="fa-solid fa-stream"></i>Live Event Stream
-        </div>
+        <span class="db-card-title">
+          <span id="evDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,.2);margin-right:6px;animation:dbpulse 2.5s ease-in-out infinite;vertical-align:middle;"></span>
+          Live Event Stream
+        </span>
         <div class="db-card-actions" style="gap:8px;">
-          <span id="evNewCount" style="
-            display:none;padding:1px 7px;border-radius:99px;
-            font-size:.68rem;font-weight:700;
-            background:rgba(59,130,246,.2);color:#93c5fd;
-          "></span>
-          <a href="{{ url_for('status.system_logs') }}" style="
-            color:rgba(203,213,225,.6);font-size:.72rem;font-weight:600;
-            text-decoration:none;padding:2px 6px;border-radius:4px;
-          " title="Open full log monitor">Monitor ↗</a>
-          <button class="db-icon-btn" data-wa="collapse" title="Collapse"><i class="fa-solid fa-chevron-up"></i></button>
-          <button class="db-icon-btn" data-wa="hide" title="Hide"><i class="fa-solid fa-eye-slash"></i></button>
+          <span id="evNewCount" style="display:none;padding:1px 7px;border-radius:99px;font-size:.68rem;font-weight:700;background:rgba(59,130,246,.15);color:#93c5fd;"></span>
+          <a href="{{ url_for('status.system_logs') }}" style="color:var(--muted);font-size:.72rem;font-weight:600;text-decoration:none;padding:2px 6px;border-radius:4px;">Monitor ↗</a>
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
         </div>
       </div>
       <div class="db-card-body no-pad">
         <div class="db-scroll" id="evScrollWrap">
           <table class="db-tbl">
-            <thead>
-              <tr>
-                <th>Time (UTC)</th>
-                <th>Category</th>
-                <th>Action</th>
-                <th>User</th>
-                <th>IP</th>
-                <th>Detail</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Time (UTC)</th><th>Category</th><th>Action</th><th>User</th><th>IP</th><th>Detail</th></tr></thead>
             <tbody id="tblEvents"></tbody>
           </table>
         </div>
@@ -888,29 +516,37 @@
   </div><!-- /db-grid -->
 </div>
 
-<!-- Widget Manager Modal -->
-<div class="modal fade" id="dbWidgetModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-sm">
+<!-- ═══════════════ WIDGET PICKER MODAL ═══════════════ -->
+<div class="modal fade wp-modal" id="wpModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h6 class="modal-title fw-bold"><i class="fa-solid fa-sliders me-2"></i>Widget Visibility</h6>
+        <h5 class="modal-title fw-bold">Widget Manager</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:.875rem;">
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="banner">       <span class="form-check-label">Identity Banner</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_rules">    <span class="form-check-label">KPI – Firewall Rules</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_users">    <span class="form-check-label">KPI – Users</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_vpn">      <span class="form-check-label">KPI – VPN</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="kpi_auth">     <span class="form-check-label">KPI – Auth Events</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="policy_counts"><span class="form-check-label">Policy &amp; Objects</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="auth_summary"> <span class="form-check-label">Authentication</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="sysinfo">      <span class="form-check-label">System Info</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="features">     <span class="form-check-label">Feature Status</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="quicknav">     <span class="form-check-label">Quick Navigation</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="sessions">     <span class="form-check-label">Recent Sessions</span></label>
-          <label class="form-check"><input class="form-check-input" type="checkbox" data-wchk="events">       <span class="form-check-label">Event Stream</span></label>
+      <div class="modal-body p-0 d-flex" style="min-height:460px;">
+
+        <!-- Category sidebar -->
+        <div class="wp-cats">
+          <button class="wp-cat-btn active" onclick="wpShowCat('all',this)">All Widgets</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('network',this)">Network</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('firewall',this)">Firewall</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('vpn',this)">VPN</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('services',this)">Services</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('security',this)">Security</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('system',this)">System</button>
+          <button class="wp-cat-btn" onclick="wpShowCat('overview',this)">Overview</button>
         </div>
+
+        <!-- Widget list -->
+        <div class="wp-widgets-panel" id="wpWidgetPanel">
+          <!-- items injected by JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm btn-outline-secondary" onclick="wpSelectAll()">Enable All</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="wpSelectNone()">Disable All</button>
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -918,349 +554,286 @@
 
 <script>
 (() => {
-  /* ── Bootstrap ── */
-  const P = {{ dashboard_payload | tojson }};
-  const API = "{{ url_for('system.dashboard_data') }}";
-  const NS = `ss.db.{{ session.get('username','x') }}.`;
+const P   = {{ dashboard_payload | tojson }};
+const API = "{{ url_for('system.dashboard_data') }}";
+const EV_API = "{{ url_for('status.api_logs') }}";
+const NS  = `ss.db.{{ session.get('username','x') }}.`;
 
-  /* ── Utils ── */
-  const $  = id => document.getElementById(id);
-  const ls = {
-    get: (k, fb) => { try { const v = localStorage.getItem(NS+k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } },
-    set: (k, v)  => localStorage.setItem(NS+k, JSON.stringify(v))
+const $   = id => document.getElementById(id);
+const ls  = {
+  get:(k,fb)=>{ try{const v=localStorage.getItem(NS+k);return v!=null?JSON.parse(v):fb}catch{return fb} },
+  set:(k,v)=>localStorage.setItem(NS+k,JSON.stringify(v))
+};
+const esc = v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = v=>v?String(v).replace('T',' ').slice(0,19):'—';
+
+/* ── Counter animation ── */
+const count=(el,to,ms=500)=>{
+  if(!el)return;
+  const from=parseInt(el.textContent)||0;
+  if(from===to)return;
+  const t0=performance.now();
+  const tick=now=>{
+    const p=Math.min((now-t0)/ms,1),e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(to-from)*e);
+    if(p<1)requestAnimationFrame(tick);
+    else{el.textContent=to;el.classList.add('num-pop');setTimeout(()=>el.classList.remove('num-pop'),350);}
   };
-  const esc = v => String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const fmt = v => v ? String(v).replace('T',' ').slice(0,19) : '—';
+  requestAnimationFrame(tick);
+};
 
-  /* ── Animated counter ── */
-  const count = (el, to, ms = 550) => {
-    if (!el) return;
-    const from = parseInt(el.textContent) || 0;
-    if (from === to) return;
-    const t0 = performance.now();
-    const tick = now => {
-      const p = Math.min((now - t0) / ms, 1);
-      const e = 1 - Math.pow(1 - p, 3); // cubic ease-out
-      el.textContent = Math.round(from + (to - from) * e);
-      if (p < 1) requestAnimationFrame(tick);
-      else { el.textContent = to; el.classList.add('num-pop'); setTimeout(() => el.classList.remove('num-pop'), 350); }
-    };
-    requestAnimationFrame(tick);
-  };
+const txt=(id,v)=>{const e=$(id);if(e)e.textContent=v};
 
-  /* ── Badges ── */
-  const catBadge = c => {
-    const m = { session:'db-b-session', browsing:'db-b-browsing', system:'db-b-system', network:'db-b-network' };
-    return `<span class="db-badge ${m[c]||'db-b-default'}">${esc(c||'—')}</span>`;
-  };
-  const actBadge = a => {
-    if (!a) return `<span class="db-badge db-b-default">—</span>`;
-    if (/success/i.test(a))         return `<span class="db-badge db-b-ok">${esc(a)}</span>`;
-    if (/fail|error/i.test(a))      return `<span class="db-badge db-b-fail">${esc(a)}</span>`;
-    if (a === 'logout')             return `<span class="db-badge db-b-logout">${esc(a)}</span>`;
-    return `<span class="db-badge db-b-blue">${esc(a)}</span>`;
-  };
+/* ── Badges ── */
+const catBadge=c=>{
+  const m={session:'db-b-session',browsing:'db-b-browsing',system:'db-b-system',network:'db-b-network'};
+  return`<span class="db-badge ${m[c]||'db-b-default'}">${esc(c||'—')}</span>`;
+};
+const actBadge=a=>{
+  if(!a)return`<span class="db-badge db-b-default">—</span>`;
+  if(/success/i.test(a))return`<span class="db-badge db-b-ok">${esc(a)}</span>`;
+  if(/fail|error/i.test(a))return`<span class="db-badge db-b-fail">${esc(a)}</span>`;
+  return`<span class="db-badge db-b-blue">${esc(a)}</span>`;
+};
+const detail=ev=>{
+  const d=ev?.details||{};
+  let m=d.activity||(d.method&&d.path?`${d.method} ${d.path}`:'')||d.path||d.reason||'';
+  if(!m&&d.discovered_hosts!=null)m=`Discovered ${d.discovered_hosts} hosts`;
+  return esc(m||'—');
+};
 
-  const detail = ev => {
-    const d = ev?.details || {};
-    let m = d.activity || (d.method && d.path ? `${d.method} ${d.path}` : '') || d.path || d.reason || '';
-    if (!m && d.discovered_hosts != null) m = `Discovered ${d.discovered_hosts} hosts`;
-    if (!m) m = '—';
-    const bits = [];
-    if (d.status_code) bits.push(`${d.status_code}`);
-    if (d.latency_ms != null) bits.push(`${d.latency_ms} ms`);
-    if (Array.isArray(d.payload_keys) && d.payload_keys.length) bits.push(d.payload_keys.join(', '));
-    const sub = bits.length ? `<span style="color:var(--muted);font-size:.75rem;display:block;margin-top:1px;">${esc(bits.join(' · '))}</span>` : '';
-    return `${esc(m)}${sub}`;
-  };
+/* ── Render ── */
+const render=p=>{
+  if(!p)return;
+  const oc=p.object_counts||{}, ss=p.session_summary||{};
 
-  /* ── Render ── */
-  const txt = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+  /* Banner */
+  txt('dbHostname',p.hostname||'Smart Shield');
+  txt('dbTimezone',p.timezone||'—');
+  txt('dbTheme',p.theme||'—');
+  txt('dbUpdated',fmt(p.generated_at));
 
-  const flag = (dotId, stateId, on) => {
-    const dot = $(dotId), st = $(stateId);
-    if (dot)  { dot.className = 'db-flag-dot ' + (on ? 'on' : 'off'); }
-    if (st)   { st.textContent = on ? 'Enabled' : 'Disabled'; st.className = 'db-flag-state ' + (on ? 'on' : 'off'); }
-  };
+  /* KPIs */
+  const wan=oc.wan_rules||0,lan=oc.lan_rules||0,flt=oc.floating_rules||0;
+  count($('kpiRules'),wan+lan+flt);
+  txt('kpiRulesNote',`${wan} WAN · ${lan} LAN · ${flt} Floating`);
+  count($('kpiVpn'),oc.openvpn_servers||0);
+  txt('kpiVpnNote',`${oc.openvpn_servers||0} servers · ${oc.ipsec_tunnels||0} IPsec`);
+  const u=oc.users||0,g=oc.groups||0;
+  count($('kpiUsers'),u);
+  txt('kpiUsersNote',`${u} user${u!==1?'s':''} · ${g} group${g!==1?'s':''}`);
+  count($('kpiSecurity'),(oc.dns_filter_rules||0)+(oc.web_filter_rules||0)+(oc.app_filter_rules||0));
+  const ok=ss.successful_logins||0,fail=ss.failed_logins||0,out=ss.logouts||0;
+  count($('kpiAuth'),ok+fail+out);
+  txt('kpiAuthOk',`${ok} ok`);
+  const fe=$('kpiAuthFail');if(fe){fe.textContent=`${fail} failed`;fe.className=fail>0?'c-warn':'';}
 
-  const renderSessions = rows => {
-    const tb = $('tblSessions'); if (!tb) return;
-    if (!rows?.length) { tb.innerHTML = '<tr><td colspan="5" class="td-empty">No session records yet.</td></tr>'; return; }
-    tb.innerHTML = rows.map(r =>
-      `<tr>
-        <td class="td-t">${esc(fmt(r.timestamp))}</td>
-        <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
-        <td>${actBadge(r.action)}</td>
-        <td class="td-ip">${esc(r.remote_addr||'—')}</td>
-        <td style="font-size:.82rem;">${esc(r.details?.reason||'—')}</td>
-      </tr>`).join('');
-  };
+  /* Auth */
+  count($('asOk'),ok);count($('asFail'),fail);count($('asOut'),out);
 
-  /* ── Live event stream (independent 5-second poller) ── */
-  const EV_API   = "{{ url_for('status.api_logs') }}";
-  const EV_LIMIT = 40;          // rows to show in dashboard widget
-  const EV_MAX   = 200;         // max DOM rows before trimming
-  let evLatestTs = '';          // ISO timestamp of newest fetched event
-  let evNewCount = 0;           // unseen new events since last interaction
-  let evRows     = 0;           // total rows in DOM
+  /* Firewall policy */
+  count($('pcWan'),wan);count($('pcLan'),lan);count($('pcFloat'),flt);
+  count($('pcAliases'),oc.aliases||0);
+  count($('pcNat'),oc.nat_port_forwards||0);
+  count($('pcNatOut'),oc.nat_outbound||0);
 
-  const evMakeRow = (r, animate) => `
-    <tr style="${animate ? 'animation:dbEvSlide .25s ease' : ''}">
-      <td class="td-t">${esc(fmt(r.timestamp))}</td>
-      <td>${catBadge(r.category)}</td>
-      <td>${actBadge(r.action)}</td>
-      <td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td>
-      <td class="td-ip">${esc(r.remote_addr||'—')}</td>
-      <td style="font-size:.82rem;">${detail(r)}</td>
-    </tr>`;
+  /* Interfaces */
+  const wan_row=p.wan||{},lan_row=p.lan||{};
+  const ia=p.interface_assignments||{};
+  txt('ifWanPort',ia.WAN||wan_row.assigned_port||'—');
+  txt('ifWanMode',wan_row.ipv4_config_type||'—');
+  txt('ifWanAddr',wan_row.ipv4_address||'—');
+  txt('ifLanPort',ia.LAN||lan_row.assigned_port||'—');
+  txt('ifLanAddr',lan_row.ipv4_address||'—');
 
-  const evUpdateBadge = () => {
-    const badge = $('evNewCount');
-    if (!badge) return;
-    if (evNewCount > 0) {
-      badge.textContent = `+${evNewCount} new`;
-      badge.style.display = '';
-    } else {
-      badge.style.display = 'none';
+  /* VPN */
+  count($('vpnOvpnSrv'),oc.openvpn_servers||0);
+  count($('vpnOvpnCli'),oc.openvpn_clients||0);
+  count($('vpnIpsec'),oc.ipsec_tunnels||0);
+
+  /* Routing */
+  count($('rtGw'),oc.gateways||0);
+  count($('rtStatic'),oc.static_routes||0);
+
+  /* Services */
+  count($('svcDhcpPools'),oc.dhcp_pools||0);
+  count($('svcDhcpEnabled'),p.dhcp_enabled_pools||0);
+  count($('svcStaticLeases'),oc.static_leases||0);
+
+  /* Security Profiles */
+  count($('spDns'),oc.dns_filter_rules||0);
+  count($('spWeb'),oc.web_filter_rules||0);
+  count($('spApp'),oc.app_filter_rules||0);
+
+  /* IDS */
+  const ids=p.ids||{};
+  txt('idsStatus',ids.enabled?'Enabled':'Disabled');
+  txt('idsMode',(ids.mode||'—').toUpperCase());
+  txt('idsIface',ids.interface||'—');
+  count($('idsRules'),oc.ids_rulesets||0);
+
+  /* System */
+  txt('siHost',p.hostname||'—');txt('siTz',p.timezone||'—');txt('siUpd',fmt(p.generated_at));
+
+  /* Sessions */
+  const tb=$('tblSessions');
+  const rows=p.recent_session_events||[];
+  if(!rows.length){tb.innerHTML='<tr><td colspan="5" class="td-empty">No session records yet.</td></tr>';}
+  else tb.innerHTML=rows.map(r=>`<tr><td class="td-t">${esc(fmt(r.timestamp))}</td><td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td><td>${actBadge(r.action)}</td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td style="font-size:.82rem;">${esc(r.details?.reason||'—')}</td></tr>`).join('');
+};
+
+/* ── Refresh ── */
+let busy=false;
+const refresh=async()=>{
+  if(busy)return;busy=true;
+  const btn=$('dbRefreshBtn'),ico=$('dbRefreshIco');
+  if(btn)btn.disabled=true;if(ico)ico.classList.add('spin');
+  try{
+    const r=await fetch(API,{cache:'no-store'});
+    const b=await r.json();
+    if(b.status==='success')render(b.data);
+  }catch(e){console.error('Dashboard',e);}
+  finally{busy=false;if(btn)btn.disabled=false;if(ico)ico.classList.remove('spin');}
+};
+
+/* ── Widget visibility / collapse ── */
+const ALL_WIDS=[
+  {id:'banner',       cat:'system',    label:'Identity Banner',        desc:'Hostname, timezone and online status'},
+  {id:'kpi_rules',    cat:'firewall',  label:'KPI – Firewall Rules',   desc:'Total WAN/LAN/Floating rule count'},
+  {id:'kpi_vpn',      cat:'vpn',       label:'KPI – VPN Servers',      desc:'OpenVPN + IPsec tunnel count'},
+  {id:'kpi_users',    cat:'system',    label:'KPI – Users',            desc:'User and group counts'},
+  {id:'kpi_security', cat:'security',  label:'KPI – Security Rules',   desc:'DNS/Web/App filter rule count'},
+  {id:'kpi_auth',     cat:'system',    label:'KPI – Auth Events',      desc:'Login success and failure counts'},
+  {id:'policy',       cat:'firewall',  label:'Firewall Policy',        desc:'Rule counts per interface + NAT summary'},
+  {id:'auth_summary', cat:'system',    label:'Authentication',         desc:'Login success, failure and logout counts'},
+  {id:'interfaces',   cat:'network',   label:'Interface Status',       desc:'WAN and LAN port, mode and address'},
+  {id:'vpn',          cat:'vpn',       label:'VPN',                    desc:'OpenVPN servers/clients and IPsec tunnels'},
+  {id:'routing',      cat:'network',   label:'Routing & Gateways',     desc:'Gateway and static route counts'},
+  {id:'services',     cat:'services',  label:'Services (DHCP/DNS)',    desc:'DHCP pool and static lease counts'},
+  {id:'security_profiles', cat:'security', label:'Security Profiles', desc:'DNS, Web and App filter rule counts'},
+  {id:'ids',          cat:'security',  label:'IDS / IPS',              desc:'Suricata status, mode and interface'},
+  {id:'sysinfo',      cat:'system',    label:'System Info',            desc:'Hostname, timezone and config update time'},
+  {id:'quicknav',     cat:'overview',  label:'Quick Navigation',       desc:'One-click access to all project pages'},
+  {id:'sessions',     cat:'overview',  label:'Recent Sessions',        desc:'Latest login/logout audit events'},
+  {id:'events',       cat:'overview',  label:'Live Event Stream',      desc:'Real-time audit log with 5-second polling'},
+];
+
+const byWid   = id=>document.querySelector(`[data-wid="${id}"]`);
+const getHid  = ()=>new Set(ls.get('hidden',[]));
+const getCol  = ()=>new Set(ls.get('collapsed',[]));
+
+const applyVis=()=>{
+  const h=getHid();
+  ALL_WIDS.forEach(({id})=>{const el=byWid(id);if(el)el.style.display=h.has(id)?'none':'';});
+};
+const applyCol=()=>{
+  const c=getCol();
+  ALL_WIDS.forEach(({id})=>{
+    const el=byWid(id);if(!el)return;
+    const body=el.querySelector('.db-card-body');
+    const ico=el.querySelector('[data-wa="collapse"]');
+    const on=c.has(id);
+    if(body)body.style.display=on?'none':'';
+    if(ico)ico.textContent=on?'▼':'▲';
+  });
+};
+
+/* Card action buttons */
+document.querySelectorAll('[data-wa]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const w=btn.closest('[data-wid]');if(!w)return;
+    const id=w.dataset.wid,act=btn.dataset.wa;
+    if(act==='hide'){const h=getHid();h.add(id);ls.set('hidden',[...h]);applyVis();renderWpPanel(document.querySelector('.wp-cat-btn.active')?.dataset.cat||'all');}
+    if(act==='collapse'){const c=getCol();c.has(id)?c.delete(id):c.add(id);ls.set('collapsed',[...c]);applyCol();}
+  });
+});
+
+/* ── Widget Picker Panel ── */
+const renderWpPanel=(cat)=>{
+  const panel=$('wpWidgetPanel');
+  if(!panel)return;
+  const h=getHid();
+  const items=cat==='all'?ALL_WIDS:ALL_WIDS.filter(w=>w.cat===cat);
+  panel.innerHTML=items.map(w=>`
+    <div class="wp-item" onclick="wpToggle('${w.id}',this)">
+      <input type="checkbox" class="form-check-input" id="wp-${w.id}" ${h.has(w.id)?'':'checked'} onclick="event.stopPropagation();wpToggle('${w.id}',this.closest('.wp-item'))">
+      <div class="wp-item-info">
+        <div class="wp-item-name">${esc(w.label)}</div>
+        <div class="wp-item-desc">${esc(w.desc)}</div>
+      </div>
+    </div>`).join('');
+};
+
+window.wpShowCat=(cat,btn)=>{
+  document.querySelectorAll('.wp-cat-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderWpPanel(cat);
+};
+
+window.wpToggle=(id,el)=>{
+  const cb=el.querySelector('input[type=checkbox]');
+  const h=getHid();
+  if(h.has(id)){h.delete(id);if(cb)cb.checked=true;}
+  else{h.add(id);if(cb)cb.checked=false;}
+  ls.set('hidden',[...h]);
+  applyVis();
+};
+
+window.wpSelectAll=()=>{ls.set('hidden',[]);applyVis();renderWpPanel(document.querySelector('.wp-cat-btn.active')?.textContent.toLowerCase().includes('all')?'all':document.querySelector('.wp-cat-btn.active')?.dataset.cat||'all');};
+window.wpSelectNone=()=>{ls.set('hidden',ALL_WIDS.map(w=>w.id));applyVis();renderWpPanel('all');};
+
+document.getElementById('wpModal')?.addEventListener('show.bs.modal',()=>renderWpPanel('all'));
+
+/* ── Live event stream ── */
+let evLatestTs='',evNewCount=0;
+const evMakeRow=(r,animate)=>`<tr style="${animate?'animation:dbEvSlide .25s ease':''}"><td class="td-t">${esc(fmt(r.timestamp))}</td><td>${catBadge(r.category)}</td><td>${actBadge(r.action)}</td><td><strong style="font-size:.81rem;">${esc(r.username||'—')}</strong></td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td style="font-size:.81rem;">${detail(r)}</td></tr>`;
+
+const evPoll=async(initial=false)=>{
+  const tb=$('tblEvents');if(!tb)return;
+  try{
+    const since=(evLatestTs&&!initial)?`&since=${encodeURIComponent(evLatestTs)}`:'';
+    const limit=initial?40:50;
+    const res=await fetch(`${EV_API}?limit=${limit}${since}`,{cache:'no-store'});
+    const body=await res.json();
+    const events=body.events||[];
+    if(!events.length)return;
+    if(body.latest_ts&&body.latest_ts>evLatestTs)evLatestTs=body.latest_ts;
+    if(initial){tb.innerHTML=events.map(r=>evMakeRow(r,false)).join('');}
+    else{
+      const wrap=$('evScrollWrap');
+      const atTop=wrap?wrap.scrollTop<40:true;
+      const frag=document.createDocumentFragment();
+      events.forEach(r=>{const t=document.createElement('template');t.innerHTML=evMakeRow(r,true);frag.appendChild(t.content);});
+      tb.prepend(frag);
+      if(!atTop){evNewCount+=events.length;const b=$('evNewCount');if(b){b.textContent=`+${evNewCount} new`;b.style.display='';};}
     }
-  };
+  }catch{}
+};
+const evScrollWrap=$('evScrollWrap');
+if(evScrollWrap)evScrollWrap.addEventListener('scroll',()=>{
+  if(evScrollWrap.scrollTop<40&&evNewCount>0){evNewCount=0;const b=$('evNewCount');if(b)b.style.display='none';}
+});
 
-  const evTrimRows = tb => {
-    const rows = tb.querySelectorAll('tr');
-    if (rows.length > EV_MAX) {
-      for (let i = EV_MAX; i < rows.length; i++) rows[i].remove();
-    }
-    evRows = tb.querySelectorAll('tr').length;
-  };
+/* ── Auto-refresh ── */
+let timer=null;
+const setAR=on=>{ls.set('ar',on?1:0);if(timer){clearInterval(timer);timer=null;}if(on)timer=setInterval(refresh,30000);};
+const arEl=$('dbAutoRefresh');
+const arOn=ls.get('ar',1)!==0;
+arEl.checked=arOn;setAR(arOn);
+arEl.addEventListener('change',()=>setAR(arEl.checked));
 
-  const evPoll = async (initial = false) => {
-    const tb = $('tblEvents'); if (!tb) return;
-    try {
-      const since = (evLatestTs && !initial) ? `&since=${encodeURIComponent(evLatestTs)}` : '';
-      const limit = initial ? EV_LIMIT : 50;
-      const res  = await fetch(`${EV_API}?limit=${limit}${since}`, { cache: 'no-store' });
-      const body = await res.json();
-      const events = body.events || [];
-      if (!events.length) return;
+/* ── Buttons ── */
+$('dbRefreshBtn').addEventListener('click',refresh);
+$('dbResetBtn').addEventListener('click',()=>{['hidden','collapsed','ar'].forEach(k=>localStorage.removeItem(NS+k));location.reload();});
 
-      // Update latest timestamp
-      if (body.latest_ts && body.latest_ts > evLatestTs) evLatestTs = body.latest_ts;
+/* ── Clock ── */
+const pad=n=>String(n).padStart(2,'0');
+const tick=()=>{const n=new Date();const el=$('dbClock');if(el)el.textContent=`${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())} UTC`;};
+tick();setInterval(tick,1000);
 
-      if (initial) {
-        // First load: replace placeholder with full table
-        tb.innerHTML = events.map(r => evMakeRow(r, false)).join('');
-        evRows = events.length;
-      } else {
-        // Incremental: prepend new rows
-        const wrap = $('evScrollWrap');
-        const atTop = wrap ? wrap.scrollTop < 40 : true;
-
-        const frag = document.createDocumentFragment();
-        events.forEach(r => {
-          const tr = document.createElement('template');
-          tr.innerHTML = evMakeRow(r, true);
-          frag.appendChild(tr.content);
-        });
-        tb.prepend(frag);
-        evTrimRows(tb);
-
-        if (!atTop) {
-          evNewCount += events.length;
-          evUpdateBadge();
-        }
-      }
-    } catch(e) { /* silent fail in widget */ }
-  };
-
-  // Reset new-event badge when user scrolls up (to top)
-  const evScrollWrap = $('evScrollWrap');
-  if (evScrollWrap) {
-    evScrollWrap.addEventListener('scroll', () => {
-      if (evScrollWrap.scrollTop < 40 && evNewCount > 0) {
-        evNewCount = 0;
-        evUpdateBadge();
-      }
-    });
-  }
-
-  // Deprecate static renderEvents — events now handled by evPoll
-  const renderEvents = _rows => { /* no-op: live poller handles this */ };
-
-  const render = p => {
-    if (!p) return;
-    const oc = p.object_counts || {};
-    const ss = p.session_summary || {};
-
-    /* Banner */
-    txt('dbHostname', p.hostname || 'Smart Shield');
-    txt('dbTimezone', p.timezone  || '—');
-    txt('dbTheme',    p.theme     || '—');
-    txt('dbColumns',  p.dashboard_columns ?? '—');
-    txt('dbUpdated',  fmt(p.generated_at));
-
-    /* KPIs */
-    const wan = oc.wan_rules||0, lan = oc.lan_rules||0, flt = oc.floating_rules||0;
-    const total = wan + lan + flt;
-    count($('kpiRules'), total);
-    txt('kpiRulesNote', `${wan} WAN · ${lan} LAN · ${flt} Floating`);
-
-    const u = oc.users||0, g = oc.groups||0;
-    count($('kpiUsers'), u);
-    txt('kpiUsersNote', `${u} user${u!==1?'s':''} · ${g} group${g!==1?'s':''}`);
-
-    count($('kpiVpn'), oc.openvpn_servers||0);
-
-    const ok = ss.successful_logins||0, fail = ss.failed_logins||0, out = ss.logouts||0;
-    count($('kpiAuth'), ok+fail+out);
-    txt('kpiAuthOk',   `${ok} ok`);
-    const failEl = $('kpiAuthFail');
-    if (failEl) { failEl.textContent = `${fail} failed`; failEl.className = fail > 0 ? 'kpi-note-warn' : ''; }
-
-    /* Auth summary */
-    count($('asOk'), ok); count($('asFail'), fail); count($('asOut'), out);
-
-    /* Policy counts */
-    count($('pcWan'),   wan);  count($('pcLan'),   lan);    count($('pcFloat'), flt);
-    count($('pcNat'),   oc.nat_port_forwards||0);
-    count($('pcVpn'),   oc.openvpn_servers||0);
-    count($('pcUsers'), oc.users||0);
-
-    /* Sysinfo */
-    txt('siHost',  p.hostname || '—'); txt('siTz',    p.timezone || '—');
-    txt('siTheme', p.theme    || '—'); txt('siCols',  p.dashboard_columns ?? '—');
-    txt('siUpd',   fmt(p.generated_at));
-
-    /* Feature flags */
-    flag('fdWidgets', 'fsWidgets', !!p.widgets_enabled);
-    flag('fdLogFilter','fsLogFilter', !!p.log_filter_enabled);
-    flag('fdManage',  'fsManage',  !!p.manage_log_enabled);
-    flag('fdMonitor', 'fsMonitor', !!p.monitoring_enabled);
-
-    /* Session table (still pulled from dashboard payload) */
-    renderSessions(p.recent_session_events || []);
-    /* Event stream is driven by its own live poller — renderEvents is a no-op */
-
-    /* Last update */
-    const lu = $('dbLastUpdate');
-    if (lu) lu.textContent = `Updated ${fmt(p.generated_at)}`;
-  };
-
-  /* ── Fetch ── */
-  let busy = false;
-  const refresh = async () => {
-    if (busy) return; busy = true;
-    const btn = $('dbRefreshBtn'), ico = $('dbRefreshIco');
-    if (btn) btn.disabled = true;
-    if (ico) ico.classList.add('spin');
-    try {
-      const r = await fetch(API, { cache: 'no-store' });
-      const b = await r.json();
-      if (b.status === 'success') render(b.data);
-    } catch(e) { console.error('Dashboard refresh', e); }
-    finally {
-      busy = false;
-      if (btn) btn.disabled = false;
-      if (ico) ico.classList.remove('spin');
-    }
-  };
-
-  /* ── Widget visibility / collapse ── */
-  const allWids = ['banner','kpi_rules','kpi_users','kpi_vpn','kpi_auth',
-    'policy_counts','auth_summary','sysinfo','features','quicknav','sessions','events'];
-
-  const byWid = id => document.querySelector(`[data-wid="${id}"]`);
-
-  const getHidden    = () => new Set(ls.get('hidden', []));
-  const getCollapsed = () => new Set(ls.get('collapsed', []));
-
-  const applyVis = () => {
-    const h = getHidden();
-    allWids.forEach(id => { const el = byWid(id); if (el) el.style.display = h.has(id) ? 'none' : ''; });
-    document.querySelectorAll('[data-wchk]').forEach(cb => { cb.checked = !h.has(cb.dataset.wchk); });
-  };
-
-  const applyCol = () => {
-    const c = getCollapsed();
-    allWids.forEach(id => {
-      const el = byWid(id); if (!el) return;
-      const body = el.querySelector('.db-card-body');
-      const ico  = el.querySelector('[data-wa="collapse"] i');
-      const on = c.has(id);
-      if (body) body.style.display = on ? 'none' : '';
-      if (ico)  ico.className = on ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
-    });
-  };
-
-  /* Widget action buttons */
-  document.querySelectorAll('[data-wa]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const w = btn.closest('[data-wid]'); if (!w) return;
-      const id = w.dataset.wid, act = btn.dataset.wa;
-      if (act === 'hide') {
-        const h = getHidden(); h.add(id); ls.set('hidden', [...h]); applyVis();
-      }
-      if (act === 'collapse') {
-        const c = getCollapsed(); c.has(id) ? c.delete(id) : c.add(id); ls.set('collapsed', [...c]); applyCol();
-      }
-    });
-  });
-
-  /* Widget manager checkboxes */
-  document.querySelectorAll('[data-wchk]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const id = cb.dataset.wchk, h = getHidden();
-      cb.checked ? h.delete(id) : h.add(id);
-      ls.set('hidden', [...h]); applyVis();
-    });
-  });
-
-  /* ── Drag & drop ── */
-  let drag = null;
-  document.querySelectorAll('[data-wid]').forEach(w => {
-    w.addEventListener('dragstart', () => { drag = w; w.classList.add('dragging'); });
-    w.addEventListener('dragend',   () => { w.classList.remove('dragging'); drag = null; });
-    w.addEventListener('dragover',  e => e.preventDefault());
-    w.addEventListener('drop', e => {
-      e.preventDefault();
-      if (!drag || drag === w) return;
-      const p = w.parentNode; if (p) p.insertBefore(drag, w);
-    });
-  });
-
-  /* ── Auto-refresh ── */
-  let timer = null;
-  const setAR = on => {
-    ls.set('ar', on ? 1 : 0);
-    if (timer) { clearInterval(timer); timer = null; }
-    if (on) timer = setInterval(refresh, 30000);
-  };
-  const arEl = $('dbAutoRefresh');
-  const arOn = ls.get('ar', 1) !== 0;
-  arEl.checked = arOn; setAR(arOn);
-  arEl.addEventListener('change', () => setAR(arEl.checked));
-
-  /* ── Buttons ── */
-  $('dbRefreshBtn').addEventListener('click', refresh);
-  $('dbResetBtn').addEventListener('click', () => {
-    ['hidden','collapsed','ar'].forEach(k => localStorage.removeItem(NS+k));
-    location.reload();
-  });
-
-  /* ── Live clock ── */
-  const pad = n => String(n).padStart(2,'0');
-  const tick = () => {
-    const n = new Date();
-    const el = $('dbClock');
-    if (el) el.textContent = `${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())} UTC`;
-  };
-  tick(); setInterval(tick, 1000);
-
-  /* ── Init ── */
-  applyVis(); applyCol(); render(P);
-
-  // Start independent event stream poller (5-second cadence)
-  evPoll(true);                           // initial load
-  setInterval(() => evPoll(false), 5000); // incremental updates
+/* ── Init ── */
+applyVis();applyCol();render(P);
+evPoll(true);setInterval(()=>evPoll(false),5000);
 })();
 </script>
 {% endblock %}

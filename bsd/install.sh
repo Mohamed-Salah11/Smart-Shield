@@ -219,6 +219,58 @@ for TOOL in smartshieldctl smartshield-cli; do
     fi
 done
 
+# ── Privilege separation: sudoers allowlist ───────────────────────────────────
+section "5a. Privilege Separation (sudoers)"
+
+# Ensure sudo is installed
+if ! command -v sudo >/dev/null 2>&1; then
+    pkg install -y sudo
+    info "sudo installed."
+fi
+
+SUDOERS_DIR="/usr/local/etc/sudoers.d"
+SUDOERS_SRC="${APP_ROOT}/bsd/etc/sudoers.d/smartshield"
+SUDOERS_DEST="${SUDOERS_DIR}/smartshield"
+
+if [ ! -d "${SUDOERS_DIR}" ]; then
+    install -d -m 0750 "${SUDOERS_DIR}"
+    info "Created: ${SUDOERS_DIR}"
+fi
+
+if [ -f "${SUDOERS_SRC}" ]; then
+    # Validate syntax before installing
+    if visudo -c -f "${SUDOERS_SRC}" >/dev/null 2>&1; then
+        install -m 0440 "${SUDOERS_SRC}" "${SUDOERS_DEST}"
+        info "Installed sudoers allowlist: ${SUDOERS_DEST}"
+    else
+        warn "sudoers syntax check failed — NOT installing ${SUDOERS_DEST}"
+        warn "Run 'visudo -c -f ${SUDOERS_SRC}' to diagnose."
+    fi
+else
+    warn "sudoers source not found: ${SUDOERS_SRC}"
+fi
+
+# Ensure sudoers.d is included in /usr/local/etc/sudoers
+SUDOERS_MAIN="/usr/local/etc/sudoers"
+if [ -f "${SUDOERS_MAIN}" ]; then
+    if ! grep -q "sudoers.d" "${SUDOERS_MAIN}" 2>/dev/null; then
+        echo "" >> "${SUDOERS_MAIN}"
+        echo "@includedir ${SUDOERS_DIR}" >> "${SUDOERS_MAIN}"
+        info "Added @includedir ${SUDOERS_DIR} to ${SUDOERS_MAIN}"
+    else
+        info "sudoers.d already included in ${SUDOERS_MAIN}"
+    fi
+fi
+
+# Create the smartshield system user if it doesn't exist
+if ! id smartshield >/dev/null 2>&1; then
+    pw useradd -n smartshield -d /nonexistent -s /usr/sbin/nologin \
+        -c "Smart Shield web application" -w no
+    info "Created system user: smartshield"
+else
+    info "User smartshield already exists."
+fi
+
 section "6. Enable Service"
 
 sysrc smart_shield_enable=YES
