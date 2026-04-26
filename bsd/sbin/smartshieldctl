@@ -136,9 +136,18 @@ cmd_iface_show() {
     echo "IPv4 Mode     : ${mode:-unknown}"
     echo "IPv4 Address  : ${addr:-<empty>}"
     echo "IPv4 Gateway  : ${gw:-<empty>}"
-    # Live state from ifconfig
+    # Live state from ifconfig — convert FreeBSD hex netmask (0xffffff00) to CIDR prefix
     if [ -n "${phys}" ] && command -v ifconfig >/dev/null 2>&1; then
-        live="$(ifconfig "${phys}" 2>/dev/null | grep 'inet ' | awk '{print $2"/"$4}' | head -1)"
+        live="$(ifconfig "${phys}" 2>/dev/null | python3 -c "
+import sys, re
+for line in sys.stdin:
+    m = re.search(r'inet\s+(\S+)\s+netmask\s+(\S+)', line)
+    if m:
+        ip, mask = m.group(1), m.group(2)
+        pfx = bin(int(mask, 16)).count('1') if mask.startswith('0x') else mask
+        print(ip + '/' + str(pfx))
+        break
+" 2>/dev/null)"
         echo "Live IP       : ${live:-<none>}"
         state="$(ifconfig "${phys}" 2>/dev/null | grep -c 'RUNNING' || true)"
         echo "Link          : $([ "${state}" -gt 0 ] && echo UP || echo DOWN)"
@@ -166,8 +175,21 @@ cmd_iface_set() {
             echo "${itype} configured as DHCP."
             if [ "${apply_now}" = "1" ]; then
                 phys="$(_resolve_port "${itype}" || true)"
-                [ -n "${phys}" ] && { ifconfig "${phys}" up; dhclient "${phys}"; echo "DHCP lease requested on ${phys}."; } \
-                                 || echo "No physical port assigned — DB updated only."
+                if [ -n "${phys}" ]; then
+                    # FreeBSD 13: dhclient in base. FreeBSD 14: dhcpcd in base.
+                    if command -v dhclient >/dev/null 2>&1; then
+                        _dhcp_bin="dhclient"
+                    elif command -v dhcpcd >/dev/null 2>&1; then
+                        _dhcp_bin="dhcpcd"
+                    else
+                        echo "error: no DHCP client found (dhclient or dhcpcd)"; exit 1
+                    fi
+                    ifconfig "${phys}" up
+                    "${_dhcp_bin}" "${phys}"
+                    echo "DHCP lease requested on ${phys} via ${_dhcp_bin}."
+                else
+                    echo "No physical port assigned — DB updated only."
+                fi
             fi
             ;;
         static)
@@ -198,7 +220,8 @@ cmd_iface_set() {
 cmd_assign() {
     # smartshieldctl assign <LAN|WAN> <port>
     itype="$(echo "${1:-}" | tr '[:lower:]' '[:upper:]')"
-    port="${2:-}"
+    # Sanitize port: allow only alphanumeric, dots, colons, underscores, hyphens
+    port="$(echo "${2:-}" | tr -cd 'A-Za-z0-9_.:-')"
     [ -z "${itype}" ] || [ -z "${port}" ] && { echo "usage: smartshieldctl assign <LAN|WAN> <port>"; exit 1; }
     _need_sqlite
     _sql "INSERT OR IGNORE INTO interface_assignments (interface_type, network_port) VALUES ('${itype}','${port}');
@@ -240,7 +263,13 @@ cmd_passwd() {
     stty echo 2>/dev/null || true
     echo
     [ -z "${newpass}" ] && { echo "error: password cannot be empty"; exit 1; }
-    hashed="$(python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('${newpass}'))" 2>/dev/null)"
+    # Pass the password via env var to avoid shell injection when the
+    # password contains single quotes, backslashes, or other special chars.
+    hashed="$(_SS_PASSWD="${newpass}" python3 -c "
+import os
+from werkzeug.security import generate_password_hash
+print(generate_password_hash(os.environ['_SS_PASSWD']))
+" 2>/dev/null)"
     [ -z "${hashed}" ] && { echo "error: could not hash password (werkzeug not installed?)"; exit 1; }
     rows="$(_sql "UPDATE users SET password='${hashed}' WHERE username='${user}'; SELECT changes();")"
     if [ "${rows}" = "0" ]; then

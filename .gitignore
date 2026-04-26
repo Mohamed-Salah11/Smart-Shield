@@ -22,11 +22,17 @@ config.json
 logs/
 instance/
 static/uploads/
+uploads/
+backups/
 *.pid
 *.sqlite
 *.sqlite3
 *.db
 data.db
+
+# Secrets
+master.key
+*.key
 
 # Test/coverage/cache artifacts
 .pytest_cache/

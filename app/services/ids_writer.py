@@ -76,7 +76,10 @@ def generate_suricata_yaml(conn) -> str:
     if not rule_files:
         rule_files = [f"{_SURICATA_RULES_DIR}/emerging-threats.rules"]
 
-    # Build capture config depending on mode
+    # Build capture config depending on mode.
+    # FreeBSD does not support af-packet (Linux AF_PACKET socket).
+    # IDS mode uses pcap (portable, works on FreeBSD via BPF).
+    # IPS mode uses netmap (FreeBSD-native inline capture).
     if mode == "ips":
         capture_section = textwrap.dedent(f"""\
             netmap:
@@ -88,12 +91,9 @@ def generate_suricata_yaml(conn) -> str:
         runmode = "workers"
     else:
         capture_section = textwrap.dedent(f"""\
-            af-packet:
+            pcap:
               - interface: {interface}
-                threads: auto
-                cluster-id: 99
-                cluster-type: cluster_flow
-                defrag: yes
+                checksum-checks: no
         """)
         runmode = "autofp"
 
@@ -187,7 +187,7 @@ def generate_suricata_yaml(conn) -> str:
         outputs:
         {outputs_yaml}
 
-        af-packet:
+        pcap:
           - interface: default
 
         {capture_section}
@@ -324,6 +324,59 @@ def generate_suricata_yaml(conn) -> str:
 # Write config
 # ---------------------------------------------------------------------------
 
+def validate_suricata_yaml(text: str) -> tuple:
+    """
+    Validate the Suricata YAML via ``suricata -T -c <file>``.
+    Returns ``(True, "")`` on success, ``(False, error)`` on failure.
+    On non-FreeBSD or if suricata is not installed, returns ``(True, "skipped")``.
+    """
+    import shutil, tempfile, os as _os
+    if not sys.platform.startswith("freebsd"):
+        return (True, "skipped-non-freebsd")
+    if not shutil.which("suricata"):
+        return (True, "skipped-suricata-not-found")
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, prefix="ss_ids_"
+        ) as f:
+            f.write(text)
+            tmp_path = f.name
+        result = run_command(["suricata", "-T", "-c", tmp_path], check=False)
+        ok  = result.returncode == 0
+        msg = (result.stderr or result.stdout or "").strip()
+        return (ok, msg)
+    except FreeBSDNetworkError as exc:
+        return (False, str(exc))
+    finally:
+        if tmp_path:
+            try:
+                _os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+def validate_ips_safety(conn) -> list:
+    """
+    Additional safety checks required before enabling IPS mode.
+    Returns a list of warning/error strings; empty means safe to proceed.
+    """
+    errors = []
+    cfg = _cfg(conn)
+    interface = (cfg.get("interface") or "").strip()
+    if not interface:
+        errors.append("IPS mode requires an interface to be selected.")
+    # On FreeBSD, netmap requires the NIC to support it.
+    # We cannot programmatically verify this without trying, so warn the user.
+    errors.append(
+        "IPS mode uses netmap(4) inline capture. Verify your NIC supports netmap "
+        "before enabling IPS (check: kldload netmap). IPS mode will drop traffic on "
+        "misconfiguration."
+    )
+    return errors
+
+
 def write_suricata_config(conn) -> dict:
     conf = generate_suricata_yaml(conn)
 
@@ -424,16 +477,39 @@ def get_ids_status() -> dict:
 # ---------------------------------------------------------------------------
 
 def toggle_ids(conn, enabled: bool) -> dict:
-    """Enable or disable Suricata, writing config first if enabling."""
+    """
+    Enable or disable Suricata.
+    When enabling in IPS mode, additional safety checks are performed.
+    Validates YAML via ``suricata -T`` before applying on FreeBSD.
+    """
+    cfg = _cfg(conn)
+    mode = (cfg.get("mode") or "ids").lower()
+
+    # IPS mode safety gate
+    if enabled and mode == "ips":
+        safety_warnings = validate_ips_safety(conn)
+        # The first warning is always present — it's informational.
+        # Only treat it as a hard error if the interface is also missing.
+        hard_errors = [w for w in safety_warnings if "requires" in w.lower()]
+        if hard_errors:
+            return {"ok": False, "message": " | ".join(hard_errors)}
+
     # Update DB
     cur = conn.cursor()
-    cur.execute("UPDATE ids_config SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=1", (1 if enabled else 0,))
+    cur.execute(
+        "UPDATE ids_config SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+        (1 if enabled else 0,),
+    )
     conn.commit()
 
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
 
     if enabled:
+        conf_text  = generate_suricata_yaml(conn)
+        ok, err    = validate_suricata_yaml(conf_text)
+        if not ok:
+            return {"ok": False, "message": f"Suricata YAML validation failed: {err}"}
         write_result = write_suricata_config(conn)
         if not write_result["ok"]:
             return write_result

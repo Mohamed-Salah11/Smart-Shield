@@ -169,6 +169,7 @@ def create_app():
     from routes.diagnostics import diagnostics_bp
     from routes.network_api import network_api_bp
     from routes.ids import ids_bp
+    from routes.filters import filters_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
@@ -182,5 +183,6 @@ def create_app():
     app.register_blueprint(diagnostics_bp)
     app.register_blueprint(network_api_bp)
     app.register_blueprint(ids_bp)
+    app.register_blueprint(filters_bp)
 
     return app

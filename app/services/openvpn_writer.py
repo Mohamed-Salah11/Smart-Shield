@@ -1,13 +1,106 @@
 """
 openvpn_writer.py — generates OpenVPN server/client configs + apply/status.
+
+Public API additions (Phase 3)
+-------------------------------
+validate_server(row)    -> list[str]   validation errors
+validate_client(row)    -> list[str]
+apply_openvpn(conn)     -> dict        (already existed, now validates first)
+get_connected_clients(server_id) -> list[dict]
+get_openvpn_log(server_id, lines) -> str
 """
 import os
+import re
 import sys
 
 _OPENVPN_DIR  = "/usr/local/etc/openvpn"
 _OPENVPN_KEYS = "/usr/local/etc/openvpn/keys"
 _OPENVPN_LOG  = "/var/log/openvpn"
 _OPENVPN_RUN  = "/var/run/openvpn"
+
+_VALID_PROTOCOLS  = {"udp", "tcp", "udp4", "tcp4", "udp6", "tcp6"}
+_VALID_DEV_MODES  = {"tun", "tap"}
+_VALID_TOPOLOGIES = {"subnet", "p2p", "net30"}
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_server(row: dict) -> list:
+    """
+    Validate an openvpn_servers row.
+    Returns a list of error strings; empty means valid.
+    """
+    errors = []
+
+    proto = (row.get("protocol") or "").lower()
+    if not proto:
+        errors.append("Protocol is required.")
+    elif proto not in _VALID_PROTOCOLS:
+        errors.append(f"Unknown protocol: {proto!r}. Must be one of {sorted(_VALID_PROTOCOLS)}.")
+
+    dev = (row.get("device_mode") or "tun").lower()
+    if dev not in _VALID_DEV_MODES:
+        errors.append(f"Device mode must be 'tun' or 'tap', got {dev!r}.")
+
+    port = row.get("local_port")
+    try:
+        p = int(port) if port is not None else 1194
+        if not (1 <= p <= 65535):
+            errors.append(f"Port must be 1-65535, got {port!r}.")
+    except (TypeError, ValueError):
+        errors.append(f"Port must be 1-65535, got {port!r}.")
+
+    tunnel = (row.get("tunnel_network") or "").strip()
+    if not tunnel:
+        errors.append("Tunnel network is required (e.g. 10.8.0.0/24).")
+    else:
+        try:
+            import ipaddress
+            ipaddress.ip_network(tunnel, strict=False)
+        except ValueError:
+            errors.append(f"Tunnel network {tunnel!r} is not a valid CIDR.")
+
+    local_net = (row.get("local_network") or "").strip()
+    if local_net:
+        try:
+            import ipaddress
+            ipaddress.ip_network(local_net, strict=False)
+        except ValueError:
+            errors.append(f"Local network {local_net!r} is not a valid CIDR.")
+
+    topo = (row.get("topology") or "subnet").lower()
+    if topo not in _VALID_TOPOLOGIES:
+        errors.append(f"Topology must be one of {sorted(_VALID_TOPOLOGIES)}, got {topo!r}.")
+
+    return errors
+
+
+def validate_client(row: dict) -> list:
+    """
+    Validate an openvpn_clients row.
+    Returns a list of error strings; empty means valid.
+    """
+    errors = []
+
+    proto = (row.get("protocol") or "").lower()
+    if proto and proto not in _VALID_PROTOCOLS:
+        errors.append(f"Unknown protocol: {proto!r}.")
+
+    hostname = (row.get("server_hostname") or "").strip()
+    if not hostname:
+        errors.append("Server hostname or IP is required.")
+
+    port = row.get("server_port")
+    try:
+        p = int(port) if port is not None else 1194
+        if not (1 <= p <= 65535):
+            errors.append(f"Server port must be 1-65535, got {port!r}.")
+    except (TypeError, ValueError):
+        errors.append(f"Server port must be 1-65535, got {port!r}.")
+
+    return errors
 
 
 def _rows(conn, sql, params=()):
@@ -255,6 +348,22 @@ def write_openvpn_configs(conn) -> dict:
 # ---------------------------------------------------------------------------
 
 def apply_openvpn(conn) -> dict:
+    """Write validated configs and restart OpenVPN."""
+    # Validate all servers and clients first
+    servers  = _rows(conn, "SELECT * FROM openvpn_servers WHERE disabled=0 ORDER BY id")
+    clients  = _rows(conn, "SELECT * FROM openvpn_clients WHERE disabled=0 ORDER BY id")
+    all_errs = []
+    for row in servers:
+        errs = validate_server(row)
+        if errs:
+            all_errs.append(f"Server {row.get('id')} ({row.get('description','')}): " + "; ".join(errs))
+    for row in clients:
+        errs = validate_client(row)
+        if errs:
+            all_errs.append(f"Client {row.get('id')} ({row.get('description','')}): " + "; ".join(errs))
+    if all_errs:
+        return {"ok": False, "message": "Validation failed: " + " | ".join(all_errs), "configs": []}
+
     result = write_openvpn_configs(conn)
     if not result["ok"] or not _on_freebsd():
         return result
@@ -271,6 +380,56 @@ def apply_openvpn(conn) -> dict:
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------
+
+def get_connected_clients(server_id: int) -> list:
+    """
+    Parse the OpenVPN status file for server *server_id* and return connected clients.
+    Status file format: CSV lines after "CLIENT_LIST" header.
+    Returns [] on non-FreeBSD or if the file doesn't exist.
+    """
+    path = os.path.join(_OPENVPN_LOG, f"status{server_id}.log")
+    if not os.path.exists(path):
+        return []
+    clients = []
+    in_clients = False
+    try:
+        with open(path) as fh:
+            for line in fh:
+                line = line.rstrip()
+                if line.startswith("CLIENT_LIST"):
+                    in_clients = True
+                    continue
+                if line.startswith("ROUTING_TABLE") or line.startswith("GLOBAL_STATS"):
+                    in_clients = False
+                    continue
+                if in_clients:
+                    parts = line.split(",")
+                    if len(parts) >= 5 and parts[0] != "Common Name":
+                        clients.append({
+                            "common_name": parts[0],
+                            "real_address": parts[1],
+                            "virtual_address": parts[2],
+                            "bytes_recv": parts[3],
+                            "bytes_sent": parts[4],
+                            "connected_since": parts[7] if len(parts) > 7 else "",
+                        })
+    except OSError:
+        pass
+    return clients
+
+
+def get_openvpn_log(server_id: int, lines: int = 100) -> str:
+    """Return the last *lines* of the OpenVPN server log."""
+    path = os.path.join(_OPENVPN_LOG, f"server{server_id}.log")
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path) as fh:
+            all_lines = fh.readlines()
+        return "".join(all_lines[-lines:])
+    except OSError:
+        return ""
+
 
 def get_openvpn_status() -> dict:
     if not _on_freebsd():

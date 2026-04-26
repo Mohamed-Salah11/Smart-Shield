@@ -1,0 +1,134 @@
+"""
+dns_filter.py
+-------------
+DNS-level content filtering via Unbound local-zone directives.
+
+Blocking a zone with always_nxdomain causes Unbound to return NXDOMAIN for
+the zone apex and every subdomain, requiring no knowledge of individual
+subdomains.  Redirect mode returns a specific IP (e.g. a block-page server).
+
+Public API
+----------
+generate_dns_filter_zones(conn)              -> List[str]   # unbound config lines
+get_dns_filter_rules(conn)                   -> List[dict]
+add_dns_filter_rule(conn, domain, ...)       -> int         # new row id
+toggle_dns_filter_rule(conn, rule_id, bool)  -> None
+delete_dns_filter_rule(conn, rule_id)        -> None
+apply_dns_filter(conn)                       -> dict        # {"ok", "message"}
+"""
+
+import re
+import sys
+
+
+def _rows(conn, sql, params=()):
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    return [dict(r) for r in cur.fetchall()]
+
+
+def _sanitize_domain(raw: str) -> str:
+    """Strip protocol, path, wildcards, and trailing dots from a domain string."""
+    d = re.sub(r'^https?://', '', raw.strip().lower())
+    d = d.split('/')[0].strip()
+    d = d.lstrip('*.').strip('.')
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Unbound config line generator (consumed by dns_writer.py)
+# ---------------------------------------------------------------------------
+
+def generate_dns_filter_zones(conn) -> list:
+    """
+    Return a list of Unbound server-block lines for all enabled DNS filter rules.
+    These are injected into unbound.conf by dns_writer.generate_unbound_conf().
+    """
+    rules = _rows(conn, """
+        SELECT domain, action, redirect_ip
+        FROM filter_dns_rules
+        WHERE enabled = 1
+        ORDER BY id
+    """)
+    lines = []
+    for rule in rules:
+        domain = _sanitize_domain(rule.get("domain") or "")
+        action = (rule.get("action") or "block").lower()
+        redirect_ip = (rule.get("redirect_ip") or "").strip()
+        if not domain:
+            continue
+        fqdn = domain + "."
+        if action == "block":
+            lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+        elif action == "redirect" and redirect_ip:
+            lines.append(f'    local-zone: "{fqdn}" redirect')
+            lines.append(f'    local-data: "{fqdn} A {redirect_ip}"')
+        elif action == "allow":
+            lines.append(f'    local-zone: "{fqdn}" transparent')
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
+
+def get_dns_filter_rules(conn) -> list:
+    return _rows(conn, "SELECT * FROM filter_dns_rules ORDER BY id DESC")
+
+
+def add_dns_filter_rule(
+    conn,
+    domain: str,
+    action: str = "block",
+    redirect_ip: str = "",
+    category: str = "custom",
+    description: str = "",
+) -> int:
+    domain = _sanitize_domain(domain)
+    if not domain:
+        raise ValueError("Domain must not be empty.")
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT OR IGNORE INTO filter_dns_rules
+            (domain, action, redirect_ip, category, description)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (domain, action, redirect_ip, category, description),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def toggle_dns_filter_rule(conn, rule_id: int, enabled: bool) -> None:
+    conn.execute(
+        "UPDATE filter_dns_rules SET enabled = ? WHERE id = ?",
+        (1 if enabled else 0, rule_id),
+    )
+    conn.commit()
+
+
+def delete_dns_filter_rule(conn, rule_id: int) -> None:
+    conn.execute("DELETE FROM filter_dns_rules WHERE id = ?", (rule_id,))
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Apply (write + reload Unbound)
+# ---------------------------------------------------------------------------
+
+def apply_dns_filter(conn) -> dict:
+    """Regenerate unbound.conf (including filter rules) and reload Unbound."""
+    try:
+        from app.services.dns_writer import write_unbound_conf
+        result = write_unbound_conf(conn)
+        if not result["ok"]:
+            return result
+        if sys.platform.startswith("freebsd"):
+            from app.services.service_manager import service_action
+            r = service_action("unbound", "reload")
+            if not r["ok"]:
+                return {"ok": False, "message": f"Config written but Unbound reload failed: {r['message']}"}
+        return {"ok": True, "message": "DNS filter applied and Unbound reloaded."}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}

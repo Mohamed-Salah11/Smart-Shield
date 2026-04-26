@@ -83,14 +83,69 @@ def _build_dashboard_payload():
     conn = get_db()
     cur = conn.cursor()
     object_counts = {
-        "users": _safe_count(cur, "users"),
-        "groups": _safe_count(cur, "groups"),
-        "wan_rules": _safe_count(cur, "firewall_rules_wan"),
-        "lan_rules": _safe_count(cur, "firewall_rules_lan"),
-        "floating_rules": _safe_count(cur, "firewall_rules_floating"),
-        "nat_port_forwards": _safe_count(cur, "nat_pf"),
-        "openvpn_servers": _safe_count(cur, "openvpn_servers"),
+        # Users & auth
+        "users":              _safe_count(cur, "users"),
+        "groups":             _safe_count(cur, "groups"),
+        # Firewall
+        "wan_rules":          _safe_count(cur, "firewall_rules_wan"),
+        "lan_rules":          _safe_count(cur, "firewall_rules_lan"),
+        "floating_rules":     _safe_count(cur, "firewall_rules_floating"),
+        "aliases":            _safe_count(cur, "firewall_aliases"),
+        # NAT
+        "nat_port_forwards":  _safe_count(cur, "nat_pf"),
+        "nat_outbound":       _safe_count(cur, "nat_outbound"),
+        "nat_1to1":           _safe_count(cur, "nat_1to1"),
+        # VPN
+        "openvpn_servers":    _safe_count(cur, "openvpn_servers"),
+        "openvpn_clients":    _safe_count(cur, "openvpn_clients"),
+        "ipsec_tunnels":      _safe_count(cur, "ipsec_phase1"),
+        # Routing
+        "gateways":           _safe_count(cur, "gateways"),
+        "static_routes":      _safe_count(cur, "static_routes"),
+        # Services
+        "dhcp_pools":         _safe_count(cur, "dhcp_pools"),
+        "static_leases":      _safe_count(cur, "static_leases"),
+        # Security Profiles
+        "dns_filter_rules":   _safe_count(cur, "filter_dns_rules"),
+        "web_filter_rules":   _safe_count(cur, "filter_web_rules"),
+        "app_filter_rules":   _safe_count(cur, "filter_app_rules"),
+        # IDS/IPS
+        "ids_rulesets":       _safe_count(cur, "ids_rulesets"),
     }
+
+    # Interface assignments
+    try:
+        cur.execute("SELECT interface_type, network_port FROM interface_assignments")
+        iface_rows = {r["interface_type"]: r["network_port"] for r in cur.fetchall()}
+    except Exception:
+        iface_rows = {}
+
+    # WAN/LAN config summary
+    try:
+        cur.execute("SELECT ipv4_config_type, ipv4_address, assigned_port FROM wan_config WHERE id=1")
+        wan_row = dict(cur.fetchone() or {})
+    except Exception:
+        wan_row = {}
+    try:
+        cur.execute("SELECT ipv4_address, assigned_port FROM lan_config WHERE id=1")
+        lan_row = dict(cur.fetchone() or {})
+    except Exception:
+        lan_row = {}
+
+    # IDS enabled state
+    try:
+        cur.execute("SELECT enabled, mode, interface FROM ids_config WHERE id=1")
+        ids_row = dict(cur.fetchone() or {})
+    except Exception:
+        ids_row = {}
+
+    # DHCP enabled pools
+    try:
+        cur.execute("SELECT COUNT(*) AS c FROM dhcp_pools WHERE enabled=1")
+        dhcp_enabled = int((cur.fetchone() or {}).get("c", 0))
+    except Exception:
+        dhcp_enabled = 0
+
     conn.close()
 
     try:
@@ -100,19 +155,24 @@ def _build_dashboard_payload():
     dashboard_columns = min(max(dashboard_columns, 1), 4)
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "dashboard_columns": dashboard_columns,
-        "widgets_enabled": _config_bool(config.get("widgets"), True),
+        "generated_at":       datetime.now(timezone.utc).isoformat(),
+        "dashboard_columns":  dashboard_columns,
+        "widgets_enabled":    _config_bool(config.get("widgets"), True),
         "log_filter_enabled": _config_bool(config.get("log_filter"), True),
         "manage_log_enabled": _config_bool(config.get("manage_log"), True),
         "monitoring_enabled": _config_bool(config.get("monitoring"), True),
-        "hostname": config.get("hostname") or "Smart Shield",
-        "timezone": config.get("timezone") or "Etc/UTC",
-        "theme": config.get("theme") or "Smart Shield",
-        "session_summary": session_summary,
-        "object_counts": object_counts,
+        "hostname":           config.get("hostname") or "Smart Shield",
+        "timezone":           config.get("timezone") or "Etc/UTC",
+        "theme":              config.get("theme") or "Smart Shield",
+        "session_summary":    session_summary,
+        "object_counts":      object_counts,
+        "interface_assignments": iface_rows,
+        "wan": wan_row,
+        "lan": lan_row,
+        "ids": ids_row,
+        "dhcp_enabled_pools": dhcp_enabled,
         "recent_session_events": session_events[:25],
-        "recent_events": events[:25],
+        "recent_events":      events[:25],
     }
 
 # ----------------------------
@@ -123,6 +183,12 @@ def _build_dashboard_payload():
 @login_required
 def system_home():
     return redirect(url_for("system.general_setup"))
+
+
+@system_bp.route("/theme-editor")
+@login_required
+def theme_editor():
+    return render_template("theme_editor.html", title="Theme Editor")
 
 @system_bp.route("/dashboard")
 @login_required

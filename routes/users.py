@@ -58,6 +58,8 @@ def _category_for_endpoint(endpoint):
 
 
 def _permission_catalog():
+    from app.api_auth import API_PERMISSION_CATALOG
+
     excluded_prefixes = ("auth.", "static.", "users.")
     excluded_endpoints = {"system.logout"}
     entries = []
@@ -92,6 +94,16 @@ def _permission_catalog():
             continue
         seen.add(entry["endpoint"])
         unique_entries.append(entry)
+
+    # Append API-level permission strings so they can be granted to groups.
+    for perm, area, path_hint, description in API_PERMISSION_CATALOG:
+        unique_entries.append({
+            "endpoint": perm,
+            "path": path_hint,
+            "label": f"[API] {description}",
+            "category": area,
+            "category_key": area.lower().replace("/", "_").replace(" ", "_"),
+        })
 
     return unique_entries
 

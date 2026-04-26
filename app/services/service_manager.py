@@ -124,6 +124,110 @@ SERVICES = {
 }
 
 
+def get_all_service_health(conn) -> dict:
+    """
+    Return a lightweight health snapshot of all Smart Shield services.
+    Safe to call on non-FreeBSD — returns ``state: "dry-run"`` for all.
+
+    Result shape::
+
+        {
+          "pf":      {"running": bool, "state": str, "message": str},
+          "dhcpd":   {...},
+          "unbound": {...},
+          "openvpn": {...},
+          "ipsec":   {...},
+          "ids":     {...},
+          "interfaces": [{"name": str, "state": str, "ip": str}, ...],
+        }
+    """
+    health: dict = {}
+
+    # PF
+    try:
+        from app.services.pf_generator import get_pf_status
+        health["pf"] = get_pf_status()
+    except Exception as exc:
+        health["pf"] = {"running": False, "state": "error", "message": str(exc)}
+
+    # DHCP
+    try:
+        from app.services.dhcp_writer import get_dhcp_status
+        health["dhcpd"] = get_dhcp_status()
+    except Exception as exc:
+        health["dhcpd"] = {"running": False, "state": "error", "message": str(exc)}
+
+    # Unbound
+    try:
+        from app.services.dns_writer import get_unbound_status
+        health["unbound"] = get_unbound_status()
+    except Exception as exc:
+        health["unbound"] = {"running": False, "state": "error", "message": str(exc)}
+
+    # OpenVPN (best-effort)
+    try:
+        from app.services.openvpn_writer import get_openvpn_status
+        ovpn = get_openvpn_status()
+        health["openvpn"] = {
+            "running": ovpn.get("running", False),
+            "state":   "running" if ovpn.get("running") else "stopped",
+            "message": ovpn.get("status", ""),
+        }
+    except Exception:
+        health["openvpn"] = service_status("openvpn")
+
+    # IPsec / strongSwan (best-effort)
+    try:
+        from app.services.ipsec_writer import get_ipsec_status
+        ipsec = get_ipsec_status()
+        health["ipsec"] = {
+            "running": ipsec.get("running", False),
+            "state":   "running" if ipsec.get("running") else "stopped",
+            "message": ipsec.get("status", ""),
+        }
+    except Exception:
+        health["ipsec"] = service_status("strongswan")
+
+    # IDS / Suricata (best-effort)
+    try:
+        from app.services.ids_writer import get_ids_status
+        ids = get_ids_status()
+        health["ids"] = {
+            "running": ids.get("running", False),
+            "state":   "running" if ids.get("running") else "stopped",
+            "message": ids.get("status", ""),
+        }
+    except Exception:
+        health["ids"] = {"running": False, "state": "unknown", "message": "IDS status unavailable"}
+
+    # Interface state (LAN/WAN from DB + live on FreeBSD)
+    interfaces = []
+    try:
+        cur = conn.cursor()
+        for table, label in [("lan_config", "LAN"), ("wan_config", "WAN")]:
+            cur.execute(f"SELECT assigned_port, ipv4_address FROM {table} LIMIT 1")
+            row = cur.fetchone()
+            if row:
+                port = (row["assigned_port"] or "").strip()
+                ip   = (row["ipv4_address"]  or "").strip()
+                iface_info = {"name": label, "port": port, "ip": ip, "state": "unknown"}
+                if _on_freebsd() and port:
+                    try:
+                        r = run_command(["ifconfig", port.split()[0]], check=False, timeout_seconds=3)
+                        if r.returncode == 0:
+                            iface_info["state"] = "up" if "status: active" in r.stdout else "down"
+                    except Exception:
+                        pass
+                else:
+                    iface_info["state"] = "dry-run"
+                interfaces.append(iface_info)
+    except Exception:
+        pass
+    health["interfaces"] = interfaces
+
+    return health
+
+
 def reload_all_services(conn) -> dict:
     """
     Inspect the DB for enabled services and reload/start each one.

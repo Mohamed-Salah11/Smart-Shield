@@ -119,7 +119,7 @@
         <nav class="sidebar-nav">
             <!-- System -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-shield-halved sg-icon"></i><span class="label">System</span><span class="chev">▾</span></summary>
+                <summary><span class="label">System</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
                     <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">Advanced</a></li>
@@ -138,7 +138,7 @@
 
             <!-- Interfaces -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-network-wired sg-icon"></i><span class="label">Interfaces</span><span class="chev">▾</span></summary>
+                <summary><span class="label">Interfaces</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('interfaces.interfaces_lan') }}">LAN</a></li>
                     <li><a href="{{ url_for('interfaces.interfaces_wan') }}">WAN</a></li>
@@ -148,7 +148,7 @@
 
             <!-- Firewall -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-fire-flame-curved sg-icon"></i><span class="label">Firewall</span><span class="chev">▾</span></summary>
+                <summary><span class="label">Firewall</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('firewall.rules') }}">Rules</a></li>
                     <li><a href="{{ url_for('firewall.nat') }}">NAT</a></li>
@@ -161,7 +161,7 @@
 
             <!-- Services -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-server sg-icon"></i><span class="label">Services</span><span class="chev">▾</span></summary>
+                <summary><span class="label">Services</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('services.auto_config_backup') }}">Auto Config Backup</a></li>
                     <li><a href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
@@ -184,7 +184,7 @@
 
             <!-- VPN -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-lock sg-icon"></i><span class="label">VPN</span><span class="chev">▾</span></summary>
+                <summary><span class="label">VPN</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
                     <li><a href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
@@ -194,7 +194,7 @@
 
             <!-- IDS / IPS -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-shield-virus sg-icon"></i><span class="label">IDS / IPS</span><span class="chev">▾</span></summary>
+                <summary><span class="label">IDS / IPS</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">Overview</a></li>
                     <li><a href="{{ url_for('ids.ids_index', tab='config') }}">Configuration</a></li>
@@ -202,9 +202,19 @@
                 </ul>
             </details>
 
+            <!-- Security Profiles -->
+            <details class="side-group">
+                <summary><span class="label">Security Profiles</span><span class="chev">▾</span></summary>
+                <ul class="side-links">
+                    <li><a href="{{ url_for('filters.dns_filter_page') }}" data-match-pattern="/filters/dns">DNS Filter</a></li>
+                    <li><a href="{{ url_for('filters.web_filter_page') }}" data-match-pattern="/filters/web">Web Filter</a></li>
+                    <li><a href="{{ url_for('filters.app_filter_page') }}" data-match-pattern="/filters/app">Application Filter</a></li>
+                </ul>
+            </details>
+
             <!-- Status -->
             <details class="side-group">
-                <summary><i class="fa-solid fa-chart-line sg-icon"></i><span class="label">Status</span><span class="chev">▾</span></summary>
+                <summary><span class="label">Status</span><span class="chev">▾</span></summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('status.status_home') }}">Overview</a></li>
                     <li><a href="{{ url_for('status.carp_failover') }}">CARP (failover)</a></li>
@@ -213,7 +223,7 @@
                     <li><a href="{{ url_for('status.queues') }}">Queues</a></li>
                     <li><a href="{{ url_for('status.traffic_graph') }}">Traffic Graph</a></li>
                     <li><a href="{{ url_for('status.dhcp_leases') }}">DHCP Leases</a></li>
-                    <li><a href="{{ url_for('status.system_logs') }}"><i class="fa-solid fa-circle" style="color:#10b981;font-size:.45rem;vertical-align:middle;margin-right:4px;"></i>Live Log Monitor</a></li>
+                    <li><a href="{{ url_for('status.system_logs') }}">Live Log Monitor</a></li>
                     <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">Session Logs</a></li>
                 </ul>
             </details>
@@ -449,20 +459,32 @@
     })();
 })();
 
-// Dark Mode Toggle
+// Dark Mode Toggle + User Theme Restoration
 (function() {
     const darkModeSwitch = document.getElementById('darkModeSwitch');
     const html = document.documentElement;
-    
+
     // Check for saved preference or system preference
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
         html.setAttribute('data-theme', 'dark');
         if (darkModeSwitch) darkModeSwitch.checked = true;
     }
-    
+
+    // Restore custom theme colors saved by the Theme Editor
+    try {
+        const userTheme = localStorage.getItem('userTheme');
+        if (userTheme) {
+            const t = JSON.parse(userTheme);
+            if (t['data-theme']) html.setAttribute('data-theme', t['data-theme']);
+            Object.entries(t).forEach(([v, val]) => {
+                if (v !== '_name' && v !== 'data-theme') html.style.setProperty(v, val);
+            });
+        }
+    } catch(e) { /* ignore corrupt data */ }
+
     // Toggle handler
     if (darkModeSwitch) {
         darkModeSwitch.addEventListener('change', function() {
@@ -473,6 +495,15 @@
                 html.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
             }
+            // Update stored data-theme in userTheme if present
+            try {
+                const ut = localStorage.getItem('userTheme');
+                if (ut) {
+                    const t = JSON.parse(ut);
+                    t['data-theme'] = this.checked ? 'dark' : 'light';
+                    localStorage.setItem('userTheme', JSON.stringify(t));
+                }
+            } catch(e) {}
         });
     }
 })();
