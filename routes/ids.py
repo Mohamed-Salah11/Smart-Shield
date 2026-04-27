@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
 from app.database import get_db
 from app.auth_utils import login_required
+from app.api_auth import api_permission_required
 from app.audit_log import log_event
 
 ids_bp = Blueprint("ids", __name__, url_prefix="/ids")
@@ -94,7 +95,7 @@ def ids_save():
 # ── Toggle IDS on/off (AJAX) ───────────────────────────────────────────────
 
 @ids_bp.route("/api/toggle", methods=["POST"])
-@login_required
+@api_permission_required("api.ids.edit")
 def ids_toggle():
     data = request.get_json(silent=True) or {}
     enabled = bool(data.get("enabled", False))
@@ -122,7 +123,7 @@ def ids_rulesets_list():
 
 
 @ids_bp.route("/api/rulesets", methods=["POST"])
-@login_required
+@api_permission_required("api.ids.edit")
 def ids_ruleset_add():
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
@@ -145,7 +146,7 @@ def ids_ruleset_add():
 
 
 @ids_bp.route("/api/rulesets/<int:rid>", methods=["PUT"])
-@login_required
+@api_permission_required("api.ids.edit")
 def ids_ruleset_update(rid):
     data    = request.get_json(silent=True) or {}
     enabled = 1 if data.get("enabled") else 0
@@ -159,7 +160,7 @@ def ids_ruleset_update(rid):
 
 
 @ids_bp.route("/api/rulesets/<int:rid>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.ids.edit")
 def ids_ruleset_delete(rid):
     conn = get_db()
     conn.cursor().execute("DELETE FROM ids_rulesets WHERE id=?", (rid,))
@@ -170,7 +171,7 @@ def ids_ruleset_delete(rid):
 # ── Update rules (trigger suricata-update) ────────────────────────────────
 
 @ids_bp.route("/api/update-rules", methods=["POST"])
-@login_required
+@api_permission_required("api.ids.edit")
 def ids_update_rules():
     conn = get_db()
     from app.services.ids_writer import update_rules

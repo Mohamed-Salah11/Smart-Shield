@@ -1,9 +1,11 @@
 from flask import Blueprint, render_template, request, jsonify
 from app.database import get_db
 from app.auth_utils import login_required
-from app.secret_store import seal
+from app.api_auth import api_permission_required
+from app.secret_store import seal, decrypt_secret
+from app.validators import validate_ip, validate_port, validate_username, collect_errors
 import sqlite3
-from werkzeug.security import generate_password_hash
+from app.secret_store import encrypt_secret
 
 vpn_bp = Blueprint("vpn", __name__, url_prefix="/vpn")
 
@@ -125,7 +127,7 @@ def ipsec_p1_list():
 
 
 @vpn_bp.route("/api/ipsec/p1", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_p1_create():
     db = None
     try:
@@ -227,7 +229,7 @@ def ipsec_p1_create():
 
 
 @vpn_bp.route("/api/ipsec/p1/<int:p1_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_p1_delete(p1_id):
     db = None
     try:
@@ -291,7 +293,7 @@ def ipsec_mobile_clients_get():
 
 
 @vpn_bp.route("/api/ipsec/mobile-clients", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_mobile_clients_save():
     try:
         data = request.get_json() or {}
@@ -370,7 +372,7 @@ def ipsec_psk_list():
 
 
 @vpn_bp.route("/api/ipsec/psk", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_psk_create():
     try:
         data = request.get_json() or {}
@@ -411,7 +413,7 @@ def ipsec_psk_create():
 
 
 @vpn_bp.route("/api/ipsec/psk/<int:psk_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_psk_delete(psk_id):
     try:
         db = get_db()
@@ -441,7 +443,7 @@ def ipsec_advanced_settings_get():
 
 
 @vpn_bp.route("/api/ipsec/advanced-settings", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_advanced_settings_save():
     try:
         data = request.get_json() or {}
@@ -570,7 +572,7 @@ def l2tp_settings_get():
 
 
 @vpn_bp.route("/api/l2tp/settings", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def l2tp_settings_save():
     try:
         data = request.get_json() or {}
@@ -596,7 +598,7 @@ def l2tp_settings_save():
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-server", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_openvpn_server():
     try:
         data = request.get_json()
@@ -676,7 +678,7 @@ def get_openvpn_servers():
 
 
 @vpn_bp.route("/api/openvpn/delete-server/<int:server_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_openvpn_server(server_id):
     try:
         db = get_db()
@@ -701,7 +703,7 @@ def delete_openvpn_server(server_id):
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-client", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_openvpn_client():
     try:
         data = request.get_json()
@@ -796,7 +798,7 @@ def get_openvpn_clients():
 
 
 @vpn_bp.route("/api/openvpn/delete-client/<int:client_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_openvpn_client(client_id):
     try:
         db = get_db()
@@ -821,7 +823,7 @@ def delete_openvpn_client(client_id):
 # ----------------------------
 
 @vpn_bp.route("/api/openvpn/save-cso", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_openvpn_cso():
     try:
         data = request.get_json()
@@ -918,7 +920,7 @@ def get_openvpn_csos():
 
 
 @vpn_bp.route("/api/openvpn/delete-cso/<int:cso_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_openvpn_cso(cso_id):
     try:
         db = get_db()
@@ -943,7 +945,7 @@ def delete_openvpn_cso(cso_id):
 # ----------------------------
 
 @vpn_bp.route("/api/ipsec/save-phase1", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_ipsec_phase1():
     payload, status = _payload_and_status(ipsec_p1_create())
     if payload.get("success"):
@@ -979,7 +981,7 @@ def get_ipsec_phase1():
 
 
 @vpn_bp.route("/api/ipsec/delete-phase1/<int:phase1_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_ipsec_phase1(phase1_id):
     payload, status = _payload_and_status(ipsec_p1_delete(phase1_id))
     if payload.get("success"):
@@ -992,7 +994,7 @@ def delete_ipsec_phase1(phase1_id):
 # ----------------------------
 
 @vpn_bp.route("/api/l2tp/save-config", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_l2tp_config():
     try:
         data = request.get_json()
@@ -1034,7 +1036,7 @@ def get_l2tp_config():
 
 
 @vpn_bp.route("/api/l2tp/save-user", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_l2tp_user():
     try:
         data = request.get_json()
@@ -1051,7 +1053,7 @@ def save_l2tp_user():
             VALUES (?, ?, ?)
         """, (
             username,
-            generate_password_hash(password),
+            encrypt_secret(password),
             data.get('ip_address', '')
         ))
         
@@ -1105,7 +1107,7 @@ def get_l2tp_user(user_id):
 
 
 @vpn_bp.route("/api/l2tp/update-user/<int:user_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def update_l2tp_user(user_id):
     try:
         data = request.get_json()
@@ -1115,12 +1117,12 @@ def update_l2tp_user(user_id):
         # If password is provided, update it; otherwise, only update username and ip_address
         if data.get('password'):
             cursor.execute("""
-                UPDATE l2tp_users 
+                UPDATE l2tp_users
                 SET username = ?, password = ?, ip_address = ?
                 WHERE id = ?
             """, (
                 data.get('username'),
-                generate_password_hash(data.get('password')),
+                encrypt_secret(data.get('password')),
                 data.get('ip_address', ''),
                 user_id
             ))
@@ -1142,7 +1144,7 @@ def update_l2tp_user(user_id):
 
 
 @vpn_bp.route("/api/l2tp/delete-user/<int:user_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_l2tp_user(user_id):
     try:
         db = get_db()
@@ -1159,7 +1161,7 @@ def delete_l2tp_user(user_id):
 # ----------------------------
 
 @vpn_bp.route("/api/wizard/save-auth-type", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_wizard_auth_type():
     try:
         data = request.get_json()
@@ -1189,7 +1191,7 @@ def save_wizard_auth_type():
 
 
 @vpn_bp.route("/api/wizard/save-ca", methods=['POST'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def save_wizard_ca():
     try:
         data = request.get_json()
@@ -1265,7 +1267,7 @@ def get_wizard_cas():
 
 
 @vpn_bp.route("/api/wizard/delete-ca/<int:ca_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.vpn.edit")
 def delete_wizard_ca(ca_id):
     try:
         db = get_db()
@@ -1284,7 +1286,7 @@ def delete_wizard_ca(ca_id):
 # ── OpenVPN ───────────────────────────────────────────────────────────────────
 
 @vpn_bp.route("/api/openvpn/apply", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.apply")
 def openvpn_apply():
     """Write all OpenVPN configs and restart the service on FreeBSD."""
     try:
@@ -1333,7 +1335,7 @@ def openvpn_generate_config(server_id):
 # ── IPsec ─────────────────────────────────────────────────────────────────────
 
 @vpn_bp.route("/api/ipsec/apply", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.apply")
 def ipsec_apply():
     """Write ipsec.conf + ipsec.secrets and reload strongSwan."""
     try:
@@ -1396,7 +1398,7 @@ def ipsec_p2_list():
 
 
 @vpn_bp.route("/api/ipsec/p2", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_p2_create():
     """Create or update a Phase 2 child SA."""
     try:
@@ -1437,7 +1439,7 @@ def ipsec_p2_create():
 
 
 @vpn_bp.route("/api/ipsec/p2/<int:p2_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.vpn.edit")
 def ipsec_p2_delete(p2_id):
     try:
         conn = get_db()
@@ -1451,7 +1453,7 @@ def ipsec_p2_delete(p2_id):
 # ── L2TP ─────────────────────────────────────────────────────────────────────
 
 @vpn_bp.route("/api/l2tp/apply", methods=["POST"])
-@login_required
+@api_permission_required("api.vpn.apply")
 def l2tp_apply():
     """Write mpd5 config and restart L2TP service."""
     try:
@@ -1487,5 +1489,258 @@ def l2tp_preview():
         from app.services.l2tp_writer import generate_mpd_conf
         conn = get_db()
         return jsonify({"ok": True, "conf": generate_mpd_conf(conn)})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 3 — Validation / Preview / Connected-clients endpoints
+# ══════════════════════════════════════════════════════════════════════════════
+
+@vpn_bp.route("/api/openvpn/validate", methods=["GET"])
+@login_required
+def openvpn_validate():
+    """Validate all enabled OpenVPN server and client configs."""
+    try:
+        from app.services.openvpn_writer import validate_server, validate_client
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("SELECT * FROM openvpn_servers WHERE disabled=0 ORDER BY id")
+        servers = [dict(r) for r in cur.fetchall()]
+        cur.execute("SELECT * FROM openvpn_clients WHERE disabled=0 ORDER BY id")
+        clients = [dict(r) for r in cur.fetchall()]
+
+        errors = []
+        for row in servers:
+            errs = validate_server(row)
+            if errs:
+                errors.append({"kind": "server", "id": row["id"],
+                                "description": row.get("description", ""),
+                                "errors": errs})
+        for row in clients:
+            errs = validate_client(row)
+            if errs:
+                errors.append({"kind": "client", "id": row["id"],
+                                "description": row.get("description", ""),
+                                "errors": errs})
+        return jsonify({"ok": not errors, "issues": errors})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/preview-server/<int:server_id>", methods=["GET"])
+@login_required
+def openvpn_preview_server(server_id):
+    """Return the generated config for a single OpenVPN server."""
+    try:
+        from app.services.openvpn_writer import generate_server_conf, validate_server
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("SELECT * FROM openvpn_servers WHERE id=?", (server_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "Server not found"}), 404
+        row  = dict(row)
+        errs = validate_server(row)
+        conf = generate_server_conf(row)
+        return jsonify({"ok": True, "conf": conf,
+                        "validation_errors": errs, "valid": not errs})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/clients-connected/<int:server_id>", methods=["GET"])
+@login_required
+def openvpn_connected_clients(server_id):
+    """Return currently connected clients for an OpenVPN server (from status file)."""
+    from app.services.openvpn_writer import get_connected_clients
+    clients = get_connected_clients(server_id)
+    return jsonify({"ok": True, "server_id": server_id,
+                    "clients": clients, "count": len(clients)})
+
+
+@vpn_bp.route("/api/openvpn/logs/<int:server_id>", methods=["GET"])
+@login_required
+def openvpn_logs(server_id):
+    """Return the last N lines of the OpenVPN server log."""
+    try:
+        lines = min(int(request.args.get("lines", 100) or 100), 1000)
+    except (TypeError, ValueError):
+        lines = 100
+    from app.services.openvpn_writer import get_openvpn_log
+    log_text = get_openvpn_log(server_id, lines)
+    return jsonify({"ok": True, "server_id": server_id, "log": log_text})
+
+
+@vpn_bp.route("/api/ipsec/validate", methods=["GET"])
+@login_required
+def ipsec_validate():
+    """Validate all enabled IPsec Phase 1 + Phase 2 configs."""
+    try:
+        from app.services.ipsec_writer import validate_ipsec_config
+        conn   = get_db()
+        errors = validate_ipsec_config(conn)
+        return jsonify({"ok": not errors, "errors": errors})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/l2tp/validate", methods=["GET"])
+@login_required
+def l2tp_validate():
+    """Validate L2TP configuration and user list."""
+    try:
+        from app.services.l2tp_writer import validate_l2tp_config
+        conn   = get_db()
+        errors = validate_l2tp_config(conn)
+        return jsonify({"ok": not errors, "errors": errors})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ── Certificate management ─────────────────────────────────────────────────
+
+@vpn_bp.route("/api/certs", methods=["GET"])
+@login_required
+def list_certificates():
+    """List all certificates safe for the UI."""
+    try:
+        from app.services.cert_manager import list_certs, mask_cert_fields
+        cert_type = request.args.get("type")
+        conn  = get_db()
+        certs = list_certs(conn, cert_type=cert_type or None)
+        return jsonify({"ok": True, "certs": [mask_cert_fields(c) for c in certs]})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/create-ca", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def create_ca():
+    """Create a new internal Certificate Authority."""
+    try:
+        from app.services.cert_manager import create_ca as _create_ca
+        from app.audit_log import log_event
+        data = request.get_json() or {}
+        conn = get_db()
+        result = _create_ca(
+            conn,
+            name=data.get("name", ""),
+            common_name=data.get("common_name", ""),
+            key_bits=int(data.get("key_bits", 2048) or 2048),
+            lifetime_days=int(data.get("lifetime_days", 3650) or 3650),
+            country=data.get("country", ""),
+            org=data.get("org", ""),
+            ou=data.get("ou", ""),
+            state=data.get("state", ""),
+            city=data.get("city", ""),
+        )
+        log_event(category="system", action="cert_ca_create",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"name": data.get("name"), "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/create-server", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def create_server_cert():
+    """Create a server certificate signed by a CA."""
+    try:
+        from app.services.cert_manager import create_server_cert as _create_sc
+        from app.audit_log import log_event
+        data = request.get_json() or {}
+        conn = get_db()
+        result = _create_sc(
+            conn,
+            ca_id=int(data.get("ca_id", 0) or 0),
+            name=data.get("name", ""),
+            common_name=data.get("common_name", ""),
+            key_bits=int(data.get("key_bits", 2048) or 2048),
+            lifetime_days=int(data.get("lifetime_days", 397) or 397),
+            san_dns=data.get("san_dns", []),
+            san_ip=data.get("san_ip", []),
+        )
+        log_event(category="system", action="cert_server_create",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"name": data.get("name"), "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/create-client", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def create_client_cert():
+    """Create a client certificate signed by a CA."""
+    try:
+        from app.services.cert_manager import create_client_cert as _create_cc
+        from app.audit_log import log_event
+        data = request.get_json() or {}
+        conn = get_db()
+        result = _create_cc(
+            conn,
+            ca_id=int(data.get("ca_id", 0) or 0),
+            name=data.get("name", ""),
+            common_name=data.get("common_name", ""),
+            key_bits=int(data.get("key_bits", 2048) or 2048),
+            lifetime_days=int(data.get("lifetime_days", 397) or 397),
+        )
+        log_event(category="system", action="cert_client_create",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"name": data.get("name"), "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/<int:cert_id>/revoke", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def revoke_certificate(cert_id):
+    """Revoke a certificate."""
+    try:
+        from app.services.cert_manager import revoke_cert
+        from app.audit_log import log_event
+        conn   = get_db()
+        result = revoke_cert(conn, cert_id)
+        log_event(category="system", action="cert_revoke",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"cert_id": cert_id, "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/<int:cert_id>/export-pem", methods=["GET"])
+@login_required
+def export_cert_pem(cert_id):
+    """Download the PEM-encoded certificate (no private key)."""
+    try:
+        from app.services.cert_manager import get_cert_pem
+        from flask import Response
+        conn    = get_db()
+        pem     = get_cert_pem(conn, cert_id)
+        if not pem:
+            return jsonify({"ok": False, "error": "Certificate not found"}), 404
+        return Response(pem, mimetype="application/x-pem-file",
+                        headers={"Content-Disposition": f"attachment; filename=cert-{cert_id}.pem"})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/<int:cert_id>/export-p12", methods=["POST"])
+@login_required
+def export_cert_p12(cert_id):
+    """Download a PKCS#12 bundle (cert + key + CA chain)."""
+    try:
+        from app.services.cert_manager import export_pkcs12
+        from flask import Response
+        data     = request.get_json() or {}
+        password = data.get("password", "")
+        conn     = get_db()
+        p12_bytes = export_pkcs12(conn, cert_id, password=password)
+        return Response(p12_bytes, mimetype="application/x-pkcs12",
+                        headers={"Content-Disposition": f"attachment; filename=cert-{cert_id}.p12"})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500

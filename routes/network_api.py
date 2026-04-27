@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, request, session
 from app.audit_log import log_event
 from app.database import get_db
 from app.auth_utils import login_required
+from app.api_auth import api_permission_required
+from app.secret_store import encrypt_secret, mask_secret
 from app.services.network_service import (
     capture_dns_activity,
     capture_http_activity,
@@ -630,6 +632,7 @@ def get_interfaces():
                     "ipv4_upstream_gateway": wan["ipv4_upstream_gateway"] if wan else "",
                     "username": wan["username"] if wan else "",
                     "has_password": bool(wan and wan["password"]),
+                    "password_placeholder": mask_secret(wan["password"] if wan else ""),
                     "dial_on_demand": row_to_bool(wan, "dial_on_demand"),
                     "idle_timeout": wan["idle_timeout"] if wan else 0,
                     "block_private_networks": row_to_bool(wan, "block_private_networks", True),
@@ -641,7 +644,7 @@ def get_interfaces():
 
 
 @network_api_bp.route("/interfaces/<interface_type>", methods=["PUT"])
-@login_required
+@api_permission_required("api.network.edit")
 def update_interface(interface_type):
     try:
         validate_interface_type(interface_type)
@@ -654,7 +657,22 @@ def update_interface(interface_type):
         validate_ip(gateway)
 
         conn = get_db()
-        cur = conn.cursor()
+        cur  = conn.cursor()
+
+        # Save pre-apply snapshot for rollback support
+        import json as _json
+        _snap_table = "lan_config" if interface_type == "LAN" else "wan_config"
+        cur.execute(f"SELECT * FROM {_snap_table} WHERE id=1")
+        _snap_row = cur.fetchone()
+        if _snap_row:
+            cur.execute(
+                """
+                INSERT INTO pending_interface_changes
+                    (interface_type, snapshot_json, confirmed)
+                VALUES (?, ?, 0)
+                """,
+                (interface_type, _json.dumps(dict(_snap_row))),
+            )
 
         if interface_type == "LAN":
             cur.execute(
@@ -723,7 +741,8 @@ def update_interface(interface_type):
                     ipv4_address,
                     gateway,
                     payload["username"],
-                    payload["password"],
+                    # Encrypt on save; pass None so COALESCE keeps existing value when empty.
+                    encrypt_secret(payload["password"]) if payload.get("password") else None,
                     int(payload["dial_on_demand"]),
                     payload["idle_timeout"],
                     int(payload["block_private_networks"]),
@@ -775,7 +794,7 @@ def get_dhcp():
 
 
 @network_api_bp.route("/dhcp/<interface_type>", methods=["PUT"])
-@login_required
+@api_permission_required("api.network.edit")
 def update_dhcp(interface_type):
     try:
         validate_interface_type(interface_type)
@@ -839,7 +858,7 @@ def get_leases():
 
 
 @network_api_bp.route("/leases", methods=["POST"])
-@login_required
+@api_permission_required("api.network.edit")
 def add_lease():
     try:
         data = request.get_json(force=True) or {}
@@ -870,7 +889,7 @@ def add_lease():
 
 
 @network_api_bp.route("/leases/<int:lease_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_lease(lease_id):
     conn = get_db()
     cur = conn.cursor()
@@ -924,7 +943,7 @@ def list_hosts():
 
 
 @network_api_bp.route("/hosts/refresh", methods=["POST"])
-@login_required
+@api_permission_required("api.network.edit")
 def refresh_hosts():
     conn = None
     try:
@@ -1075,16 +1094,22 @@ def web_activity():
 
 
 @network_api_bp.route("/apply", methods=["POST"])
-@login_required
+@api_permission_required("api.network.apply")
 def apply_network():
     try:
+        from app.services.network_service import run_command
+
         data = request.get_json(force=True) or {}
         interface_name = data["interface_name"]
-        ipv4_address = data["ipv4_address"]
-        gateway_ip = data.get("gateway_ip", "")
+        # config_type distinguishes DHCP ("dhcp") from static ("static").
+        # Callers that omit it but provide an ipv4_address are treated as static.
+        config_type = (data.get("config_type") or "static").lower().strip()
+        ipv4_address = (data.get("ipv4_address") or "").strip()
+        gateway_ip = (data.get("gateway_ip") or "").strip()
 
         validate_interface_name(interface_name)
-        validate_cidr(ipv4_address)
+        if config_type != "dhcp":
+            validate_cidr(ipv4_address)
         validate_ip(gateway_ip)
 
         if not _network_apply_enabled():
@@ -1099,6 +1124,40 @@ def apply_network():
             )
 
         ensure_freebsd()
+
+        if config_type == "dhcp":
+            # FreeBSD 13: dhclient is in base (/sbin/dhclient).
+            # FreeBSD 14: dhclient was removed; dhcpcd is the base replacement.
+            # Accept whichever is present.
+            import shutil
+            dhcp_bin = shutil.which("dhclient") or shutil.which("dhcpcd")
+            if not dhcp_bin:
+                raise FreeBSDNetworkError(
+                    "No DHCP client found. FreeBSD 13: dhclient is in base. "
+                    "FreeBSD 14: install dhcpcd via: pkg install dhcpcd"
+                )
+            run_command(["ifconfig", interface_name, "up"], check=True)
+            run_command([dhcp_bin, interface_name], check=True)
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": f"DHCP lease requested on {interface_name} via {dhcp_bin}.",
+                }
+            )
+
+        if config_type == "pppoe":
+            # Write /etc/ppp/ppp.conf from DB and (re)start the ppp daemon.
+            # The physical NIC name is read from wan_config; interface_name
+            # in the request is ignored for PPPoE (ppp manages tun0 itself).
+            from app.services.pppoe_writer import apply_pppoe
+            conn = get_db()
+            result = apply_pppoe(conn)
+            conn.close()
+            status = "success" if result["ok"] else "error"
+            code = 200 if result["ok"] else 400
+            return jsonify({"status": status, "message": result["message"]}), code
+
+        # Static: apply explicit address, then optional default gateway.
         apply_interface_ipv4(interface_name, ipv4_address)
 
         if gateway_ip:
@@ -1107,13 +1166,172 @@ def apply_network():
         return jsonify(
             {
                 "status": "success",
-                "message": "Network settings applied on FreeBSD.",
+                "message": f"Static address {ipv4_address} applied on {interface_name}.",
             }
         )
     except FreeBSDNetworkError as e:
         return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@network_api_bp.route("/pppoe/status", methods=["GET"])
+@login_required
+def pppoe_status():
+    """Return live PPPoE session state (running, tun0 IP, etc.)."""
+    from app.services.pppoe_writer import get_pppoe_status
+    return jsonify({"status": "success", "data": get_pppoe_status()})
+
+
+@network_api_bp.route("/pppoe/disconnect", methods=["POST"])
+@api_permission_required("api.network.edit")
+def pppoe_disconnect():
+    """Tear down the active PPPoE session."""
+    from app.services.pppoe_writer import disconnect_pppoe
+    result = disconnect_pppoe()
+    status = "success" if result["ok"] else "error"
+    return jsonify({"status": status, "message": result["message"]})
+
+
+@network_api_bp.route("/interfaces/<interface_type>/snapshot", methods=["GET"])
+@login_required
+def get_interface_snapshot(interface_type: str):
+    """Return the last pre-apply snapshot for an interface (for rollback UI)."""
+    try:
+        validate_interface_type(interface_type)
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, snapshot_json, applied_at, confirmed, rollback_by
+            FROM pending_interface_changes
+            WHERE interface_type = ?
+            ORDER BY applied_at DESC LIMIT 1
+            """,
+            (interface_type,),
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return jsonify({"status": "success", "snapshot": None})
+        import json as _json
+        return jsonify({
+            "status": "success",
+            "snapshot": {
+                "id":          row["id"],
+                "config":      _json.loads(row["snapshot_json"]),
+                "applied_at":  row["applied_at"],
+                "confirmed":   bool(row["confirmed"]),
+                "rollback_by": row["rollback_by"],
+            },
+        })
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
+
+
+@network_api_bp.route("/interfaces/<interface_type>/confirm", methods=["POST"])
+@api_permission_required("api.network.edit")
+def confirm_interface_apply(interface_type: str):
+    """
+    Mark the most recent interface apply as confirmed (administrator can still
+    reach the management interface after the change).
+    Clears the rollback window.
+    """
+    try:
+        validate_interface_type(interface_type)
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            UPDATE pending_interface_changes
+            SET confirmed = 1
+            WHERE interface_type = ? AND confirmed = 0
+            """,
+            (interface_type,),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": f"{interface_type} change confirmed."})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
+
+
+@network_api_bp.route("/interfaces/<interface_type>/rollback", methods=["POST"])
+@api_permission_required("api.network.edit")
+def rollback_interface(interface_type: str):
+    """
+    Restore the last pre-apply snapshot for an interface.
+    Writes the saved config back to the DB (does not re-apply to OS — use /apply
+    after rollback if live apply is desired).
+    """
+    try:
+        validate_interface_type(interface_type)
+        import json as _json
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, snapshot_json FROM pending_interface_changes
+            WHERE interface_type = ? ORDER BY applied_at DESC LIMIT 1
+            """,
+            (interface_type,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "No snapshot to roll back to."}), 404
+
+        snap = _json.loads(row["snapshot_json"])
+
+        if interface_type == "LAN":
+            cur.execute(
+                """
+                UPDATE lan_config SET
+                    ipv4_config_type=?, ipv4_address=?, ipv4_upstream_gateway=?,
+                    block_private_networks=?, block_bogon_networks=?
+                WHERE id=1
+                """,
+                (
+                    snap.get("ipv4_config_type", "static"),
+                    snap.get("ipv4_address", ""),
+                    snap.get("ipv4_upstream_gateway", ""),
+                    int(snap.get("block_private_networks", 0)),
+                    int(snap.get("block_bogon_networks", 0)),
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE wan_config SET
+                    ipv4_config_type=?, ipv4_address=?, ipv4_upstream_gateway=?,
+                    username=?, block_private_networks=?, block_bogon_networks=?
+                WHERE id=1
+                """,
+                (
+                    snap.get("ipv4_config_type", "dhcp"),
+                    snap.get("ipv4_address", ""),
+                    snap.get("ipv4_upstream_gateway", ""),
+                    snap.get("username", ""),
+                    int(snap.get("block_private_networks", 1)),
+                    int(snap.get("block_bogon_networks", 1)),
+                ),
+            )
+
+        # Delete the snapshot after rollback
+        cur.execute("DELETE FROM pending_interface_changes WHERE id=?", (row["id"],))
+        conn.commit()
+        conn.close()
+
+        from app.audit_log import log_event
+        log_event(
+            category="system", action="interface_rollback",
+            username=session.get("username", "anonymous"),
+            remote_addr=request.remote_addr,
+            details={"interface_type": interface_type},
+        )
+        return jsonify({"status": "success", "message": f"{interface_type} rolled back to previous config."})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
 
 
 @network_api_bp.route("/connections", methods=["GET"])

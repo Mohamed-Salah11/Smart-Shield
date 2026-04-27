@@ -1,0 +1,272 @@
+"""
+tests/test_pf_generator.py
+--------------------------
+Unit tests for app/services/pf_generator.py.
+No FreeBSD required — all system calls are either skipped or mocked.
+"""
+
+import os
+import sys
+import pytest
+
+# Ensure test env vars are set before importing the app
+os.environ.setdefault("SMARTSHIELD_DB_PATH", "file:pftest?mode=memory&cache=shared")
+os.environ.setdefault("SECRET_KEY", "test-pf-key")
+os.environ.setdefault("SMARTSHIELD_MASTER_KEY",
+    __import__("base64").b64encode(__import__("secrets").token_bytes(32)).decode())
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def conn():
+    """In-memory SQLite with the Smart Shield schema and minimal seed data."""
+    from app.database import get_db, init_db
+    init_db()
+    db = get_db()
+
+    # Seed LAN / WAN config
+    db.execute(
+        "UPDATE lan_config SET assigned_port='em1', ipv4_address='192.168.1.1/24' WHERE id=1"
+    )
+    db.execute(
+        "UPDATE wan_config SET assigned_port='em0', ipv4_config_type='static', "
+        "ipv4_address='203.0.113.1/24' WHERE id=1"
+    )
+    db.commit()
+    yield db
+    db.close()
+
+
+@pytest.fixture()
+def fresh_conn():
+    """Per-test clean in-memory DB."""
+    os.environ["SMARTSHIELD_DB_PATH"] = "file:pftest2?mode=memory&cache=shared"
+    from app.database import get_db, init_db
+    init_db()
+    db = get_db()
+    db.execute(
+        "UPDATE lan_config SET assigned_port='em1', ipv4_address='192.168.1.1/24' WHERE id=1"
+    )
+    db.execute(
+        "UPDATE wan_config SET assigned_port='em0', ipv4_config_type='static', "
+        "ipv4_address='203.0.113.1/24' WHERE id=1"
+    )
+    db.commit()
+    yield db
+    db.close()
+    os.environ["SMARTSHIELD_DB_PATH"] = "file:pftest?mode=memory&cache=shared"
+
+
+# ---------------------------------------------------------------------------
+# Config generation
+# ---------------------------------------------------------------------------
+
+class TestGeneratePfConf:
+
+    def test_contains_wan_lan_macros(self, conn):
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert 'WAN     = "em0"' in conf
+        assert 'LAN     = "em1"' in conf
+
+    def test_contains_lan_net(self, conn):
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert "LAN_NET" in conf
+        assert "192.168.1.0/24" in conf
+
+    def test_default_block_policy(self, conn):
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert "set block-policy drop" in conf
+
+    def test_default_masquerade_when_no_outbound_nat(self, conn):
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert "nat on $WAN from $LAN_NET to any -> ($WAN)" in conf
+
+    def test_no_default_masquerade_when_outbound_nat_exists(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_outbound (disabled, interface, src_address, dst_address, nat_address)"
+            " VALUES (0, 'em0', '192.168.1.0/24', 'any', '')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        # Should not have the default masquerade line when explicit outbound rules exist
+        assert "LAN_NET to any -> ($WAN)" not in conf
+
+    def test_pppoe_wan_uses_tun0(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "UPDATE wan_config SET ipv4_config_type='pppoe' WHERE id=1"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert 'WAN     = "tun0"' in conf
+
+    def test_wan_rules_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination)"
+            " VALUES ('pass', 0, 'tcp', 'any', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "pass in on em0" in conf
+
+    def test_lan_rules_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_lan (disabled, protocol, source, destination)"
+            " VALUES (0, 'any', 'any', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "pass in on em1" in conf
+
+    def test_disabled_rules_excluded(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination, description)"
+            " VALUES ('block', 1, 'tcp', '10.0.0.1', 'any', 'DISABLED_TEST')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "DISABLED_TEST" not in conf
+
+    def test_nat_port_forward_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_pf (disabled, interface, protocol, src_address, dst_address, redirect_ip)"
+            " VALUES (0, 'em0', 'tcp', 'any', 'any', '192.168.1.100')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "rdr on em0 proto tcp" in conf
+        assert "192.168.1.100" in conf
+
+    def test_nat_port_forward_without_redirect_skipped(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_pf (disabled, interface, protocol, src_address, dst_address, redirect_ip)"
+            " VALUES (0, 'em0', 'tcp', 'any', 'any', '')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        # Rule with empty redirect_ip must be skipped
+        lines = [l for l in conf.splitlines() if "rdr on em0" in l]
+        # Only rules with a real redirect_ip should appear
+        for line in lines:
+            assert "any" not in line.split("->")[-1].strip()
+
+    def test_alias_table_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        import json
+        fresh_conn.execute(
+            "INSERT INTO firewall_aliases (name, type, alias_values)"
+            " VALUES ('BADGUYS', 'host', ?)",
+            (json.dumps(["1.2.3.4", "5.6.7.8"]),),
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "table <BADGUYS>" in conf
+        assert "1.2.3.4" in conf
+
+    def test_floating_rule_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_floating (disabled, protocol, source, destination, description)"
+            " VALUES (0, 'icmp', 'any', 'any', 'Allow ICMP')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "pass quick" in conf
+        assert "proto icmp" in conf
+
+    def test_outbound_nat_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_outbound (disabled, interface, src_address, dst_address)"
+            " VALUES (0, 'em0', '10.0.0.0/8', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "nat on em0 from 10.0.0.0/8 to any" in conf
+
+    def test_1to1_nat_generated(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_1to1 (disabled, interface, external_address, internal_address)"
+            " VALUES (0, 'em0', '203.0.113.10', '192.168.1.10')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "binat on em0 from 192.168.1.10 to any -> 203.0.113.10" in conf
+
+    def test_scrub_present(self, conn):
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert "scrub in all" in conf
+
+
+# ---------------------------------------------------------------------------
+# Validation (pfctl is mocked — only tests non-FreeBSD path)
+# ---------------------------------------------------------------------------
+
+class TestValidatePfConf:
+
+    def test_non_freebsd_always_passes(self):
+        from app.services.pf_generator import validate_pf_conf
+        ok, msg = validate_pf_conf("anything here")
+        assert ok is True
+        assert "skipped" in msg
+
+    def test_empty_string_passes_on_non_freebsd(self):
+        from app.services.pf_generator import validate_pf_conf
+        ok, _ = validate_pf_conf("")
+        assert ok is True
+
+
+# ---------------------------------------------------------------------------
+# Status (non-FreeBSD path)
+# ---------------------------------------------------------------------------
+
+class TestGetPfStatus:
+
+    def test_non_freebsd_returns_dry_run(self):
+        from app.services.pf_generator import get_pf_status
+        status = get_pf_status()
+        assert status["state"] == "dry-run"
+        assert status["running"] is False
+
+
+# ---------------------------------------------------------------------------
+# Rollback (non-FreeBSD path)
+# ---------------------------------------------------------------------------
+
+class TestRollbackPf:
+
+    def test_rollback_fails_gracefully_on_non_freebsd(self):
+        from app.services.pf_generator import rollback_pf
+        result = rollback_pf()
+        assert result["ok"] is False
+        assert "FreeBSD" in result["message"] or "Non" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# reload_pf_rules (dry-run)
+# ---------------------------------------------------------------------------
+
+class TestReloadPfRules:
+
+    def test_non_freebsd_returns_ok_with_conf(self, conn):
+        from app.services.pf_generator import reload_pf_rules
+        result = reload_pf_rules(conn)
+        assert result["ok"] is True
+        assert "conf" in result
+        assert "WAN" in result["conf"]
+        assert "Non-FreeBSD" in result["message"]

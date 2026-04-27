@@ -96,27 +96,35 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN is_superuser INTEGER DEFAULT 0")
 
     # Migration: add assigned_port to lan_config / wan_config if missing.
+    # Guard with `if lan_columns` so we only ALTER on existing tables — on a
+    # fresh DB these tables don't exist yet and will be created with the column
+    # included in the CREATE TABLE statement below.
     cursor.execute("PRAGMA table_info(lan_config)")
     lan_columns = {row["name"] for row in cursor.fetchall()}
-    if "assigned_port" not in lan_columns:
+    if lan_columns and "assigned_port" not in lan_columns:
         cursor.execute("ALTER TABLE lan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
 
     cursor.execute("PRAGMA table_info(wan_config)")
     wan_columns = {row["name"] for row in cursor.fetchall()}
-    if "assigned_port" not in wan_columns:
+    if wan_columns and "assigned_port" not in wan_columns:
         cursor.execute("ALTER TABLE wan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
 
     # Keep lan_config/wan_config assigned_port in sync with interface_assignments.
+    # Only run when all three tables already exist (skip on fresh install).
     cursor.execute(
-        "SELECT interface_type, network_port FROM interface_assignments WHERE network_port IS NOT NULL"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='interface_assignments'"
     )
-    for row in cursor.fetchall():
-        itype = (row[0] or "").upper()
-        port  = row[1] or ""
-        if itype == "LAN" and port:
-            cursor.execute("UPDATE lan_config SET assigned_port=? WHERE assigned_port=''", (port,))
-        elif itype == "WAN" and port:
-            cursor.execute("UPDATE wan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+    if cursor.fetchone():
+        cursor.execute(
+            "SELECT interface_type, network_port FROM interface_assignments WHERE network_port IS NOT NULL"
+        )
+        for row in cursor.fetchall():
+            itype = (row[0] or "").upper()
+            port  = row[1] or ""
+            if itype == "LAN" and port:
+                cursor.execute("UPDATE lan_config SET assigned_port=? WHERE assigned_port=''", (port,))
+            elif itype == "WAN" and port:
+                cursor.execute("UPDATE wan_config SET assigned_port=? WHERE assigned_port=''", (port,))
 
     # Group-level page whitelist permissions.
     cursor.execute(
@@ -1355,5 +1363,258 @@ ON static_leases(mac_address)
     )
     """)
 
+    # ── Security Profiles: DNS Filter ────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS filter_dns_rules (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled     INTEGER DEFAULT 1,
+        domain      TEXT NOT NULL,
+        action      TEXT DEFAULT 'block',
+        redirect_ip TEXT DEFAULT '',
+        category    TEXT DEFAULT 'custom',
+        description TEXT DEFAULT '',
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_filter_dns_domain ON filter_dns_rules(domain)"
+    )
+
+    # ── Security Profiles: Web Filter ─────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS filter_web_rules (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled     INTEGER DEFAULT 1,
+        url_pattern TEXT NOT NULL,
+        action      TEXT DEFAULT 'block',
+        category    TEXT DEFAULT 'custom',
+        description TEXT DEFAULT '',
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_filter_web_pattern ON filter_web_rules(url_pattern)"
+    )
+
+    # ── Security Profiles: Application Filter ─────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS filter_app_rules (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled     INTEGER DEFAULT 1,
+        app_name    TEXT NOT NULL,
+        action      TEXT DEFAULT 'block',
+        block_dns   INTEGER DEFAULT 1,
+        block_ports INTEGER DEFAULT 0,
+        ports       TEXT DEFAULT '',
+        protocol    TEXT DEFAULT 'tcp+udp',
+        domains     TEXT DEFAULT '',
+        category    TEXT DEFAULT 'custom',
+        description TEXT DEFAULT '',
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ── Certificates (CA, server, client) ────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS certificates (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        name             TEXT    NOT NULL,
+        cert_type        TEXT    NOT NULL DEFAULT 'client',
+        common_name      TEXT    NOT NULL,
+        ca_id            INTEGER,
+        cert_pem         TEXT    NOT NULL DEFAULT '',
+        private_key_enc  TEXT    NOT NULL DEFAULT '',
+        serial           TEXT    DEFAULT '',
+        not_before       TEXT    DEFAULT '',
+        not_after        TEXT    DEFAULT '',
+        revoked          INTEGER DEFAULT 0,
+        revoked_at       TIMESTAMP,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(ca_id) REFERENCES certificates(id) ON DELETE SET NULL
+    )
+    """)
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_name_type "
+        "ON certificates(name, cert_type)"
+    )
+
+    # ── Schema version ────────────────────────────────────────────────────────
+    # Monotonically increasing integer; bumped each time the DB schema changes.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS schema_version (
+        version    INTEGER NOT NULL,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("SELECT COALESCE(MAX(version), 0) AS v FROM schema_version")
+    _current_schema_version = cursor.fetchone()["v"]
+    if _current_schema_version < 2:
+        cursor.execute("INSERT INTO schema_version (version) VALUES (2)")
+    if _current_schema_version < 3:
+        cursor.execute("INSERT INTO schema_version (version) VALUES (3)")
+    if _current_schema_version < 4:
+        cursor.execute("INSERT INTO schema_version (version) VALUES (4)")
+    if _current_schema_version < 5:
+        cursor.execute("INSERT INTO schema_version (version) VALUES (5)")
+
+    # ── Phase 4: DHCPv6 pools ─────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dhcpv6_pools (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        interface_type    TEXT    NOT NULL UNIQUE,
+        interface_name    TEXT    DEFAULT '',
+        enabled           INTEGER DEFAULT 0,
+        prefix            TEXT    DEFAULT '::/64',
+        start_address     TEXT    DEFAULT '',
+        end_address       TEXT    DEFAULT '',
+        valid_lifetime    INTEGER DEFAULT 86400,
+        preferred_lifetime INTEGER DEFAULT 3600,
+        dns_servers       TEXT    DEFAULT '',
+        domain_search     TEXT    DEFAULT '',
+        pd_prefix         TEXT    DEFAULT '',
+        pd_prefix_len     INTEGER DEFAULT 64,
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("SELECT COUNT(*) AS c FROM dhcpv6_pools")
+    if cursor.fetchone()["c"] == 0:
+        cursor.execute(
+            "INSERT INTO dhcpv6_pools (interface_type) VALUES ('LAN')"
+        )
+
+    # ── Phase 4: Router Advertisement per-interface settings ──────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ra_settings (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        interface_name   TEXT    NOT NULL UNIQUE,
+        enabled          INTEGER DEFAULT 0,
+        prefix           TEXT    DEFAULT '',
+        autonomous_flag  INTEGER DEFAULT 1,
+        managed_flag     INTEGER DEFAULT 0,
+        other_flag       INTEGER DEFAULT 0,
+        router_priority  TEXT    DEFAULT 'medium',
+        min_interval     INTEGER DEFAULT 200,
+        max_interval     INTEGER DEFAULT 600,
+        default_lifetime INTEGER DEFAULT 1800,
+        dns_servers      TEXT    DEFAULT '',
+        domain_search    TEXT    DEFAULT '',
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ra_settings_iface "
+        "ON ra_settings(interface_name)"
+    )
+
+    # ── Phase 4: Wake-on-LAN saved hosts ─────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS wol_hosts (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT    NOT NULL,
+        mac_address  TEXT    NOT NULL,
+        interface    TEXT    NOT NULL DEFAULT 'LAN',
+        broadcast_ip TEXT    DEFAULT '255.255.255.255',
+        description  TEXT    DEFAULT '',
+        last_sent_at TIMESTAMP,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_wol_hosts_mac "
+        "ON wol_hosts(mac_address)"
+    )
+
+    # ── Phase 4: Captive portal sessions ─────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS captive_sessions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        mac_address  TEXT    NOT NULL UNIQUE,
+        ip_address   TEXT    NOT NULL,
+        username     TEXT    DEFAULT '',
+        expires_at   INTEGER NOT NULL,
+        logged_out   INTEGER DEFAULT 0,
+        bytes_in     INTEGER DEFAULT 0,
+        bytes_out    INTEGER DEFAULT 0,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_captive_sessions_expires "
+        "ON captive_sessions(expires_at, logged_out)"
+    )
+
+    # ── Phase 4: Captive portal vouchers ─────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS captive_vouchers (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        code              TEXT    NOT NULL UNIQUE,
+        duration_minutes  INTEGER NOT NULL DEFAULT 60,
+        bandwidth_kbps    INTEGER DEFAULT 0,
+        redeemed          INTEGER DEFAULT 0,
+        redeemed_at       TIMESTAMP,
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ── Pending interface changes (rollback protection) ───────────────────────
+    # Records a pre-apply snapshot so the UI can offer explicit rollback.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS pending_interface_changes (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        interface_type TEXT    NOT NULL,
+        snapshot_json  TEXT    NOT NULL,
+        applied_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        confirmed      INTEGER DEFAULT 0,
+        rollback_by    TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pending_iface_type "
+        "ON pending_interface_changes(interface_type, applied_at)"
+    )
+
+    # ── Phase 5: Config version history ──────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS config_versions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        service      TEXT    NOT NULL,
+        version_num  INTEGER NOT NULL DEFAULT 1,
+        content      TEXT    NOT NULL,
+        content_hash TEXT    DEFAULT '',
+        applied_by   TEXT    DEFAULT 'system',
+        applied_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        validation_ok INTEGER DEFAULT 1,
+        apply_ok      INTEGER DEFAULT 1,
+        notes        TEXT    DEFAULT '',
+        file_path    TEXT    DEFAULT ''
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_config_versions_service_version "
+        "ON config_versions(service, version_num DESC)"
+    )
+
+    # ── Phase 5: Service health snapshots ────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS health_snapshots (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        services_json TEXT NOT NULL DEFAULT '{}',
+        disk_json     TEXT NOT NULL DEFAULT '{}',
+        system_json   TEXT NOT NULL DEFAULT '{}'
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_health_snapshots_at "
+        "ON health_snapshots(snapshot_at DESC)"
+    )
+
     conn.commit()
+
+    # Run formal migrations (Phase 5+).  This is a no-op when the DB is
+    # already at CURRENT_SCHEMA_VERSION.
+    from app.migrations import run_migrations
+    run_migrations(conn)
+
     conn.close()

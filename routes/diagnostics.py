@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ from datetime import datetime, timezone
 from flask import (
     Blueprint,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -326,16 +328,30 @@ def _collect_config_roots():
     return roots
 
 
+def _master_key_path():
+    try:
+        from app.secret_store import _master_key_path as _sk_path
+        return _sk_path()
+    except Exception:
+        pass
+    if sys.platform.startswith("freebsd"):
+        return "/usr/local/etc/smart-shield/master.key"
+    local = os.getenv("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(local, "SmartShield", "master.key")
+
+
 def _snapshot_component_definitions():
     db_path = _normalize_abs(_database_path())
     config_path = _normalize_abs(_general_config_path())
     upload_path = _normalize_abs(get_upload_dir())
+    master_key_path = _normalize_abs(_master_key_path())
 
     definitions = [
         {"name": "database_main", "kind": "file", "path": db_path, "label": "Database"},
         {"name": "database_wal", "kind": "file", "path": f"{db_path}-wal", "label": "Database WAL"},
         {"name": "database_shm", "kind": "file", "path": f"{db_path}-shm", "label": "Database SHM"},
         {"name": "general_config", "kind": "file", "path": config_path, "label": "General Config"},
+        {"name": "secret_master_key", "kind": "file", "path": master_key_path, "label": "Secret Master Key"},
         {"name": "uploads", "kind": "directory", "path": upload_path, "label": "Uploads"},
     ]
 
@@ -754,6 +770,16 @@ def _restore_file_component(component, component_payload):
     return stats
 
 
+def _force_rmtree(path):
+    def _on_error(func, path, exc_info):
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except Exception:
+            pass
+    shutil.rmtree(path, onerror=_on_error)
+
+
 def _restore_directory_component(component, component_payload):
     target_root = component["path"]
     stats = {"components_applied": 1, "files_restored": 0, "bytes_restored": 0, "dirs_restored": 0}
@@ -764,7 +790,7 @@ def _restore_directory_component(component, component_payload):
     is_present = bool(component_payload.get("present"))
     if not is_present:
         if os.path.isdir(target_root):
-            shutil.rmtree(target_root)
+            _force_rmtree(target_root)
         elif os.path.exists(target_root):
             os.remove(target_root)
         return stats
@@ -774,7 +800,7 @@ def _restore_directory_component(component, component_payload):
         raise BackupFormatError(f"Snapshot directory component '{component['name']}' is invalid.")
 
     if os.path.isdir(target_root):
-        shutil.rmtree(target_root)
+        _force_rmtree(target_root)
     elif os.path.exists(target_root):
         os.remove(target_root)
     os.makedirs(target_root, exist_ok=True)
@@ -1061,7 +1087,7 @@ def backup_restore_restore():
     if create_safety_backup:
         try:
             safety_backup_name, _ = _save_safety_backup(rollback_payload)
-        except OSError:
+        except Exception:
             flash("Could not write a pre-restore safety file, but restore will continue.", "warning")
 
     restore_stats = {"components_applied": 0, "files_restored": 0, "bytes_restored": 0, "dirs_restored": 0}

@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+.page-card { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:var(--shadow-soft); }
+.page-title { font-size:1.15rem;font-weight:700;color:var(--text-color);margin:0 0 4px; }
+.page-sub   { font-size:.82rem;color:var(--muted);margin:0; }
+.toolbar    { display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px; }
+.ftbl { width:100%;border-collapse:collapse;font-size:.83rem; }
+.ftbl thead th {
+  background:var(--border-color-soft);padding:9px 12px;text-align:left;
+  font-size:.70rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);border-bottom:1px solid var(--border-color);white-space:nowrap;
+}
+.ftbl tbody tr { border-bottom:1px solid var(--border-color);transition:background .12s; }
+.ftbl tbody tr:last-child { border-bottom:none; }
+.ftbl tbody td { padding:9px 12px;vertical-align:middle; }
+.ftbl tbody tr:hover { background:rgba(0,0,0,.03); }
+.ftbl .empty-row td { text-align:center;color:var(--muted);font-style:italic;padding:32px; }
+.mono { font-family:monospace;font-size:.82rem;font-weight:600; }
+.badge-action {
+  display:inline-block;padding:2px 10px;border-radius:99px;
+  font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+}
+.badge-block { background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2); }
+.badge-allow { background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2); }
+.badge-cat   { display:inline-block;padding:1px 8px;border-radius:99px;font-size:.66rem;font-weight:600;background:rgba(100,116,139,.12);color:var(--muted);border:1px solid var(--border-color); }
+.sw { position:relative;display:inline-flex;align-items:center; }
+.sw input { opacity:0;width:0;height:0;position:absolute; }
+.sw-track { width:34px;height:18px;background:#4b5563;border-radius:9px;cursor:pointer;transition:background .2s;display:inline-block;position:relative; }
+.sw input:checked ~ .sw-track { background:#6366f1; }
+.sw-thumb { position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s;pointer-events:none; }
+.sw input:checked ~ .sw-track .sw-thumb { left:18px; }
+#toast { position:fixed;bottom:22px;right:22px;z-index:9999;min-width:270px;max-width:400px;border-radius:9px;padding:13px 16px;font-size:.83rem;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.3);display:none; }
+#toast.ok  { background:#0f3d2e;color:#34d399;border:1px solid rgba(52,211,153,.2); }
+#toast.err { background:#3d0f0f;color:#f87171;border:1px solid rgba(248,113,113,.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <div class="page-card">
+    <p class="page-title">Web Filter</p>
+    <p class="page-sub">Domain-level URL blocking via Unbound DNS. The entire domain and all its subdomains are blocked. Full URL-path filtering requires an HTTP proxy.</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-sm btn-primary" onclick="openModal('addModal')">Add Rule</button>
+    <button class="btn btn-sm btn-success" onclick="applyFilter()">Apply to Unbound</button>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <table class="ftbl">
+        <thead>
+          <tr>
+            <th style="width:40px;">On</th>
+            <th>Domain / URL Pattern</th>
+            <th>Action</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th style="width:70px;">Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rules %}
+          <tr id="row-{{ r.id }}">
+            <td>
+              <label class="sw">
+                <input type="checkbox" {% if r.enabled %}checked{% endif %}
+                  onchange="toggleRule({{ r.id }}, this.checked)">
+                <span class="sw-track"><span class="sw-thumb"></span></span>
+              </label>
+            </td>
+            <td class="mono">{{ r.url_pattern }}</td>
+            <td><span class="badge-action badge-{{ r.action }}">{{ r.action }}</span></td>
+            <td><span class="badge-cat">{{ r.category }}</span></td>
+            <td style="color:var(--muted);font-size:.78rem;">{{ r.description or '—' }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2"
+                onclick="deleteRule({{ r.id }})">Delete</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr class="empty-row"><td colspan="6">No web filter rules yet. Click Add Rule to get started.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Rule Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Web Filter Rule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">URL / Domain <span class="text-danger">*</span></label>
+          <input type="text" id="f-pattern" class="form-control"
+            placeholder="e.g. reddit.com or https://reddit.com/r/gaming">
+          <div class="form-text">The domain is extracted automatically. The full domain and all subdomains will be blocked.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="f-action" class="form-select">
+            <option value="block">Block</option>
+            <option value="allow">Allow (whitelist override)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Category</label>
+          <select id="f-category" class="form-select">
+            {% for key, label in web_categories %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" id="f-description" class="form-control" placeholder="Optional note">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitAdd()">Add Rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
+function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
+
+function showToast(msg, ok) {
+  const el = document.getElementById('toast');
+  el.className = ok ? 'ok' : 'err';
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 4000);
+}
+
+async function api(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json();
+}
+
+async function toggleRule(id, enabled) {
+  const r = await api(`/filters/web/${id}/toggle`, { enabled });
+  if (!r.ok) showToast(r.message, false);
+}
+
+async function deleteRule(id) {
+  if (!confirm('Delete this rule?')) return;
+  const r = await api(`/filters/web/${id}/delete`, {});
+  if (r.ok) { document.getElementById(`row-${id}`)?.remove(); showToast('Rule deleted.', true); }
+  else showToast(r.message, false);
+}
+
+async function applyFilter() {
+  showToast('Applying…', true);
+  const r = await api('/filters/web/apply', {});
+  showToast(r.message, r.ok);
+}
+
+async function submitAdd() {
+  const pattern = document.getElementById('f-pattern').value.trim();
+  if (!pattern) { showToast('URL/domain is required.', false); return; }
+  const r = await api('/filters/web/add', {
+    url_pattern: pattern,
+    action: document.getElementById('f-action').value,
+    category: document.getElementById('f-category').value,
+    description: document.getElementById('f-description').value.trim(),
+  });
+  if (r.ok) { closeModal('addModal'); showToast(r.message, true); setTimeout(() => location.reload(), 900); }
+  else showToast(r.message, false);
+}
+</script>
+{% endblock %}

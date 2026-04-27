@@ -14,8 +14,85 @@ write_l2tp_conf(conn)      -> {"ok": bool, "message": str}
 apply_l2tp(conn)           -> {"ok": bool, "message": str}
 get_l2tp_status()          -> {"running": bool, "sessions": [...]}
 """
+import ipaddress
 import os
 import sys
+
+from app.secret_store import decrypt_secret
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_l2tp_config(conn) -> list:
+    """
+    Validate the L2TP configuration and user list.
+    Returns a list of error strings; empty means valid.
+    """
+    errors = []
+
+    cfg_rows = _rows(conn, "SELECT * FROM l2tp_config WHERE id=1 LIMIT 1")
+    if not cfg_rows:
+        # No config is not an error — default values will be used
+        return []
+    cfg = cfg_rows[0]
+
+    server_addr  = (cfg.get("server_address") or "").strip()
+    remote_range = (cfg.get("remote_address_range") or "").strip()
+    auth_type    = (cfg.get("authentication") or "chap").upper()
+
+    if server_addr:
+        try:
+            ipaddress.ip_address(server_addr)
+        except ValueError:
+            errors.append(f"Server address {server_addr!r} is not a valid IP.")
+
+    if remote_range:
+        try:
+            ipaddress.ip_address(remote_range)
+        except ValueError:
+            errors.append(f"Remote address range start {remote_range!r} is not a valid IP.")
+
+    if auth_type not in {"CHAP", "PAP", "MSCHAPv2"}:
+        errors.append(f"Authentication type {auth_type!r} is not supported. Use CHAP, PAP, or MSCHAPv2.")
+
+    dns1 = (cfg.get("dns_server1") or "").strip()
+    dns2 = (cfg.get("dns_server2") or "").strip()
+    for label, dns in [("DNS1", dns1), ("DNS2", dns2)]:
+        if dns:
+            try:
+                ipaddress.ip_address(dns)
+            except ValueError:
+                errors.append(f"{label} {dns!r} is not a valid IP.")
+
+    # Validate users
+    users = _rows(conn, "SELECT * FROM l2tp_users ORDER BY id")
+    seen_usernames = set()
+    for u in users:
+        uname = (u.get("username") or "").strip()
+        pw_enc = (u.get("password") or "").strip()
+        if not uname:
+            errors.append(f"L2TP user id={u['id']} has no username.")
+            continue
+        if uname in seen_usernames:
+            errors.append(f"Duplicate L2TP username: {uname!r}.")
+        seen_usernames.add(uname)
+        if pw_enc:
+            pw = decrypt_secret(pw_enc)
+            if not pw:
+                errors.append(f"L2TP user {uname!r}: password is stored but cannot be decrypted — re-enter it.")
+        else:
+            errors.append(f"L2TP user {uname!r} has no password set.")
+
+        ip_addr = (u.get("ip_address") or "").strip()
+        if ip_addr:
+            try:
+                ipaddress.ip_address(ip_addr)
+            except ValueError:
+                errors.append(f"L2TP user {uname!r} has invalid static IP: {ip_addr!r}.")
+
+    return errors
 
 _MPD_DIR    = "/usr/local/etc/mpd5"
 _MPD_CONF   = "/usr/local/etc/mpd5/mpd.conf"
@@ -111,7 +188,7 @@ def generate_mpd_secret(conn) -> str:
     ]
     for u in users:
         username = (u.get("username") or "").strip()
-        password = (u.get("password") or "").strip()
+        password = decrypt_secret((u.get("password") or "").strip())
         ip_addr  = (u.get("ip_address") or "").strip()
         if not username or not password:
             continue
@@ -153,6 +230,13 @@ def write_l2tp_conf(conn) -> dict:
 
 
 def apply_l2tp(conn) -> dict:
+    """Validate, write mpd5 config, and restart L2TP."""
+    validation_errors = validate_l2tp_config(conn)
+    if validation_errors:
+        return {
+            "ok": False,
+            "message": "Validation failed: " + " | ".join(validation_errors),
+        }
     result = write_l2tp_conf(conn)
     if not result["ok"] or not _on_freebsd():
         return result
@@ -179,8 +263,9 @@ def get_l2tp_status() -> dict:
 
         sessions = []
         if running:
-            # Try to get active sessions via netstat
-            ns = run_command(["netstat", "-na", "-p", "udp"], check=False)
+            # sockstat -46 lists open sockets on FreeBSD; filter for L2TP port 1701.
+            # netstat -p udp is Linux-specific (on FreeBSD -p means protocol stats).
+            ns = run_command(["sockstat", "-46", "-u"], check=False)
             for line in (ns.stdout or "").splitlines():
                 if "l2tp" in line.lower() or ":1701" in line:
                     sessions.append(line.strip())

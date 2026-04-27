@@ -1,5 +1,5 @@
 import json as _json
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session
 from app.auth_utils import login_required
 from app.audit_log import tail_events, tail_events_since, log_stats
 
@@ -299,3 +299,360 @@ def api_logs():
 def api_logs_stats():
     """Per-category event counts for the stats bar."""
     return jsonify(log_stats())
+
+
+# ══════════════════════════════════════════════════
+# SERVICE HEALTH API
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/health")
+@login_required
+def api_health():
+    """
+    Return a health snapshot for all Smart Shield services.
+
+    Response shape::
+
+        {
+          "ok": true,
+          "services": {
+            "pf":      {"running": bool, "state": str, "message": str},
+            "dhcpd":   {...},
+            "unbound": {...},
+            "openvpn": {...},
+            "ipsec":   {...},
+            "ids":     {...}
+          },
+          "interfaces": [{"name": str, "port": str, "ip": str, "state": str}]
+        }
+
+    Safe to call on non-FreeBSD — returns ``state: "dry-run"`` for all
+    services that require the OS.
+    """
+    from app.database import get_db
+    from app.services.service_manager import get_all_service_health
+    conn  = get_db()
+    data  = get_all_service_health(conn)
+    ifaces = data.pop("interfaces", [])
+    return jsonify({"ok": True, "services": data, "interfaces": ifaces})
+
+
+@status_bp.route("/api/health/<service_name>")
+@login_required
+def api_health_service(service_name: str):
+    """Return health for a single named service (pf, dhcpd, unbound, openvpn, ipsec, ids)."""
+    from app.database import get_db
+    from app.services.service_manager import get_all_service_health
+    conn = get_db()
+    all_health = get_all_service_health(conn)
+    svc = all_health.get(service_name)
+    if svc is None:
+        return jsonify({"ok": False, "error": f"Unknown service: {service_name}"}), 404
+    return jsonify({"ok": True, "service": service_name, "health": svc})
+
+
+# ══════════════════════════════════════════════════
+# PF CONFIG PREVIEW
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/pf/preview")
+@login_required
+def api_pf_preview():
+    """Return the pf.conf that would be applied (no filesystem writes)."""
+    from app.database import get_db
+    from app.services.pf_generator import generate_pf_conf, validate_pf_conf
+    conn = get_db()
+    conf = generate_pf_conf(conn)
+    ok, err = validate_pf_conf(conf)
+    return jsonify({"ok": ok, "conf": conf, "validation_message": err})
+
+
+# ══════════════════════════════════════════════════
+# PF ROLLBACK
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/pf/rollback", methods=["POST"])
+@login_required
+def api_pf_rollback():
+    """Restore the last known-good pf.conf."""
+    from app.database import get_db
+    from app.services.pf_generator import rollback_pf
+    from app.audit_log import log_event
+    result = rollback_pf()
+    log_event(
+        category="system", action="pf_rollback",
+        username=request.values.get("username"),
+        remote_addr=request.remote_addr,
+        details=result,
+    )
+    return jsonify(result)
+
+
+# ══════════════════════════════════════════════════
+# DHCP apply + status
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/dhcp/apply", methods=["POST"])
+@login_required
+def api_dhcp_apply():
+    """Validate, write, and restart isc-dhcpd."""
+    from app.database import get_db
+    from app.services.dhcp_writer import apply_dhcpd
+    from app.audit_log import log_event
+    conn   = get_db()
+    result = apply_dhcpd(conn)
+    log_event(
+        category="system", action="dhcp_apply",
+        username=request.values.get("username"),
+        remote_addr=request.remote_addr,
+        details={"ok": result["ok"], "errors": result.get("errors", [])},
+    )
+    return jsonify(result)
+
+
+@status_bp.route("/api/dhcp/preview")
+@login_required
+def api_dhcp_preview():
+    """Return the dhcpd.conf that would be applied."""
+    from app.database import get_db
+    from app.services.dhcp_writer import generate_dhcpd_conf, validate_dhcp_config
+    conn   = get_db()
+    conf   = generate_dhcpd_conf(conn)
+    errors = validate_dhcp_config(conn)
+    return jsonify({"ok": not errors, "conf": conf, "errors": errors})
+
+
+@status_bp.route("/api/dhcp/leases")
+@login_required
+def api_dhcp_leases():
+    """Return live DHCP leases (parsed from lease file on FreeBSD)."""
+    from app.services.dhcp_writer import get_live_leases
+    from app.database import get_db
+    leases = get_live_leases()
+    # Fall back to static leases from DB when live file is not available
+    if not leases:
+        conn = get_db()
+        cur  = conn.cursor()
+        cur.execute("SELECT * FROM static_leases ORDER BY interface_type, ip_address")
+        leases = [dict(r) for r in cur.fetchall()]
+    return jsonify({"ok": True, "leases": leases, "count": len(leases)})
+
+
+# ══════════════════════════════════════════════════
+# DNS apply + test
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/dns/apply", methods=["POST"])
+@login_required
+def api_dns_apply():
+    """Validate, write, and reload Unbound."""
+    from app.database import get_db
+    from app.services.dns_writer import apply_unbound
+    from app.audit_log import log_event
+    conn   = get_db()
+    result = apply_unbound(conn)
+    log_event(
+        category="system", action="dns_apply",
+        username=request.values.get("username"),
+        remote_addr=request.remote_addr,
+        details={"ok": result["ok"]},
+    )
+    return jsonify(result)
+
+
+@status_bp.route("/api/dns/preview")
+@login_required
+def api_dns_preview():
+    """Return the unbound.conf that would be applied."""
+    from app.database import get_db
+    from app.services.dns_writer import generate_unbound_conf, validate_unbound_conf
+    conn = get_db()
+    conf = generate_unbound_conf(conn)
+    ok, err = validate_unbound_conf(conf)
+    return jsonify({"ok": ok, "conf": conf, "validation_message": err})
+
+
+@status_bp.route("/api/dns/test")
+@login_required
+def api_dns_test():
+    """
+    Resolve a hostname via the local DNS resolver.
+    Query params: hostname (required), server (optional, default 127.0.0.1).
+    """
+    from app.services.dns_writer import test_dns_resolution
+    hostname = request.args.get("hostname", "").strip()
+    server   = request.args.get("server", "127.0.0.1").strip()
+    if not hostname:
+        return jsonify({"ok": False, "error": "hostname is required"}), 400
+    result = test_dns_resolution(hostname, server)
+    return jsonify(result)
+
+
+# ══════════════════════════════════════════════════
+# APP LOG API
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/app-logs")
+@login_required
+def api_app_logs():
+    """
+    Paginated operational app log viewer.
+
+    Query params
+    ------------
+    limit     : Max entries (default 100, max 500).
+    level     : Filter by level: INFO / WARNING / ERROR.
+    component : Filter by component name prefix.
+    search    : Free-text search across message + details.
+    """
+    from app.app_log import tail_app_events, app_log_stats
+    limit     = min(int(request.args.get("limit", 100) or 100), 500)
+    level     = request.args.get("level", "").strip()
+    component = request.args.get("component", "").strip()
+    search    = request.args.get("search", "").strip()
+
+    events = tail_app_events(limit=limit, level=level, component=component, search=search)
+    return jsonify({"ok": True, "events": events, "count": len(events)})
+
+
+@status_bp.route("/api/app-logs/stats")
+@login_required
+def api_app_logs_stats():
+    from app.app_log import app_log_stats
+    return jsonify(app_log_stats())
+
+
+# ══════════════════════════════════════════════════
+# CONFIG HISTORY API
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/config-history")
+@login_required
+def api_config_history_services():
+    """List all services that have saved config versions."""
+    from app.database import get_db
+    from app.services.config_history import list_all_services_with_history
+    conn = get_db()
+    return jsonify({"ok": True, "services": list_all_services_with_history(conn)})
+
+
+@status_bp.route("/api/config-history/<service>")
+@login_required
+def api_config_history_list(service: str):
+    """
+    List saved versions for a service (content excluded, newest first).
+
+    Query params: limit (default 20, max 100).
+    """
+    from app.database import get_db
+    from app.services.config_history import list_config_versions
+    limit = min(int(request.args.get("limit", 20) or 20), 100)
+    conn  = get_db()
+    versions = list_config_versions(conn, service, limit=limit)
+    return jsonify({"ok": True, "service": service, "versions": versions, "count": len(versions)})
+
+
+@status_bp.route("/api/config-history/<int:version_id>")
+@login_required
+def api_config_history_get(version_id: int):
+    """Return a single config version including full content."""
+    from app.database import get_db
+    from app.services.config_history import get_config_version
+    conn = get_db()
+    ver  = get_config_version(conn, version_id)
+    if not ver:
+        return jsonify({"ok": False, "error": "Version not found"}), 404
+    return jsonify({"ok": True, "version": ver})
+
+
+@status_bp.route("/api/config-history/<int:version_id>/rollback", methods=["POST"])
+@login_required
+def api_config_history_rollback(version_id: int):
+    """
+    Roll back a service config to a previously saved version.
+
+    Writes the stored config to disk and reloads the service.
+    Records the rollback in the audit log.
+    """
+    from app.database import get_db
+    from app.services.config_history import rollback_to_config_version
+    from app.audit_log import log_event
+    conn     = get_db()
+    username = session.get("username", "anonymous")
+    result   = rollback_to_config_version(conn, version_id, rolled_back_by=username)
+    log_event(
+        category="system", action="config_rollback",
+        username=username, remote_addr=request.remote_addr,
+        details={"version_id": version_id, "ok": result["ok"]},
+    )
+    status = 200 if result["ok"] else 500
+    return jsonify(result), status
+
+
+@status_bp.route("/api/config-history/<service>/prune", methods=["POST"])
+@login_required
+def api_config_history_prune(service: str):
+    """
+    Delete old config versions beyond the most-recent ``keep``.
+
+    JSON body: {"keep": 20}
+    """
+    from app.database import get_db
+    from app.services.config_history import prune_config_versions
+    data    = request.get_json(silent=True) or {}
+    keep    = int(data.get("keep", 20))
+    conn    = get_db()
+    deleted = prune_config_versions(conn, service, keep=keep)
+    return jsonify({"ok": True, "service": service, "deleted": deleted})
+
+
+# ══════════════════════════════════════════════════
+# HEALTH MONITOR API
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/api/health/full")
+@login_required
+def api_health_full():
+    """
+    Run a comprehensive health check and return the result.
+
+    This is heavier than ``/api/health`` — it also checks disk,
+    memory/CPU, config drift, and all Phase 4 services.
+    """
+    from app.database import get_db
+    from app.services.health_monitor import full_health_check, store_health_snapshot
+    conn     = get_db()
+    snapshot = full_health_check(conn)
+    store_health_snapshot(conn, snapshot)
+    return jsonify({"ok": True, **snapshot})
+
+
+@status_bp.route("/api/health/history")
+@login_required
+def api_health_history():
+    """
+    Return stored health snapshots (no service restart check — read only).
+
+    Query params: limit (default 24, max 168).
+    """
+    from app.database import get_db
+    from app.services.health_monitor import get_health_history
+    limit = min(int(request.args.get("limit", 24) or 24), 168)
+    conn  = get_db()
+    return jsonify({"ok": True, "history": get_health_history(conn, limit=limit)})
+
+
+@status_bp.route("/api/health/disk")
+@login_required
+def api_health_disk():
+    """Return disk usage for key filesystem paths."""
+    from app.services.health_monitor import check_disk_usage
+    return jsonify({"ok": True, **check_disk_usage()})
+
+
+@status_bp.route("/api/health/system")
+@login_required
+def api_health_system():
+    """Return memory and CPU load averages."""
+    from app.services.health_monitor import check_memory_cpu
+    return jsonify({"ok": True, **check_memory_cpu()})
