@@ -11,8 +11,111 @@ generate_ipsec_secrets(conn) -> str
 write_ipsec_conf(conn)       -> {"ok": bool, "message": str}
 """
 
+import ipaddress
 import os
 import sys
+
+from app.secret_store import decrypt_secret
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+_VALID_IKE_VERSIONS = {"ikev1", "ikev2", "ike"}
+_VALID_ENCS         = {"aes", "aes128", "aes192", "aes256", "3des", "camellia128", "camellia256"}
+_VALID_HASH_ALGS    = {"sha1", "sha256", "sha384", "sha512", "md5", "aesxcbc"}
+_VALID_DH_GROUPS    = {
+    # Numeric shorthand used in the UI
+    "1", "2", "5", "14", "15", "16", "17", "18", "19", "20", "21",
+    # Full names as used in strongSwan proposals
+    "modp768", "modp1024", "modp2048", "modp4096", "modp8192",
+    "ecp256", "ecp384", "ecp521", "curve25519",
+    # 1024, 2048, 4096 numeric strings (stored without "modp" prefix in some rows)
+    "1024", "2048", "4096", "8192",
+}
+
+
+def validate_phase1(p1: dict, algs: list) -> list:
+    """
+    Validate a Phase 1 configuration dict.
+    Returns a list of error strings; empty means valid.
+    """
+    errors = []
+
+    ike_ver = (p1.get("ike_version") or "ikev2").lower()
+    if ike_ver not in _VALID_IKE_VERSIONS:
+        errors.append(f"IKE version {ike_ver!r} is not supported. Use ikev1 or ikev2.")
+
+    remote = (p1.get("remote_gateway") or "").strip()
+    if not remote:
+        errors.append("Remote gateway is required.")
+    else:
+        try:
+            ipaddress.ip_address(remote)
+        except ValueError:
+            # Accept hostnames too — just verify it's not empty or obviously wrong
+            if " " in remote or len(remote) > 253:
+                errors.append(f"Remote gateway {remote!r} does not look like a valid IP or hostname.")
+
+    lifetime = p1.get("p1_life_time") or 28800
+    try:
+        lt = int(lifetime)
+        if lt < 300:
+            errors.append(f"Phase 1 lifetime {lt}s is very short (minimum recommended: 300s).")
+    except (TypeError, ValueError):
+        errors.append(f"Phase 1 lifetime {lifetime!r} must be an integer.")
+
+    if not algs:
+        errors.append("At least one Phase 1 algorithm must be configured.")
+    for alg in algs:
+        enc = (alg.get("encryption") or "").lower()
+        hsh = (alg.get("hash") or "").lower()
+        dh  = str(alg.get("dh_group") or "").lower().replace("modp", "")
+        if enc and enc not in _VALID_ENCS:
+            errors.append(f"Unknown encryption algorithm: {enc!r}.")
+        if hsh and hsh not in _VALID_HASH_ALGS:
+            errors.append(f"Unknown hash algorithm: {hsh!r}.")
+        if dh and dh not in _VALID_DH_GROUPS:
+            errors.append(f"Unknown DH group: {dh!r}.")
+
+    auth = (p1.get("auth_method") or "mutual-psk").lower()
+    if "psk" in auth:
+        psk_raw = (p1.get("pre_shared_key") or "").strip()
+        if psk_raw:
+            from app.secret_store import decrypt_secret as _ds
+            if not _ds(psk_raw):
+                errors.append("PSK is stored but cannot be decrypted — re-enter the PSK.")
+        else:
+            errors.append("PSK authentication selected but no pre-shared key configured.")
+
+    return errors
+
+
+def validate_phase2(p2: dict) -> list:
+    """
+    Validate a Phase 2 (child SA) configuration dict.
+    Returns a list of error strings; empty means valid.
+    """
+    errors = []
+
+    local_net = (p2.get("local_network") or "").strip()
+    remote_net = (p2.get("remote_network") or "").strip()
+    for label, net in [("Local network", local_net), ("Remote network", remote_net)]:
+        if net and net != "0.0.0.0/0":
+            try:
+                ipaddress.ip_network(net, strict=False)
+            except ValueError:
+                errors.append(f"{label} {net!r} is not a valid CIDR.")
+
+    lifetime = p2.get("lifetime") or 3600
+    try:
+        lt = int(lifetime)
+        if lt < 60:
+            errors.append(f"Phase 2 lifetime {lt}s is too short (minimum: 60s).")
+    except (TypeError, ValueError):
+        errors.append(f"Phase 2 lifetime {lifetime!r} must be an integer.")
+
+    return errors
 
 _IPSEC_CONF_PATH    = "/usr/local/etc/ipsec.conf"
 _IPSEC_SECRETS_PATH = "/usr/local/etc/ipsec.secrets"
@@ -165,7 +268,7 @@ def generate_ipsec_secrets(conn) -> str:
     for p1 in phase1s:
         left  = (p1.get("my_identifier") or "%any").strip()
         right = (p1.get("remote_gateway") or "%any").strip()
-        psk   = (p1.get("pre_shared_key") or "").strip()
+        psk   = decrypt_secret((p1.get("pre_shared_key") or "").strip())
         if not psk:
             continue
         left_str  = "%any" if left  in ("my-ip","myaddress","%defaultroute","") else left
@@ -179,7 +282,7 @@ def generate_ipsec_secrets(conn) -> str:
     psks = _rows(conn, "SELECT * FROM ipsec_pre_shared_keys ORDER BY id")
     for psk in psks:
         identifier = (psk.get("identifier") or "%any").strip()
-        secret     = (psk.get("pre_shared_key") or "").strip()
+        secret     = decrypt_secret((psk.get("pre_shared_key") or "").strip())
         if not secret:
             continue
         key = (identifier, "")
@@ -218,8 +321,39 @@ def write_ipsec_conf(conn) -> dict:
     return {"ok": True, "message": "ipsec.conf + ipsec.secrets written.", "conf": conf}
 
 
+def validate_ipsec_config(conn) -> list:
+    """
+    Validate all enabled Phase 1 + Phase 2 entries.
+    Returns a list of error strings; empty means valid.
+    """
+    all_errors = []
+    phase1s = _rows(conn, "SELECT * FROM ipsec_phase1 WHERE disabled=0 ORDER BY id")
+    for p1 in phase1s:
+        p1id = p1["id"]
+        algs = _rows(conn, "SELECT * FROM ipsec_phase1_algorithms WHERE phase1_id=?", (p1id,))
+        errs = validate_phase1(p1, algs)
+        if errs:
+            desc = p1.get("description") or f"tunnel {p1id}"
+            all_errors.extend(f"[{desc}] {e}" for e in errs)
+
+        phase2s = _rows(conn, "SELECT * FROM ipsec_phase2 WHERE phase1_id=? AND disabled=0", (p1id,))
+        for p2 in phase2s:
+            errs2 = validate_phase2(p2)
+            if errs2:
+                desc2 = p2.get("description") or f"child-SA {p2['id']}"
+                all_errors.extend(f"[{desc2}] {e}" for e in errs2)
+    return all_errors
+
+
 def apply_ipsec(conn) -> dict:
-    """Write config files then reload strongSwan (ipsec reload)."""
+    """Validate, write config files, then reload strongSwan."""
+    validation_errors = validate_ipsec_config(conn)
+    if validation_errors:
+        return {
+            "ok": False,
+            "message": "Validation failed: " + " | ".join(validation_errors),
+        }
+
     result = write_ipsec_conf(conn)
     if not result["ok"] or not sys.platform.startswith("freebsd"):
         return result

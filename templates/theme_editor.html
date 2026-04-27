@@ -1,0 +1,528 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+/* ── Layout ── */
+.te-wrap { display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start; }
+.te-panel { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;padding:22px;box-shadow:var(--shadow-soft); }
+.te-panel + .te-panel { margin-top:20px; }
+.te-section-title { font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border-color); }
+.te-section-title:first-of-type { margin-top:0; }
+
+/* ── Color rows ── */
+.te-row { display:flex;align-items:center;gap:10px;margin-bottom:9px; }
+.te-swatch { width:32px;height:32px;border-radius:6px;border:1px solid var(--border-color);cursor:pointer;flex-shrink:0;padding:0;background:none;overflow:hidden; }
+.te-swatch input[type=color] { width:44px;height:44px;border:none;background:none;cursor:pointer;margin:-6px; }
+.te-label { flex:1;font-size:.8rem;font-weight:600;color:var(--text-color); }
+.te-hex { width:80px;font-size:.75rem;font-family:monospace;border:1px solid var(--border-color);border-radius:5px;padding:4px 7px;background:var(--bg);color:var(--text-color); }
+
+/* ── Preset chips ── */
+.preset-grid { display:flex;flex-wrap:wrap;gap:8px; }
+.preset-btn { padding:6px 14px;border-radius:20px;font-size:.75rem;font-weight:700;cursor:pointer;border:1px solid var(--border-color);background:var(--bg);color:var(--text-color);transition:all .15s; }
+.preset-btn:hover { border-color:var(--primary);color:var(--primary); }
+.preset-btn.active { background:var(--primary);color:#fff;border-color:var(--primary); }
+
+/* ── Slots ── */
+.slot-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px; }
+.slot-btn { padding:7px 4px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg);color:var(--text-color);font-size:.7rem;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.slot-btn:hover { border-color:var(--primary); }
+.slot-btn.filled { border-color:var(--primary);color:var(--primary); }
+
+/* ── Preview card ── */
+.prev-kpi { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px; }
+.prev-kpi-card { background:var(--panel);border:1px solid var(--border-color);border-radius:8px;padding:14px 16px;box-shadow:var(--shadow-soft); }
+.prev-kpi-val { font-size:1.5rem;font-weight:800;color:var(--text-color); }
+.prev-kpi-lbl { font-size:.68rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.05em; }
+.prev-badges { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px; }
+.badge-p { background:var(--primary);color:#fff;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700; }
+.badge-s { background:rgba(16,185,129,.15);color:#10b981;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid rgba(16,185,129,.3); }
+.badge-d { background:rgba(239,68,68,.12);color:#ef4444;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid rgba(239,68,68,.25); }
+.badge-w { background:rgba(245,158,11,.12);color:#f59e0b;padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;border:1px solid rgba(245,158,11,.25); }
+.prev-tbl { width:100%;border-collapse:collapse;font-size:.78rem; }
+.prev-tbl th { background:var(--border-color-soft);padding:7px 10px;font-weight:700;font-size:.65rem;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-color); }
+.prev-tbl td { padding:7px 10px;border-bottom:1px solid var(--border-color); }
+.prev-tbl tr:last-child td { border-bottom:none; }
+.prev-btn { padding:5px 14px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;border:none; }
+.prev-btn-p { background:var(--primary);color:#fff; }
+.prev-btn-o { background:transparent;border:1px solid var(--border-color);color:var(--text-color); }
+
+/* ── Action bar ── */
+.te-actions { display:flex;gap:10px;flex-wrap:wrap;margin-top:14px; }
+
+/* ── Import/Export ── */
+.te-textarea { width:100%;font-family:monospace;font-size:.71rem;border:1px solid var(--border-color);border-radius:6px;background:var(--bg);color:var(--text-color);padding:8px;resize:vertical;min-height:80px; }
+
+#toast { position:fixed;bottom:22px;right:22px;z-index:9999;min-width:260px;border-radius:8px;padding:12px 16px;font-size:.82rem;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,.35);display:none; }
+#toast.ok  { background:#0f3d2e;color:#34d399;border:1px solid rgba(52,211,153,.2); }
+#toast.err { background:#3d0f0f;color:#f87171;border:1px solid rgba(248,113,113,.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <h5 style="margin:0;font-weight:800;color:var(--text-color);">Theme Editor</h5>
+      <p style="margin:0;font-size:.8rem;color:var(--muted);">Customize every color in the interface. Changes are applied live.</p>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm btn-outline-secondary" onclick="resetToBase()">Reset</button>
+      <button class="btn btn-sm btn-primary" onclick="applyAndSave()">Save &amp; Apply</button>
+    </div>
+  </div>
+
+  <div class="te-wrap">
+
+    <!-- LEFT: Controls -->
+    <div>
+
+      <!-- Presets -->
+      <div class="te-panel">
+        <p class="te-section-title" style="margin-top:0;">Preset Themes</p>
+        <div class="preset-grid">
+          <button class="preset-btn" id="pre-black"  onclick="applyPreset('black')">Pure Black</button>
+          <button class="preset-btn" id="pre-dark"   onclick="applyPreset('dark')">Dark Navy</button>
+          <button class="preset-btn" id="pre-light"  onclick="applyPreset('light')">Light</button>
+          <button class="preset-btn" id="pre-slate"  onclick="applyPreset('slate')">Slate</button>
+          <button class="preset-btn" id="pre-forest" onclick="applyPreset('forest')">Forest</button>
+        </div>
+      </div>
+
+      <!-- Color groups -->
+      <div class="te-panel">
+
+        <p class="te-section-title">Page Backgrounds</p>
+        <div id="grp-bg"></div>
+
+        <p class="te-section-title">Text &amp; Muted</p>
+        <div id="grp-text"></div>
+
+        <p class="te-section-title">Brand Colors</p>
+        <div id="grp-brand"></div>
+
+        <p class="te-section-title">Status Colors</p>
+        <div id="grp-status"></div>
+
+        <p class="te-section-title">Borders</p>
+        <div id="grp-border"></div>
+
+        <p class="te-section-title">Sidebar</p>
+        <div id="grp-sidebar"></div>
+
+        <p class="te-section-title">Accents</p>
+        <div id="grp-accent"></div>
+
+      </div>
+
+      <!-- Saved slots -->
+      <div class="te-panel">
+        <p class="te-section-title" style="margin-top:0;">Saved Themes</p>
+        <p style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">Click a slot to save the current theme. Long-press / right-click to load.</p>
+        <div class="slot-grid" id="slotGrid"></div>
+        <div class="te-actions" style="margin-top:12px;">
+          <button class="btn btn-sm btn-outline-secondary" onclick="exportTheme()">Export JSON</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('importArea').style.display='block'">Import JSON</button>
+        </div>
+        <div id="importArea" style="display:none;margin-top:10px;">
+          <textarea class="te-textarea" id="importJson" placeholder='Paste exported theme JSON here…' rows="4"></textarea>
+          <button class="btn btn-sm btn-primary mt-2" onclick="importTheme()">Apply Import</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Live preview -->
+    <div>
+      <div class="te-panel">
+        <p class="te-section-title" style="margin-top:0;">Live Preview</p>
+
+        <div class="prev-kpi">
+          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:var(--primary);">148</div><div class="prev-kpi-lbl">Firewall Rules</div></div>
+          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:#10b981;">3</div><div class="prev-kpi-lbl">VPN Servers</div></div>
+          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:#f59e0b;">7</div><div class="prev-kpi-lbl">Security Rules</div></div>
+        </div>
+
+        <div class="prev-badges">
+          <span class="badge-p">Primary</span>
+          <span class="badge-s">Success</span>
+          <span class="badge-d">Danger</span>
+          <span class="badge-w">Warning</span>
+        </div>
+
+        <table class="prev-tbl">
+          <thead><tr><th>Interface</th><th>IP Address</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:600;">em0 (WAN)</td>
+              <td style="font-family:monospace;">203.0.113.1/24</td>
+              <td><span class="badge-s">Up</span></td>
+              <td><button class="prev-btn prev-btn-o">Edit</button></td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">em1 (LAN)</td>
+              <td style="font-family:monospace;">192.168.1.1/24</td>
+              <td><span class="badge-s">Up</span></td>
+              <td><button class="prev-btn prev-btn-o">Edit</button></td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">tun0 (PPPoE)</td>
+              <td style="font-family:monospace;">—</td>
+              <td><span class="badge-d">Down</span></td>
+              <td><button class="prev-btn prev-btn-p">Connect</button></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:14px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border-color);">
+          <p style="margin:0 0 8px;font-size:.78rem;font-weight:700;color:var(--text-color);">Sample card on page background</p>
+          <p style="margin:0;font-size:.74rem;color:var(--muted);">Muted helper text, borders, and backgrounds all update in real time as you pick colors.</p>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px;">
+          <button class="btn btn-sm btn-primary">Primary Button</button>
+          <button class="btn btn-sm btn-success">Success</button>
+          <button class="btn btn-sm btn-danger">Danger</button>
+          <button class="btn btn-sm btn-outline-secondary">Outline</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ────────────────────────────────────────────────
+   Variable definitions
+──────────────────────────────────────────────── */
+const GROUPS = {
+  bg: [
+    { v:'--bg',               label:'Page background' },
+    { v:'--panel',            label:'Card / panel surface' },
+  ],
+  text: [
+    { v:'--text-color',       label:'Body text' },
+    { v:'--muted',            label:'Muted / helper text' },
+    { v:'--heading-blue',     label:'Heading accent' },
+  ],
+  brand: [
+    { v:'--primary',          label:'Primary' },
+    { v:'--primary-dark',     label:'Primary dark' },
+    { v:'--accent',           label:'Accent / info' },
+  ],
+  status: [
+    { v:'--success',          label:'Success' },
+    { v:'--danger',           label:'Danger' },
+    { v:'--warning',          label:'Warning' },
+    { v:'--info',             label:'Info' },
+  ],
+  border: [
+    { v:'--border-color',     label:'Border' },
+    { v:'--border-color-soft',label:'Border soft' },
+  ],
+  sidebar: [
+    { v:'--sb-bg',            label:'Sidebar background' },
+    { v:'--sb-header-bg',     label:'Sidebar header' },
+    { v:'--sb-text',          label:'Sidebar text' },
+    { v:'--sb-active-bg',     label:'Active item bg' },
+    { v:'--sb-active-border', label:'Active item border' },
+  ],
+  accent: [
+    { v:'--hdr-border',       label:'Card header accent bar' },
+  ],
+};
+
+/* ────────────────────────────────────────────────
+   Presets
+──────────────────────────────────────────────── */
+const PRESETS = {
+  black: {
+    '--bg':'#0a0a0a','--panel':'#111111','--text-color':'#d4d4d4','--muted':'#6b7280',
+    '--heading-blue':'#93c5fd','--primary':'#3b82f6','--primary-dark':'#2563eb','--accent':'#38bdf8',
+    '--success':'#10b981','--danger':'#ef4444','--warning':'#f59e0b','--info':'#38bdf8',
+    '--border-color':'#1e1e1e','--border-color-soft':'#161616',
+    '--sb-bg':'#0d0d0d','--sb-header-bg':'#050505','--sb-text':'rgba(163,163,163,.85)',
+    '--sb-active-bg':'rgba(59,130,246,.18)','--sb-active-border':'#3b82f6','--hdr-border':'#3b82f6',
+  },
+  dark: {
+    '--bg':'#0d1117','--panel':'#0f1729','--text-color':'#c9d1d9','--muted':'#8b949e',
+    '--heading-blue':'#93c5fd','--primary':'#3b82f6','--primary-dark':'#2563eb','--accent':'#38bdf8',
+    '--success':'#10b981','--danger':'#ef4444','--warning':'#f59e0b','--info':'#38bdf8',
+    '--border-color':'#1e2d45','--border-color-soft':'#182030',
+    '--sb-bg':'#0d1117','--sb-header-bg':'#080c14','--sb-text':'rgba(203,213,225,.78)',
+    '--sb-active-bg':'rgba(59,130,246,.18)','--sb-active-border':'#3b82f6','--hdr-border':'#3b82f6',
+  },
+  light: {
+    '--bg':'#eef2f7','--panel':'#ffffff','--text-color':'#0f172a','--muted':'#94a3b8',
+    '--heading-blue':'#1e40af','--primary':'#2563eb','--primary-dark':'#1d4ed8','--accent':'#0ea5e9',
+    '--success':'#10b981','--danger':'#ef4444','--warning':'#f59e0b','--info':'#0ea5e9',
+    '--border-color':'#e2e8f0','--border-color-soft':'#f1f5f9',
+    '--sb-bg':'#161616','--sb-header-bg':'#0d0d0d','--sb-text':'rgba(203,213,225,.78)',
+    '--sb-active-bg':'rgba(59,130,246,.18)','--sb-active-border':'#3b82f6','--hdr-border':'#3b82f6',
+  },
+  slate: {
+    '--bg':'#0f172a','--panel':'#1e293b','--text-color':'#e2e8f0','--muted':'#94a3b8',
+    '--heading-blue':'#93c5fd','--primary':'#6366f1','--primary-dark':'#4f46e5','--accent':'#a78bfa',
+    '--success':'#10b981','--danger':'#ef4444','--warning':'#f59e0b','--info':'#38bdf8',
+    '--border-color':'#334155','--border-color-soft':'#1e293b',
+    '--sb-bg':'#090e1a','--sb-header-bg':'#060b15','--sb-text':'rgba(148,163,184,.85)',
+    '--sb-active-bg':'rgba(99,102,241,.2)','--sb-active-border':'#6366f1','--hdr-border':'#6366f1',
+  },
+  forest: {
+    '--bg':'#0a0f0a','--panel':'#111811','--text-color':'#d4e8d4','--muted':'#6b8f6b',
+    '--heading-blue':'#86efac','--primary':'#22c55e','--primary-dark':'#16a34a','--accent':'#4ade80',
+    '--success':'#22c55e','--danger':'#ef4444','--warning':'#f59e0b','--info':'#38bdf8',
+    '--border-color':'#1a2e1a','--border-color-soft':'#141f14',
+    '--sb-bg':'#080e08','--sb-header-bg':'#040804','--sb-text':'rgba(134,239,172,.75)',
+    '--sb-active-bg':'rgba(34,197,94,.18)','--sb-active-border':'#22c55e','--hdr-border':'#22c55e',
+  },
+};
+
+/* ────────────────────────────────────────────────
+   State
+──────────────────────────────────────────────── */
+const ROOT = document.documentElement;
+const NS   = 'te_';            // localStorage namespace
+const SLOTS = 5;
+
+function getCSSVar(v) {
+  return getComputedStyle(ROOT).getPropertyValue(v).trim();
+}
+function setCSSVar(v, val) {
+  ROOT.style.setProperty(v, val);
+}
+
+/* Read current value — if rgba(), try to keep hex for color pickers */
+function toHex(raw) {
+  if (!raw) return '#000000';
+  raw = raw.trim();
+  if (raw.startsWith('#') && raw.length === 7) return raw;
+  if (raw.startsWith('#') && raw.length === 4) {
+    const [,a,b,c] = raw;
+    return '#' + a+a + b+b + c+c;
+  }
+  // Try to convert rgb/rgba to hex
+  const m = raw.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (m) {
+    return '#' + [m[1],m[2],m[3]].map(n=>parseInt(n).toString(16).padStart(2,'0')).join('');
+  }
+  return '#000000';
+}
+
+/* ────────────────────────────────────────────────
+   Build controls
+──────────────────────────────────────────────── */
+function buildGroup(grpId, items) {
+  const container = document.getElementById('grp-' + grpId);
+  items.forEach(({ v, label }) => {
+    const hexVal = toHex(getCSSVar(v));
+
+    const row = document.createElement('div');
+    row.className = 'te-row';
+    row.innerHTML = `
+      <label class="te-swatch" title="${v}">
+        <input type="color" data-var="${v}" value="${hexVal}">
+      </label>
+      <span class="te-label">${label}</span>
+      <input type="text" class="te-hex" data-var="${v}" value="${hexVal}" maxlength="7">
+    `;
+    container.appendChild(row);
+
+    const picker = row.querySelector('input[type=color]');
+    const hexInput = row.querySelector('.te-hex');
+
+    picker.addEventListener('input', () => {
+      hexInput.value = picker.value;
+      setCSSVar(v, picker.value);
+      updateSwatch(row, picker.value);
+    });
+    hexInput.addEventListener('change', () => {
+      const val = hexInput.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        picker.value = val;
+        setCSSVar(v, val);
+        updateSwatch(row, val);
+      }
+    });
+
+    updateSwatch(row, hexVal);
+  });
+}
+
+function updateSwatch(row, color) {
+  row.querySelector('.te-swatch').style.background = color;
+}
+
+function buildAllGroups() {
+  Object.entries(GROUPS).forEach(([grp, items]) => buildGroup(grp, items));
+}
+
+/* ────────────────────────────────────────────────
+   Refresh all pickers from current CSS vars
+──────────────────────────────────────────────── */
+function refreshPickers() {
+  document.querySelectorAll('[data-var]').forEach(el => {
+    const v = el.dataset.var;
+    const hex = toHex(getCSSVar(v));
+    if (el.type === 'color') { el.value = hex; }
+    else { el.value = hex; }
+    const row = el.closest('.te-row');
+    if (row) updateSwatch(row, hex);
+  });
+}
+
+/* ────────────────────────────────────────────────
+   Apply preset
+──────────────────────────────────────────────── */
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  Object.entries(p).forEach(([v, val]) => setCSSVar(v, val));
+  // Also switch base theme attr so dark/light rules don't override us
+  ROOT.setAttribute('data-theme', (name === 'light') ? 'light' : 'dark');
+  refreshPickers();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pre-' + name)?.classList.add('active');
+  showToast('Preset "' + name + '" applied', true);
+}
+
+/* ────────────────────────────────────────────────
+   Save slots
+──────────────────────────────────────────────── */
+function collectCurrentTheme() {
+  const out = {};
+  Object.values(GROUPS).flat().forEach(({ v }) => {
+    out[v] = getCSSVar(v);
+  });
+  out['data-theme'] = ROOT.getAttribute('data-theme') || 'dark';
+  return out;
+}
+
+function buildSlots() {
+  const grid = document.getElementById('slotGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < SLOTS; i++) {
+    const saved = localStorage.getItem(NS + 'slot' + i);
+    const theme = saved ? JSON.parse(saved) : null;
+    const btn = document.createElement('button');
+    btn.className = 'slot-btn' + (theme ? ' filled' : '');
+    btn.textContent = theme ? (theme._name || ('Slot ' + (i+1))) : ('Slot ' + (i+1));
+    btn.title = theme ? 'Left-click: load | Right-click: save' : 'Click to save current theme';
+    btn.addEventListener('click', () => {
+      if (theme) { loadSlot(i); }
+      else { saveSlot(i); }
+    });
+    btn.addEventListener('contextmenu', e => { e.preventDefault(); saveSlot(i); });
+    grid.appendChild(btn);
+  }
+}
+
+function saveSlot(i) {
+  const name = prompt('Name this theme:', 'My Theme ' + (i+1));
+  if (name === null) return;
+  const theme = collectCurrentTheme();
+  theme._name = name || ('Slot ' + (i+1));
+  localStorage.setItem(NS + 'slot' + i, JSON.stringify(theme));
+  buildSlots();
+  showToast('Saved to slot ' + (i+1), true);
+}
+
+function loadSlot(i) {
+  const saved = localStorage.getItem(NS + 'slot' + i);
+  if (!saved) return;
+  const theme = JSON.parse(saved);
+  if (theme['data-theme']) ROOT.setAttribute('data-theme', theme['data-theme']);
+  Object.entries(theme).forEach(([v, val]) => {
+    if (v !== '_name' && v !== 'data-theme') setCSSVar(v, val);
+  });
+  refreshPickers();
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  showToast('Loaded "' + (theme._name || 'Slot ' + (i+1)) + '"', true);
+}
+
+/* ────────────────────────────────────────────────
+   Apply & Save (persist to localStorage for base.html to pick up)
+──────────────────────────────────────────────── */
+function applyAndSave() {
+  const theme = collectCurrentTheme();
+  localStorage.setItem('userTheme', JSON.stringify(theme));
+  showToast('Theme saved — it will persist across sessions', true);
+}
+
+/* ────────────────────────────────────────────────
+   Reset
+──────────────────────────────────────────────── */
+function resetToBase() {
+  const currentTheme = ROOT.getAttribute('data-theme') || 'light';
+  ROOT.style.cssText = '';  // clear all inline overrides
+  // Reapply stored theme attribute
+  ROOT.setAttribute('data-theme', currentTheme);
+  localStorage.removeItem('userTheme');
+  setTimeout(refreshPickers, 50);
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  showToast('Reset to stylesheet defaults', true);
+}
+
+/* ────────────────────────────────────────────────
+   Export / Import
+──────────────────────────────────────────────── */
+function exportTheme() {
+  const theme = collectCurrentTheme();
+  theme._name = prompt('Name for export:', 'My Theme') || 'My Theme';
+  const json = JSON.stringify(theme, null, 2);
+  navigator.clipboard?.writeText(json).then(() => showToast('Copied to clipboard', true));
+  document.getElementById('importArea').style.display = 'block';
+  document.getElementById('importJson').value = json;
+}
+
+function importTheme() {
+  try {
+    const theme = JSON.parse(document.getElementById('importJson').value);
+    if (theme['data-theme']) ROOT.setAttribute('data-theme', theme['data-theme']);
+    Object.entries(theme).forEach(([v, val]) => {
+      if (v !== '_name' && v !== 'data-theme') setCSSVar(v, val);
+    });
+    refreshPickers();
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    showToast('Theme imported: ' + (theme._name || 'unnamed'), true);
+  } catch(e) {
+    showToast('Invalid JSON — could not import', false);
+  }
+}
+
+/* ────────────────────────────────────────────────
+   Toast
+──────────────────────────────────────────────── */
+function showToast(msg, ok) {
+  const el = document.getElementById('toast');
+  el.className = ok ? 'ok' : 'err';
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.display = 'none', 3500);
+}
+
+/* ────────────────────────────────────────────────
+   Boot
+──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  buildAllGroups();
+  buildSlots();
+
+  // Restore any saved user theme
+  const saved = localStorage.getItem('userTheme');
+  if (saved) {
+    try {
+      const theme = JSON.parse(saved);
+      if (theme['data-theme']) ROOT.setAttribute('data-theme', theme['data-theme']);
+      Object.entries(theme).forEach(([v, val]) => {
+        if (v !== '_name' && v !== 'data-theme') setCSSVar(v, val);
+      });
+      setTimeout(refreshPickers, 50);
+    } catch(e) { /* ignore */ }
+  }
+});
+</script>
+{% endblock %}

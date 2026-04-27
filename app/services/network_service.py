@@ -33,9 +33,76 @@ def ensure_freebsd():
         raise FreeBSDNetworkError("Live network apply is only supported on FreeBSD.")
 
 
-def run_command(cmd: List[str], check=True, timeout_seconds: Optional[int] = 20) -> CommandResult:
+# ---------------------------------------------------------------------------
+# Secret redaction helpers
+# ---------------------------------------------------------------------------
+
+_SECRET_FLAGS = {
+    "-p", "--password", "-P", "--secret", "--psk",
+    "--auth", "--token", "--key", "--credential",
+}
+
+_SECRET_PATTERNS = re.compile(
+    r"(password|secret|psk|token|auth|key|credential)",
+    re.IGNORECASE,
+)
+
+
+def redact_command(cmd: List[str]) -> List[str]:
+    """
+    Return a copy of ``cmd`` with any argument that follows a secret flag
+    replaced by ``***``.  Also redacts tokens that look like
+    ``--flag=secret_value``.
+
+    This is used for logging — the original ``cmd`` is always passed to
+    subprocess unchanged.
+    """
+    if not cmd:
+        return cmd
+    out = list(cmd)
+    i   = 0
+    while i < len(out):
+        tok = out[i]
+        # --flag=value form
+        if "=" in tok:
+            flag, _, value = tok.partition("=")
+            if flag in _SECRET_FLAGS or _SECRET_PATTERNS.search(flag):
+                out[i] = f"{flag}=***"
+        # -flag value form
+        elif tok in _SECRET_FLAGS or _SECRET_PATTERNS.search(tok):
+            if i + 1 < len(out):
+                out[i + 1] = "***"
+        i += 1
+    return out
+
+
+def run_command(
+    cmd: List[str],
+    check: bool = True,
+    timeout_seconds: Optional[int] = 20,
+    _audit: bool = False,
+) -> CommandResult:
+    """
+    Execute a system command safely.
+
+    Parameters
+    ----------
+    cmd             : Argument list.  shell=True is NEVER used.
+    check           : If True, raise FreeBSDNetworkError on non-zero exit.
+    timeout_seconds : Kill the process if it exceeds this duration.
+    _audit          : If True, emit an app-log INFO entry with the redacted
+                      command.  Default False to avoid log spam for
+                      high-frequency read-only calls.
+    """
     if _network_dry_run_enabled():
         return CommandResult(command=cmd, returncode=0, stdout="", stderr="")
+
+    if _audit:
+        try:
+            from app.app_log import log_info
+            log_info("network_service", "run_command", {"cmd": redact_command(cmd)})
+        except Exception:
+            pass
 
     try:
         proc = subprocess.run(
@@ -43,13 +110,17 @@ def run_command(cmd: List[str], check=True, timeout_seconds: Optional[int] = 20)
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
+            shell=False,
         )
     except subprocess.TimeoutExpired:
-        raise FreeBSDNetworkError(f"Command timed out ({' '.join(cmd)}).")
+        raise FreeBSDNetworkError(
+            f"Command timed out after {timeout_seconds}s: {' '.join(redact_command(cmd))}"
+        )
 
     if check and proc.returncode != 0:
         raise FreeBSDNetworkError(
-            f"Command failed ({' '.join(cmd)}): {proc.stderr.strip() or proc.stdout.strip()}"
+            f"Command failed ({' '.join(redact_command(cmd))}): "
+            f"{proc.stderr.strip() or proc.stdout.strip()}"
         )
     return CommandResult(
         command=cmd,

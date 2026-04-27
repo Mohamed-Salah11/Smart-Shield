@@ -1,0 +1,93 @@
+# =============================================================================
+# Smart Shield — sudoers rules for least-privilege operation
+# =============================================================================
+# Install:
+#   install -m 0440 smartshield /usr/local/etc/sudoers.d/smartshield
+#
+# The Smart Shield web application runs as an unprivileged `smartshield` user.
+# This file grants that user the ability to run specific system commands as
+# root WITHOUT a password, via the priv_helper module.
+#
+# SECURITY NOTES
+# --------------
+# * Do NOT add shell, text editors, or interpreters to this list.
+# * Do NOT add wildcards that allow arbitrary file paths outside safe dirs.
+# * Review this file whenever a new privileged operation is added to the app.
+# * Run `visudo -c` after any edit to verify syntax.
+# =============================================================================
+
+Defaults:smartshield !requiretty
+Defaults:smartshield log_output
+
+# ── PF (packet filter) ───────────────────────────────────────────────────────
+# Allow reloading PF from pre-validated config files only
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -f /etc/pf.conf
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -f /etc/pf.captive_portal.conf
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -n -f /etc/pf.conf
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -e
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -d
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -F rules
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -a captive_portal -f /etc/pf.captive_portal.conf
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T show
+
+# ── Services ─────────────────────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd restart
+
+# ── sysrc (rc.conf persistence) ──────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc *_enable=YES
+smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc *_enable=NO
+
+# ── Interface configuration ───────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /sbin/ifconfig * inet * netmask *
+smartshield ALL=(root) NOPASSWD: /sbin/ifconfig * up
+smartshield ALL=(root) NOPASSWD: /sbin/ifconfig * down
+
+# ── Routing ──────────────────────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /sbin/route -n add default *
+smartshield ALL=(root) NOPASSWD: /sbin/route -n delete default
+
+# ── Unbound control ──────────────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control reload
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control status

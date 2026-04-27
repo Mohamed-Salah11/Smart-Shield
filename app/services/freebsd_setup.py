@@ -173,6 +173,8 @@ _TOOLS: List[ToolSpec] = [
              description="Packet capture — FreeBSD base system"),
     ToolSpec("pgrep",    "/bin/pgrep",       "",
              description="Process search — FreeBSD base system"),
+    ToolSpec("ppp",      "/usr/sbin/ppp",    "",
+             description="User-mode PPP daemon — FreeBSD base system (required for PPPoE WAN)"),
 
     # ── pkg + Python ──────────────────────────────────────────────────────
     ToolSpec("pkg",      "/usr/sbin/pkg",   "",

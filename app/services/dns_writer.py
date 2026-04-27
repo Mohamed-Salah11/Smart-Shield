@@ -6,15 +6,25 @@ table (DNS Resolver / DNS Forwarder settings).
 
 Public API
 ----------
-generate_unbound_conf(conn)  -> str
-write_unbound_conf(conn)     -> {"ok": bool, "message": str, "conf": str}
+generate_unbound_conf(conn)         -> str
+validate_unbound_conf(text)         -> (bool, str)   (ok, error_message)
+write_unbound_conf(conn)            -> {"ok", "message", "conf"}
+apply_unbound(conn)                 -> {"ok", "message", "conf"}
+get_unbound_status()                -> {"running", "state", "message"}
+test_dns_resolution(hostname, server) -> {"ok", "ip", "message", "method"}
 """
 
 import json
+import os
 import sys
+import tempfile
 
 _UNBOUND_CONF_PATH = "/usr/local/etc/unbound/unbound.conf"
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _rows(conn, sql, params=()):
     cur = conn.cursor()
@@ -32,51 +42,60 @@ def _load_service_state(conn, key: str) -> dict:
         return {}
 
 
-def _load_general_config(conn) -> dict:
-    """Pull hostname + domain from config table or return defaults."""
-    rows = _rows(conn, "SELECT value_json FROM service_state WHERE key_name='general_config' LIMIT 1")
-    if rows:
-        try:
-            return json.loads(rows[0]["value_json"] or "{}")
-        except Exception:
-            pass
-    return {"hostname": "smartshield", "domain": "home.arpa"}
-
-
-def generate_unbound_conf(conn) -> str:
-    resolver = _load_service_state(conn, "dns_resolver")
-    forwarder = _load_service_state(conn, "dns_forwarder")
-
-    # Pull DNS servers from general config
-    general_rows = _rows(conn, "SELECT * FROM service_state WHERE key_name='general_config' LIMIT 1")
-    upstream_dns = []
-
-    # Also check general_setup config.json stored via system.py
+def _upstream_dns(conn) -> list:
+    """Load upstream DNS servers from config file or return defaults."""
     try:
-        import os, json as _json
         cfg_path = os.getenv("SMARTSHIELD_CONFIG_PATH", "config.json")
         if os.path.exists(cfg_path):
             with open(cfg_path) as f:
-                cfg = _json.load(f)
-            upstream_dns = [s for s in (cfg.get("dns_servers") or []) if s]
+                cfg = json.load(f)
+            servers = [s for s in (cfg.get("dns_servers") or []) if s]
+            if servers:
+                return servers
     except Exception:
         pass
+    return ["1.1.1.1", "8.8.8.8"]
 
-    if not upstream_dns:
-        upstream_dns = ["1.1.1.1", "8.8.8.8"]
 
-    # Pull LAN IP for local access
-    lan_rows = _rows(conn, "SELECT ipv4_address FROM lan_config LIMIT 1")
-    lan_ip = ""
-    if lan_rows:
-        cidr = (lan_rows[0].get("ipv4_address") or "").strip()
-        try:
-            import ipaddress
-            lan_ip = str(ipaddress.ip_interface(cidr).ip)
-        except Exception:
-            lan_ip = cidr.split("/")[0] if "/" in cidr else cidr
+def _lan_ip(conn) -> str:
+    rows = _rows(conn, "SELECT ipv4_address FROM lan_config LIMIT 1")
+    if not rows:
+        return "127.0.0.1"
+    cidr = (rows[0].get("ipv4_address") or "").strip()
+    try:
+        import ipaddress
+        return str(ipaddress.ip_interface(cidr).ip)
+    except Exception:
+        return cidr.split("/")[0] if "/" in cidr else (cidr or "127.0.0.1")
 
-    interface_ip = lan_ip or "127.0.0.1"
+
+def _lan_net(conn) -> str:
+    rows = _rows(conn, "SELECT ipv4_address FROM lan_config LIMIT 1")
+    if not rows:
+        return ""
+    cidr = (rows[0].get("ipv4_address") or "").strip()
+    try:
+        import ipaddress
+        return str(ipaddress.ip_interface(cidr).network)
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Config generator
+# ---------------------------------------------------------------------------
+
+def generate_unbound_conf(conn) -> str:
+    """
+    Build a complete unbound.conf from DB state.
+    Merge order: base settings → access controls → host overrides
+                 → DNS filter zones → Web filter zones → App filter zones
+                 → forward zone
+    """
+    resolver = _load_service_state(conn, "dns_resolver")
+    upstream  = _upstream_dns(conn)
+    iface_ip  = _lan_ip(conn) or "127.0.0.1"
+    lan_subnet = _lan_net(conn)
 
     lines = [
         "# ============================================================",
@@ -86,7 +105,7 @@ def generate_unbound_conf(conn) -> str:
         "# ============================================================",
         "",
         "server:",
-        f"    interface: {interface_ip}",
+        f"    interface: {iface_ip}",
         "    interface: 127.0.0.1",
         "    port: 53",
         "    do-ip4: yes",
@@ -98,17 +117,8 @@ def generate_unbound_conf(conn) -> str:
         "    access-control: ::1 allow",
     ]
 
-    # Allow LAN subnet
-    if lan_ip:
-        lan_rows2 = _rows(conn, "SELECT ipv4_address FROM lan_config LIMIT 1")
-        if lan_rows2:
-            cidr = (lan_rows2[0].get("ipv4_address") or "").strip()
-            try:
-                import ipaddress
-                net = str(ipaddress.ip_interface(cidr).network)
-                lines.append(f"    access-control: {net} allow")
-            except Exception:
-                pass
+    if lan_subnet:
+        lines.append(f"    access-control: {lan_subnet} allow")
 
     lines += [
         "",
@@ -126,43 +136,104 @@ def generate_unbound_conf(conn) -> str:
         "    infra-cache-slabs: 1",
         "    key-cache-slabs: 1",
         "",
-        "    # Private address reverse lookup suppression",
+        "    # Private address suppression",
         "    private-address: 192.168.0.0/16",
         "    private-address: 172.16.0.0/12",
         "    private-address: 10.0.0.0/8",
         "",
     ]
 
-    # Static host overrides from DNS resolver state
+    # Static host overrides
     host_overrides = resolver.get("host_overrides") or []
     if host_overrides:
         lines.append("    # ── Host overrides ──")
         for entry in host_overrides:
-            host = entry.get("host", "")
-            domain = entry.get("domain", "")
-            ip = entry.get("ip", "")
+            host   = (entry.get("host")   or "").strip()
+            domain = (entry.get("domain") or "").strip()
+            ip     = (entry.get("ip")     or "").strip()
             if host and domain and ip:
-                lines.append(f"    local-data: \"{host}.{domain}. A {ip}\"")
-                lines.append(f"    local-data-ptr: \"{ip} {host}.{domain}\"")
+                fqdn = f"{host}.{domain}"
+                lines.append(f'    local-data: "{fqdn}. A {ip}"')
+                lines.append(f'    local-data-ptr: "{ip} {fqdn}"')
         lines.append("")
 
-    # Forward zone to upstream resolvers
+    # DNS filter zones (Security Profiles)
+    for module, fn_name, label in [
+        ("app.services.dns_filter",  "generate_dns_filter_zones",  "DNS Filter"),
+        ("app.services.web_filter",  "generate_web_filter_zones",  "Web Filter"),
+        ("app.services.app_filter",  "generate_app_filter_dns_zones", "App Filter DNS"),
+    ]:
+        try:
+            import importlib
+            mod   = importlib.import_module(module)
+            fn    = getattr(mod, fn_name)
+            zones = fn(conn)
+            if zones:
+                lines.append(f"    # ── {label} (Security Profiles) ──")
+                lines.extend(zones)
+                lines.append("")
+        except Exception:
+            pass
+
+    # Forward zone
     lines.append("forward-zone:")
-    lines.append("    name: \".\"")
-    for dns in upstream_dns:
+    lines.append('    name: "."')
+    for dns in upstream:
         lines.append(f"    forward-addr: {dns}")
     lines.append("")
 
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Validation via unbound-checkconf
+# ---------------------------------------------------------------------------
+
+def validate_unbound_conf(text: str) -> tuple:
+    """
+    Validate unbound.conf syntax using ``unbound-checkconf``.
+    Returns ``(True, "")`` on success, ``(False, error)`` on failure.
+    On non-FreeBSD or if unbound-checkconf is not installed, returns
+    ``(True, "skipped")``.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return (True, "skipped-non-freebsd")
+
+    import shutil
+    if not shutil.which("unbound-checkconf"):
+        return (True, "skipped-unbound-checkconf-not-found")
+
+    tmp_path = None
+    try:
+        from app.services.network_service import run_command, FreeBSDNetworkError
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".conf", delete=False, prefix="ss_unbound_"
+        ) as f:
+            f.write(text)
+            tmp_path = f.name
+
+        result = run_command(["unbound-checkconf", tmp_path], check=False)
+        ok  = result.returncode == 0
+        msg = (result.stderr or result.stdout or "").strip()
+        return (ok, msg)
+    except Exception as exc:
+        return (False, str(exc))
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Write
+# ---------------------------------------------------------------------------
+
 def write_unbound_conf(conn) -> dict:
     conf = generate_unbound_conf(conn)
-
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — unbound.conf generated but not written.", "conf": conf}
-
-    import os
     os.makedirs(os.path.dirname(_UNBOUND_CONF_PATH), exist_ok=True)
     try:
         with open(_UNBOUND_CONF_PATH, "w") as fh:
@@ -170,3 +241,131 @@ def write_unbound_conf(conn) -> dict:
         return {"ok": True, "message": f"Written to {_UNBOUND_CONF_PATH}", "conf": conf}
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
+
+
+# ---------------------------------------------------------------------------
+# Apply (write + checkconf + reload)
+# ---------------------------------------------------------------------------
+
+def apply_unbound(conn) -> dict:
+    """
+    Generate unbound.conf, validate with unbound-checkconf when available,
+    write to disk, and reload Unbound.
+
+    On non-FreeBSD: generate + validate only (no file writes, no service restart).
+    Returns ``{"ok": bool, "message": str, "conf": str}``.
+    """
+    conf = generate_unbound_conf(conn)
+
+    # Validate
+    ok, err = validate_unbound_conf(conf)
+    if not ok:
+        return {"ok": False, "message": f"unbound-checkconf error: {err}", "conf": conf}
+
+    # Non-FreeBSD dry-run
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "Non-FreeBSD — conf generated (validation OK).", "conf": conf}
+
+    # Write
+    os.makedirs(os.path.dirname(_UNBOUND_CONF_PATH), exist_ok=True)
+    try:
+        with open(_UNBOUND_CONF_PATH, "w") as fh:
+            fh.write(conf)
+    except OSError as exc:
+        return {"ok": False, "message": str(exc), "conf": conf}
+
+    # Reload
+    from app.services.service_manager import service_action
+    result = service_action("unbound", "reload")
+    return {
+        "ok": result["ok"],
+        "message": result["message"],
+        "conf": conf,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Service status
+# ---------------------------------------------------------------------------
+
+def get_unbound_status() -> dict:
+    """Return the live Unbound running state."""
+    if not sys.platform.startswith("freebsd"):
+        return {"running": False, "state": "dry-run", "message": "Non-FreeBSD host."}
+    from app.services.service_manager import service_action
+    result = service_action("unbound", "status")
+    msg    = result.get("message", "")
+    running = result.get("ok", False) and "running" in msg.lower()
+    return {
+        "running": running,
+        "state":   "running" if running else "stopped",
+        "message": msg,
+    }
+
+
+# ---------------------------------------------------------------------------
+# DNS resolution test
+# ---------------------------------------------------------------------------
+
+def test_dns_resolution(hostname: str, server: str = "127.0.0.1") -> dict:
+    """
+    Resolve *hostname* using the local resolver and return the result.
+
+    Tries (in order):
+      1. ``drill`` (FreeBSD base, uses ldns)
+      2. ``dig``   (bind-tools)
+      3. Python's ``socket.getaddrinfo`` (always available)
+
+    Returns ``{"ok": bool, "ip": str|None, "method": str, "message": str}``.
+    """
+    import shutil
+    import socket
+
+    hostname = (hostname or "").strip()
+    if not hostname:
+        return {"ok": False, "ip": None, "method": "none", "message": "No hostname provided."}
+
+    # 1. drill
+    if sys.platform.startswith("freebsd") and shutil.which("drill"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(
+                ["drill", "@" + server, hostname, "A"],
+                check=False, timeout_seconds=5
+            )
+            if r.returncode == 0:
+                for line in r.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 5 and parts[3] == "A":
+                        return {"ok": True, "ip": parts[4], "method": "drill", "message": ""}
+                return {"ok": False, "ip": None, "method": "drill", "message": "No A record."}
+        except Exception as exc:
+            pass
+
+    # 2. dig
+    if shutil.which("dig"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(
+                ["dig", f"@{server}", "+short", hostname, "A"],
+                check=False, timeout_seconds=5
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                ip = r.stdout.strip().splitlines()[0].strip()
+                return {"ok": True, "ip": ip, "method": "dig", "message": ""}
+        except Exception:
+            pass
+
+    # 3. Python socket (uses system resolver, ignores server param)
+    try:
+        info = socket.getaddrinfo(hostname, None, socket.AF_INET)
+        if info:
+            ip = info[0][4][0]
+            return {
+                "ok": True, "ip": ip, "method": "socket",
+                "message": "Resolved via system resolver (server param ignored).",
+            }
+    except socket.gaierror as exc:
+        return {"ok": False, "ip": None, "method": "socket", "message": str(exc)}
+
+    return {"ok": False, "ip": None, "method": "none", "message": "All resolution methods failed."}

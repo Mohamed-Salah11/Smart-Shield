@@ -3,6 +3,11 @@ import sqlite3
 from flask import Blueprint, render_template, request, jsonify
 from app.database import get_db
 from app.auth_utils import login_required
+from app.api_auth import api_permission_required
+from app.validators import (
+    validate_ip, validate_cidr, validate_protocol,
+    validate_description, validate_name, collect_errors,
+)
 
 firewall_bp = Blueprint("firewall", __name__, url_prefix="/firewall")
 
@@ -47,7 +52,7 @@ def get_floating_rules():
 
 
 @firewall_bp.route("/api/rules/floating", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_floating_rule():
     """Add a new floating rule"""
     try:
@@ -93,7 +98,7 @@ def add_floating_rule():
 
 
 @firewall_bp.route("/api/rules/floating/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_floating_rule(rule_id):
     """Move a floating rule up or down"""
     try:
@@ -138,7 +143,7 @@ def move_floating_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/floating/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_floating_rule(rule_id):
     """Update a floating rule"""
     try:
@@ -173,7 +178,7 @@ def update_floating_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/floating/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_floating_rule(rule_id):
     """Delete a floating rule"""
     try:
@@ -210,7 +215,7 @@ def get_wan_rules():
 
 
 @firewall_bp.route("/api/rules/wan", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_wan_rule():
     """Add a new WAN rule"""
     db = None
@@ -252,7 +257,7 @@ def add_wan_rule():
 
 
 @firewall_bp.route("/api/rules/wan/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_wan_rule(rule_id):
     """Move a WAN rule up or down"""
     try:
@@ -292,7 +297,7 @@ def move_wan_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/wan/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_wan_rule(rule_id):
     """Update a WAN rule"""
     try:
@@ -321,7 +326,7 @@ def update_wan_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/wan/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_wan_rule(rule_id):
     """Delete a WAN rule"""
     db = None
@@ -358,7 +363,7 @@ def get_lan_rules():
 
 
 @firewall_bp.route("/api/rules/lan", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_lan_rule():
     """Add a new LAN rule"""
     try:
@@ -396,7 +401,7 @@ def add_lan_rule():
 
 
 @firewall_bp.route("/api/rules/lan/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_lan_rule(rule_id):
     """Move a LAN rule up or down"""
     try:
@@ -436,7 +441,7 @@ def move_lan_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/lan/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_lan_rule(rule_id):
     """Update a LAN rule"""
     try:
@@ -465,7 +470,7 @@ def update_lan_rule(rule_id):
 
 
 @firewall_bp.route("/api/rules/lan/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_lan_rule(rule_id):
     """Delete a LAN rule"""
     try:
@@ -509,7 +514,7 @@ def get_nat_pf():
 
 
 @firewall_bp.route("/api/nat/pf", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_nat_pf():
     """Add a new port forward rule"""
     try:
@@ -552,7 +557,7 @@ def add_nat_pf():
 
 
 @firewall_bp.route("/api/nat/pf/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_nat_pf(rule_id):
     """Move a port forward rule up or down"""
     try:
@@ -592,7 +597,7 @@ def move_nat_pf(rule_id):
 
 
 @firewall_bp.route("/api/nat/pf/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_nat_pf(rule_id):
     """Update a port forward rule"""
     try:
@@ -626,7 +631,7 @@ def update_nat_pf(rule_id):
 
 
 @firewall_bp.route("/api/nat/pf/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_nat_pf(rule_id):
     """Delete a port forward rule"""
     try:
@@ -660,7 +665,7 @@ def get_nat_1to1():
 
 
 @firewall_bp.route("/api/nat/1to1", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_nat_1to1():
     """Add a new 1:1 NAT mapping"""
     try:
@@ -699,7 +704,7 @@ def add_nat_1to1():
 
 
 @firewall_bp.route("/api/nat/1to1/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_nat_1to1(rule_id):
     """Move a 1:1 NAT mapping up or down"""
     try:
@@ -739,7 +744,7 @@ def move_nat_1to1(rule_id):
 
 
 @firewall_bp.route("/api/nat/1to1/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_nat_1to1(rule_id):
     """Update a 1:1 NAT mapping"""
     try:
@@ -769,7 +774,7 @@ def update_nat_1to1(rule_id):
 
 
 @firewall_bp.route("/api/nat/1to1/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_nat_1to1(rule_id):
     """Delete a 1:1 NAT mapping"""
     try:
@@ -803,7 +808,7 @@ def get_nat_outbound():
 
 
 @firewall_bp.route("/api/nat/outbound", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_nat_outbound():
     """Add a new outbound NAT rule"""
     try:
@@ -843,7 +848,7 @@ def add_nat_outbound():
 
 
 @firewall_bp.route("/api/nat/outbound/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_nat_outbound(rule_id):
     """Move an outbound NAT rule up or down"""
     try:
@@ -883,7 +888,7 @@ def move_nat_outbound(rule_id):
 
 
 @firewall_bp.route("/api/nat/outbound/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_nat_outbound(rule_id):
     """Update an outbound NAT rule"""
     try:
@@ -914,7 +919,7 @@ def update_nat_outbound(rule_id):
 
 
 @firewall_bp.route("/api/nat/outbound/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_nat_outbound(rule_id):
     """Delete an outbound NAT rule"""
     try:
@@ -948,7 +953,7 @@ def get_nat_npt():
 
 
 @firewall_bp.route("/api/nat/npt", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_nat_npt():
     """Add a new NPt mapping"""
     try:
@@ -991,7 +996,7 @@ def add_nat_npt():
 
 
 @firewall_bp.route("/api/nat/npt/<int:rule_id>/move", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def move_nat_npt(rule_id):
     """Move an NPt mapping up or down"""
     try:
@@ -1031,7 +1036,7 @@ def move_nat_npt(rule_id):
 
 
 @firewall_bp.route("/api/nat/npt/<int:rule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_nat_npt(rule_id):
     """Update an NPt mapping"""
     try:
@@ -1065,7 +1070,7 @@ def update_nat_npt(rule_id):
 
 
 @firewall_bp.route("/api/nat/npt/<int:rule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_nat_npt(rule_id):
     """Delete an NPt mapping"""
     try:
@@ -1155,7 +1160,7 @@ def get_aliases():
 
 
 @firewall_bp.route("/api/aliases", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def add_alias():
     """Add a new alias"""
     try:
@@ -1184,7 +1189,7 @@ def add_alias():
 
 
 @firewall_bp.route("/api/aliases/<int:alias_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_alias(alias_id):
     """Update an alias"""
     try:
@@ -1215,7 +1220,7 @@ def update_alias(alias_id):
 
 
 @firewall_bp.route("/api/aliases/<int:alias_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_alias(alias_id):
     """Delete an alias"""
     try:
@@ -1277,7 +1282,7 @@ def list_schedules():
 
 
 @firewall_bp.route("/api/schedules", methods=["POST"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def create_schedule():
     """Create a schedule (with ranges). Expects JSON: {name, description, ranges:[...]}."""
     try:
@@ -1332,7 +1337,7 @@ def create_schedule():
 
 
 @firewall_bp.route("/api/schedules/<int:schedule_id>", methods=["PUT"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_schedule(schedule_id):
     """Replace schedule fields and ranges. Expects JSON: {name, description, ranges:[...]}."""
     try:
@@ -1389,7 +1394,7 @@ def update_schedule(schedule_id):
 
 
 @firewall_bp.route("/api/schedules/<int:schedule_id>", methods=["DELETE"])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_schedule(schedule_id):
     """Delete a schedule and its ranges."""
     try:
@@ -1449,7 +1454,7 @@ def get_traffic_shaper_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/save-traffic-shaper-config", methods=['POST'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def save_traffic_shaper_config():
     try:
         data = request.get_json()
@@ -1490,7 +1495,7 @@ def get_traffic_shaper_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/update-traffic-shaper-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_traffic_shaper_config(config_id):
     try:
         data = request.get_json()
@@ -1504,7 +1509,7 @@ def update_traffic_shaper_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/delete-traffic-shaper-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_traffic_shaper_config(config_id):
     try:
         db = get_db()
@@ -1554,7 +1559,7 @@ def get_limiters_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/save-limiters-config", methods=['POST'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def save_limiters_config():
     try:
         data = request.get_json()
@@ -1601,7 +1606,7 @@ def get_limiters_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/update-limiters-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_limiters_config(config_id):
     try:
         data = request.get_json()
@@ -1615,7 +1620,7 @@ def update_limiters_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/delete-limiters-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_limiters_config(config_id):
     try:
         db = get_db()
@@ -1658,7 +1663,7 @@ def get_virtual_ips_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/save-virtual-ips-config", methods=['POST'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def save_virtual_ips_config():
     try:
         data = request.get_json()
@@ -1698,7 +1703,7 @@ def get_virtual_ips_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/update-virtual-ips-config/<int:config_id>", methods=['PUT', 'POST'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def update_virtual_ips_config(config_id):
     try:
         data = request.get_json()
@@ -1712,7 +1717,7 @@ def update_virtual_ips_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @firewall_bp.route("/delete-virtual-ips-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.firewall.edit")
 def delete_virtual_ips_config(config_id):
     try:
         db = get_db()

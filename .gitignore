@@ -22,11 +22,17 @@ config.json
 logs/
 instance/
 static/uploads/
+uploads/
+backups/
 *.pid
 *.sqlite
 *.sqlite3
 *.db
 data.db
+
+# Secrets
+master.key
+*.key
 
 # Test/coverage/cache artifacts
 .pytest_cache/
@@ -49,6 +55,11 @@ pip-wheel-metadata/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Claude Code local machine state (never shared)
+.claude/settings.local.json
+.claude/settings.local.json.bak
+.claude/keybindings.json
 
 # Local/generated project artifacts
 edits.txt
