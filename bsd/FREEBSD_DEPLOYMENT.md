@@ -148,14 +148,33 @@ service smart_shield restart
 
 ## 9) Appliance hardening baseline
 
-1. Put Smart Shield behind a hardened reverse proxy with TLS.
-2. Use non-default admin password and rotate secrets.
-3. Enable regular backup of:
-- `/var/db/smart-shield/`
-- `/usr/local/etc/smart-shield/`
-- `/var/log/smart-shield/`
-4. Configure log rotation for `/var/log/smart-shield/*.log`.
-5. Restrict management UI access to admin networks.
+1. **TLS reverse proxy (nginx)**
+```sh
+pkg install nginx
+# Create SSL directory and generate or install your certificate:
+install -d -m 0700 /usr/local/etc/smart-shield/ssl
+# Copy the example config, edit server_name + cert paths, then enable:
+cp bsd/etc/nginx.conf.example /usr/local/etc/nginx/smart-shield.conf
+# Add  include /usr/local/etc/nginx/smart-shield.conf;  to nginx.conf http block
+nginx -t
+sysrc nginx_enable=YES
+service nginx start
+```
+
+2. **Log rotation (newsyslog)**
+```sh
+cp bsd/etc/newsyslog.d/smart-shield.conf /usr/local/etc/newsyslog.d/smart-shield.conf
+newsyslog -v   # dry-run to verify
+```
+
+3. Use a non-default admin password and rotate `SECRET_KEY` periodically.
+
+4. Enable regular snapshots of:
+- `/var/db/smart-shield/` (database + uploads)
+- `/usr/local/etc/smart-shield/` (config + master key)
+- `/var/log/smart-shield/` (audit trail)
+
+5. Restrict management UI access to admin networks (see nginx example `allow`/`deny` block).
 
 ## Known scope
 

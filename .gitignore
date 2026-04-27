@@ -56,6 +56,11 @@ pip-wheel-metadata/
 .DS_Store
 Thumbs.db
 
+# Claude Code local machine state (never shared)
+.claude/settings.local.json
+.claude/settings.local.json.bak
+.claude/keybindings.json
+
 # Local/generated project artifacts
 edits.txt
 paths.txt
