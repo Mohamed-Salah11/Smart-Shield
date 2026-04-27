@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(.venv/bin/pip install *)",
-      "Bash(.venv/bin/python -m pytest tests/test_validators.py tests/test_secret_store.py -v)"
-    ]
-  }
-}

@@ -293,16 +293,19 @@ class PrivilegedActionError(RuntimeError):
     pass
 
 
-def run_privileged(action: str, audit_username: str = "system", **params) -> CommandResult:
+def run_privileged(priv_action: str, audit_username: str = "system", **params) -> CommandResult:
     """
     Execute a pre-approved privileged action via sudo.
 
     Parameters
     ----------
-    action         : Key into the _ALLOWLIST, e.g. "pf.reload".
+    priv_action    : Key into the _ALLOWLIST, e.g. "pf.reload".
     audit_username : Username to record in the audit log.
     **params       : Named parameters required by the action; all are
                      validated before the command is constructed.
+                     NOTE: use ``priv_action`` (not ``action``) for the
+                     action name so that params named ``action`` (e.g.
+                     for ``service.action``) do not clash.
 
     Returns
     -------
@@ -313,6 +316,7 @@ def run_privileged(action: str, audit_username: str = "system", **params) -> Com
     PrivilegedActionError — if action is unknown or a param fails validation.
     FreeBSDNetworkError   — if the command itself fails.
     """
+    action = priv_action
     if action not in _ALLOWLIST:
         raise PrivilegedActionError(
             f"Action {action!r} is not in the privileged allowlist. "
