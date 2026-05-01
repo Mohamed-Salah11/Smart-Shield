@@ -1,8 +1,12 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / L2TP
+
+<div class="ss-page-header">
+  <div>
+    <h1 class="ss-page-title">L2TP Users</h1>
+    <p class="ss-page-desc">L2TP VPN user accounts</p>
+  </div>
 </div>
 
 <ul class="nav nav-tabs">
@@ -14,30 +18,32 @@
 	</li>
 </ul>
 
-<div class="settings-section">
-	<h5 class="openvpn-section-title">L2TP Users</h5>
+<div class="ss-card mt-3">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+    <div><div class="ss-card-title">L2TP Users</div></div>
+  </div>
+  <div class="ss-card-body p-0">
+    <table class="table table-hover mb-0" style="font-size:.85rem;">
+      <thead style="background:var(--border-color-soft);">
+        <tr>
+          <th>Username</th>
+          <th>IP address</th>
+          <th style="width: 18%">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="l2tpUsersTable">
+        <tr>
+          <td colspan="3" class="text-center text-muted py-4">Loading...</td>
+        </tr>
+      </tbody>
+    </table>
 
-	<div class="openvpn-section-body">
-		<table class="table table-bordered">
-			<thead>
-				<tr>
-					<th>Username</th>
-					<th>IP address</th>
-					<th style="width: 18%">Actions</th>
-				</tr>
-			</thead>
-			<tbody id="l2tpUsersTable">
-				<tr>
-					<td colspan="3" class="text-center text-muted py-4">Loading...</td>
-				</tr>
-			</tbody>
-		</table>
-
-		<div class="d-flex justify-content-start mt-3">
-			<button type="button" class="btn btn-success" data-bs-toggle="modal"
-				data-bs-target="#addL2tpUserModal">Add</button>
-		</div>
-	</div>
+    <div class="d-flex justify-content-start mt-3 px-3 pb-3">
+      <button type="button" class="btn btn-success" data-bs-toggle="modal"
+        data-bs-target="#addL2tpUserModal">Add</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="addL2tpUserModal" tabindex="-1" aria-labelledby="addL2tpUserModalLabel" aria-hidden="true">

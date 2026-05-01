@@ -4,7 +4,7 @@
 
 <script>
     let sanCounter = 0;
-    
+
     function addSanRow() {
         sanCounter++;
         const container = document.getElementById('san-container');
@@ -25,7 +25,7 @@
         `;
         container.appendChild(newRow);
     }
-    
+
     function removeSanRow(id) {
         const row = document.getElementById('san-row-' + id);
         if (row) {
@@ -35,26 +35,14 @@
 </script>
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.certificates') }}">Certificates</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Add Certificate</li>
-            </ol>
-        </nav>
-        <h1>Add/Sign a New Certificate</h1>
-    </div>
+    <div class="ss-page-header"><div><h1 class="ss-page-title">Add Certificate</h1><p class="ss-page-desc">Create or import an SSL/TLS certificate</p></div></div>
 
     <form method="POST" action="{{ url_for('system.add_certificate') }}">
 
         <!-- Certificate Method Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Add/Sign a New Certificate</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
+        <div class="ss-card">
+            <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-file-certificate"></i></div><div><div class="ss-card-title">Add/Sign a New Certificate</div></div></div>
+            <div class="ss-card-body" style="padding: 20px;">
 
                 <div class="mb-3 row align-items-center">
                     <label for="method" class="col-sm-3 col-form-label fw-semibold">Method</label>
@@ -80,11 +68,9 @@
         </div>
 
         <!-- Internal Certificate Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Internal Certificate</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
+        <div class="ss-card">
+            <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-certificate"></i></div><div><div class="ss-card-title">Internal Certificate</div></div></div>
+            <div class="ss-card-body" style="padding: 20px;">
 
                 <div class="mb-3 row align-items-center">
                     <label for="certificate_authority" class="col-sm-3 col-form-label fw-semibold">Certificate Authority</label>
@@ -193,11 +179,9 @@
         </div>
 
         <!-- Certificate Attributes Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Certificate Attributes</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
+        <div class="ss-card">
+            <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div><div><div class="ss-card-title">Certificate Attributes</div></div></div>
+            <div class="ss-card-body" style="padding: 20px;">
 
                 <div class="mb-3 row align-items-center">
                     <label for="certificate_type" class="col-sm-3 col-form-label fw-semibold">Certificate Type</label>

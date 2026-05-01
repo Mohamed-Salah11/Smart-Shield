@@ -3,17 +3,7 @@
 {% block main %}
 
 <div class="container">
-<!-- Page Header -->
-<div class="page-header">
-<nav aria-label="breadcrumb">
-<ol class="breadcrumb mb-2">
-<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
-<li class="breadcrumb-item active" aria-current="page">Reload</li>
-</ol>
-</nav>
-<h1>Smart Shield Setup</h1>
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 8</h1><p class="ss-page-desc">Reload configuration</p></div></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -27,11 +17,9 @@
 </div>
 
 <!-- Content Card -->
-<div class="section">
-<div class="section-header">
-<h2>Reload Configuration</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-rotate"></i></div><div><div class="ss-card-title">Reload Configuration</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <div class="text-center py-4">
 <div class="mb-4">
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="var(--primary)" viewBox="0 0 16 16">

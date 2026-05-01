@@ -1,47 +1,51 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / IPsec / Tunnels
-</div>
+<div class="container">
 
-<ul class="nav nav-tabs">
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
-	</li>
-</ul>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Pre-Shared Keys</h1>
+      <p class="ss-page-desc">IPsec authentication credentials</p>
+    </div>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPskModal">
+      <i class="fa-solid fa-plus me-1"></i>Add PSK
+    </button>
+  </div>
 
-<div class="settings-section">
-	<h5 class="openvpn-section-title">Pre-Shared Keys</h5>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a></li>
+  </ul>
 
-	<div class="openvpn-section-body">
-		<table class="table table-bordered">
-			<thead>
-				<tr>
-					<th>Identifier</th>
-					<th>Secret Type</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				<!-- rows injected by JS -->
-			</tbody>
-		</table>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-key"></i></div>
+      <div><div class="ss-card-title">Pre-Shared Keys</div><div class="ss-card-subtitle">Shared secrets for IKEv1 and IKEv2 authentication</div></div>
+      <div class="ss-card-actions">
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addPskModal">
+          <i class="fa-solid fa-plus me-1"></i>Add PSK
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">Identifier</th>
+            <th>Secret Type</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-		<div class="d-flex justify-content-start">
-			<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPskModal">Add PSK</button>
-		</div>
-	</div>
-</div>
 
 <div class="modal fade" id="addPskModal" tabindex="-1" aria-labelledby="addPskModalLabel" aria-hidden="true">
 	<div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -207,4 +211,5 @@ function editIpsecPsk(id) {
 	modal.show();
 }
 </script>
+</div>
 {% endblock %}

@@ -2,55 +2,51 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Status Summary</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-chart-bar me-2 text-primary"></i>System Status Summary</h1>
-    <p class="lead">At-a-glance counts of active configuration objects.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Status Summary</h1>
+      <p class="ss-page-desc">Quick overview of system health</p>
+    </div>
   </div>
 
   <div class="row g-3 mb-4">
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-fire fa-2x text-primary mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('firewall_rules_wan', 0) }}</div>
         <div class="text-muted small mt-1">WAN Firewall Rules</div>
       </div>
     </div>
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-network-wired fa-2x text-success mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('firewall_rules_lan', 0) }}</div>
         <div class="text-muted small mt-1">LAN Firewall Rules</div>
       </div>
     </div>
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-layer-group fa-2x text-warning mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('firewall_rules_floating', 0) }}</div>
         <div class="text-muted small mt-1">Floating Rules</div>
       </div>
     </div>
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-shuffle fa-2x text-info mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('nat_pf', 0) }}</div>
         <div class="text-muted small mt-1">NAT Rules</div>
       </div>
     </div>
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-lock fa-2x text-secondary mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('openvpn_servers', 0) }}</div>
         <div class="text-muted small mt-1">OpenVPN Servers</div>
       </div>
     </div>
     <div class="col-sm-6 col-lg-4">
-      <div class="section text-center p-3">
+      <div class="ss-card text-center p-3">
         <i class="fa fa-key fa-2x text-danger mb-2 d-block"></i>
         <div class="fs-2 fw-bold">{{ counts.get('ipsec_phase1', 0) }}</div>
         <div class="text-muted small mt-1">IPsec Phase-1</div>
@@ -58,9 +54,12 @@
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-header"><h2 class="mb-0">System Details</h2></div>
-    <div class="section-body">
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-circle-info"></i></div>
+      <div><div class="ss-card-title">System Details</div></div>
+    </div>
+    <div class="ss-card-body">
       <dl class="row mb-0">
         <dt class="col-sm-4">Platform</dt>
         <dd class="col-sm-8">{% if on_freebsd %}<span class="badge bg-success">FreeBSD</span>{% else %}<span class="badge bg-secondary">Development</span>{% endif %}</dd>

@@ -3,23 +3,12 @@
 {% block main %}
 
 <div class="container">
-	<!-- Page Header -->
-	<div class="page-header">
-		<nav aria-label="breadcrumb">
-			<ol class="breadcrumb mb-2">
-				<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-				<li class="breadcrumb-item active" aria-current="page">Setup Wizard</li>
-			</ol>
-		</nav>
-		<h1>Smart Shield Setup</h1>
-	</div>
+	<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant</h1><p class="ss-page-desc">Initial firewall configuration wizard</p></div></div>
 
 	<!-- Wizard Card -->
-	<div class="section">
-		<div class="section-header">
-			<h2>Welcome</h2>
-		</div>
-		<div class="section-body" style="padding: 24px;">
+	<div class="ss-card">
+		<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div><div><div class="ss-card-title">Welcome</div></div></div>
+		<div class="ss-card-body" style="padding: 24px;">
 			<div class="wizard-welcome">
 				<div class="wizard-icon mb-3">
 					<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="var(--primary)" viewBox="0 0 16 16">
@@ -29,7 +18,7 @@
 				</div>
 				<h3 style="color: var(--primary); margin-bottom: 1rem;">Welcome to Smart Shield Software!</h3>
 				<p class="text-muted" style="max-width: 600px; margin-bottom: 1rem;">
-					This wizard will guide you through the initial configuration of your Smart Shield firewall. 
+					This wizard will guide you through the initial configuration of your Smart Shield firewall.
 					Follow the steps to set up your network interfaces, security policies, and system preferences.
 				</p>
 				<p class="text-muted" style="max-width: 600px; margin-bottom: 1.5rem;">
@@ -39,7 +28,7 @@
 					</svg>
 					You can exit the wizard at any time by clicking the Smart Shield logo in the sidebar.
 				</p>
-				
+
 				<div class="alert alert-info d-flex align-items-center" style="max-width: 600px;">
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="me-2 flex-shrink-0" viewBox="0 0 16 16">
 						<path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>

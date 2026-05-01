@@ -2,29 +2,26 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">L2TP</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-network-wired me-2 text-primary"></i>L2TP Server</h1>
-    <p class="lead">L2TP/IPsec VPN via mpd5 — configuration and user management.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">L2TP VPN</h1>
+      <p class="ss-page-desc">L2TP/IPsec VPN via mpd5 — configuration and user management</p>
+    </div>
   </div>
 
   <!-- Status bar -->
-  <div class="section mb-4">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-circle-dot me-2"></i>Service Status</h2>
-      <div class="d-flex gap-2">
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-circle-dot"></i></div>
+      <div><div class="ss-card-title">Service Status</div></div>
+      <div class="ss-card-actions d-flex gap-2">
         <span id="l2tp-status-badge" class="badge bg-secondary">Checking…</span>
         <button class="btn btn-sm btn-success" id="btn-apply">
-          <i class="fa fa-bolt me-1"></i>Apply &amp; Restart
+          <i class="fa-solid fa-bolt me-1"></i>Apply &amp; Restart
         </button>
       </div>
     </div>
-    <div class="section-body">
+    <div class="ss-card-body">
       <div id="apply-result" class="d-none alert mb-0"></div>
       <div id="l2tp-sessions" class="mt-2 text-muted small"></div>
     </div>
@@ -51,9 +48,12 @@
 
   <!-- Configuration tab -->
   <div id="tab-config">
-    <div class="section mb-4">
-      <div class="section-header"><h2 class="mb-0">Server Settings</h2></div>
-      <div class="section-body">
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div><div class="ss-card-title">Server Settings</div></div>
+      </div>
+      <div class="ss-card-body">
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label fw-semibold">Enable L2TP Server</label>
@@ -121,16 +121,18 @@
 
   <!-- Users tab -->
   <div id="tab-users" class="d-none">
-    <div class="section mb-4">
-      <div class="section-header d-flex justify-content-between align-items-center">
-        <h2 class="mb-0">L2TP Users</h2>
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+        <div><div class="ss-card-title">L2TP Users</div></div>
+        <div class="ss-card-actions">
         <button class="btn btn-sm btn-primary" id="btn-add-user">
           <i class="fa fa-plus me-1"></i>Add User
         </button>
+        </div>
       </div>
-      <div class="section-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
             <thead><tr><th>Username</th><th>Assigned IP</th><th>Actions</th></tr></thead>
             <tbody id="users-tbody">
               <tr><td colspan="3" class="text-center text-muted py-3">Loading…</td></tr>
@@ -143,14 +145,17 @@
 
   <!-- Preview tab -->
   <div id="tab-preview" class="d-none">
-    <div class="section">
-      <div class="section-header d-flex justify-content-between align-items-center">
-        <h2 class="mb-0">mpd.conf Preview</h2>
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-file-code"></i></div>
+        <div><div class="ss-card-title">mpd.conf Preview</div></div>
+        <div class="ss-card-actions">
         <button class="btn btn-sm btn-outline-primary" id="btn-refresh-preview">
           <i class="fa fa-rotate me-1"></i>Refresh
         </button>
+        </div>
       </div>
-      <div class="section-body p-0">
+      <div>
         <pre id="conf-preview" style="background:var(--bg);color:var(--text-color);
           font-family:monospace;font-size:.8rem;padding:1rem;margin:0;
           min-height:200px;white-space:pre-wrap;border-radius:0 0 8px 8px;">

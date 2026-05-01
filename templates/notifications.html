@@ -1,502 +1,169 @@
 {% extends 'base.html' %}
-
 {% block main %}
+<div class="container">
 
-<div class="breadcrumb">
-    System / <a href="{{ url_for('system.admin_access') }}">Advanced</a> / Notifications
-</div>
-
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall & NAT</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link active" href="{{ url_for('system.notifications') }}">Notifications</a>
-    </li>
-</ul>
-
-<form method="POST" action="{{ url_for('system.notifications') }}">
-
-<div class="settings-section">
-    <h5>General Settings</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="certificate_expiration">Certificate Expiration</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="certificate_expiration" name="certificate_expiration" checked>
-                    <label class="form-check-label" for="certificate_expiration">Enable daily notifications of expired and soon-to-expire certificates</label>
-                </div>
-                <div class="help-text">
-                    When enabled, the firewall will check CA and Certificate expiration times daily and file notices when expired or soon-to-expire entries are detected.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="ignore_revoked">Ignore Revoked</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="ignore_revoked" name="ignore_revoked">
-                    <label class="form-check-label" for="ignore_revoked">Ignore notifications for revoked certificates</label>
-                </div>
-                <div class="help-text">
-                    When enabled, the firewall will NOT check expiring for revoked (at least once) certificates
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="certificate_expiration_threshold">Certificate Expiration Threshold</label>
-            <div class="form-group-content">
-                <input type="text" id="certificate_expiration_threshold" name="certificate_expiration_threshold" class="form-control" style="max-width: 150px;" value="7" placeholder="7">
-                <div class="help-text">
-                    The number of days at which a certificate lifetime is considered to be expiring soon and worthy of notification. Default is 27 days.
-                </div>
-            </div>
-        </div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Advanced Settings</h1>
+      <p class="ss-page-desc">System alert delivery configuration</p>
     </div>
-</div>
+  </div>
 
-<div class="settings-section">
-    <h5>E-Mail</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="disable_smtp">Disable SMTP</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="disable_smtp" name="disable_smtp">
-                    <label class="form-check-label" for="disable_smtp">Disable SMTP Notifications</label>
-                </div>
-                <div class="help-text">
-                    Check this option to disable SMTP notifications but preserve the settings below. Some other mechanisms, such as packages, may need these settings in place to function.
-                </div>
-            </div>
-        </div>
+  <ul class="nav nav-pills mb-4">
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('system.admin_access') }}">Admin Access</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('system.advanced_firewall_nat') }}">Firewall &amp; NAT</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('system.advanced_network') }}">Network</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('system.advanced_miscellaneous') }}">Miscellaneous</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a></li>
+    <li class="nav-item"><a class="nav-link active" href="{{ url_for('system.notifications') }}">Notifications</a></li>
+  </ul>
 
-        <div class="form-group">
-            <label for="email_server">E-Mail server</label>
-            <div class="form-group-content">
-                <input type="text" id="email_server" name="email_server" class="form-control" style="max-width: 400px;" placeholder="">
-                <div class="help-text">
-                    This is the FQDN or IP address of the SMTP E-Mail server to which notifications will be sent.
-                </div>
-            </div>
-        </div>
+  <form method="POST" action="{{ url_for('system.notifications') }}">
 
-        <div class="form-group">
-            <label for="smtp_port">SMTP Port of E-Mail server</label>
-            <div class="form-group-content">
-                <input type="text" id="smtp_port" name="smtp_port" class="form-control" style="max-width: 150px;" placeholder="">
-                <div class="help-text">
-                    This is the port of the SMTP E-Mail server, typically 25, 587 (submission) or 465 (smtps).
-                </div>
-            </div>
+    <!-- General Settings -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-bell"></i></div>
+        <div><div class="ss-card-title">General Settings</div><div class="ss-card-subtitle">Certificate expiry and system alerts</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="certificate_expiration" name="certificate_expiration" checked><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Certificate Expiry Notifications</p><p class="ss-toggle-desc">Daily check for expired and soon-to-expire CA and certificate entries</p></div>
         </div>
-
-        <div class="form-group">
-            <label for="connection_timeout">Connection timeout to E-Mail server</label>
-            <div class="form-group-content">
-                <input type="text" id="connection_timeout" name="connection_timeout" class="form-control" style="max-width: 150px;" placeholder="">
-                <div class="help-text">
-                    This is how many seconds it will wait for the SMTP server to connect. Default is 20s.
-                </div>
-            </div>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="ignore_revoked" name="ignore_revoked"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Ignore Revoked Certificates</p><p class="ss-toggle-desc">Skip expiry notifications for certificates that have been revoked</p></div>
         </div>
-
-        <div class="form-group">
-            <label for="secure_smtp_connection">Secure SMTP Connection</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="secure_smtp_connection" name="secure_smtp_connection">
-                    <label class="form-check-label" for="secure_smtp_connection">Enable SMTP over SSL/TLS</label>
-                </div>
-            </div>
+        <hr class="ss-divider">
+        <div class="ss-field" style="max-width:220px;">
+          <label class="ss-label">Certificate Expiration Threshold (days)</label>
+          <input type="number" id="certificate_expiration_threshold" name="certificate_expiration_threshold" class="form-control" value="27">
+          <p class="ss-hint">Notify when a certificate expires within this many days</p>
         </div>
-
-        <div class="form-group">
-            <label for="validate_ssl_tls">Validate SSL/TLS</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="validate_ssl_tls" name="validate_ssl_tls" checked>
-                    <label class="form-check-label" for="validate_ssl_tls">Validate the SSL/TLS certificate presented by the server</label>
-                </div>
-                <div class="help-text">
-                    By default if SMTP over SSL/TLS is enabled the certificate will still be used if available, but the identity of the server will not be confirmed. Check this box if the certificate must match the server or the message will not be sent. A certificate for this server or its CA must be imported on the <a href="#">Certificate Manager</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="from_email_address">From e-mail address</label>
-            <div class="form-group-content">
-                <input type="email" id="from_email_address" name="from_email_address" class="form-control" style="max-width: 400px;" placeholder="">
-                <div class="help-text">
-                    This is the e-mail address that will appear in the from field.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="notification_email_address">Notification E-Mail address</label>
-            <div class="form-group-content">
-                <input type="email" id="notification_email_address" name="notification_email_address" class="form-control" style="max-width: 400px;" placeholder="">
-                <div class="help-text">
-                    Enter the e-mail address to send email notifications to.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="notification_email_auth_username">Notification E-Mail auth username (optional)</label>
-            <div class="form-group-content">
-                <input type="text" id="notification_email_auth_username" name="notification_email_auth_username" class="form-control" style="max-width: 400px;" placeholder="">
-                <div class="help-text">
-                    Enter the e-mail address username for SMTP authentication.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="notification_email_auth_password">Notification E-Mail auth password</label>
-            <div class="form-group-content">
-                <div style="display: flex; gap: 10px;">
-                    <input type="password" id="notification_email_auth_password" name="notification_email_auth_password" class="form-control" style="max-width: 400px;" placeholder="Notification E-Mail auth password">
-                    <input type="password" id="notification_email_auth_password_confirm" name="notification_email_auth_password_confirm" class="form-control" style="max-width: 400px;" placeholder="Notification E-Mail auth password">
-                </div>
-                <div class="help-text">
-                    Enter the e-mail account password for SMTP authentication.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="notification_email_auth_mechanism">Notification E-Mail auth mechanism</label>
-            <div class="form-group-content">
-                <select id="notification_email_auth_mechanism" name="notification_email_auth_mechanism" class="form-control" style="max-width: 400px;">
-                    <option value="PLAIN" selected>PLAIN</option>
-                    <option value="LOGIN">LOGIN</option>
-                    <option value="CRAM-MD5">CRAM-MD5</option>
-                </select>
-                <div class="help-text">
-                    Select the authentication mechanism used by the SMTP server. Most work with PLAIN, some servers like Exchange or Office365 might require LOGIN.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="test_smtp_settings">Test SMTP Settings</label>
-            <div class="form-group-content">
-                <button type="button" class="btn btn-primary" id="test_smtp_settings" style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
-                    </svg>
-                    Test SMTP Settings
-                </button>
-                <div class="help-text">
-                    A test notification will be sent even if the service is marked as disabled. The last SAVED values will be used, not necessarily the values entered here.
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-</div>
 
-<div class="settings-section">
-    <h5>Sounds</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="console_bell">Console Bell</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="console_bell" name="console_bell" checked>
-                    <label class="form-check-label" for="console_bell">Enable the console bell</label>
-                </div>
-                <div class="help-text">
-                    When checked, emergency console messages, such as from a GUI login, will trigger a bell in connected consoles including serial terminals. On devices with a speaker, such messages can trigger an audible beep.
-                </div>
-            </div>
+    <!-- E-Mail -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-envelope"></i></div>
+        <div><div class="ss-card-title">E-Mail (SMTP)</div><div class="ss-card-subtitle">Send alerts via email</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="disable_smtp" name="disable_smtp"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Disable SMTP Notifications</p></div>
         </div>
-
-        <div class="form-group">
-            <label for="startup_shutdown_sound">Startup/Shutdown Sound</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="startup_shutdown_sound" name="startup_shutdown_sound">
-                    <label class="form-check-label" for="startup_shutdown_sound">Disable the startup/shutdown beep</label>
-                </div>
-                <div class="help-text">
-                    When this is checked, startup and shutdown sounds will no longer play through the built-in PC speaker. Has no effect on devices without a speaker.
-                </div>
-            </div>
+        <hr class="ss-divider">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">SMTP Server</label>
+            <input type="text" id="email_server" name="email_server" class="form-control" placeholder="mail.example.com">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">SMTP Port</label>
+            <input type="number" id="smtp_port" name="smtp_port" class="form-control" placeholder="587" style="max-width:160px;">
+            <p class="ss-hint">Typically 25, 587 (STARTTLS), or 465 (SSL)</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Connection Timeout (sec)</label>
+            <input type="number" id="connection_timeout" name="connection_timeout" class="form-control" placeholder="20" style="max-width:160px;">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Auth Mechanism</label>
+            <select id="notification_email_auth_mechanism" name="notification_email_auth_mechanism" class="form-select">
+              <option value="PLAIN">PLAIN</option>
+              <option value="LOGIN">LOGIN</option>
+              <option value="CRAM-MD5">CRAM-MD5</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">From E-Mail Address</label>
+            <input type="email" id="from_email_address" name="from_email_address" class="form-control" placeholder="smartshield@example.com">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Notification Recipient</label>
+            <input type="email" id="notification_email_address" name="notification_email_address" class="form-control" placeholder="admin@example.com">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">SMTP Username (optional)</label>
+            <input type="text" id="notification_email_auth_username" name="notification_email_auth_username" class="form-control" placeholder="SMTP auth username">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">SMTP Password</label>
+            <input type="password" id="notification_email_auth_password" name="notification_email_auth_password" class="form-control" placeholder="SMTP auth password">
+          </div>
         </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Telegram</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="enable_telegram">Enable Telegram</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="enable_telegram" name="enable_telegram">
-                    <label class="form-check-label" for="enable_telegram">Enable Telegram Notifications</label>
-                </div>
-                <div class="help-text">
-                    Check this option to enable Telegram notifications.<br>
-                    You will need a Telegram Bot and its associated API key. <a href="#">Instructions here</a>.
-                </div>
-            </div>
+        <hr class="ss-divider">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="secure_smtp_connection" name="secure_smtp_connection"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable SMTP over SSL/TLS</p></div>
         </div>
-
-        <div class="form-group">
-            <label for="api_key">API Key</label>
-            <div class="form-group-content">
-                <input type="text" id="api_key" name="api_key" class="form-control" style="max-width: 400px;" placeholder="123456789:ABCDefghc_FGHIJKqpKLMNOmoPQRST">
-                <div class="help-text">
-                    Enter the Bot API key required to authenticate with the Telegram API server.
-                </div>
-            </div>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="validate_ssl_tls" name="validate_ssl_tls" checked><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Validate SSL/TLS Certificate</p><p class="ss-toggle-desc">Reject if the server certificate does not match. Requires the server CA to be imported in Certificate Manager.</p></div>
         </div>
-
-        <div class="form-group">
-            <label for="chat_id">Chat ID</label>
-            <div class="form-group-content">
-                <input type="text" id="chat_id" name="chat_id" class="form-control" style="max-width: 400px;" placeholder="123456789">
-                <div class="help-text">
-                    Enter the chat ID number (private) or channel @username (public) that will be used to send the notifications to.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="test_telegram_settings">Test Telegram Settings</label>
-            <div class="form-group-content">
-                <button type="button" class="btn btn-primary" id="test_telegram_settings" style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.287 5.906c-.778.324-2.334.994-4.666 2.01-.378.15-.577.298-.595.442-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294.26.006.549-.1.868-.32 2.179-1.471 3.304-2.214 3.374-2.23.05-.012.12-.026.166.016.047.041.042.12.037.141-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8.154 8.154 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629.093.06.183.125.27.187.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.426 1.426 0 0 0-.013-.315.337.337 0 0 0-.114-.217.526.526 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09z"/>
-                    </svg>
-                    Test Telegram Settings
-                </button>
-                <div class="help-text">
-                    A test notification will be sent even if the service is not enabled. The last SAVED values will be used, not necessarily the values displayed here.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Pushover</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="enable_pushover">Enable Pushover</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="enable_pushover" name="enable_pushover">
-                    <label class="form-check-label" for="enable_pushover">Enable Pushover Notifications</label>
-                </div>
-                <div class="help-text">
-                    Check this option to enable Pushover notifications.<br>
-                    An API key will need to be created and entered along with the Pushover account user key. <a href="#">API documentation</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="pushover_api_key">API Key</label>
-            <div class="form-group-content">
-                <input type="text" id="pushover_api_key" name="pushover_api_key" class="form-control" style="max-width: 400px;" placeholder="azGDDReP8gMaCQ0YAMyEuzz3nyH">
-                <div class="help-text">
-                    Enter the API key required to authenticate with the Pushover API server. <a href="#">Create API key here</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="pushover_user_key">User Key</label>
-            <div class="form-group-content">
-                <input type="text" id="pushover_user_key" name="pushover_user_key" class="form-control" style="max-width: 400px;" placeholder="u0tRzpo4fQXpnf0zz7Qu7cmVRsG">
-                <div class="help-text">
-                    Enter user key of the Pushover account
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="notification_sound">Notification Sound</label>
-            <div class="form-group-content">
-                <select id="notification_sound" name="notification_sound" class="form-control" style="max-width: 400px;">
-                    <option value="device_default" selected>Device Default</option>
-                    <option value="pushover">Pushover</option>
-                    <option value="bike">Bike</option>
-                    <option value="bugle">Bugle</option>
-                    <option value="cashregister">Cash Register</option>
-                    <option value="classical">Classical</option>
-                    <option value="cosmic">Cosmic</option>
-                    <option value="falling">Falling</option>
-                    <option value="gamelan">Gamelan</option>
-                    <option value="incoming">Incoming</option>
-                    <option value="intermission">Intermission</option>
-                    <option value="magic">Magic</option>
-                    <option value="mechanical">Mechanical</option>
-                    <option value="pianobar">Piano Bar</option>
-                    <option value="siren">Siren</option>
-                    <option value="spacealarm">Space Alarm</option>
-                    <option value="tugboat">Tug Boat</option>
-                    <option value="alien">Alien Alarm (long)</option>
-                    <option value="climb">Climb (long)</option>
-                    <option value="persistent">Persistent (long)</option>
-                    <option value="echo">Pushover Echo (long)</option>
-                    <option value="updown">Up Down (long)</option>
-                    <option value="vibrate">Vibrate Only</option>
-                    <option value="none">None (silent)</option>
-                </select>
-                <div class="help-text">
-                    Select notification sound. <a href="#">Notification Sound documentation with audio</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="message_priority">Message Priority</label>
-            <div class="form-group-content">
-                <select id="message_priority" name="message_priority" class="form-control" style="max-width: 400px;">
-                    <option value="normal" selected>Normal Priority</option>
-                    <option value="lowest">Lowest Priority</option>
-                    <option value="low">Low Priority</option>
-                    <option value="high">High Priority</option>
-                    <option value="emergency">Emergency Priority</option>
-                </select>
-                <div class="help-text">
-                    Select message priority. <a href="#">Message Priority documentation</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="emergency_priority_notification_retry">Emergency Priority Notification Retry Interval</label>
-            <div class="form-group-content">
-                <input type="number" id="emergency_priority_notification_retry" name="emergency_priority_notification_retry" class="form-control" style="max-width: 150px;" value="60" min="30">
-                <div class="help-text">
-                    This specifies how often (in seconds) the Pushover servers will send the same notification for Emergency Priority notifications until the notification is acknowledged.<br>
-                    This parameter must have a value of at least 30 seconds between retries. Default is 1 minute.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="emergency_priority_notification_expiration">Emergency Priority Notification Expiration</label>
-            <div class="form-group-content">
-                <input type="number" id="emergency_priority_notification_expiration" name="emergency_priority_notification_expiration" class="form-control" style="max-width: 150px;" value="300" max="10800">
-                <div class="help-text">
-                    This specifies how many seconds the notifications will continue to be retried (every retry seconds) for Emergency Priority notifications until the notification is acknowledged.<br>
-                    This parameter must have a maximum value of at most 10800 seconds (3 hours). Default is 5 minutes.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="test_pushover_settings">Test Pushover Settings</label>
-            <div class="form-group-content">
-                <button type="button" class="btn btn-primary" id="test_pushover_settings" style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm.256 7a4.474 4.474 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10c.26 0 .507.009.74.025.226-.341.496-.65.804-.918C9.077 9.038 8.564 9 8 9c-5 0-6 3-6 4s1 1 1 1h5.256Zm3.63-4.54c.18-.613 1.048-.613 1.229 0l.043.148a.64.64 0 0 0 .921.382l.136-.074c.561-.306 1.175.308.87.869l-.075.136a.64.64 0 0 0 .382.92l.149.045c.612.18.612 1.048 0 1.229l-.15.043a.64.64 0 0 0-.38.921l.074.136c.305.561-.309 1.175-.87.87l-.136-.075a.64.64 0 0 0-.92.382l-.045.149c-.18.612-1.048.612-1.229 0l-.043-.15a.64.64 0 0 0-.921-.38l-.136.074c-.561.305-1.175-.309-.87-.87l.075-.136a.64.64 0 0 0-.382-.92l-.148-.045c-.613-.18-.613-1.048 0-1.229l.148-.043a.64.64 0 0 0 .382-.921l-.074-.136c-.306-.561.308-1.175.869-.87l.136.075a.64.64 0 0 0 .92-.382l.045-.148ZM14 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/>
-                    </svg>
-                    Test Pushover Settings
-                </button>
-                <div class="help-text">
-                    A test notification will be sent even if the service is not enabled. The last SAVED values will be used, not necessarily the values displayed here.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="settings-section">
-    <h5>Slack</h5>
-    
-    <div style="padding: 20px;">
-        <div class="form-group">
-            <label for="enable_slack">Enable Slack</label>
-            <div class="form-group-content">
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="enable_slack" name="enable_slack">
-                    <label class="form-check-label" for="enable_slack">Enable Slack Notifications</label>
-                </div>
-                <div class="help-text">
-                    Check this option to enable Slack notifications.<br>
-                    You will need a Slack API key. <a href="#">See Instructions here</a>.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="slack_api_key">API Key</label>
-            <div class="form-group-content">
-                <input type="text" id="slack_api_key" name="slack_api_key" class="form-control" style="max-width: 400px;" placeholder="123456789:ABCDefabcde_FGHIJfghjKLMNOklmnoPQRST">
-                <div class="help-text">
-                    Enter the Slack API key.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="slack_channel">Slack Channel</label>
-            <div class="form-group-content">
-                <input type="text" id="slack_channel" name="slack_channel" class="form-control" style="max-width: 400px;" placeholder="">
-                <div class="help-text">
-                    Enter the Slack Channel name that will be used to send the notifications to.
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="test_slack_settings">Test Slack Settings</label>
-            <div class="form-group-content">
-                <button type="button" class="btn btn-primary" id="test_slack_settings" style="display: inline-flex; align-items: center; gap: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M3.362 10.11c0 .926-.756 1.681-1.681 1.681S0 11.036 0 10.111C0 9.186.756 8.43 1.68 8.43h1.682v1.68zm.846 0c0-.924.756-1.68 1.681-1.68s1.681.756 1.681 1.68v4.21c0 .924-.756 1.68-1.68 1.68a1.685 1.685 0 0 1-1.682-1.68v-4.21zM5.89 3.362c-.926 0-1.682-.756-1.682-1.681S4.964 0 5.89 0s1.68.756 1.68 1.68v1.682H5.89zm0 .846c.924 0 1.68.756 1.68 1.681S6.814 7.57 5.89 7.57H1.68C.757 7.57 0 6.814 0 5.89c0-.926.756-1.682 1.68-1.682h4.21zm6.749 1.682c0-.926.755-1.682 1.68-1.682.925 0 1.681.756 1.681 1.681s-.756 1.681-1.68 1.681h-1.681V5.89zm-.848 0c0 .924-.755 1.68-1.68 1.68A1.685 1.685 0 0 1 8.43 5.89V1.68C8.43.757 9.186 0 10.11 0c.926 0 1.681.756 1.681 1.68v4.21zm-1.681 6.748c.926 0 1.682.756 1.682 1.681S11.036 16 10.11 16s-1.681-.756-1.681-1.68v-1.682h1.68zm0-.847c-.924 0-1.68-.755-1.68-1.68 0-.925.756-1.681 1.68-1.681h4.21c.924 0 1.68.756 1.68 1.68 0 .926-.756 1.681-1.68 1.681h-4.21z"/>
-                    </svg>
-                    Test Slack Settings
-                </button>
-                <div class="help-text">
-                    A test notification will be sent even if the service is not enabled. The last SAVED values will be used, not necessarily the values displayed here.
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="form-group">
-    <label></label>
-    <div class="form-group-content">
-        <button type="submit" class="btn-save" style="display: inline-flex; align-items: center; gap: 8px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
-            </svg>
-            Save
+        <hr class="ss-divider">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="test_smtp_settings">
+          <i class="fa-solid fa-paper-plane me-1"></i>Test SMTP Settings
         </button>
+        <p class="ss-hint mt-2">Test uses last saved values, not current unsaved input.</p>
+      </div>
     </div>
+
+    <!-- Sounds -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-volume-high"></i></div>
+        <div><div class="ss-card-title">Sounds</div><div class="ss-card-subtitle">Console and speaker alerts</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="console_bell" name="console_bell" checked><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Console Bell</p><p class="ss-toggle-desc">Audible beep on emergency console messages (if device has a speaker)</p></div>
+        </div>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="startup_shutdown_sound" name="startup_shutdown_sound"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Disable Startup/Shutdown Sound</p><p class="ss-toggle-desc">Silence the startup and shutdown beeps on devices with a PC speaker</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telegram -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-brands fa-telegram"></i></div>
+        <div><div class="ss-card-title">Telegram</div><div class="ss-card-subtitle">Push alerts via Telegram Bot API</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_telegram" name="enable_telegram"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Telegram Notifications</p></div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">Bot API Key</label>
+            <input type="text" id="api_key" name="api_key" class="form-control" placeholder="123456789:ABCdef...">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Chat ID</label>
+            <input type="text" id="chat_id" name="chat_id" class="form-control" placeholder="123456789 or @channel">
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="test_telegram_settings">
+          <i class="fa-brands fa-telegram me-1"></i>Test Telegram Settings
+        </button>
+      </div>
+    </div>
+
+    <div class="ss-save-bar">
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="fa-solid fa-check me-1"></i>Save
+      </button>
+    </div>
+
+  </form>
 </div>
-
-</form>
-
 {% endblock %}

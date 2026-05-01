@@ -3,17 +3,11 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced_system_tunables') }}">System Tunables</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ 'Edit' if index is not none else 'New' }} Tunable</li>
-            </ol>
-        </nav>
-        <h1>Advanced Settings</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Advanced Settings</h1>
+        <p class="ss-page-desc">{{ 'Edit' if index is not none else 'New' }} kernel sysctl value</p>
+      </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -35,12 +29,12 @@
         </li>
     </ul>
 
-    <!-- Edit Tunable Section -->
-    <div class="section">
-        <div class="section-header">
-            <h2>{{ 'Edit' if index is not none else 'New' }} Tunable</h2>
-        </div>
-        <div class="section-body">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div><div class="ss-card-title">{{ 'Edit' if index is not none else 'New' }} Tunable</div></div>
+      </div>
+      <div class="ss-card-body">
             <form method="POST" action="{{ url_for('system.advanced_system_tunables_save') }}">
                 {% if index is not none %}
                 <input type="hidden" name="index" value="{{ index }}">

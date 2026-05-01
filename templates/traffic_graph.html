@@ -2,21 +2,18 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Traffic Graph</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-chart-area me-2 text-primary"></i>Real-Time Traffic Graph</h1>
-    <p class="lead">Live bandwidth utilisation across all interfaces.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Bandwidth Monitor</h1>
+      <p class="ss-page-desc">Interface traffic graphs</p>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-wave-square me-2"></i>Bandwidth</h2>
-      <div class="d-flex align-items-center gap-2">
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-wave-square"></i></div>
+      <div><div class="ss-card-title">Bandwidth</div></div>
+      <div class="ss-card-actions">
         <span class="badge bg-success" id="live-badge">
           <i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live
         </span>
@@ -25,14 +22,17 @@
         </button>
       </div>
     </div>
-    <div class="section-body">
+    <div class="ss-card-body">
       <canvas id="trafficChart" style="width:100%;height:320px;"></canvas>
     </div>
   </div>
 
-  <div class="section mt-4">
-    <div class="section-header"><h2 class="mb-0">Interface Summary</h2></div>
-    <div class="section-body p-0">
+  <div class="ss-card mt-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-table-list"></i></div>
+      <div><div class="ss-card-title">Interface Summary</div></div>
+    </div>
+    <div class="ss-card-body p-0">
       <div id="iface-summary">
         <div class="p-3 text-muted text-center">
           <i class="fa fa-spinner fa-spin me-2"></i>Loading…
@@ -107,8 +107,8 @@
       <td class="text-end text-danger">${s.rx_errs + s.tx_errs}</td>
     </tr>`).join('');
     document.getElementById('iface-summary').innerHTML = `
-      <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-        <thead><tr><th>Interface</th><th class="text-end">RX pkts</th><th class="text-end">TX pkts</th><th class="text-end">Errors</th></tr></thead>
+      <div class="table-responsive"><table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);"><tr><th>Interface</th><th class="text-end">RX pkts</th><th class="text-end">TX pkts</th><th class="text-end">Errors</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
   }

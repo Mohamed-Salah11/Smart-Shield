@@ -2,35 +2,33 @@
 
 {% block main %}
 <div class="container">
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Register</li>
-            </ol>
-        </nav>
-        <h1>Register Smart Shield</h1>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Register</h1>
+      <p class="ss-page-desc">Create your administrator account</p>
     </div>
+  </div>
 
-    <div class="alert alert-info">
-        Thank you for choosing Smart Shield.
-    </div>
+  <div class="alert alert-info">
+    Thank you for choosing Smart Shield.
+  </div>
 
-    <div class="alert alert-danger">
-        The registration system is not currently available. Please check your network connection and try again.
-    </div>
+  <div class="alert alert-danger">
+    The registration system is not currently available. Please check your network connection and try again.
+  </div>
 
-    <div class="section">
-        <div class="section-header">
-            <h2>Registration Token</h2>
-        </div>
-        <div class="section-body">
-            <label for="token" class="form-label fw-semibold">Activation Token</label>
-            <textarea id="token" class="form-control" rows="4"></textarea>
-            <div class="mt-3">
-                <button type="button" class="btn btn-primary">Register</button>
-            </div>
-        </div>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-key"></i></div>
+      <div><div class="ss-card-title">Registration Token</div></div>
     </div>
+    <div class="ss-card-body">
+      <label for="token" class="form-label fw-semibold">Activation Token</label>
+      <textarea id="token" class="form-control" rows="4"></textarea>
+      <div class="mt-3">
+        <button type="button" class="btn btn-primary">Register</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

@@ -1,31 +1,26 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / IPsec
-</div>
-
-<ul class="nav nav-tabs">
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
-	</li>
-</ul>
-
 <div class="container">
-	<h1>Mobile Clients</h1>
 
-	<div class="settings-section">
-		<div class="section-header">
-			<h2>Enable IPsec Mobile Client Support</h2>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">IPsec Mobile Clients</h1>
+      <p class="ss-page-desc">IKEv2 mobile client configuration</p>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a></li>
+  </ul>
+
+	<div class="ss-card">
+		<div class="ss-card-head">
+			<div class="ss-card-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+			<div><div class="ss-card-title">Enable IPsec Mobile Client Support</div></div>
 		</div>
 		<div class="p-3">
 			<div class="form-check">
@@ -37,11 +32,12 @@
 		</div>
 	</div>
 
-	<div class="settings-section">
-		<div class="section-header">
-			<h2>Extended Authentication (Xauth)</h2>
+	<div class="ss-card">
+		<div class="ss-card-head">
+			<div class="ss-card-icon"><i class="fa-solid fa-id-card"></i></div>
+			<div><div class="ss-card-title">Extended Authentication (Xauth)</div></div>
 		</div>
-		<div class="p-3">
+		<div class="ss-card-body">
 			<h3 class="mb-3">User Authentication</h3>
 
 			<div class="mb-2">
@@ -68,11 +64,12 @@
 		</div>
 	</div>
 
-	<div class="settings-section">
-		<div class="section-header">
-			<h2>Client Configuration (mode-cfg)</h2>
+	<div class="ss-card">
+		<div class="ss-card-head">
+			<div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+			<div><div class="ss-card-title">Client Configuration (mode-cfg)</div></div>
 		</div>
-		<div class="p-3">
+		<div class="ss-card-body">
 			<div class="form-check mb-3">
 				<input class="form-check-input" type="checkbox" id="virtualAddressPool" name="virtual_address_pool" checked />
 				<label class="form-check-label" for="virtualAddressPool">

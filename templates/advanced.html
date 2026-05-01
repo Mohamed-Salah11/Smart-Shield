@@ -42,15 +42,11 @@
 
 <div class="container">
     <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Admin Access</li>
-            </ol>
-        </nav>
-        <h1>Advanced Settings</h1>
+    <div class="ss-page-header">
+        <div>
+            <h1 class="ss-page-title">Advanced Settings</h1>
+            <p class="ss-page-desc">Admin access, SSH, login protection, serial and console options</p>
+        </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -75,11 +71,12 @@
     <form method="POST" action="{{ url_for('system.advanced') }}">
 
         <!-- webConfigurator Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>webConfigurator</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div>
+                <div><div class="ss-card-title">webConfigurator</div></div>
             </div>
-            <div class="section-body" style="padding: 20px;">
+            <div class="ss-card-body">
                 <div class="mb-3 row align-items-center">
                     <label class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                     <div class="col-sm-9">
@@ -239,11 +236,12 @@
         </div>
 
         <!-- Secure Shell Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Secure Shell</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-terminal"></i></div>
+                <div><div class="ss-card-title">Secure Shell</div></div>
             </div>
-            <div class="section-body" style="padding: 20px;">
+            <div class="ss-card-body">
                 <div class="mb-3 row align-items-center">
                     <label class="col-sm-3 col-form-label fw-semibold">SSH Server</label>
                     <div class="col-sm-9">
@@ -286,11 +284,12 @@
         </div>
 
         <!-- Login Protection Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Login Protection</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-lock"></i></div>
+                <div><div class="ss-card-title">Login Protection</div></div>
             </div>
-            <div class="section-body" style="padding: 20px;">
+            <div class="ss-card-body">
                 <div class="mb-3 row align-items-center">
                     <label for="threshold" class="col-sm-3 col-form-label fw-semibold">Threshold</label>
                     <div class="col-sm-9">
@@ -341,11 +340,12 @@
         </div>
 
         <!-- Serial Communications Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Serial Communications</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-plug"></i></div>
+                <div><div class="ss-card-title">Serial Communications</div></div>
             </div>
-            <div class="section-body" style="padding: 20px;">
+            <div class="ss-card-body">
                 <div class="mb-3 row align-items-center">
                     <label class="col-sm-3 col-form-label fw-semibold">Serial Terminal</label>
                     <div class="col-sm-9">
@@ -383,11 +383,12 @@
         </div>
 
         <!-- Console Options Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Console Options</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-display"></i></div>
+                <div><div class="ss-card-title">Console Options</div></div>
             </div>
-            <div class="section-body" style="padding: 20px;">
+            <div class="ss-card-body">
                 <div class="mb-3 row align-items-center">
                     <label class="col-sm-3 col-form-label fw-semibold">Console Menu</label>
                     <div class="col-sm-9">

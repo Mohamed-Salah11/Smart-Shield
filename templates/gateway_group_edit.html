@@ -4,25 +4,19 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing/groups">Gateway Groups</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Edit</li>
-            </ol>
-        </nav>
-        <h1>Edit Gateway Group</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Edit Gateway Group</h1>
+        <p class="ss-page-desc">Configure failover or load-balance gateway group</p>
+      </div>
     </div>
 
-    <!-- Edit Form Section -->
-    <div class="section">
-        <div class="section-header">
-            <h2>Gateway Group Configuration</h2>
-        </div>
-        <div class="section-body" style="padding: 20px;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-object-group"></i></div>
+        <div><div class="ss-card-title">Gateway Group Configuration</div></div>
+      </div>
+      <div class="ss-card-body">
             <form method="post" action="{{ url_for('routing.gateway_group_edit', group_id=group_id) if group_id else url_for('routing.gateway_group_edit') }}">
                 <div class="mb-3 row align-items-center">
                     <label for="name" class="col-sm-3 col-form-label fw-semibold">Group Name</label>

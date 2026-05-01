@@ -1,33 +1,28 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / IPsec / Tunnels
-</div>
-
-<ul class="nav nav-tabs">
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
-	</li>
-</ul>
-
 <div class="container">
-	<h1>Advanced Settings</h1>
 
-	<div class="settings-section">
-		<div class="section-header">
-			<h2>IPsec Logging Controls</h2>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">IPsec Advanced Settings</h1>
+      <p class="ss-page-desc">Low-level IKE/ESP tuning and logging controls</p>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a></li>
+  </ul>
+
+	<div class="ss-card">
+		<div class="ss-card-head">
+			<div class="ss-card-icon"><i class="fa-solid fa-terminal"></i></div>
+			<div><div class="ss-card-title">IPsec Logging Controls</div><div class="ss-card-subtitle">Per-subsystem verbosity levels</div></div>
 		</div>
-		<div class="p-0">
+		<div style="overflow-x:auto;">
 			<table class="table mb-0">
 				<tbody>
 					{% set logging_rows = [
@@ -73,11 +68,12 @@
 		Changes the log verbosity for the IPsec daemon, so that more detail will be generated to aid in troubleshooting.
 	</div>
 
-	<div class="settings-section">
-		<div class="section-header">
-			<h2>Advanced IPsec Settings</h2>
+	<div class="ss-card">
+		<div class="ss-card-head">
+			<div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+			<div><div class="ss-card-title">Advanced IPsec Settings</div></div>
 		</div>
-		<div class="p-3">
+		<div class="ss-card-body">
 			<div class="row align-items-start mb-4">
 				<div class="col-md-4">
 					<div class="fw-semibold">Configure Unique IDs as</div>

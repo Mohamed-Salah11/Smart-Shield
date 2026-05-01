@@ -2,28 +2,26 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
-        <li class="breadcrumb-item active">Limiter Info</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-gauge-high me-2 text-primary"></i>Traffic Limiter Info</h1>
-    <p class="lead">dummynet pipe and queue statistics.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Limiter Info</h1>
+      <p class="ss-page-desc">dummynet pipe and queue statistics</p>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0">Limiters</h2>
-      <span class="badge bg-primary">{{ limiters|length }}</span>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+      <div><div class="ss-card-title">Limiters</div></div>
+      <div class="ss-card-actions">
+        <span class="badge bg-primary">{{ limiters|length }}</span>
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div class="ss-card-body p-0">
       {% if limiters %}
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead>
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
             <tr><th>Name</th><th>Bandwidth</th><th>Delay (ms)</th><th>Packet Loss %</th><th>Description</th></tr>
           </thead>
           <tbody>

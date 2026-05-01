@@ -2,15 +2,11 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">System Activity</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-list-check me-2 text-primary"></i>System Activity</h1>
-    <p class="lead">Aggregated audit log — recent actions across all categories.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">System Activity</h1>
+      <p class="ss-page-desc">Process and resource utilization</p>
+    </div>
   </div>
 
   <!-- Stats bar -->
@@ -25,7 +21,7 @@
     ] %}
     {% for label, val, icon, color in stat_items %}
     <div class="col-6 col-sm-4 col-lg-2">
-      <div class="section text-center py-2 px-3">
+      <div class="ss-card text-center py-2 px-3">
         <i class="fa {{ icon }} text-{{ color }} mb-1 d-block"></i>
         <div class="fw-bold">{{ val or 0 }}</div>
         <div class="text-muted" style="font-size:.72rem">{{ label }}</div>
@@ -35,18 +31,21 @@
   </div>
   {% endif %}
 
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0">Recent Events</h2>
-      <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-outline-primary">
-        <i class="fa fa-terminal me-1"></i>Live Monitor
-      </a>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div><div class="ss-card-title">Recent Events</div></div>
+      <div class="ss-card-actions">
+        <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-outline-primary">
+          <i class="fa fa-terminal me-1"></i>Live Monitor
+        </a>
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div class="ss-card-body p-0">
       {% if events %}
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead>
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
             <tr><th>Time</th><th>Category</th><th>Action</th><th>User</th><th>IP</th></tr>
           </thead>
           <tbody>

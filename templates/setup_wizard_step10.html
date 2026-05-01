@@ -3,17 +3,7 @@
 {% block main %}
 
 <div class="container">
-<!-- Page Header -->
-<div class="page-header">
-<nav aria-label="breadcrumb">
-<ol class="breadcrumb mb-2">
-<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
-<li class="breadcrumb-item active" aria-current="page">Complete</li>
-</ol>
-</nav>
-<h1>Smart Shield Setup</h1>
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Complete</h1><p class="ss-page-desc">Setup complete</p></div></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -27,11 +17,9 @@
 </div>
 
 <!-- Success Card -->
-<div class="section">
-<div class="section-header" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);">
-<h2 style="color: #fff;">Wizard Completed!</h2>
-</div>
-<div class="section-body" style="padding: 48px 24px;">
+<div class="ss-card">
+<div class="ss-card-head" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);"><div class="ss-card-icon"><i class="fa-solid fa-circle-check"></i></div><div><div class="ss-card-title" style="color: #fff;">Wizard Completed!</div></div></div>
+<div class="ss-card-body" style="padding: 48px 24px;">
 <div class="text-center">
 <div class="mb-4">
 <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#198754" class="bi bi-check-circle-fill" viewBox="0 0 16 16">
@@ -54,11 +42,9 @@ Your settings have been saved and applied successfully.
 </div>
 
 <!-- Resources Section -->
-<div class="section mt-4">
-<div class="section-header">
-<h2>What's Next?</h2>
-</div>
-<div class="section-body">
+<div class="ss-card mt-4">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-rocket"></i></div><div><div class="ss-card-title">What's Next?</div></div></div>
+<div class="ss-card-body">
 <div class="row">
 <div class="col-md-4 mb-3">
 <div class="d-flex align-items-start">

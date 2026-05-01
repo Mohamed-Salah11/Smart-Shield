@@ -1,35 +1,30 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-    Dashboard / VPN / OpenVPN
-</div>
+<div class="container">
 
-<ul class="nav nav-tabs">
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}"
-            href="{{ url_for('vpn.openvpn') }}">Servers</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}"
-            href="{{ url_for('vpn.openvpn_clients') }}">Clients</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client
-            Specific Overrides</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}"
-            href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
-    </li>
-</ul>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Client Specific Overrides</h1>
+      <p class="ss-page-desc">Per-client OpenVPN configuration overrides</p>
+    </div>
+  </div>
 
-<div class="settings-section openvpn-section">
-    <h5 class="openvpn-section-title">Client Specific Overrides</h5>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a></li>
+  </ul>
 
-    <div class="openvpn-section-body">
-        <table class="table table-bordered">
-            <thead>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-user-gear"></i></div>
+      <div><div class="ss-card-title">Client Specific Overrides</div><div class="ss-card-subtitle">Match clients by Common Name and apply custom settings</div></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
                 <tr>
                     <th>Disabled</th>
                     <th>Common Name</th>
@@ -528,5 +523,5 @@
             });
     }
 </script>
-
+</div>
 {% endblock %}

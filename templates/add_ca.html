@@ -3,26 +3,14 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.certificates') }}">Certificates</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Add CA</li>
-            </ol>
-        </nav>
-        <h1>Create Certificate Authority</h1>
-    </div>
+    <div class="ss-page-header"><div><h1 class="ss-page-title">Add Certificate Authority</h1><p class="ss-page-desc">Create or import a CA certificate</p></div></div>
 
     <form method="POST" action="{{ url_for('system.add_ca') }}">
 
         <!-- Internal Certificate Authority Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Internal Certificate Authority</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
+        <div class="ss-card">
+            <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-building-columns"></i></div><div><div class="ss-card-title">Internal Certificate Authority</div></div></div>
+            <div class="ss-card-body" style="padding: 20px;">
 
                 <div class="mb-3 row align-items-center">
                     <label for="key_type" class="col-sm-3 col-form-label fw-semibold">Key Type</label>

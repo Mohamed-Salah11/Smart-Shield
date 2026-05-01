@@ -2,15 +2,11 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Filter Reload</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-fire-flame-curved me-2 text-primary"></i>Filter Reload Status</h1>
-    <p class="lead">Reload firewall rules into the pf(4) packet filter.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Filter Reload</h1>
+      <p class="ss-page-desc">Force firewall rule recompilation</p>
+    </div>
   </div>
 
   <!-- Rule counts -->
@@ -35,11 +31,12 @@
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-header">
-      <h2 class="mb-0"><i class="fa fa-rotate me-2"></i>Apply Firewall Rules</h2>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+      <div><div class="ss-card-title">Apply Firewall Rules</div></div>
     </div>
-    <div class="section-body">
+    <div class="ss-card-body">
       {% if pf_enabled %}
       <p>Clicking <strong>Apply</strong> will regenerate <code>pf.conf</code> from the current rule database and reload it via <code>pfctl -f</code>.</p>
       <div id="reload-result" class="alert d-none mb-3"></div>
