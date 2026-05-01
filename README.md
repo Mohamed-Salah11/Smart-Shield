@@ -1,6 +1,6 @@
 # Smart Shield
 
-A web-based network appliance management system built on Flask and designed for FreeBSD. Smart Shield provides a full-featured GUI for managing firewalls, routing, VPN, DHCP/DNS, IDS/IPS, content filtering, and system monitoring — similar in scope to pfSense or OPNsense but built from scratch in Python.
+A web-based network appliance management system built on Flask and designed for FreeBSD. Smart Shield provides a full-featured GUI for managing firewalls, routing, VPN, DHCP/DNS, IDS/IPS, content filtering, and system monitoring.
 
 ---
 
