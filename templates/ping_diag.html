@@ -2,23 +2,21 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
-        <li class="breadcrumb-item active">Ping</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-satellite-dish me-2 text-primary"></i>Ping</h1>
-    <p class="lead">Send ICMP echo requests to test host reachability.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Ping</h1>
+      <p class="ss-page-desc">ICMP echo diagnostic tool</p>
+    </div>
   </div>
 
   <div class="row g-4">
     <div class="col-lg-5">
-      <div class="section">
-        <div class="section-header"><h2 class="mb-0">Parameters</h2></div>
-        <div class="section-body">
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+          <div><div class="ss-card-title">Parameters</div></div>
+        </div>
+        <div class="ss-card-body">
           <div class="mb-3">
             <label class="form-label fw-semibold">Host / IP</label>
             <input type="text" id="ping-host" class="form-control" placeholder="8.8.8.8 or example.com" autocomplete="off">
@@ -40,12 +38,15 @@
     </div>
 
     <div class="col-lg-7">
-      <div class="section h-100">
-        <div class="section-header d-flex justify-content-between align-items-center">
-          <h2 class="mb-0">Result</h2>
-          <button id="btn-clear" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
+      <div class="ss-card h-100">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-terminal"></i></div>
+          <div><div class="ss-card-title">Result</div></div>
+          <div class="ss-card-actions">
+            <button id="btn-clear" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
+          </div>
         </div>
-        <div class="section-body p-0">
+        <div style="overflow-x:auto;">
           <pre id="ping-output" style="
             min-height:220px;background:var(--bg);color:var(--text-color);
             font-size:.82rem;padding:1rem;margin:0;white-space:pre-wrap;

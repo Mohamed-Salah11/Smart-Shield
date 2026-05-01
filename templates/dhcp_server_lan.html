@@ -1,8 +1,12 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-    <span>Services / DHCP Server / LAN</span>
+
+<div class="ss-page-header">
+  <div>
+    <h1 class="ss-page-title">DHCP Server</h1>
+    <p class="ss-page-desc">LAN interface DHCP configuration</p>
+  </div>
 </div>
 
 <ul class="nav nav-tabs">
@@ -14,9 +18,12 @@
     </li>
 </ul>
 
-<div class="settings-section">
-    <h5>General Settings</h5>
-    
+<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-gear"></i></div>
+    <div><div class="ss-card-title">General Settings</div></div>
+  </div>
+  <div class="ss-card-body">
     <div class="form-group">
         <label>DHCP Backend</label>
         <div class="form-group-content">
@@ -50,7 +57,7 @@
             <select class="form-control">
                 <option>Allow all clients</option>
             </select>
-            <div class="help-text">When set to "Allow all clients", any DHCP client will get an IP address within this scope/range on this interface. If set to "Allow known clients from any interface", any DHCP client with a DUID or IP address listed in a static mapping on any interface(s) will get IP address(es). If set to "Allow known clients from only this interface", only known clients from this interface, only MAC addresses listed in static mappings on this interface will get an IP address within this scope/range</div>
+            <p class="ss-hint">When set to "Allow all clients", any DHCP client will get an IP address within this scope/range on this interface. If set to "Allow known clients from any interface", any DHCP client with a DUID or IP address listed in a static mapping on any interface(s) will get IP address(es). If set to "Allow known clients from only this interface", only known clients from this interface, only MAC addresses listed in static mappings on this interface will get an IP address within this scope/range</p>
         </div>
     </div>
 
@@ -61,7 +68,7 @@
                 <input type="checkbox" class="form-check-input" id="ignore_denied">
                 <label class="form-check-label" for="ignore_denied">Ignore denied clients rather than reject</label>
             </div>
-            <div class="help-text">This option is not compatible with failover and cannot be enabled when a Failover Peer IP address is configured.</div>
+            <p class="ss-hint">This option is not compatible with failover and cannot be enabled when a Failover Peer IP address is configured.</p>
         </div>
     </div>
 
@@ -72,14 +79,18 @@
                 <input type="checkbox" class="form-check-input" id="ignore_client_ids">
                 <label class="form-check-label" for="ignore_client_ids">Ignore Client Identifiers</label>
             </div>
-            <div class="help-text">This option may be used when a client can dual boot using different client identifiers but the same hardware (MAC) address. Note that the resulting server behavior violates the official DHCP specification.</div>
+            <p class="ss-hint">This option may be used when a client can dual boot using different client identifiers but the same hardware (MAC) address. Note that the resulting server behavior violates the official DHCP specification.</p>
         </div>
     </div>
+  </div>
 </div>
 
-<div class="settings-section">
-    <h5>Primary Address Pool</h5>
-    
+<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+    <div><div class="ss-card-title">Primary Address Pool</div></div>
+  </div>
+  <div class="ss-card-body">
     <div class="form-group">
         <label>Subnet</label>
         <div class="form-group-content">
@@ -107,7 +118,7 @@
                     <input type="text" class="form-control">
                 </div>
             </div>
-            <div class="help-text">The specified range for this pool must not be within the range configured on any other address pool for this interface.</div>
+            <p class="ss-hint">The specified range for this pool must not be within the range configured on any other address pool for this interface.</p>
         </div>
     </div>
 
@@ -115,14 +126,18 @@
         <label>Additional Pools</label>
         <div class="form-group-content">
             <button class="btn btn-success" onclick="alert('Add Address Pool')">+ Add Address Pool</button>
-            <div class="help-text">If additional pools of addresses are needed inside of this subnet outside the above range, they may be specified here.</div>
+            <p class="ss-hint">If additional pools of addresses are needed inside of this subnet outside the above range, they may be specified here.</p>
         </div>
     </div>
+  </div>
 </div>
 
-<div class="settings-section">
-    <h5>Server Options</h5>
-    
+<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+    <div><div class="ss-card-title">Server Options</div></div>
+  </div>
+  <div class="ss-card-body">
     <div class="form-group">
         <label>WINS Servers</label>
         <div class="form-group-content">
@@ -140,16 +155,20 @@
             <input type="text" class="form-control" placeholder="DNS Server 4">
         </div>
     </div>
+  </div>
 </div>
 
-<div class="settings-section">
-    <h5>OMAPI</h5>
-    
+<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-plug"></i></div>
+    <div><div class="ss-card-title">OMAPI</div></div>
+  </div>
+  <div class="ss-card-body">
     <div class="form-group">
         <label>OMAPI Port</label>
         <div class="form-group-content">
             <input type="text" class="form-control" placeholder="OMAPI Port">
-            <div class="help-text">Set the port that OMAPI will listen on. The default port is 7911. Leave blank to disable. Only the first OMAPI configuration is used.</div>
+            <p class="ss-hint">Set the port that OMAPI will listen on. The default port is 7911. Leave blank to disable. Only the first OMAPI configuration is used.</p>
         </div>
     </div>
 
@@ -157,12 +176,12 @@
         <label>OMAPI Key</label>
         <div class="form-group-content">
             <input type="text" class="form-control" placeholder="OMAPI Key">
-            <div class="help-text">Enter a key matching the selected algorithm to secure connections to the OMAPI endpoint.</div>
+            <p class="ss-hint">Enter a key matching the selected algorithm to secure connections to the OMAPI endpoint.</p>
             <div class="form-check mt-2">
                 <input type="checkbox" class="form-check-input" id="generate_key">
                 <label class="form-check-label" for="generate_key">Generate New Key</label>
             </div>
-            <div class="help-text">Generate a new key based on the selected algorithm.</div>
+            <p class="ss-hint">Generate a new key based on the selected algorithm.</p>
         </div>
     </div>
 
@@ -172,19 +191,23 @@
             <select class="form-control">
                 <option>HMAC-SHA256 (current bind9 default)</option>
             </select>
-            <div class="help-text">Set the algorithm that OMAPI key will use.</div>
+            <p class="ss-hint">Set the algorithm that OMAPI key will use.</p>
         </div>
     </div>
+  </div>
 </div>
 
-<div class="settings-section">
-    <h5>Other DHCP Options</h5>
-    
+<div class="ss-card">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+    <div><div class="ss-card-title">Other DHCP Options</div></div>
+  </div>
+  <div class="ss-card-body">
     <div class="form-group">
         <label>Gateway</label>
         <div class="form-group-content">
             <input type="text" class="form-control" value="10.0.0.1">
-            <div class="help-text">The default is to use the IP address of this firewall interface as the gateway. Specify an alternate gateway here if this is not the correct gateway for the network. Enter "none" for no gateway assignment.</div>
+            <p class="ss-hint">The default is to use the IP address of this firewall interface as the gateway. Specify an alternate gateway here if this is not the correct gateway for the network. Enter "none" for no gateway assignment.</p>
         </div>
     </div>
 
@@ -192,7 +215,7 @@
         <label>Domain Name</label>
         <div class="form-group-content">
             <input type="text" class="form-control" placeholder="home.arpa">
-            <div class="help-text">The default is to use the domain name of this firewall as the default domain name provided by DHCP. An alternate domain name may be specified here.</div>
+            <p class="ss-hint">The default is to use the domain name of this firewall as the default domain name provided by DHCP. An alternate domain name may be specified here.</p>
         </div>
     </div>
 
@@ -200,7 +223,7 @@
         <label>Domain Search List</label>
         <div class="form-group-content">
             <input type="text" class="form-control" placeholder="example.com;sub.example.com">
-            <div class="help-text">The DHCP server can optionally provide a domain search list. Use the semicolon character as separator</div>
+            <p class="ss-hint">The DHCP server can optionally provide a domain search list. Use the semicolon character as separator</p>
         </div>
     </div>
 
@@ -208,7 +231,7 @@
         <label>Default Lease Time</label>
         <div class="form-group-content">
             <input type="number" class="form-control" value="7200">
-            <div class="help-text">This is used for clients that do not ask for a specific expiration time. The default is 7200 seconds</div>
+            <p class="ss-hint">This is used for clients that do not ask for a specific expiration time. The default is 7200 seconds</p>
         </div>
     </div>
 
@@ -216,7 +239,7 @@
         <label>Maximum Lease Time</label>
         <div class="form-group-content">
             <input type="number" class="form-control" value="86400">
-            <div class="help-text">This is the maximum lease time for clients that ask for a specific expiration time. The default is 86400 seconds</div>
+            <p class="ss-hint">This is the maximum lease time for clients that ask for a specific expiration time. The default is 86400 seconds</p>
         </div>
     </div>
 
@@ -224,7 +247,7 @@
         <label>Failover peer IP</label>
         <div class="form-group-content">
             <input type="text" class="form-control" placeholder="">
-            <div class="help-text">Leave blank to disable. Enter the interface IP address of the other firewall (Failover peer) in this subnet. Firewalls must be using CARP. Advertising skew of the CARP VIP on this interface determines whether the DHCP daemon is Primary or Secondary. Ensure the advertising skew for the VIP on one firewall is < 20 and the other is > 20.</div>
+            <p class="ss-hint">Leave blank to disable. Enter the interface IP address of the other firewall (Failover peer) in this subnet. Firewalls must be using CARP. Advertising skew of the CARP VIP on this interface determines whether the DHCP daemon is Primary or Secondary. Ensure the advertising skew for the VIP on one firewall is &lt; 20 and the other is &gt; 20.</p>
         </div>
     </div>
 
@@ -235,7 +258,7 @@
                 <input type="checkbox" class="form-check-input" id="static_arp">
                 <label class="form-check-label" for="static_arp">Enable Static ARP</label>
             </div>
-            <div class="help-text">Restrict communication on the firewall to only hosts listed in static mappings containing both IP addresses and MAC addresses. No other hosts will be able to communicate with the firewall on this interface. This behavior is enforced even when DHCP server is disabled</div>
+            <p class="ss-hint">Restrict communication on the firewall to only hosts listed in static mappings containing both IP addresses and MAC addresses. No other hosts will be able to communicate with the firewall on this interface. This behavior is enforced even when DHCP server is disabled</p>
         </div>
     </div>
 
@@ -246,7 +269,7 @@
                 <input type="checkbox" class="form-check-input" id="time_format">
                 <label class="form-check-label" for="time_format">Change DHCP display lease time from UTC to local time</label>
             </div>
-            <div class="help-text">By default DHCP leases are displayed in UTC time. By checking this box DHCP lease time will be displayed in local time and set to the time zone selected. This will be used for all DHCP interfaces lease time.</div>
+            <p class="ss-hint">By default DHCP leases are displayed in UTC time. By checking this box DHCP lease time will be displayed in local time and set to the time zone selected. This will be used for all DHCP interfaces lease time.</p>
         </div>
     </div>
 
@@ -257,7 +280,7 @@
                 <input type="checkbox" class="form-check-input" id="statistics">
                 <label class="form-check-label" for="statistics">Enable monitoring graphs for DHCP lease statistics</label>
             </div>
-            <div class="help-text">Enable this to add DHCP leases statistics to the Monitoring graphs. Disabled by default.</div>
+            <p class="ss-hint">Enable this to add DHCP leases statistics to the Monitoring graphs. Disabled by default.</p>
         </div>
     </div>
 
@@ -268,7 +291,7 @@
                 <input type="checkbox" class="form-check-input" id="ping_check">
                 <label class="form-check-label" for="ping_check">Disable ping check</label>
             </div>
-            <div class="help-text">When enabled dhcpd sends a ping to the address being assigned, and if no response has been heard, it assigns the address. Enabled by default.</div>
+            <p class="ss-hint">When enabled dhcpd sends a ping to the address being assigned, and if no response has been heard, it assigns the address. Enabled by default.</p>
         </div>
     </div>
 
@@ -381,17 +404,21 @@
             </div>
         </div>
     </div>
+  </div>
 </div>
 
 <div class="d-flex gap-2 mt-3">
     <button class="btn btn-primary">Save</button>
 </div>
 
-<div class="settings-section">
-    <h5>DHCP Static Mappings</h5>
-    
-    <table class="table-bordered">
-        <thead>
+<div class="ss-card mt-4">
+  <div class="ss-card-head">
+    <div class="ss-card-icon"><i class="fa-solid fa-map-pin"></i></div>
+    <div><div class="ss-card-title">DHCP Static Mappings</div></div>
+  </div>
+  <div class="ss-card-body p-0">
+    <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
             <tr>
                 <th>IP Address</th>
                 <th>Hostname</th>
@@ -410,6 +437,7 @@
             </tr>
         </tbody>
     </table>
+  </div>
 </div>
 
 <script>
@@ -418,7 +446,7 @@
         const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
         const tbody = document.getElementById('static_mappings_body');
         const emptyRow = document.getElementById('empty_row');
-        
+
         if (mappings.length > 0) {
             emptyRow.style.display = 'none';
             tbody.innerHTML = mappings.map((mapping, index) => `
@@ -437,13 +465,13 @@
             emptyRow.style.display = 'table-row';
         }
     }
-    
+
     function editMapping(index) {
         const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
         localStorage.setItem('edit_mapping_index_lan', index);
         window.location.href = '{{ url_for("services.dhcp_static_mapping_lan") }}';
     }
-    
+
     function deleteMapping(index) {
         if (confirm('Are you sure you want to delete this mapping?')) {
             const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
@@ -452,7 +480,7 @@
             loadStaticMappings();
         }
     }
-    
+
     // Load mappings when page loads
     document.addEventListener('DOMContentLoaded', loadStaticMappings);
 </script>

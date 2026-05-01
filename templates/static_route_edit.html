@@ -4,25 +4,19 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing/static">Static Routes</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Edit</li>
-            </ol>
-        </nav>
-        <h1>Edit Static Route</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Edit Static Route</h1>
+        <p class="ss-page-desc">Configure a static network route</p>
+      </div>
     </div>
 
-    <!-- Edit Form Section -->
-    <div class="section">
-        <div class="section-header">
-            <h2>Static Route Configuration</h2>
-        </div>
-        <div class="section-body" style="padding: 20px;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-route"></i></div>
+        <div><div class="ss-card-title">Static Route Configuration</div></div>
+      </div>
+      <div class="ss-card-body">
             <form method="post" action="{{ url_for('routing.static_route_edit', route_id=route_id) if route_id else url_for('routing.static_route_edit') }}">
                 <div class="mb-3 row align-items-center">
                     <label for="destination" class="col-sm-3 col-form-label fw-semibold">Destination Network</label>

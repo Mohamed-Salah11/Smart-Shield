@@ -55,6 +55,28 @@ pip-wheel-metadata/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.tmp
+*.temp
+
+# Process output
+nohup.out
+
+# Generated certificate/key files (keep .example variants)
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+!*.example.*
 
 # Claude Code local machine state (never shared)
 .claude/settings.local.json

@@ -1,207 +1,158 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / Dynamic DNS / RFC 2136 Clients</span>
+<div class="container">
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Dynamic DNS</h1>
+      <p class="ss-page-desc">Automatically update DNS records when your WAN IP address changes</p>
+    </div>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal">
+      <i class="fa-solid fa-plus me-1"></i>Add Client
+    </button>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS Clients</a></li>
+    <li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns_checkip') }}">Check IP Services</a></li>
+  </ul>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-rotate"></i></div>
+      <div><div class="ss-card-title">RFC 2136 Clients</div><div class="ss-card-subtitle">TSIG-authenticated DNS update clients</div></div>
+      <div class="ss-card-actions">
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal">
+          <i class="fa-solid fa-plus me-1"></i>Add
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;width:40px;"></th>
+            <th>Interface</th><th>Server</th><th>Hostname</th><th>Cached IP</th><th>Description</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set clients = clients if clients is defined else [] %}
+          {% if clients %}{% for c in clients %}
+          <tr>
+            <td style="padding:8px 14px;">{% if not c.disabled %}<span style="color:var(--success);font-size:1rem;">●</span>{% endif %}</td>
+            <td>{{ c.interface }}</td><td>{{ c.server }}</td><td>{{ c.hostname }}</td>
+            <td><span style="font-family:monospace;font-size:.8rem;">—</span></td><td>{{ c.description }}</td>
+            <td><button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal"><i class="fa-solid fa-pen"></i></button></td>
+          </tr>
+          {% endfor %}{% else %}
+          <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted);">No RFC 2136 clients configured</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ss-card-body pt-2">
+      <p class="ss-hint">Green dot = record is current with DNS provider. IP shown in green = up to date.</p>
+    </div>
+  </div>
 </div>
 
-<ul class="nav nav-tabs">
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS Clients</a></li>
-	<li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dynamic_dns_rfc2136') }}">RFC 2136 Clients</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dynamic_dns_checkip') }}">Check IP Services</a></li>
-</ul>
-
-<div class="settings-section">
-	<div class="d-flex justify-content-between align-items-center mb-3">
-		<h5>RFC 2136 Clients</h5>
-		<button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal">+ Add</button>
-	</div>
-	
-	<table class="table-bordered">
-		<thead>
-			<tr>
-				<th>Status</th>
-				<th>Interface</th>
-				<th>Server</th>
-				<th>Hostname</th>
-				<th>Cached IP</th>
-				<th>Description</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% set clients = clients if clients is defined else [] %}
-			{% if clients %}
-				{% for c in clients %}
-				<tr>
-					<td>{% if not c.disabled %}<span class="status-green">●</span>{% else %}&nbsp;{% endif %}</td>
-					<td>{{ c.interface }}</td>
-					<td>{{ c.server }}</td>
-					<td>{{ c.hostname }}</td>
-					<td>&nbsp;</td>
-					<td>{{ c.description }}</td>
-					<td><button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal">Edit</button></td>
-				</tr>
-				{% endfor %}
-			{% else %}
-				<tr>
-					<td colspan="7" style="text-align: center; padding: 20px;">No RFC 2136 clients configured.</td>
-				</tr>
-			{% endif %}
-		</tbody>
-	</table>
-	
-	<div class="help-text mt-2">Entries with a <span class="status-green">●</span> status column icon and IP address appearing in <span class="status-green">green</span> are up to date with Dynamic DNS provider. An update can be forced on the edit page for an entry.</div>
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="addRFC2136Modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
+      <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
+        <h5 class="modal-title fw-700" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">RFC 2136 Client</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:24px;">
+        <form id="rfc2136Form" method="post" action="{{ url_for('services.dynamic_dns_rfc2136') }}">
+          <div class="ss-toggle-row" style="padding-top:0;">
+            <label class="ss-toggle"><input type="checkbox" id="enable" name="enable"><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content"><p class="ss-toggle-label">Enable this client</p></div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-field-grid ss-field-grid-2">
+            <div class="ss-field">
+              <label class="ss-label">Interface</label>
+              <select name="interface" class="form-select">
+                <option>WAN</option><option>LAN</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Server</label>
+              <input class="form-control" name="server" placeholder="DNS server address">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Hostname</label>
+              <input class="form-control" name="hostname" placeholder="host.example.com">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Zone</label>
+              <input class="form-control" name="zone" placeholder="example.com (optional)">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">TTL (seconds)</label>
+              <input type="number" class="form-control" name="ttl" placeholder="300">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Key Name</label>
+              <input class="form-control" name="key_name" placeholder="Must match DNS server setting">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Key Algorithm</label>
+              <select name="key_algorithm" class="form-select">
+                <option>HMAC-MD5 (legacy default)</option>
+                <option>HMAC-SHA1</option>
+                <option>HMAC-SHA224</option>
+                <option>HMAC-SHA256 (current bind9 default)</option>
+                <option>HMAC-SHA384</option>
+                <option>HMAC-SHA512 (most secure)</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Key</label>
+              <input class="form-control" name="key" placeholder="Secret TSIG key">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Update Source</label>
+              <select name="update_source" class="form-select">
+                <option>Default (use Interface above)</option>
+                <option>Do not specify</option>
+                <option>WAN</option><option>LAN</option><option>Localhost</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Update Source Family</label>
+              <select name="update_source_family" class="form-select">
+                <option>Default</option><option>IPv4</option><option>IPv6</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Description</label>
+              <input class="form-control" name="description" placeholder="Optional note">
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-field mb-2">
+            <label class="ss-label">Record Type</label>
+            <div class="d-flex gap-4 pt-1">
+              <div class="form-check"><input class="form-check-input" type="radio" name="record_type" id="type_a" value="A" checked><label class="form-check-label" for="type_a">A (IPv4)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="record_type" id="type_aaaa" value="AAAA"><label class="form-check-label" for="type_aaaa">AAAA (IPv6)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="record_type" id="type_both" value="Both"><label class="form-check-label" for="type_both">Both</label></div>
+            </div>
+          </div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" name="protocol_tcp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Use TCP instead of UDP</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" name="use_public_ip"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Use Public IP</p><p class="ss-toggle-desc">If interface IP is private, fetch and use the public IP instead</p></div></div>
+        </form>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border-color-soft);">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="rfc2136Form" class="btn btn-primary px-4">
+          <i class="fa-solid fa-check me-1"></i>Save Client
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
-
-<!-- Add/Edit RFC 2136 Client Modal -->
-<div class="modal fade" id="addRFC2136Modal" tabindex="-1" aria-labelledby="addRFC2136ModalLabel" aria-hidden="true">
-	<div class="modal-dialog modal-lg modal-dialog-scrollable">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="addRFC2136ModalLabel">RFC 2136 Client</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-			</div>
-			<div class="modal-body">
-				<form id="rfc2136Form" method="post" action="{{ url_for('services.dynamic_dns_rfc2136') }}">
-					<div class="mb-3 form-check">
-						<input type="checkbox" class="form-check-input" id="enable" name="enable">
-						<label class="form-check-label" for="enable">Enable</label>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Interface</label>
-						<select name="interface" class="form-select">
-							<option>WAN</option>
-							<option>LAN</option>
-						</select>
-						<div class="option-desc">Interface to monitor for updates. The address of this interface will be used in the updated DNS record.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Hostname</label>
-						<input class="form-control" name="hostname">
-						<div class="option-desc">Fully qualified hostname of the host to be updated.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Zone</label>
-						<input class="form-control" name="zone">
-						<div class="option-desc">Hostname zone (optional).</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">TTL (seconds)</label>
-						<input type="number" class="form-control" name="ttl">
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Key name</label>
-						<input class="form-control" name="key_name">
-						<div class="option-desc">This must match the setting on the DNS server.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Key algorithm</label>
-						<select name="key_algorithm" class="form-select">
-							<option>HMAC-MD5 (legacy default)</option>
-							<option>HMAC-SHA1</option>
-							<option>HMAC-SHA224</option>
-							<option>HMAC-SHA256 (current bind9 default)</option>
-							<option>HMAC-SHA384</option>
-							<option>HMAC-SHA512 (most secure)</option>
-						</select>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Key</label>
-						<input class="form-control" name="key">
-						<div class="option-desc">Secret TSIG domain key.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Server</label>
-						<input class="form-control" name="server">
-					</div>
-
-					<div class="row mb-3">
-						<label class="col-sm-3 col-form-label">Protocol</label>
-						<div class="col-sm-9">
-							<div class="form-check">
-								<input type="checkbox" class="form-check-input" id="protocol_tcp" name="protocol_tcp">
-								<label class="form-check-label" for="protocol_tcp">Use TCP instead of UDP</label>
-							</div>
-						</div>
-					</div>
-
-					<div class="row mb-3">
-						<label class="col-sm-3 col-form-label">Use public IP</label>
-						<div class="col-sm-9">
-							<div class="form-check">
-								<input type="checkbox" class="form-check-input" id="use_public_ip" name="use_public_ip">
-								<label class="form-check-label" for="use_public_ip">Use public IP</label>
-							</div>
-							<div class="option-desc">If the interface IP is private, attempt to fetch and use the public IP instead.</div>
-						</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Update Source</label>
-						<select name="update_source" class="form-select">
-							<option>Default (use Interface above)</option>
-							<option>Do not specify</option>
-							<option>WAN</option>
-							<option>LAN</option>
-							<option>Localhost</option>
-						</select>
-						<div class="option-desc">Interface or address from which the firewall will send the DNS update request.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Update Source Family</label>
-						<select name="update_source_family" class="form-select">
-							<option>Default</option>
-							<option>IPv4</option>
-							<option>IPv6</option>
-						</select>
-						<div class="option-desc">Address family to use for sourcing updates.</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Record Type</label>
-						<div>
-							<div class="form-check form-check-inline">
-								<input class="form-check-input" type="radio" name="record_type" id="type_a" value="A" checked>
-								<label class="form-check-label" for="type_a">A (IPv4)</label>
-							</div>
-							<div class="form-check form-check-inline">
-								<input class="form-check-input" type="radio" name="record_type" id="type_aaaa" value="AAAA">
-								<label class="form-check-label" for="type_aaaa">AAAA (IPv6)</label>
-							</div>
-							<div class="form-check form-check-inline">
-								<input class="form-check-input" type="radio" name="record_type" id="type_both" value="Both">
-								<label class="form-check-label" for="type_both">Both</label>
-							</div>
-						</div>
-					</div>
-
-					<div class="mb-3">
-						<label class="form-label">Description</label>
-						<input class="form-control" name="description">
-						<div class="option-desc">A description may be entered here for administrative reference (not parsed).</div>
-					</div>
-
-					<div class="notice-alert">
-						A DNS server must be configured in System: General Setup or allow the DNS server list to be overridden by DHCP/PPP on WAN for dynamic DNS updates to work.
-					</div>
-				</form>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-				<button type="submit" form="rfc2136Form" class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
-			</div>
-		</div>
-	</div>
-</div>
-
 {% endblock %}

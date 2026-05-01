@@ -3,17 +3,7 @@
 {% block main %}
 
 <div class="container">
-<!-- Page Header -->
-<div class="page-header">
-<nav aria-label="breadcrumb">
-<ol class="breadcrumb mb-2">
-<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
-<li class="breadcrumb-item active" aria-current="page">Time Server</li>
-</ol>
-</nav>
-<h1>Smart Shield Setup</h1>
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 4</h1><p class="ss-page-desc">WAN interface configuration</p></div></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -28,11 +18,9 @@
 
 <form method="post" action="#">
 <!-- Content Card -->
-<div class="section">
-<div class="section-header">
-<h2>Time Server Information</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-clock"></i></div><div><div class="ss-card-title">Time Server Information</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <p class="text-muted mb-4">Configure the time server settings and timezone for accurate system time synchronization.</p>
 
 <div class="row mb-4">

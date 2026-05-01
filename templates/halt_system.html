@@ -2,26 +2,22 @@
 
 {% block main %}
 <div class="container" style="max-width:680px">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
-        <li class="breadcrumb-item active">Halt / Reboot</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-power-off me-2 text-danger"></i>Halt / Reboot System</h1>
-    <p class="lead">Gracefully shut down or restart the firewall appliance.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Halt / Reboot</h1>
+      <p class="ss-page-desc">Gracefully shut down or restart the firewall appliance</p>
+    </div>
   </div>
 
   <div class="row g-3">
     <!-- Reboot -->
     <div class="col-sm-6">
-      <div class="section">
-        <div class="section-header">
-          <h2 class="mb-0"><i class="fa fa-rotate me-2"></i>Reboot</h2>
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-rotate"></i></div>
+          <div><div class="ss-card-title">Reboot</div></div>
         </div>
-        <div class="section-body">
+        <div class="ss-card-body">
           <p class="text-muted">Reboot the system. Connectivity will be lost briefly while the OS restarts.</p>
           <button id="btn-reboot" class="btn btn-warning w-100">
             <i class="fa fa-rotate me-2"></i>Reboot Now
@@ -32,11 +28,12 @@
 
     <!-- Halt -->
     <div class="col-sm-6">
-      <div class="section">
-        <div class="section-header">
-          <h2 class="mb-0"><i class="fa fa-power-off me-2"></i>Halt</h2>
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-power-off"></i></div>
+          <div><div class="ss-card-title">Halt</div></div>
         </div>
-        <div class="section-body">
+        <div class="ss-card-body">
           <p class="text-muted">Power off the system cleanly. All network traffic will stop.</p>
           <button id="btn-halt" class="btn btn-danger w-100">
             <i class="fa fa-power-off me-2"></i>Halt System

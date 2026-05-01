@@ -206,22 +206,22 @@
 {% block main %}
 <div style="width:100%;max-width:none;">
 
-  <div class="page-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <h1><i class="fa-solid fa-terminal me-2" style="color:var(--primary);font-size:1rem;"></i>Live Log Monitor</h1>
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <select id="refreshRate" class="form-select form-select-sm" style="width:auto;">
-          <option value="2000">2s refresh</option>
-          <option value="5000" selected>5s refresh</option>
-          <option value="10000">10s refresh</option>
-          <option value="30000">30s refresh</option>
-          <option value="0">Paused</option>
-        </select>
-        <button class="btn btn-sm btn-secondary" id="btnExport"><i class="fa-solid fa-download"></i> Export</button>
-        <button class="btn btn-sm btn-outline-danger" id="btnClear"><i class="fa-solid fa-trash-can"></i> Clear View</button>
-      </div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Live Log Monitor</h1>
+      <p class="ss-page-desc">Real-time event stream — auto-polls every 5 s. Click any row to expand details.</p>
     </div>
-    <p class="lead">Real-time event stream — auto-polls every 5 s. Click any row to expand details.</p>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <select id="refreshRate" class="form-select form-select-sm" style="width:auto;">
+        <option value="2000">2s refresh</option>
+        <option value="5000" selected>5s refresh</option>
+        <option value="10000">10s refresh</option>
+        <option value="30000">30s refresh</option>
+        <option value="0">Paused</option>
+      </select>
+      <button class="btn btn-sm btn-secondary" id="btnExport"><i class="fa-solid fa-download"></i> Export</button>
+      <button class="btn btn-sm btn-outline-danger" id="btnClear"><i class="fa-solid fa-trash-can"></i> Clear View</button>
+    </div>
   </div>
 
   <!-- Toolbar -->

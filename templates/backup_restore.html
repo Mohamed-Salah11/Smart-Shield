@@ -2,12 +2,11 @@
 
 {% block main %}
 <div class="container-fluid">
-    <div class="page-header mb-3">
-        <h2>Diagnostics / Backup &amp; Restore</h2>
-        <p class="text-muted mb-0">
-            <!-- FortiGate-style configuration backup and restore for Smart Shield. -->
-            Current device: <strong>{{ backup_context.hostname }}</strong> ({{ backup_context.timezone }}).
-        </p>
+    <div class="ss-page-header mb-3">
+        <div>
+            <h1 class="ss-page-title">Backup &amp; Restore</h1>
+            <p class="ss-page-desc">Current device: <strong>{{ backup_context.hostname }}</strong> ({{ backup_context.timezone }}).</p>
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}

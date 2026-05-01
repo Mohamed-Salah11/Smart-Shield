@@ -4,15 +4,7 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1><i class="fa-solid fa-certificate me-2" style="color:var(--primary);font-size:1.1rem;"></i>Certificate Manager</h1>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSearch()" title="Search Certificates">
-                <i class="fa-solid fa-search"></i>
-            </button>
-        </div>
-    </div>
+    <div class="ss-page-header"><div><h1 class="ss-page-title">Certificate Manager</h1><p class="ss-page-desc">CA authorities, certificates, and revocation lists</p></div></div>
 
     <!-- Navigation Tabs -->
     <ul class="nav nav-tabs">
@@ -40,14 +32,9 @@
     </ul>
 
     <!-- Search Section (Hidden by default) -->
-    <div class="section mb-4" id="search-section" style="display: none;">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Search Certificates</h2>
-            <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleSearch()" title="Close">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
-        <div class="section-body" style="padding: 15px;">
+    <div class="ss-card mb-4" id="search-section" style="display: none;">
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-search"></i></div><div><div class="ss-card-title">Search Certificates</div></div><button type="button" class="btn btn-sm btn-outline-light ms-auto" onclick="toggleSearch()" title="Close"><i class="fa-solid fa-times"></i></button></div>
+        <div class="ss-card-body" style="padding: 15px;">
             <form method="get" class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label">Search Term</label>
@@ -75,16 +62,12 @@
     </div>
 
     <!-- Certificate Authorities Section -->
-    <div class="section" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Certificate Authorities</h2>
-            <a href="{{ url_for('system.add_ca') }}" class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i>Add
-            </a>
-        </div>
+    <div class="ss-card" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-building-columns"></i></div><div><div class="ss-card-title">Certificate Authorities</div></div><a href="{{ url_for('system.add_ca') }}" class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add</a></div>
+        <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table table-hover mb-0" style="font-size:.85rem;">
+                <thead style="background:var(--border-color-soft);">
                     <tr>
                         <th>Name</th>
                         <th>Internal</th>
@@ -143,19 +126,16 @@
                 </tbody>
             </table>
         </div>
+        </div>
     </div>
 
     <!-- Certificates Section -->
-    <div class="section" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Certificates</h2>
-            <a href="{{ url_for('system.add_certificate') }}" class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i>Add / Sign
-            </a>
-        </div>
+    <div class="ss-card" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-file-certificate"></i></div><div><div class="ss-card-title">Certificates</div></div><a href="{{ url_for('system.add_certificate') }}" class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add / Sign</a></div>
+        <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table table-hover mb-0" style="font-size:.85rem;">
+                <thead style="background:var(--border-color-soft);">
                     <tr>
                         <th>Name</th>
                         <th>Issuer</th>
@@ -210,19 +190,16 @@
                 </tbody>
             </table>
         </div>
+        </div>
     </div>
 
     <!-- Revocation Section -->
-    <div class="section" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Certificate Revocation Lists</h2>
-            <button class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i>Add or Import CRL
-            </button>
-        </div>
+    <div class="ss-card" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div><div><div class="ss-card-title">Certificate Revocation Lists</div></div><button class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add or Import CRL</button></div>
+        <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table table-hover mb-0" style="font-size:.85rem;">
+                <thead style="background:var(--border-color-soft);">
                     <tr>
                         <th>CA</th>
                         <th>Method</th>
@@ -266,6 +243,7 @@
                 </tbody>
             </table>
         </div>
+        </div>
     </div>
 
 </div>
@@ -273,7 +251,7 @@
 <script>
     function showSection(section, linkEl) {
         // Hide all content sections (not the search bar)
-        document.querySelectorAll('.section[id$="-section"]').forEach(s => {
+        document.querySelectorAll('.ss-card[id$="-section"]').forEach(s => {
             if (s.id !== 'search-section') s.style.display = 'none';
         });
         // Show the selected section

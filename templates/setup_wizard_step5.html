@@ -3,17 +3,7 @@
 {% block main %}
 
 <div class="container">
-<!-- Page Header -->
-<div class="page-header">
-<nav aria-label="breadcrumb">
-<ol class="breadcrumb mb-2">
-<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
-<li class="breadcrumb-item active" aria-current="page">WAN Interface</li>
-</ol>
-</nav>
-<h1>Smart Shield Setup</h1>
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 5</h1><p class="ss-page-desc">LAN interface configuration</p></div></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -28,11 +18,9 @@
 
 <form method="post" action="#">
 <!-- Configuration Type -->
-<div class="section">
-<div class="section-header">
-<h2>Configure WAN Interface</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div><div><div class="ss-card-title">Configure WAN Interface</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <p class="text-muted mb-4">Configure the Wide Area Network (WAN) interface settings for your internet connection.</p>
 
 <div class="row mb-4">
@@ -50,11 +38,9 @@
 </div>
 
 <!-- General Configuration -->
-<div class="section">
-<div class="section-header">
-<h2>General Configuration</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div><div><div class="ss-card-title">General Configuration</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <div class="row mb-4">
 <label class="col-sm-3 col-form-label fw-semibold">MAC Address</label>
 <div class="col-sm-6">
@@ -81,11 +67,9 @@
 </div>
 
 <!-- Static IP Configuration -->
-<div class="section">
-<div class="section-header">
-<h2>Static IP Configuration</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-map-pin"></i></div><div><div class="ss-card-title">Static IP Configuration</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <div class="row mb-4">
 <label class="col-sm-3 col-form-label fw-semibold">IP Address</label>
 <div class="col-sm-4">
@@ -114,11 +98,9 @@
 </div>
 
 <!-- Security Settings -->
-<div class="section">
-<div class="section-header">
-<h2>Security Settings</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div><div><div class="ss-card-title">Security Settings</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <div class="mb-4">
 <div class="form-check form-switch">
 <input class="form-check-input" type="checkbox" id="block_rfc1918" checked>

@@ -114,9 +114,12 @@
 {% block main %}
 <div class="container">
 
-  <div class="page-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <h1><i class="fa-solid fa-shield-virus me-2" style="color:var(--primary);font-size:1.1rem;"></i>IDS / IPS</h1>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Threat Detection</h1>
+      <p class="ss-page-desc">Intrusion detection and prevention with Suricata</p>
+    </div>
+    <div class="d-flex gap-2">
       <div class="d-flex gap-2">
         <button class="btn btn-sm btn-primary" id="btnRefreshStatus"><i class="fa-solid fa-rotate"></i> Refresh</button>
         <button class="btn btn-sm {% if cfg.enabled %}btn-danger{% else %}btn-success{% endif %}" id="btnToggle"
@@ -189,10 +192,13 @@
 
   <!-- ── Tab: Status & Alerts ── -->
   <div class="tab-pane {% if active_tab=='status' %}d-block{% else %}d-none{% endif %}" id="tab-status">
-    <div class="section mt-3">
-      <div class="section-header d-flex justify-content-between align-items-center">
-        <h2><i class="fa-solid fa-triangle-exclamation me-2"></i>Recent Alerts</h2>
-        <button class="btn btn-sm btn-secondary" onclick="loadAlerts()"><i class="fa-solid fa-rotate"></i> Reload</button>
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div><div class="ss-card-title">Recent Alerts</div></div>
+        <div class="ss-card-actions">
+          <button class="btn btn-sm btn-secondary" onclick="loadAlerts()"><i class="fa-solid fa-rotate"></i> Reload</button>
+        </div>
       </div>
       <div class="alert-scroll">
         <table class="alert-tbl">
@@ -217,9 +223,12 @@
 
   <!-- ── Tab: Configuration ── -->
   <div class="tab-pane {% if active_tab=='config' %}d-block{% else %}d-none{% endif %}" id="tab-config">
-    <div class="section mt-3">
-      <div class="section-header"><h2>IDS / IPS Settings</h2></div>
-      <div class="section-body">
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div><div class="ss-card-title">IDS / IPS Settings</div></div>
+      </div>
+      <div class="ss-card-body">
         <form method="POST" action="{{ url_for('ids.ids_save') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -322,10 +331,11 @@
 
   <!-- ── Tab: Rulesets ── -->
   <div class="tab-pane {% if active_tab=='rules' %}d-block{% else %}d-none{% endif %}" id="tab-rules">
-    <div class="section mt-3">
-      <div class="section-header d-flex justify-content-between align-items-center">
-        <h2><i class="fa-solid fa-list-check me-2"></i>Rule Sources</h2>
-        <div class="d-flex gap-2">
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
+        <div><div class="ss-card-title">Rule Sources</div></div>
+        <div class="ss-card-actions d-flex gap-2">
           <button class="btn btn-sm btn-secondary" id="btnUpdateRules">
             <i class="fa-solid fa-cloud-arrow-down"></i> Update Rules
           </button>

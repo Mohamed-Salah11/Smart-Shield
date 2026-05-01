@@ -1,9 +1,7 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-    Dashboard / VPN / OpenVPN
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">OpenVPN Wizard — Step 1</h1><p class="ss-page-desc">Certificate Authority selection</p></div></div>
 
 <ul class="nav nav-tabs">
     <li class="nav-item">
@@ -24,41 +22,149 @@
     </li>
 </ul>
 
-<div class="settings-section openvpn-section">
-    <h5 class="openvpn-section-title">OpenVPN Wizards</h5>
-
-    <div class="openvpn-section-body">
-        <div class="card mb-4">
-            <div class="card-body p-4">
-                <h4 class="mb-3">OpenVPN Remote Access Server Setup</h4>
-                <p class="mb-2">This wizard will provide guidance through an OpenVPN Remote Access Server Setup.</p>
-                <p class="mb-0">The wizard may be stopped at any time by clicking the logo image at the top of the
-                    screen.</p>
-            </div>
-        </div>
-
+<div class="ss-card">
+    <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-hat-wizard"></i></div><div><div class="ss-card-title">OpenVPN Wizards</div></div></div>
+    <div class="ss-card-body">
         <div class="card">
-            <div class="card-body p-4">
-                <h6 class="mb-4">Select an Authentication Backend Type</h6>
+            <div class="card-body">
+                <div class="p-3 bg-dark text-white rounded mb-3">Certificate Authority Selection</div>
 
-                <div class="row align-items-center g-3">
-                    <div class="col-md-4">
-                        <label for="wizTypeOfServer" class="form-label mb-0">Type of Server</label>
-                    </div>
-                    <div class="col-md-8">
-                        <select class="form-select" id="wizTypeOfServer" name="type_of_server">
-                            <option value="local" selected>Local User Access</option>
-                            <option value="ldap">LDAP</option>
-                            <option value="radius">RADIUS</option>
-                        </select>
-                        <small class="text-muted">NOTE: If unsure, leave this set to &quot;Local User
-                            Access.&quot;</small>
-                    </div>
-                </div>
+                <div class="border rounded p-3 text-center mb-4">OpenVPN Remote Access Server Setup Wizard</div>
 
-                <div class="mt-4">
-                    <a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step2') }}"
-                        id="nextStepBtn">Next</a>
+                <div class="border rounded p-3">
+                    <div class="p-2 bg-dark text-white rounded mb-4">Create a New Certificate Authority (CA) Certificate
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaDescriptiveName" class="form-label fw-semibold">Descriptive name</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaDescriptiveName" name="descriptive_name" type="text" />
+                            <small class="text-muted">A name for administrative reference, to identify this
+                                certificate.</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaRandomizeSerial" class="form-label fw-semibold">Randomize Serial</label>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="form-check">
+                                <input class="form-check-input" id="wizCaRandomizeSerial" name="randomize_serial"
+                                    type="checkbox" checked />
+                                <label class="form-check-label" for="wizCaRandomizeSerial">Use random serial numbers
+                                    when signing certificates.</label>
+                            </div>
+                            <small class="text-muted">
+                                When enabled, serial numbers for certificates signed by this CA will be automatically
+                                randomized and checked for uniqueness instead of using sequential values.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaKeyLength" class="form-label fw-semibold">Key length</label>
+                        </div>
+                        <div class="col-md-9">
+                            <select class="form-select" id="wizCaKeyLength" name="key_length">
+                                <option value="2048" selected>2048 bit</option>
+                                <option value="4096">4096 bit</option>
+                            </select>
+                            <small class="text-muted">
+                                Size of the key which will be generated. The larger the key, the more security it
+                                offers, but larger keys take considerably more time to generate, and take slightly
+                                longer to validate leading to a slight slowdown in setting up new sessions (not always
+                                noticeable).
+                                As of 2016, 2048 bit is the minimum and most common selection and 4096 is the maximum in
+                                common use.
+                                For more information see <a href="#" class="link-primary">keylength.com</a>
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaLifetime" class="form-label fw-semibold">Lifetime</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaLifetime" name="lifetime" type="text" value="3650" />
+                            <small class="text-muted">Lifetime in days. This is commonly set to 3650 (Approximately 10
+                                years.)</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-0">
+                        <div class="col-md-3">
+                            <label for="wizCaCommonName" class="form-label fw-semibold">Common Name</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaCommonName" name="common_name" type="text" />
+                            <small class="text-muted">The internal name of the CA, used as a part of the CA subject. If
+                                left blank, the descriptive name will be used instead.</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mt-3 mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaCountryCode" class="form-label fw-semibold">Country Code</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaCountryCode" name="country_code" type="text" />
+                            <small class="text-muted">Two-letter ISO country code (e.g. US, AU, CA)</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaStateProvince" class="form-label fw-semibold">State or Province</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaStateProvince" name="state_or_province" type="text" />
+                            <small class="text-muted">Full State or Province name, not abbreviated (e.g. Texas, Indiana,
+                                Ontario).</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaCity" class="form-label fw-semibold">City</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaCity" name="city" type="text" />
+                            <small class="text-muted">City or other Locality name (e.g. Austin, Indianapolis,
+                                Toronto).</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-2">
+                        <div class="col-md-3">
+                            <label for="wizCaOrganization" class="form-label fw-semibold">Organization</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaOrganization" name="organization" type="text" />
+                            <small class="text-muted">Organization name, often the company or group name.</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-start mb-0">
+                        <div class="col-md-3">
+                            <label for="wizCaOrganizationalUnit" class="form-label fw-semibold">Organizational
+                                Unit</label>
+                        </div>
+                        <div class="col-md-9">
+                            <input class="form-control" id="wizCaOrganizationalUnit" name="organizational_unit"
+                                type="text" />
+                            <small class="text-muted">Organizational Unit name, often a department or team name.</small>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <a class="btn btn-primary" href="{{ url_for('vpn.openvpn_wizards_step3') }}" id="addCaBtn">Add
+                            new CA</a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,32 +172,50 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Save auth type before proceeding
-        document.getElementById('nextStepBtn').addEventListener('click', function (e) {
-            e.preventDefault();
+	document.addEventListener('DOMContentLoaded', function () {
+		// Handle Add new CA button
+		document.getElementById('addCaBtn').addEventListener('click', function (e) {
+			e.preventDefault();
 
-            const authType = document.getElementById('wizTypeOfServer').value;
+			const formData = {
+				descriptive_name: document.getElementById('wizCaDescriptiveName').value,
+				randomize_serial: document.getElementById('wizCaRandomizeSerial').checked,
+				key_length: parseInt(document.getElementById('wizCaKeyLength').value),
+				lifetime: parseInt(document.getElementById('wizCaLifetime').value),
+				common_name: document.getElementById('wizCaCommonName').value,
+				country_code: document.getElementById('wizCaCountryCode').value,
+				state_or_province: document.getElementById('wizCaStateProvince').value,
+				city: document.getElementById('wizCaCity').value,
+				organization: document.getElementById('wizCaOrganization').value,
+				organizational_unit: document.getElementById('wizCaOrganizationalUnit').value
+			};
 
-            fetch('/vpn/api/wizard/save-auth-type', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type_of_server: authType })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        window.location.href = "{{ url_for('vpn.openvpn_wizards_step2') }}";
-                    } else {
-                        alert('Error saving authentication type: ' + (data.message || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error saving authentication type');
-                });
-        });
-    });
+			// Validate required fields
+			if (!formData.descriptive_name) {
+				alert('Please enter a descriptive name for the CA');
+				return;
+			}
+
+			fetch('/vpn/api/wizard/save-ca', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(formData)
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data.status === 'success') {
+						alert('Certificate Authority created successfully!');
+						window.location.href = "{{ url_for('vpn.openvpn_wizards_step3') }}";
+					} else {
+						alert('Error creating CA: ' + (data.message || 'Unknown error'));
+					}
+				})
+				.catch(error => {
+					console.error('Error:', error);
+					alert('Error creating Certificate Authority');
+				});
+		});
+	});
 </script>
 
 {% endblock %}

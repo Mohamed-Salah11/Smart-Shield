@@ -3,17 +3,7 @@
 {% block main %}
 
 <div class="container">
-<!-- Page Header -->
-<div class="page-header">
-<nav aria-label="breadcrumb">
-<ol class="breadcrumb mb-2">
-<li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-<li class="breadcrumb-item"><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
-<li class="breadcrumb-item active" aria-current="page">Support</li>
-</ol>
-</nav>
-<h1>Smart Shield Setup</h1>
-</div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 2</h1><p class="ss-page-desc">General information</p></div></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -27,11 +17,9 @@
 </div>
 
 <!-- Content Card -->
-<div class="section">
-<div class="section-header">
-<h2>Smart Shield Global Support is Available 24/7</h2>
-</div>
-<div class="section-body" style="padding: 24px;">
+<div class="ss-card">
+<div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-headset"></i></div><div><div class="ss-card-title">Smart Shield Global Support is Available 24/7</div></div></div>
+<div class="ss-card-body" style="padding: 24px;">
 <div class="d-flex align-items-start mb-4">
 <div class="me-3">
 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="var(--primary)" viewBox="0 0 16 16">

@@ -2,23 +2,19 @@
 
 {% block main %}
 <div class="container" style="max-width:680px">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{{ url_for('diagnostics.diagnostics_home') }}">Diagnostics</a></li>
-        <li class="breadcrumb-item active">Factory Defaults</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-trash-can me-2 text-danger"></i>Reset to Factory Defaults</h1>
-    <p class="lead">Erase all configuration and return to a clean state.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Factory Defaults</h1>
+      <p class="ss-page-desc">Erase all configuration and return to a clean state</p>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-header">
-      <h2 class="mb-0"><i class="fa fa-triangle-exclamation me-2 text-danger"></i>Danger Zone</h2>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div><div class="ss-card-title">Danger Zone</div><div class="ss-card-subtitle">This action cannot be undone</div></div>
     </div>
-    <div class="section-body">
+    <div class="ss-card-body">
       <div class="alert alert-danger">
         <strong>Warning:</strong> This action will permanently delete all firewall rules, interface config,
         VPN tunnels, DHCP/DNS settings, and user accounts. <strong>This cannot be undone.</strong>

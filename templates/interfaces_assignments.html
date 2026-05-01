@@ -4,14 +4,11 @@
 
 <div class="container">
     <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('interfaces.interfaces') }}">Interfaces</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Assignments</li>
-            </ol>
-        </nav>
-        <h1>Interface Assignments</h1>
+    <div class="ss-page-header">
+        <div>
+            <h1 class="ss-page-title">Interface Assignments</h1>
+            <p class="ss-page-desc">Manage network interface assignments and virtual interfaces</p>
+        </div>
     </div>
 
     <!-- Navigation Tabs -->
@@ -30,11 +27,12 @@
 
     <!-- Interface Assignments Tab -->
     <div id="interface-assignments" class="tab-content active">
-        <div class="section">
-            <div class="section-header">
-                <h2>Interface Assignments</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+                <div><div class="ss-card-title">Interface Assignments</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -76,11 +74,12 @@
 
     <!-- Interface Groups Tab -->
     <div id="interface-groups" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>Interface Groups</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+                <div><div class="ss-card-title">Interface Groups</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="interface-groups-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -101,11 +100,12 @@
 
     <!-- Wireless Tab -->
     <div id="wireless" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>Wireless Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-wifi"></i></div>
+                <div><div class="ss-card-title">Wireless Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="wireless-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -126,11 +126,12 @@
 
     <!-- VLANs Tab -->
     <div id="vlans" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>VLAN Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-sitemap"></i></div>
+                <div><div class="ss-card-title">VLAN Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="vlan-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -152,11 +153,12 @@
 
     <!-- QinQs Tab -->
     <div id="qinqs" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>QinQ Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-tags"></i></div>
+                <div><div class="ss-card-title">QinQ Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="qinq-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -178,11 +180,12 @@
 
     <!-- PPPs Tab -->
     <div id="ppps" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>PPP Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-phone-flip"></i></div>
+                <div><div class="ss-card-title">PPP Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="ppp-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -204,11 +207,12 @@
 
     <!-- GREs Tab -->
     <div id="gres" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>GRE Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-tunnel"></i></div>
+                <div><div class="ss-card-title">GRE Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="gre-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -230,11 +234,12 @@
 
     <!-- GIFs Tab -->
     <div id="gifs" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>GIF Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-route"></i></div>
+                <div><div class="ss-card-title">GIF Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="gif-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -256,11 +261,12 @@
 
     <!-- Bridges Tab -->
     <div id="bridges" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>Bridge Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-bridge"></i></div>
+                <div><div class="ss-card-title">Bridge Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="bridge-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -281,11 +287,12 @@
 
     <!-- LAGGs Tab -->
     <div id="laggs" class="tab-content" style="display: none;">
-        <div class="section">
-            <div class="section-header">
-                <h2>LAGG Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-link"></i></div>
+                <div><div class="ss-card-title">LAGG Interfaces</div></div>
             </div>
-            <div class="section-body" style="padding: 0;">
+            <div style="overflow-x:auto;">
                 <table id="lagg-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -558,11 +565,12 @@
                         <button class="btn btn-info btn-sm" onclick="toggleAdvanced('ppp-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
                     </div>
                 </div>
-                <div id="ppp-advanced-fields" class="section" style="display: none;">
-                    <div class="section-header">
-                        <h2>Advanced Configuration</h2>
+                <div id="ppp-advanced-fields" class="ss-card" style="display: none;">
+                    <div class="ss-card-head">
+                        <div class="ss-card-icon"><i class="fa-solid fa-gears"></i></div>
+                        <div><div class="ss-card-title">Advanced Configuration</div></div>
                     </div>
-                    <div class="section-body" style="padding: 20px;">
+                    <div class="ss-card-body">
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="pppDialOnDemand">
                             <label class="form-check-label" for="pppDialOnDemand">Enable Dial-on-Demand mode</label>
@@ -790,11 +798,12 @@
                         <button class="btn btn-info btn-sm" onclick="toggleAdvanced('bridge-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
                     </div>
                 </div>
-                <div id="bridge-advanced-fields" class="section" style="display: none;">
-                    <div class="section-header">
-                        <h2>Advanced Configuration</h2>
+                <div id="bridge-advanced-fields" class="ss-card" style="display: none;">
+                    <div class="ss-card-head">
+                        <div class="ss-card-icon"><i class="fa-solid fa-gears"></i></div>
+                        <div><div class="ss-card-title">Advanced Configuration</div></div>
                     </div>
-                    <div class="section-body" style="padding: 20px;">
+                    <div class="ss-card-body">
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Cache Size</label>
                             <div class="col-sm-9">

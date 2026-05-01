@@ -47,11 +47,12 @@
     <form method="POST" action="{{ url_for('system.advanced_firewall_nat') }}">
 
         <!-- Packet Processing Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Packet Processing</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-microchip"></i></div>
+                <div><div class="ss-card-title">Packet Processing</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">IP Do-Not-Fragment</label>
                     <div class="col-sm-9">
@@ -134,11 +135,12 @@
         </div>
 
         <!-- VPN Packet Processing Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>VPN Packet Processing</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div><div class="ss-card-title">VPN Packet Processing</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="alert alert-info d-flex align-items-center mb-3">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="me-2 flex-shrink-0" viewBox="0 0 16 16">
                         <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/>
@@ -187,11 +189,12 @@
         </div>
 
         <!-- Advanced Options Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Advanced Options</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-gears"></i></div>
+                <div><div class="ss-card-title">Advanced Options</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Firewall</label>
                     <div class="col-sm-9">
@@ -295,11 +298,12 @@
         </div>
 
         <!-- Bogon Networks Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Bogon Networks</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div>
+                <div><div class="ss-card-title">Bogon Networks</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="update_frequency" class="col-sm-3 col-form-label fw-semibold">Update Frequency</label>
                     <div class="col-sm-9">
@@ -315,11 +319,12 @@
         </div>
 
         <!-- NAT Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Network Address Translation</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-arrows-left-right"></i></div>
+                <div><div class="ss-card-title">Network Address Translation</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="nat_reflection_mode" class="col-sm-3 col-form-label fw-semibold">NAT Reflection Mode</label>
                     <div class="col-sm-9">
@@ -380,11 +385,12 @@
         </div>
 
         <!-- State Timeouts Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>State Timeouts (seconds)</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-clock"></i></div>
+                <div><div class="ss-card-title">State Timeouts (seconds)</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="row">
                     <div class="col-md-6">
                         <h6 class="fw-semibold mb-3">TCP Timeouts</h6>

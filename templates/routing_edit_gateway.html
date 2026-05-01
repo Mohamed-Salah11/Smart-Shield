@@ -4,24 +4,19 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Edit Gateway</li>
-            </ol>
-        </nav>
-        <h1>Edit Gateway</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Edit Gateway</h1>
+        <p class="ss-page-desc">Configure a routing gateway</p>
+      </div>
     </div>
 
-    <!-- Edit Form Section -->
-    <div class="section">
-        <div class="section-header">
-            <h2>Gateway Configuration</h2>
-        </div>
-        <div class="section-body" style="padding: 20px;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+        <div><div class="ss-card-title">Gateway Configuration</div></div>
+      </div>
+      <div class="ss-card-body">
             <form method="post" action="{{ url_for('routing.gateway_edit', gw_id=gw_id) if gw_id else url_for('routing.gateway_edit') }}">
                 <div class="mb-3 row">
                     <div class="col-sm-3"></div>
