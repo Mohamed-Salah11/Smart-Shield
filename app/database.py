@@ -19,8 +19,9 @@ def _default_db_path():
 
 
 def _database_path():
-    # Read from env at call time so tests and runtime overrides behave deterministically.
-    return os.getenv("SMARTSHIELD_DB_PATH", _default_db_path())
+    # Treat unset AND empty-string the same — fall back to the platform default.
+    val = os.getenv("SMARTSHIELD_DB_PATH", "").strip()
+    return val if val else _default_db_path()
 
 
 def _ensure_parent_dir(path: str):
@@ -30,23 +31,63 @@ def _ensure_parent_dir(path: str):
 
 
 def get_db():
+    """
+    Return a SQLite connection for the current request (or call).
+
+    When called inside a Flask application context the connection is cached on
+    Flask's ``g`` object and automatically closed at the end of the request via
+    ``close_db()``.  Callers that explicitly call ``conn.close()`` are still safe
+    — SQLite connections are idempotent on double-close.
+    """
     global _MEMORY_ANCHOR_CONN, _MEMORY_ANCHOR_PATH
+
+    # Attempt to reuse the per-request cached connection.
+    try:
+        from flask import g
+        if "db" in g:
+            try:
+                g.db.execute("SELECT 1")   # verify connection is still alive
+                return g.db
+            except Exception:
+                g.pop("db", None)          # stale/closed — fall through to create new
+    except RuntimeError:
+        # No application context (e.g. CLI / background thread) — fall through.
+        pass
+
     db_path = _database_path()
-    is_uri = db_path.startswith("file:")
+    is_uri  = db_path.startswith("file:")
     if not is_uri:
         _ensure_parent_dir(db_path)
     elif "mode=memory" in db_path:
-        # Keep an anchor connection alive so shared-memory DBs persist across connections.
         if _MEMORY_ANCHOR_CONN is None or _MEMORY_ANCHOR_PATH != db_path:
             if _MEMORY_ANCHOR_CONN is not None:
                 _MEMORY_ANCHOR_CONN.close()
             _MEMORY_ANCHOR_CONN = sqlite3.connect(db_path, uri=True)
             _MEMORY_ANCHOR_CONN.execute("PRAGMA foreign_keys = ON")
             _MEMORY_ANCHOR_PATH = db_path
+
     conn = sqlite3.connect(db_path, uri=is_uri)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
+
+    try:
+        from flask import g
+        g.db = conn
+    except RuntimeError:
+        pass
+
     return conn
+
+
+def close_db(error=None):
+    """Close the per-request DB connection (registered as a teardown handler)."""
+    try:
+        from flask import g
+        conn = g.pop("db", None)
+        if conn is not None:
+            conn.close()
+    except RuntimeError:
+        pass
 
 def init_db():
     

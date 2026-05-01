@@ -2,25 +2,22 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Gateways</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-route me-2 text-primary"></i>Gateway Status</h1>
-    <p class="lead">WAN/LAN gateway configuration and live route table.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Gateway Status</h1>
+      <p class="ss-page-desc">WAN/LAN gateway configuration and live route table</p>
+    </div>
   </div>
 
   <div class="row g-3 mb-4">
     <!-- WAN -->
     <div class="col-md-6">
-      <div class="section h-100">
-        <div class="section-header">
-          <h2 class="mb-0"><i class="fa fa-globe me-2"></i>WAN Gateway</h2>
+      <div class="ss-card h-100">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div>
+          <div><div class="ss-card-title">WAN Gateway</div></div>
         </div>
-        <div class="section-body">
+        <div class="ss-card-body">
           {% if wan %}
           <dl class="row mb-0">
             <dt class="col-sm-4">Interface</dt>
@@ -42,11 +39,12 @@
     </div>
     <!-- LAN -->
     <div class="col-md-6">
-      <div class="section h-100">
-        <div class="section-header">
-          <h2 class="mb-0"><i class="fa fa-network-wired me-2"></i>LAN Gateway</h2>
+      <div class="ss-card h-100">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+          <div><div class="ss-card-title">LAN Gateway</div></div>
         </div>
-        <div class="section-body">
+        <div class="ss-card-body">
           {% if lan %}
           <dl class="row mb-0">
             <dt class="col-sm-4">Interface</dt>
@@ -67,16 +65,19 @@
   </div>
 
   <!-- Route Table -->
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-table me-2"></i>Route Table</h2>
-      {% if on_freebsd %}
-      <span class="badge bg-success"><i class="fa fa-circle me-1" style="font-size:.6rem"></i>Live</span>
-      {% else %}
-      <span class="badge bg-secondary">Simulation Mode</span>
-      {% endif %}
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-table-list"></i></div>
+      <div><div class="ss-card-title">Route Table</div></div>
+      <div class="ss-card-actions">
+        {% if on_freebsd %}
+        <span style="padding:3px 10px;background:rgba(0,180,160,.1);color:var(--success);border:1px solid var(--success);border-radius:20px;font-size:.75rem;font-weight:600;">Live</span>
+        {% else %}
+        <span style="padding:3px 10px;background:var(--border-color-soft);border-radius:20px;font-size:.75rem;">Simulation Mode</span>
+        {% endif %}
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       {% if routes %}
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">

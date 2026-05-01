@@ -322,33 +322,28 @@
     }
 
     // --- UTILITY FUNCTION: SEND TO BACKEND ---
-    async function saveRuleToBackend(ruleData, type) {
-        try {
-            let endpoint = '';
-            if (type === 'floating') {
-                endpoint = '/firewall/api/rules/floating';
-            } else if (type === 'wan') {
-                endpoint = '/firewall/api/rules/wan';
-            } else if (type === 'lan') {
-                endpoint = '/firewall/api/rules/lan';
-            }
+    // Tracks the rule ID currently being edited per type (null = add mode)
+    const editingRuleId = { floating: null, wan: null, lan: null };
 
+    async function saveRuleToBackend(ruleData, type) {
+        const editing = editingRuleId[type];
+        const endpoint = `/firewall/api/rules/${type}` + (editing ? `/${editing}` : '');
+        const method   = editing ? 'PUT' : 'POST';
+        try {
             const response = await fetch(endpoint, {
-                method: 'POST',
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(ruleData)
             });
-
             const result = await response.json();
             if (response.ok && result.success) {
-                console.log("Success:", result);
+                editingRuleId[type] = null;
                 return result;
             } else {
-                alert("Error saving to backend: " + (result.error || 'Unknown error'));
+                alert("Error saving rule: " + (result.error || 'Unknown error'));
                 return null;
             }
         } catch (error) {
-            console.error("Backend connection failed:", error);
             alert("Could not connect to the backend server.");
             return null;
         }
@@ -628,9 +623,52 @@
         }
     }
 
-    // Edit rule function (placeholder - can be expanded)
-    function editRule(type, ruleId) {
-        alert(`Edit ${type} rule #${ruleId} - Feature coming soon!`);
+    async function editRule(type, ruleId) {
+        try {
+            const response = await fetch(`/firewall/api/rules/${type}/${ruleId}`);
+            const result   = await response.json();
+            if (!result.success) { alert('Could not load rule: ' + (result.error || '')); return; }
+            const rule = result.rule;
+
+            editingRuleId[type] = ruleId;
+
+            if (type === 'floating') {
+                const modal = document.getElementById('floatingModal');
+                document.getElementById('floatingModalLabel').textContent = 'Edit Floating Rule';
+                document.getElementById('floating_disabled').checked   = !!rule.disabled;
+                document.getElementById('floating_interface').value    = rule.interface  || '';
+                document.getElementById('floating_protocol').value     = rule.protocol   || 'any';
+                document.getElementById('floating_description').value  = rule.description || '';
+                new bootstrap.Modal(modal).show();
+
+            } else if (type === 'wan') {
+                const modal = document.getElementById('wanModal');
+                const titleEl = modal.querySelector('.modal-title');
+                if (titleEl) titleEl.textContent = 'Edit WAN Rule';
+                const actionEl = document.getElementById('wan_rule_action');
+                if (actionEl) actionEl.value  = rule.action   || 'pass';
+                document.getElementById('wan_rule_disabled').checked  = !!rule.disabled;
+                const protoEl = document.getElementById('wan_rule_protocol');
+                if (protoEl) protoEl.value = rule.protocol || 'any';
+                const descEl  = document.getElementById('rule_desc');
+                if (descEl)   descEl.value  = rule.description || '';
+                new bootstrap.Modal(modal).show();
+
+            } else if (type === 'lan') {
+                const modal = document.getElementById('lanModal');
+                const titleEl = modal.querySelector('.modal-title');
+                if (titleEl) titleEl.textContent = 'Edit LAN Rule';
+                const ifaceEl = document.getElementById('lan_interface');
+                if (ifaceEl) ifaceEl.value = rule.interface  || '';
+                const protoEl = document.getElementById('lan_protocol');
+                if (protoEl) protoEl.value = rule.protocol   || 'any';
+                const descEl  = document.getElementById('lan_description');
+                if (descEl)   descEl.value  = rule.description || '';
+                new bootstrap.Modal(modal).show();
+            }
+        } catch (e) {
+            alert('Failed to load rule for editing.');
+        }
     }
 
     // Load all rules on page load

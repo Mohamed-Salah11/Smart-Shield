@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ========================================
-   LOGIN PAGE – SMART SHIELD
+   SMART SHIELD — LOGIN PAGE
+   Brand: Deep Navy + Cyber Teal
 ======================================== */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -18,108 +19,172 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #080c14;
+  background: #040d1a;
   overflow: hidden;
   position: relative;
   color: #e2e8f0;
 }
 
-/* ── Animated background grid ── */
+/* ── Background: diagonal teal-tinted lines ── */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(37,99,235,.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(37,99,235,.06) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(rgba(0,180,160,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,180,160,.05) 1px, transparent 1px);
+  background-size: 52px 52px;
   z-index: 0;
+  transform: skewY(-2deg);
+  transform-origin: top left;
 }
 
-/* ── Radial glow blobs ── */
+/* ── Radial teal glow blobs ── */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(37,99,235,.12) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 80% 70%, rgba(14,165,233,.09) 0%, transparent 70%);
+    radial-gradient(ellipse 55% 45% at 15% 25%, rgba(0,180,160,.12) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 40% at 85% 75%, rgba(99,102,241,.09) 0%, transparent 65%),
+    radial-gradient(ellipse 30% 30% at 50% 10%, rgba(0,180,160,.06) 0%, transparent 60%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Shield glow — bottom center ── */
+.login-scene {
+  position: fixed;
+  bottom: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 300px;
+  background: radial-gradient(ellipse at center, rgba(0,180,160,.07) 0%, transparent 70%);
   z-index: 0;
   pointer-events: none;
 }
 
 /* ========================================
-   LOGIN BOX (glassmorphism card)
+   LOGIN CARD
 ======================================== */
 .login-box {
   position: relative;
   z-index: 1;
-  width: 420px;
+  width: 430px;
   max-width: 94vw;
-  background: rgba(15,23,41,.85);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 18px;
+  background: rgba(6,15,28,.88);
+  border: 1px solid rgba(0,180,160,.15);
+  border-radius: 20px;
   padding: 44px 48px 40px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   box-shadow:
-    0 0 0 1px rgba(255,255,255,.04),
-    0 20px 60px rgba(0,0,0,.5),
+    0 0 0 1px rgba(0,180,160,.08),
+    0 24px 64px rgba(0,0,0,.55),
     0 8px 24px rgba(0,0,0,.35),
-    inset 0 1px 0 rgba(255,255,255,.07);
+    inset 0 1px 0 rgba(0,180,160,.1);
   text-align: center;
 }
 
-/* Glowing top border accent */
+/* Teal glow accent bar at top */
 .login-box::before {
   content: '';
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 60%;
+  width: 55%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(37,99,235,.8), rgba(14,165,233,.6), transparent);
-  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(0,180,160,.9),
+    rgba(77,217,205,.7),
+    transparent
+  );
+  border-radius: 0 0 3px 3px;
 }
 
-/* ── Logo ── */
+/* ── Shield logo container ── */
 .login-box .logo {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px;
-  background: linear-gradient(135deg, rgba(37,99,235,.15) 0%, rgba(14,165,233,.1) 100%);
-  border: 1px solid rgba(37,99,235,.25);
-  border-radius: 18px;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 22px;
+  background: linear-gradient(135deg, rgba(0,180,160,.15) 0%, rgba(0,180,160,.05) 100%);
+  border: 1px solid rgba(0,180,160,.3);
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(37,99,235,.2), inset 0 1px 0 rgba(255,255,255,.07);
+  box-shadow:
+    0 0 24px rgba(0,180,160,.18),
+    0 4px 16px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.06);
+  position: relative;
+  overflow: hidden;
 }
+
+/* Subtle inner shine on logo box */
+.login-box .logo::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  right: 0; bottom: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,.05) 0%, transparent 100%);
+  pointer-events: none;
+}
+
 .login-box .logo img {
   width: 52px;
   height: 52px;
   object-fit: contain;
   border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Shield SVG fallback (if no image) ── */
+.login-box .logo .shield-icon {
+  font-size: 2rem;
+  color: #00b4a0;
+  filter: drop-shadow(0 0 8px rgba(0,180,160,.5));
 }
 
 /* ── Title ── */
 .login-box h2 {
-  margin: 0 0 6px;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #f1f5f9;
-  letter-spacing: -.02em;
+  margin: 0 0 4px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #f0fffe;
+  letter-spacing: -.03em;
 }
 
 .login-subtitle {
   margin: 0 0 28px;
-  font-size: .83rem;
-  color: rgba(148,163,184,.7);
-  font-weight: 400;
-  letter-spacing: .02em;
+  font-size: .78rem;
+  color: rgba(0,180,160,.7);
+  font-weight: 600;
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
+
+/* ── Edition badge ── */
+.login-edition {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 26px;
+  padding: 3px 10px;
+  background: rgba(0,180,160,.1);
+  border: 1px solid rgba(0,180,160,.2);
+  border-radius: 99px;
+  font-size: .72rem;
+  font-weight: 700;
+  color: #4dd9cd;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.login-edition i { font-size: .68rem; }
 
 /* ── Form ── */
 form {
@@ -137,21 +202,22 @@ form {
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(148,163,184,.6);
-  font-size: .85rem;
+  color: rgba(0,180,160,.55);
+  font-size: .84rem;
   pointer-events: none;
   z-index: 1;
+  transition: color .2s;
 }
 
 form input[type="text"],
 form input[type="password"] {
   width: 100%;
   height: 46px;
-  background: rgba(8,12,20,.7);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 10px;
+  background: rgba(4,13,26,.75);
+  border: 1px solid rgba(0,180,160,.14);
+  border-radius: 11px;
   padding: 0 16px 0 40px;
-  color: #e2e8f0;
+  color: #e2fffe;
   font-size: .9rem;
   font-family: inherit;
   font-weight: 500;
@@ -161,36 +227,39 @@ form input[type="password"] {
   letter-spacing: .01em;
 }
 
-form input::placeholder { color: rgba(148,163,184,.5); font-weight: 400; }
+form input::placeholder { color: rgba(0,180,160,.35); font-weight: 400; }
 
 form input[type="text"]:focus,
 form input[type="password"]:focus {
-  border-color: rgba(37,99,235,.6);
-  background: rgba(8,12,20,.9);
+  border-color: rgba(0,180,160,.55);
+  background: rgba(4,13,26,.9);
   box-shadow:
     inset 0 1px 2px rgba(0,0,0,.2),
-    0 0 0 3px rgba(37,99,235,.15);
-  color: #f1f5f9;
+    0 0 0 3px rgba(0,180,160,.12);
+  color: #f0fffe;
 }
 
+form input:focus ~ .input-icon,
+.input-wrapper:focus-within .input-icon { color: #00b4a0; }
+
 /* ── Submit button ── */
-.login-btn-wrap {
-  margin-top: 6px;
-}
+.login-btn-wrap { margin-top: 6px; }
 
 form button[type="submit"] {
   width: 100%;
   height: 46px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 60%, #1e40af 100%);
+  background: linear-gradient(135deg, #00b4a0 0%, #009688 55%, #00796b 100%);
   color: #ffffff;
   border: none;
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: .9rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: .02em;
-  box-shadow: 0 4px 16px rgba(37,99,235,.4), 0 1px 0 rgba(255,255,255,.12) inset;
+  letter-spacing: .04em;
+  box-shadow:
+    0 4px 20px rgba(0,180,160,.4),
+    0 1px 0 rgba(255,255,255,.14) inset;
   transition: transform .12s ease, box-shadow .12s ease, background .15s ease;
   position: relative;
   overflow: hidden;
@@ -200,28 +269,30 @@ form button[type="submit"]::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,.08) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,.1) 0%, transparent 55%);
   border-radius: inherit;
 }
 
 form button[type="submit"]:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(37,99,235,.5), 0 1px 0 rgba(255,255,255,.12) inset;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 60%, #1d4ed8 100%);
+  box-shadow:
+    0 8px 28px rgba(0,180,160,.5),
+    0 1px 0 rgba(255,255,255,.14) inset;
+  background: linear-gradient(135deg, #00c9b3 0%, #00b4a0 55%, #009688 100%);
 }
 
 form button[type="submit"]:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(37,99,235,.35);
+  box-shadow: 0 2px 10px rgba(0,180,160,.35);
 }
 
-/* ── Error ── */
+/* ── Error message ── */
 .error {
-  background: rgba(239,68,68,.12);
-  border: 1px solid rgba(239,68,68,.25);
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.22);
   color: #fca5a5;
   padding: 10px 14px;
-  border-radius: 9px;
+  border-radius: 10px;
   font-size: .855rem;
   font-weight: 500;
   text-align: left;
@@ -240,12 +311,13 @@ footer {
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(255,255,255,.2);
-  font-size: .78rem;
-  font-weight: 400;
+  color: rgba(0,180,160,.35);
+  font-size: .75rem;
+  font-weight: 500;
   white-space: nowrap;
   z-index: 1;
-  letter-spacing: .03em;
+  letter-spacing: .06em;
+  text-transform: uppercase;
 }
 
 /* ========================================
@@ -254,7 +326,7 @@ footer {
 @media (max-width: 480px) {
   .login-box {
     padding: 36px 24px 32px;
-    border-radius: 14px;
+    border-radius: 16px;
   }
-  .login-box h2 { font-size: 1.2rem; }
+  .login-box h2 { font-size: 1.25rem; }
 }

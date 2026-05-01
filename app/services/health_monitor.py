@@ -417,3 +417,151 @@ def prune_health_history(conn, keep: int = 168) -> int:
     )
     conn.commit()
     return cursor.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Health alerting
+# ---------------------------------------------------------------------------
+
+_ALERT_THRESHOLDS = {
+    "disk_pct":   90.0,   # % used
+    "memory_pct": 90.0,   # % used
+    "cpu_load":   8.0,    # 1-min load average (absolute, not per-core)
+}
+
+
+def _load_alert_settings(conn) -> dict:
+    """Read alert settings from service_state. Returns {} if not configured."""
+    try:
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='health_alert_settings'"
+        ).fetchone()
+        if row:
+            import json as _json
+            return _json.loads(row["value_json"] or "{}")
+    except Exception:
+        pass
+    return {}
+
+
+def check_thresholds(snapshot: dict) -> list:
+    """
+    Compare a full_health_check snapshot against thresholds.
+    Returns a list of human-readable alert strings; empty = all healthy.
+    """
+    alerts = []
+
+    # Disk
+    for disk in snapshot.get("disk", {}).get("disks", []):
+        pct = disk.get("used_pct", 0)
+        if pct > _ALERT_THRESHOLDS["disk_pct"]:
+            alerts.append(
+                f"Disk {disk.get('path','?')} is {pct:.1f}% full "
+                f"({disk.get('used_gb','?')} GB / {disk.get('total_gb','?')} GB)"
+            )
+
+    # Memory
+    mem_pct = snapshot.get("system", {}).get("memory_used_pct", 0)
+    if mem_pct > _ALERT_THRESHOLDS["memory_pct"]:
+        alerts.append(f"Memory usage is {mem_pct:.1f}% (threshold {_ALERT_THRESHOLDS['memory_pct']}%)")
+
+    # CPU load
+    cpu_load = snapshot.get("system", {}).get("cpu_load_1", 0)
+    if cpu_load > _ALERT_THRESHOLDS["cpu_load"]:
+        alerts.append(f"CPU 1-min load average is {cpu_load:.2f} (threshold {_ALERT_THRESHOLDS['cpu_load']})")
+
+    # Stopped services (skip dry-run / unknown states)
+    for svc_name, svc_data in snapshot.get("services", {}).items():
+        if svc_name in ("interfaces", "config_drift"):
+            continue
+        if not isinstance(svc_data, dict):
+            continue
+        state = svc_data.get("state", "")
+        if state in ("stopped",) and svc_data.get("running") is False:
+            alerts.append(f"Service '{svc_name}' is stopped.")
+
+    return alerts
+
+
+def send_alerts(conn, snapshot: dict) -> list:
+    """
+    Check thresholds and dispatch alerts via every configured channel.
+    Returns a list of dispatched alert strings (empty if nothing triggered).
+    """
+    alerts = check_thresholds(snapshot)
+    if not alerts:
+        return []
+
+    settings  = _load_alert_settings(conn)
+    channels  = settings.get("channels", [])
+    subject   = "Smart Shield Health Alert"
+    body      = "\n".join(f"• {a}" for a in alerts)
+    body      = f"Smart Shield detected the following issues at {snapshot.get('timestamp','?')}:\n\n{body}"
+
+    for ch in channels:
+        ch_type = (ch.get("type") or "").lower()
+        try:
+            if ch_type == "email":
+                _send_email_alert(ch, subject, body)
+            elif ch_type == "webhook":
+                _send_webhook_alert(ch, subject, body, alerts)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Alert dispatch failed (%s): %s", ch_type, exc)
+
+    return alerts
+
+
+def _send_email_alert(cfg: dict, subject: str, body: str):
+    import smtplib
+    from email.mime.text import MIMEText
+
+    host    = cfg.get("smtp_host", "localhost")
+    port    = int(cfg.get("smtp_port", 25))
+    use_tls = bool(cfg.get("use_tls", False))
+    user    = cfg.get("smtp_user", "")
+    passwd  = cfg.get("smtp_password", "")
+    frm     = cfg.get("from_address", "smartshield@localhost")
+    to_list = cfg.get("to_addresses", [])
+    if not to_list:
+        return
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"]    = frm
+    msg["To"]      = ", ".join(to_list)
+
+    if use_tls:
+        smtp = smtplib.SMTP_SSL(host, port)
+    else:
+        smtp = smtplib.SMTP(host, port)
+    try:
+        if user and passwd:
+            smtp.login(user, passwd)
+        smtp.sendmail(frm, to_list, msg.as_string())
+    finally:
+        smtp.quit()
+
+
+def _send_webhook_alert(cfg: dict, subject: str, body: str, alerts: list):
+    import json as _json
+    import urllib.request
+
+    url     = cfg.get("url", "")
+    method  = (cfg.get("method") or "POST").upper()
+    headers = cfg.get("headers") or {"Content-Type": "application/json"}
+    if not url:
+        return
+
+    payload = _json.dumps({
+        "subject":   subject,
+        "message":   body,
+        "alerts":    alerts,
+        "timestamp": _now_iso(),
+    }).encode()
+
+    req = urllib.request.Request(url, data=payload, method=method)
+    for k, v in headers.items():
+        req.add_header(k, v)
+    with urllib.request.urlopen(req, timeout=10):
+        pass

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connected — Smart Shield</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    text-align: center;
+  }
+  .card-header {
+    background: #166534;
+    color: #fff;
+    padding: 1.5rem 2rem;
+  }
+  .card-header h1 { font-size: 1.4rem; font-weight: 600; }
+  .card-header p  { font-size: .85rem; opacity: .75; margin-top: .25rem; }
+  .card-body { padding: 2rem; }
+  .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+  .title { font-size: 1.25rem; font-weight: 700; color: #166534; margin-bottom: .5rem; }
+  .subtitle { font-size: .95rem; color: #4b5563; margin-bottom: 1.5rem; }
+  .btn-logout {
+    display: inline-block;
+    padding: .6rem 1.5rem;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: .875rem;
+    text-decoration: none;
+    transition: background .2s;
+  }
+  .btn-logout:hover { background: #e2e8f0; }
+  .footer { font-size: .8rem; color: #9ca3af; padding: 1rem 2rem; border-top: 1px solid #f1f5f9; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <h1>&#128274; Smart Shield</h1>
+    <p>Network Access Portal</p>
+  </div>
+  <div class="card-body">
+    <div class="icon">&#10004;&#65039;</div>
+    <div class="title">You are connected!</div>
+    <div class="subtitle">Your device has been granted network access.<br>You may close this window and browse normally.</div>
+    <a href="/portal/logout" class="btn-logout">Disconnect / Log out</a>
+  </div>
+  <div class="footer">Protected by Smart Shield &middot; Network Firewall Appliance</div>
+</div>
+</body>
+</html>

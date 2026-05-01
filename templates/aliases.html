@@ -462,6 +462,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (pageTab === 'urls' && aliasType) aliasType.value = 'URL (IPs)';
     updateSections();
 
+    // Tracks the alias being edited (null = add mode)
+    let editingAliasId = null;
+
     // Save alias
     if (saveBtn) saveBtn.addEventListener('click', async function (e) {
         e.preventDefault();
@@ -504,15 +507,19 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         try {
-            const response = await fetch('/firewall/api/aliases', {
-                method: 'POST',
+            const endpoint = editingAliasId
+                ? `/firewall/api/aliases/${editingAliasId}`
+                : '/firewall/api/aliases';
+            const method = editingAliasId ? 'PUT' : 'POST';
+            const response = await fetch(endpoint, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(aliasData)
             });
 
             const result = await response.json();
             if (result.success) {
-                alert('Alias saved successfully!');
+                editingAliasId = null;
                 document.getElementById('aliasForm').reset();
                 resetHostRows();
                 aliasModalInstance.hide();
@@ -521,7 +528,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Error saving alias: ' + result.error);
             }
         } catch (error) {
-            console.error('Error:', error);
             alert('Could not connect to the backend server.');
         }
     });
@@ -638,9 +644,72 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Edit alias function
-    window.editAlias = function(aliasId) {
-        alert(`Edit alias #${aliasId} - Feature coming soon!`);
+    window.editAlias = async function(aliasId) {
+        try {
+            const response = await fetch(`/firewall/api/aliases/${aliasId}`);
+            const result   = await response.json();
+            if (!result.success) { alert('Could not load alias: ' + (result.error || '')); return; }
+            const alias = result.alias;
+            editingAliasId = aliasId;
+
+            document.getElementById('aliasName').value = alias.name || '';
+            document.getElementById('aliasDesc').value = alias.description || '';
+            const typeEl = document.getElementById('aliasType');
+            if (typeEl) typeEl.value = alias.type || 'Host(s)';
+            updateSections();
+
+            // Populate values
+            let values = [];
+            try { values = JSON.parse(alias.alias_values || '[]'); } catch(e) {}
+            const typeVal = (alias.type || '').toLowerCase();
+
+            if (typeVal.startsWith('port')) {
+                portsList.innerHTML = '';
+                (values.length ? values : [{}]).forEach(v => {
+                    const row = document.createElement('div');
+                    row.className = 'port-row mb-2';
+                    row.innerHTML = `<div class="row g-2">
+                        <div class="col-md-5"><input type="text" class="form-control port-val" value="${v.value||''}"></div>
+                        <div class="col-md-5"><input type="text" class="form-control port-desc" value="${v.description||''}"></div>
+                        <div class="col-md-2"><button type="button" class="btn btn-danger btn-sm remove-port w-100"><i class="fas fa-minus"></i></button></div>
+                    </div>`;
+                    row.querySelector('.remove-port').addEventListener('click', function(){ this.closest('.port-row').remove(); });
+                    portsList.appendChild(row);
+                });
+            } else if (typeVal.includes('url')) {
+                urlsList.innerHTML = '';
+                (values.length ? values : [{}]).forEach(v => {
+                    const row = document.createElement('div');
+                    row.className = 'url-row mb-2';
+                    row.innerHTML = `<div class="row g-2">
+                        <div class="col-md-5"><input type="text" class="form-control url-val" value="${v.value||''}"></div>
+                        <div class="col-md-5"><input type="text" class="form-control url-desc" value="${v.description||''}"></div>
+                        <div class="col-md-2"><button type="button" class="btn btn-danger btn-sm remove-url w-100"><i class="fas fa-minus"></i></button></div>
+                    </div>`;
+                    row.querySelector('.remove-url').addEventListener('click', function(){ this.closest('.url-row').remove(); });
+                    urlsList.appendChild(row);
+                });
+            } else {
+                hostsList.innerHTML = '';
+                (values.length ? values : [{}]).forEach(v => {
+                    const row = document.createElement('div');
+                    row.className = 'host-row mb-2';
+                    row.innerHTML = `<div class="row g-2">
+                        <div class="col-md-5"><input type="text" class="form-control host-ip" value="${v.value||''}"></div>
+                        <div class="col-md-5"><input type="text" class="form-control host-desc" value="${v.description||''}"></div>
+                        <div class="col-md-2"><button type="button" class="btn btn-danger btn-sm remove-host w-100"><i class="fas fa-minus"></i></button></div>
+                    </div>`;
+                    row.querySelector('.remove-host').addEventListener('click', function(){ this.closest('.host-row').remove(); });
+                    hostsList.appendChild(row);
+                });
+            }
+
+            const modalTitleEl = document.getElementById('aliasModalLabel') || document.querySelector('#aliasModal .modal-title');
+            if (modalTitleEl) modalTitleEl.textContent = 'Edit Alias';
+            aliasModalInstance.show();
+        } catch (e) {
+            alert('Failed to load alias for editing.');
+        }
     };
 
     // Load aliases on page load

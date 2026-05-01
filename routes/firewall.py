@@ -142,6 +142,26 @@ def move_floating_rule(rule_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@firewall_bp.route("/api/rules/floating/<int:rule_id>", methods=["GET"])
+@login_required
+def get_floating_rule(rule_id):
+    """Get a single floating rule by ID"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT id, disabled, interface, protocol, source, source_port, "
+            "destination, dest_port, gateway, queue, schedule, description "
+            "FROM firewall_rules_floating WHERE id=?", (rule_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @firewall_bp.route("/api/rules/floating/<int:rule_id>", methods=["PUT"])
 @api_permission_required("api.firewall.edit")
 def update_floating_rule(rule_id):
@@ -209,10 +229,6 @@ def get_wan_rules():
         return jsonify({"success": True, "rules": rules})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 @firewall_bp.route("/api/rules/wan", methods=["POST"])
 @api_permission_required("api.firewall.edit")
@@ -251,10 +267,6 @@ def add_wan_rule():
         return jsonify({"success": True, "id": cursor.lastrowid})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 @firewall_bp.route("/api/rules/wan/<int:rule_id>/move", methods=["POST"])
 @api_permission_required("api.firewall.edit")
@@ -292,6 +304,25 @@ def move_wan_rule(rule_id):
             db.commit()
         
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/rules/wan/<int:rule_id>", methods=["GET"])
+@login_required
+def get_wan_rule(rule_id):
+    """Get a single WAN rule by ID"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT id, action, disabled, protocol, source, destination, description "
+            "FROM firewall_rules_wan WHERE id=?", (rule_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -338,10 +369,6 @@ def delete_wan_rule(rule_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 # LAN Rules CRUD
 @firewall_bp.route("/api/rules/lan", methods=["GET"])
@@ -436,6 +463,25 @@ def move_lan_rule(rule_id):
             db.commit()
         
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/rules/lan/<int:rule_id>", methods=["GET"])
+@login_required
+def get_lan_rule(rule_id):
+    """Get a single LAN rule by ID"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "SELECT id, action, disabled, protocol, source, destination, description "
+            "FROM firewall_rules_lan WHERE id=?", (rule_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -596,6 +642,24 @@ def move_nat_pf(rule_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@firewall_bp.route("/api/nat/pf/<int:rule_id>", methods=["GET"])
+@login_required
+def get_nat_pf_rule(rule_id):
+    """Get a single port forward rule by ID"""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, disabled, interface, protocol, src_type, src_address, "
+            "dst_type, dst_address, redirect_ip, description, nat_reflection "
+            "FROM nat_pf WHERE id=?", (rule_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @firewall_bp.route("/api/nat/pf/<int:rule_id>", methods=["PUT"])
 @api_permission_required("api.firewall.edit")
 def update_nat_pf(rule_id):
@@ -739,6 +803,23 @@ def move_nat_1to1(rule_id):
             db.commit()
         
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/1to1/<int:rule_id>", methods=["GET"])
+@login_required
+def get_nat_1to1_rule(rule_id):
+    """Get a single 1:1 NAT mapping by ID"""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, disabled, interface, external_address, internal_address, "
+            "destination_address, description FROM nat_1to1 WHERE id=?", (rule_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -887,6 +968,22 @@ def move_nat_outbound(rule_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@firewall_bp.route("/api/nat/outbound/<int:rule_id>", methods=["GET"])
+@login_required
+def get_nat_outbound_rule(rule_id):
+    """Get a single outbound NAT rule by ID"""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM nat_outbound WHERE id=?", (rule_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @firewall_bp.route("/api/nat/outbound/<int:rule_id>", methods=["PUT"])
 @api_permission_required("api.firewall.edit")
 def update_nat_outbound(rule_id):
@@ -1031,6 +1128,22 @@ def move_nat_npt(rule_id):
             db.commit()
         
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/nat/npt/<int:rule_id>", methods=["GET"])
+@login_required
+def get_nat_npt_rule(rule_id):
+    """Get a single NPt mapping by ID"""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM nat_npt WHERE id=?", (rule_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Rule not found"}), 404
+        return jsonify({"success": True, "rule": dict(row)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1184,6 +1297,23 @@ def add_alias():
         
         db.commit()
         return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@firewall_bp.route("/api/aliases/<int:alias_id>", methods=["GET"])
+@login_required
+def get_alias(alias_id):
+    """Get a single alias by ID"""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, name, type, alias_values, description FROM firewall_aliases WHERE id=?",
+            (alias_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"success": False, "error": "Alias not found"}), 404
+        return jsonify({"success": True, "alias": dict(row)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1727,6 +1857,122 @@ def delete_virtual_ips_config(config_id):
         return jsonify({'status': 'success', 'message': 'Virtual IP deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
+# APPLY — compile DB rules into pf.conf and reload PF
+# ---------------------------------------------------------------------------
+
+@firewall_bp.route("/api/apply", methods=["POST"])
+@api_permission_required("api.firewall.edit")
+def firewall_apply():
+    """
+    Compile all firewall rules, NAT rules, and aliases from the database
+    into /etc/pf.conf and reload PF via pfctl.
+
+    On non-FreeBSD the config is generated and returned but not applied.
+    Returns {"ok": bool, "message": str, "conf": str}
+    """
+    from flask import session
+    from app.audit_log import log_event
+    conn = get_db()
+    try:
+        from app.services.pf_generator import reload_pf_rules
+        result = reload_pf_rules(conn)
+        log_event(
+            category="system",
+            action="firewall_apply",
+            username=session.get("username", "system"),
+            remote_addr=request.remote_addr,
+            details={"ok": result["ok"], "message": result["message"]},
+        )
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc), "conf": ""}), 500
+
+
+@firewall_bp.route("/api/apply/status", methods=["GET"])
+@login_required
+def firewall_pf_status():
+    """Return the live PF running state."""
+    try:
+        from app.services.pf_generator import get_pf_status
+        return jsonify({"ok": True, **get_pf_status()})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@firewall_bp.route("/api/apply/rollback", methods=["POST"])
+@api_permission_required("api.firewall.edit")
+def firewall_rollback():
+    """Restore the last known-good pf.conf."""
+    from flask import session
+    from app.audit_log import log_event
+    try:
+        from app.services.pf_generator import rollback_pf
+        result = rollback_pf()
+        log_event(
+            category="system",
+            action="firewall_rollback",
+            username=session.get("username", "system"),
+            remote_addr=request.remote_addr,
+            details={"ok": result["ok"]},
+        )
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@firewall_bp.route("/api/apply/preview", methods=["GET"])
+@login_required
+def firewall_preview():
+    """Return the pf.conf that *would* be applied without touching the OS."""
+    conn = get_db()
+    try:
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        return jsonify({"ok": True, "conf": conf})
+    except Exception as exc:
+        return jsonify({"ok": False, "conf": "", "message": str(exc)}), 500
+
+
+# ---------------------------------------------------------------------------
+# RULE REORDER — update rule_order for drag-and-drop UI
+# ---------------------------------------------------------------------------
+
+_REORDER_TABLES = {
+    "floating": "firewall_rules_floating",
+    "wan":      "firewall_rules_wan",
+    "lan":      "firewall_rules_lan",
+}
+
+
+@firewall_bp.route("/api/rules/<table>/reorder", methods=["POST"])
+@api_permission_required("api.firewall.edit")
+def reorder_rules(table):
+    """
+    Accept a JSON body ``{"order": [id1, id2, ...]}`` and update rule_order
+    for the given rule table.  ``table`` must be one of floating/wan/lan.
+    """
+    if table not in _REORDER_TABLES:
+        return jsonify({"success": False, "error": f"Unknown table: {table}"}), 400
+
+    data = request.get_json() or {}
+    order = data.get("order", [])
+    if not isinstance(order, list):
+        return jsonify({"success": False, "error": "order must be a list of rule IDs"}), 400
+
+    db = get_db()
+    try:
+        for position, rule_id in enumerate(order, start=1):
+            db.execute(
+                f"UPDATE {_REORDER_TABLES[table]} SET rule_order=? WHERE id=?",
+                (position, int(rule_id)),
+            )
+        db.commit()
+        return jsonify({"success": True, "message": f"{len(order)} rules reordered."})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 # ----------------------------

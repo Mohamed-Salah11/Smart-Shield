@@ -1,188 +1,144 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / UPnP & NAT-PMP</span>
-</div>
+<div class="container">
 
-<div class="settings-section">
-	<h5>Service Settings</h5>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">UPnP / PCP</h1>
+      <p class="ss-page-desc">Universal Plug and Play and Port Control Protocol port mapping service</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="saveUPnP()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 
-	<div class="form-group">
-		<label>Port Mapping</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="enable_port_mapping">
-				<label class="form-check-label" for="enable_port_mapping">Enable port mapping service</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="allow_upnp_igd">
-				<label class="form-check-label" for="allow_upnp_igd">Allow UPnP IGD port mapping</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="allow_pcp_natpmp">
-				<label class="form-check-label" for="allow_pcp_natpmp">Allow PCP/NAT-PMP port mapping</label>
-			</div>
-		</div>
-	</div>
+  <!-- Service Settings -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-plug"></i></div>
+      <div><div class="ss-card-title">Service Settings</div><div class="ss-card-subtitle">Enable and configure the port mapping daemon</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_port_mapping"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable Port Mapping Service</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="allow_upnp_igd"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Allow UPnP IGD Port Mapping</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="allow_pcp_natpmp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Allow PCP / NAT-PMP Port Mapping</p></div></div>
+      <hr class="ss-divider">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">External Interface</label>
+          <select class="form-select" id="external_interface">
+            <option>wan</option><option>lan</option><option>localhost</option>
+          </select>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Internal Interfaces</label>
+          <select class="form-select" id="internal_interfaces">
+            <option>wan</option><option>lan</option><option>loopback</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>External interface</label>
-		<div class="form-group-content">
-			<select class="form-control" id="external_interface" style="max-width: 200px;">
-				<option>wan</option>
-				<option>lan</option>
-				<option>localhost</option>
-			</select>
-		</div>
-	</div>
+  <!-- External Address -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div><div class="ss-card-title">External Address Settings</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_stun"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable STUN for External IP Discovery</p></div></div>
+      <hr class="ss-divider">
+      <div class="ss-field-grid ss-field-grid-3">
+        <div class="ss-field">
+          <label class="ss-label">STUN Server</label>
+          <input type="text" class="form-control" id="stun_server" placeholder="stun.example.com">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">STUN Port</label>
+          <input type="text" class="form-control" id="stun_port" placeholder="3478">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Override WAN Address</label>
+          <input type="text" class="form-control" id="override_wan_address" placeholder="e.g. 203.0.113.5">
+        </div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Internal interfaces</label>
-		<div class="form-group-content">
-			<select class="form-control" id="internal_interfaces" style="max-width: 200px;">
-				<option>wan</option>
-				<option>lan</option>
-				<option>loopback</option>
-			</select>
-		</div>
-	</div>
-</div>
+  <!-- Advanced -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-gear"></i></div>
+      <div><div class="ss-card-title">Advanced Settings</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+        <div class="ss-field">
+          <label class="ss-label">Download Speed (Mbps)</label>
+          <input type="text" class="form-control" id="download_speed" placeholder="e.g. 100">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Upload Speed (Mbps)</label>
+          <input type="text" class="form-control" id="upload_speed" placeholder="e.g. 20">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Custom Presentation URL</label>
+          <input type="text" class="form-control" id="custom_presentation_url">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Custom Model Number</label>
+          <input type="text" class="form-control" id="custom_model_number">
+        </div>
+      </div>
+      <hr class="ss-divider">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="firewall_logs"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Log Mapped Connections</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="report_uptime"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Report System Uptime</p></div></div>
+    </div>
+  </div>
 
-<div class="settings-section">
-	<h5>External Address Settings</h5>
+  <!-- ACL -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="ss-card-title">Service Access Control</div><div class="ss-card-subtitle">Restrict which hosts can request port mappings</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="default_deny"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Default Deny</p><p class="ss-toggle-desc">Only explicitly allowed hosts can use the port mapping service</p></div></div>
+      <hr class="ss-divider">
+      <label class="ss-label mb-2">Allowed Hosts / Networks</label>
+      <div class="d-flex gap-2 mb-3">
+        <input type="text" class="form-control" id="acl_entry" placeholder="e.g. 192.168.1.100 or 10.0.0.0/8" style="max-width:300px;">
+        <button type="button" class="btn btn-success btn-sm" id="add_acl">
+          <i class="fa-solid fa-plus me-1"></i>Add
+        </button>
+      </div>
+      <div id="acl_entries"></div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>STUN</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="enable_stun">
-				<label class="form-check-label" for="enable_stun">Enable STUN</label>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>STUN server</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="stun_server" placeholder="stun.example.com" style="max-width: 300px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>STUN port</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="stun_port" placeholder="3478" style="max-width: 150px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Override WAN address</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="override_wan_address" placeholder="e.g. 203.0.113.5" style="max-width: 250px;">
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>Advanced Settings</h5>
-
-	<div class="form-group">
-		<label>Download speed</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="download_speed" placeholder="Mbps" style="max-width: 150px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Upload speed</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="upload_speed" placeholder="Mbps" style="max-width: 150px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Traffic shaping</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="traffic_shaping" style="max-width: 300px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Custom presentation URL</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="custom_presentation_url" style="max-width: 400px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Custom model number</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="custom_model_number" style="max-width: 250px;">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Logging & Reporting</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="firewall_logs">
-				<label class="form-check-label" for="firewall_logs">Log mapped connections</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="report_uptime">
-				<label class="form-check-label" for="report_uptime">Report system uptime</label>
-			</div>
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>Service Access Control List</h5>
-
-	<div class="form-group">
-		<label>Default Access</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="default_deny">
-				<label class="form-check-label" for="default_deny">Deny access to port mapping service by default</label>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>ACL Entries</label>
-		<div class="form-group-content">
-			<div class="d-flex gap-2 mb-2">
-				<input type="text" class="form-control" id="acl_entry" placeholder="e.g. 192.168.1.100" style="max-width: 250px;">
-				<button type="button" class="btn btn-success" id="add_acl">Add</button>
-			</div>
-			<div id="acl_entries" style="min-height: 40px;"></div>
-		</div>
-	</div>
-</div>
-
-<div class="d-flex gap-2 mt-3">
-	<button type="submit" class="btn btn-primary">Save</button>
+  <div class="ss-save-bar">
+    <button type="button" class="btn btn-primary px-4" onclick="saveUPnP()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 </div>
 
 <script>
-document.getElementById("add_acl").addEventListener("click", function() {
-	const input = document.getElementById("acl_entry");
-	const value = input.value.trim();
-	if (value === "") return;
-
-	const list = document.getElementById("acl_entries");
-	const item = document.createElement("div");
-	item.className = "d-flex gap-2 align-items-center mb-2";
-	item.innerHTML = `
-		<span class="form-control" style="max-width: 250px; background: #e8f0fe;">${value}</span>
-		<button type="button" class="btn btn-danger btn-sm">Delete</button>
-	`;
-	item.querySelector("button").addEventListener("click", () => item.remove());
-	list.appendChild(item);
-	input.value = "";
+document.getElementById('add_acl').addEventListener('click', function() {
+  const input = document.getElementById('acl_entry');
+  const value = input.value.trim();
+  if (!value) return;
+  const list = document.getElementById('acl_entries');
+  const item = document.createElement('div');
+  item.className = 'd-flex gap-2 align-items-center mb-2';
+  item.innerHTML = `<span class="form-control" style="max-width:300px;background:var(--primary-soft);color:var(--text-color);">${value}</span>
+    <button type="button" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i></button>`;
+  item.querySelector('button').addEventListener('click', () => item.remove());
+  list.appendChild(item);
+  input.value = '';
 });
-</script>
 
+function saveUPnP() { alert('UPnP settings saved.'); }
+</script>
 {% endblock %}

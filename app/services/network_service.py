@@ -104,9 +104,31 @@ def run_command(
         except Exception:
             pass
 
+    # On FreeBSD the web process runs as the unprivileged `smartshield` user.
+    # Privileged binaries (pfctl, ifconfig, service, sysrc, route) require sudo.
+    # The sudoers file at bsd/etc/sudoers.d/smartshield grants the exact allowlist.
+    _PRIVILEGED_BINS = {
+        "/sbin/pfctl", "pfctl",
+        "/sbin/ifconfig", "ifconfig",
+        "/sbin/route", "route",
+        "/usr/sbin/service", "service",
+        "/usr/sbin/sysrc", "sysrc",
+        "/usr/local/sbin/unbound-control", "unbound-control",
+        "/usr/sbin/ppp", "ppp",
+        "pkill",
+    }
+    actual_cmd = list(cmd)
+    if (
+        sys.platform.startswith("freebsd")
+        and actual_cmd
+        and actual_cmd[0] in _PRIVILEGED_BINS
+        and actual_cmd[0] != "/usr/bin/sudo"
+    ):
+        actual_cmd = ["/usr/bin/sudo"] + actual_cmd
+
     try:
         proc = subprocess.run(
-            cmd,
+            actual_cmd,
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
@@ -114,16 +136,16 @@ def run_command(
         )
     except subprocess.TimeoutExpired:
         raise FreeBSDNetworkError(
-            f"Command timed out after {timeout_seconds}s: {' '.join(redact_command(cmd))}"
+            f"Command timed out after {timeout_seconds}s: {' '.join(redact_command(actual_cmd))}"
         )
 
     if check and proc.returncode != 0:
         raise FreeBSDNetworkError(
-            f"Command failed ({' '.join(redact_command(cmd))}): "
+            f"Command failed ({' '.join(redact_command(actual_cmd))}): "
             f"{proc.stderr.strip() or proc.stdout.strip()}"
         )
     return CommandResult(
-        command=cmd,
+        command=actual_cmd,
         returncode=proc.returncode,
         stdout=proc.stdout,
         stderr=proc.stderr,

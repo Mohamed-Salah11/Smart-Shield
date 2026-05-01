@@ -1,568 +1,335 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / DHCP Server / WAN</span>
-</div>
+<div class="container">
 
-<ul class="nav nav-tabs">
-	<li class="nav-item"><a href="{{ url_for('services.dhcp_server') }}" class="nav-link active">WAN</a></li>
-	<li class="nav-item"><a href="{{ url_for('services.dhcp_server_lan') }}" class="nav-link">LAN</a></li>
-</ul>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">DHCP Server</h1>
+      <p class="ss-page-desc">Dynamic Host Configuration Protocol server settings</p>
+    </div>
+    <button type="button" class="btn btn-primary" id="dhcpServerSaveBtn">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 
-<div class="settings-section">
-	<h5>General Settings</h5>
-	
-	<div class="form-group">
-		<label>DHCP Backend</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" value="ISC DHCP" readonly>
-		</div>
-	</div>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a href="{{ url_for('services.dhcp_server') }}"     class="nav-link active">WAN</a></li>
+    <li class="nav-item"><a href="{{ url_for('services.dhcp_server_lan') }}" class="nav-link">LAN</a></li>
+  </ul>
 
-	<div class="form-group">
-		<label>Enable</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="enable_dhcp">
-				<label class="form-check-label" for="enable_dhcp">Enable DHCP server on WAN interface</label>
-			</div>
-		</div>
-	</div>
+  <!-- General Settings -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div><div class="ss-card-title">General Settings</div><div class="ss-card-subtitle">Backend, enable state and client policy</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+        <div class="ss-field">
+          <label class="ss-label">DHCP Backend</label>
+          <input type="text" class="form-control" value="ISC DHCP" readonly>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Client Policy</label>
+          <select class="form-select">
+            <option>Allow all clients</option>
+            <option>Allow known clients (any interface)</option>
+            <option>Allow known clients (this interface only)</option>
+          </select>
+        </div>
+      </div>
+      <hr class="ss-divider">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="enable_dhcp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable DHCP Server on WAN</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="ignore_bootp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Ignore BOOTP Queries</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="ignore_denied"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Ignore Denied Clients (instead of reject)</p><p class="ss-toggle-desc">Not compatible with failover</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="ignore_client_ids"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Ignore Client Identifiers</p><p class="ss-toggle-desc">Use only MAC address for client identification</p></div></div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>BOOTP</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="ignore_bootp">
-				<label class="form-check-label" for="ignore_bootp">Ignore BOOTP queries</label>
-			</div>
-		</div>
-	</div>
+  <!-- Address Pool -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-ip"></i></div>
+      <div><div class="ss-card-title">Address Pool</div><div class="ss-card-subtitle">The range of IP addresses leased to clients</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+        <div class="ss-field">
+          <label class="ss-label">Subnet</label>
+          <input type="text" class="form-control" value="192.168.1.0/24" readonly>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Available Range</label>
+          <input type="text" class="form-control" value="192.168.1.1 – 192.168.1.254" readonly>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Pool Start</label>
+          <input type="text" class="form-control" placeholder="e.g. 192.168.1.100">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Pool End</label>
+          <input type="text" class="form-control" placeholder="e.g. 192.168.1.200">
+        </div>
+      </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="alert('Add Address Pool')">
+        <i class="fa-solid fa-plus me-1"></i>Add Additional Pool
+      </button>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Deny Unknown Clients</label>
-		<div class="form-group-content">
-			<select class="form-control">
-				<option>Allow all clients</option>
-			</select>
-			<div class="help-text">When set to "Allow all clients", any DHCP client will get an IP address within this scope/range on this interface. If set to "Allow known clients from any interface", any DHCP client with a DUID or IP address listed in a static mapping on any interface(s) will get IP address(es). If set to "Allow known clients from only this interface", only known clients from this interface, only MAC addresses listed in static mappings on this interface will get an IP address within this scope/range</div>
-		</div>
-	</div>
+  <!-- Server Options -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+      <div><div class="ss-card-title">Server Options</div><div class="ss-card-subtitle">Gateway, DNS, domain and lease times pushed to clients</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+        <div class="ss-field">
+          <label class="ss-label">Gateway</label>
+          <input type="text" class="form-control" value="192.168.1.200">
+          <p class="ss-hint">Blank = use this interface's IP. Enter "none" to omit.</p>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Domain Name</label>
+          <input type="text" class="form-control" placeholder="home.arpa">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">DNS Server 1</label>
+          <input type="text" class="form-control" value="192.168.1.200">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">DNS Server 2</label>
+          <input type="text" class="form-control" placeholder="Optional">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">WINS Server 1</label>
+          <input type="text" class="form-control" placeholder="Optional">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">WINS Server 2</label>
+          <input type="text" class="form-control" placeholder="Optional">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Default Lease Time (s)</label>
+          <input type="number" class="form-control" value="7200">
+          <p class="ss-hint">Used when client doesn't request a specific expiry</p>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Maximum Lease Time (s)</label>
+          <input type="number" class="form-control" value="86400">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Domain Search List</label>
+          <input type="text" class="form-control" placeholder="example.com;sub.example.com">
+          <p class="ss-hint">Semicolon-separated</p>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Failover Peer IP</label>
+          <input type="text" class="form-control" placeholder="Leave blank to disable">
+        </div>
+      </div>
+      <hr class="ss-divider">
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="static_arp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable Static ARP</p><p class="ss-toggle-desc">Restrict firewall communication to hosts in static mappings only</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="time_format"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Display Lease Times in Local Time</p><p class="ss-toggle-desc">Default is UTC</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="statistics"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable Lease Statistics Graphs</p></div></div>
+      <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="ping_check"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Disable Ping Check</p><p class="ss-toggle-desc">Skip pre-assignment ping (enabled by default)</p></div></div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Ignore Denied Clients</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="ignore_denied">
-				<label class="form-check-label" for="ignore_denied">Ignore denied clients rather than reject</label>
-			</div>
-			<div class="help-text">This option is not compatible with failover and cannot be enabled when a Failover Peer IP address is configured.</div>
-		</div>
-	</div>
+  <!-- OMAPI -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-key"></i></div>
+      <div><div class="ss-card-title">OMAPI</div><div class="ss-card-subtitle">Management API for runtime DHCP server interaction</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">OMAPI Port</label>
+          <input type="text" class="form-control" placeholder="7911 (blank = disabled)">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Key Algorithm</label>
+          <select class="form-select">
+            <option>HMAC-SHA256 (default)</option>
+          </select>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">OMAPI Key</label>
+          <input type="text" class="form-control" placeholder="Secret key">
+        </div>
+        <div class="ss-field" style="display:flex;align-items:flex-end;">
+          <label class="ss-check-item">
+            <input type="checkbox" id="gen_key">
+            <span>Generate New Key</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Ignore Client Identifiers</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="ignore_client_ids">
-				<label class="form-check-label" for="ignore_client_ids">Ignore Client Identifiers</label>
-			</div>
-			<div class="help-text">This option may be used when a client can dual boot using different client identifiers but the same hardware (MAC) address. Note that the resulting server behavior violates the official DHCP specification.</div>
-		</div>
-	</div>
-</div>
+  <!-- Advanced Options -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-ellipsis"></i></div>
+      <div><div class="ss-card-title">Advanced Options</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button type="button" data-advanced="dhcp-wan-ddns"    class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>Dynamic DNS</button>
+        <button type="button" data-advanced="dhcp-wan-mac"     class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>MAC Control</button>
+        <button type="button" data-advanced="dhcp-wan-ntp"     class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>NTP Servers</button>
+        <button type="button" data-advanced="dhcp-wan-tftp"    class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>TFTP</button>
+        <button type="button" data-advanced="dhcp-wan-ldap"    class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>LDAP</button>
+        <button type="button" data-advanced="dhcp-wan-netboot" class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>Network Boot</button>
+        <button type="button" data-advanced="dhcp-wan-custom"  class="btn btn-outline-secondary btn-sm"><i class="fa fa-gear me-1"></i>Custom Options</button>
+      </div>
+      <div id="dhcp-wan-ddns" class="d-none ss-field-grid ss-field-grid-2 mb-3">
+        <div class="ss-field"><label class="ss-label">DDNS Domain</label><input type="text" name="ddns_domain" class="form-control" placeholder="example.com"></div>
+        <div class="ss-field"><label class="ss-label">DDNS Key Name</label><input type="text" name="ddns_keyname" class="form-control"></div>
+        <div class="ss-field"><label class="ss-label">DDNS Key</label><input type="text" name="ddns_key" class="form-control"></div>
+      </div>
+      <div id="dhcp-wan-mac" class="d-none ss-field-grid ss-field-grid-2 mb-3">
+        <div class="ss-field"><label class="ss-label">Allowed MACs</label><textarea name="mac_allow" class="form-control font-monospace" rows="3" placeholder="One MAC per line"></textarea></div>
+        <div class="ss-field"><label class="ss-label">Denied MACs</label><textarea name="mac_deny" class="form-control font-monospace" rows="3" placeholder="One MAC per line"></textarea></div>
+      </div>
+      <div id="dhcp-wan-ntp" class="d-none ss-field-grid ss-field-grid-2 mb-3">
+        <div class="ss-field"><label class="ss-label">NTP Server 1</label><input type="text" name="ntp1" class="form-control" placeholder="pool.ntp.org"></div>
+        <div class="ss-field"><label class="ss-label">NTP Server 2</label><input type="text" name="ntp2" class="form-control"></div>
+      </div>
+      <div id="dhcp-wan-tftp" class="d-none ss-field mb-3"><label class="ss-label">TFTP Server</label><input type="text" name="tftp_server" class="form-control" placeholder="192.168.1.10"></div>
+      <div id="dhcp-wan-ldap" class="d-none ss-field mb-3"><label class="ss-label">LDAP URI</label><input type="text" name="ldap_uri" class="form-control" placeholder="ldap://192.168.1.1/dc=example,dc=com"></div>
+      <div id="dhcp-wan-netboot" class="d-none ss-field-grid ss-field-grid-2 mb-3">
+        <div style="grid-column:1/-1;"><label class="ss-check-item"><input type="checkbox" name="netboot_enable" id="netboot_enable_wan"><span>Enable Network Booting (PXE)</span></label></div>
+        <div class="ss-field"><label class="ss-label">Next Server</label><input type="text" name="next_server" class="form-control" placeholder="192.168.1.100"></div>
+        <div class="ss-field"><label class="ss-label">Boot Filename</label><input type="text" name="filename" class="form-control" placeholder="pxelinux.0"></div>
+        <div class="ss-field"><label class="ss-label">Root Path</label><input type="text" name="root_path" class="form-control" placeholder="/tftpboot"></div>
+      </div>
+      <div id="dhcp-wan-custom" class="d-none mb-3">
+        <label class="ss-label mb-1">Custom DHCP Options (raw ISC DHCP syntax)</label>
+        <textarea name="custom_options" class="form-control font-monospace" rows="5" placeholder='option domain-name-servers 8.8.8.8;'></textarea>
+      </div>
+    </div>
+  </div>
 
-<div class="settings-section">
-	<h5>Primary Address Pool</h5>
-	
-	<div class="form-group">
-		<label>Subnet</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" value="192.168.1.0/24">
-		</div>
-	</div>
+  <!-- Static Mappings -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-list"></i></div>
+      <div><div class="ss-card-title">Static Leases</div><div class="ss-card-subtitle">Fixed IP assignments by MAC address</div></div>
+      <div class="ss-card-actions">
+        <a href="{{ url_for('services.dhcp_static_mapping') }}" class="btn btn-success btn-sm">
+          <i class="fa-solid fa-plus me-1"></i>Add Mapping
+        </a>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr><th style="padding:10px 14px;">IP Address</th><th>Hostname</th><th>MAC Address</th><th>Description</th><th></th></tr>
+        </thead>
+        <tbody id="static_mappings_body">
+          <tr id="empty_row"><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">No static leases configured</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Subnet Range</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" value="192.168.1.1 - 192.168.1.254">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Address Pool Range</label>
-		<div class="form-group-content">
-			<div class="d-flex gap-2">
-				<div style="flex: 1;">
-					<label>From</label>
-					<input type="text" class="form-control">
-				</div>
-				<div style="flex: 1;">
-					<label>To</label>
-					<input type="text" class="form-control">
-				</div>
-			</div>
-			<div class="help-text">The specified range for this pool must not be within the range configured on any other address pool for this interface.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Additional Pools</label>
-		<div class="form-group-content">
-			<button type="button" class="btn btn-success" onclick="alert('Add Address Pool')">Add Address Pool</button>
-			<div class="help-text">If additional pools of addresses are needed inside of this subnet outside the above range, they may be specified here.</div>
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>Server Options</h5>
-	
-	<div class="form-group">
-		<label>WINS Servers</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control mb-2" placeholder="WINS Server 1">
-			<input type="text" class="form-control" placeholder="WINS Server 2">
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>DNS Servers</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control mb-2" value="192.168.1.200">
-			<input type="text" class="form-control mb-2" placeholder="DNS Server 2">
-			<input type="text" class="form-control mb-2" placeholder="DNS Server 3">
-			<input type="text" class="form-control" placeholder="DNS Server 4">
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>OMAPI</h5>
-	
-	<div class="form-group">
-		<label>OMAPI Port</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" placeholder="OMAPI Port">
-			<div class="help-text">Set the port that OMAPI will listen on. The default port is 7911. Leave blank to disable. Only the first OMAPI configuration is used.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>OMAPI Key</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" placeholder="OMAPI Key">
-			<div class="help-text">Enter a key matching the selected algorithm to secure connections to the OMAPI endpoint.</div>
-			<div class="form-check mt-2">
-				<input class="form-check-input" type="checkbox" id="gen_key">
-				<label class="form-check-label" for="gen_key">Generate New Key</label>
-			</div>
-			<div class="help-text">Generate a new key based on the selected algorithm.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Key Algorithm</label>
-		<div class="form-group-content">
-			<select class="form-control">
-				<option>HMAC-SHA256 (current bind9 default)</option>
-			</select>
-			<div class="help-text">Set the algorithm that OMAPI key will use.</div>
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>Other DHCP Options</h5>
-	
-	<div class="form-group">
-		<label>Gateway</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" value="192.168.1.200">
-			<div class="help-text">The default is to use the IP address of this firewall interface as the gateway. Specify an alternate gateway here if this is not the correct gateway for the network. Enter "none" for no gateway assignment.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Domain Name</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" placeholder="home.arpa">
-			<div class="help-text">The default is to use the domain name of this firewall as the default domain name provided by DHCP. An alternate domain name may be specified here.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Domain Search List</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" placeholder="example.com;sub.example.com">
-			<div class="help-text">The DHCP server can optionally provide a domain search list. Use the semicolon character as separator</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Default Lease Time</label>
-		<div class="form-group-content">
-			<input type="number" class="form-control" value="7200">
-			<div class="help-text">This is used for clients that do not ask for a specific expiration time. The default is 7200 seconds</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Maximum Lease Time</label>
-		<div class="form-group-content">
-			<input type="number" class="form-control" value="86400">
-			<div class="help-text">This is the maximum lease time for clients that ask for a specific expiration time. The default is 86400 seconds</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Failover peer IP</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control">
-			<div class="help-text">Leave blank to disable. Enter the interface IP address of the other firewall (Failover peer) in this subnet. Firewalls must be using CARP. Advertising skew of the CARP VIP on this interface determines whether the DHCP daemon is Primary or Secondary. Ensure the advertising skew for the VIP on one firewall is < 20 and the other is > 20.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Static ARP</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="static_arp">
-				<label class="form-check-label" for="static_arp">Enable Static ARP</label>
-			</div>
-			<div class="help-text">Restrict communication on the firewall to only hosts listed in static mappings containing both IP addresses and MAC addresses. No other hosts will be able to communicate with the firewall on this interface. This behavior is enforced even when DHCP server is disabled</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Time Format</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="time_format">
-				<label class="form-check-label" for="time_format">Change DHCP display lease time from UTC to local time</label>
-			</div>
-			<div class="help-text">By default DHCP leases are displayed in UTC time. By checking this box DHCP lease time will be displayed in local time and set to the time zone selected. This will be used for all DHCP interfaces lease time.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Statistics</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="statistics">
-				<label class="form-check-label" for="statistics">Enable monitoring graphs for DHCP lease statistics</label>
-			</div>
-			<div class="help-text">Enable this to add DHCP leases statistics to the Monitoring graphs. Disabled by default.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Ping Check</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input class="form-check-input" type="checkbox" id="ping_check">
-				<label class="form-check-label" for="ping_check">Disable ping check</label>
-			</div>
-			<div class="help-text">When enabled dhcpd sends a ping to the address being assigned, and if no response has been heard, it assigns the address. Enabled by default.</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Dynamic DNS</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-ddns" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-ddns" class="d-none mt-3">
-				<div class="mb-2"><label class="form-label fw-semibold">DDNS Domain</label>
-					<input type="text" name="ddns_domain" class="form-control" placeholder="example.com"></div>
-				<div class="mb-2"><label class="form-label fw-semibold">DDNS Key Name</label>
-					<input type="text" name="ddns_keyname" class="form-control"></div>
-				<div class="mb-2"><label class="form-label fw-semibold">DDNS Key</label>
-					<input type="text" name="ddns_key" class="form-control"></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>MAC Address Control</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-mac" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-mac" class="d-none mt-3">
-				<div class="mb-2"><label class="form-label fw-semibold">Allowed MACs</label>
-					<textarea name="mac_allow" class="form-control font-monospace" rows="3"
-					          placeholder="One MAC per line, e.g. 00:11:22:33:44:55"></textarea></div>
-				<div class="mb-2"><label class="form-label fw-semibold">Denied MACs</label>
-					<textarea name="mac_deny" class="form-control font-monospace" rows="3"
-					          placeholder="One MAC per line"></textarea></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>NTP</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-ntp" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-ntp" class="d-none mt-3">
-				<div class="mb-2"><label class="form-label fw-semibold">NTP Server 1</label>
-					<input type="text" name="ntp1" class="form-control" placeholder="pool.ntp.org"></div>
-				<div class="mb-2"><label class="form-label fw-semibold">NTP Server 2</label>
-					<input type="text" name="ntp2" class="form-control"></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>TFTP</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-tftp" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-tftp" class="d-none mt-3">
-				<div class="mb-2"><label class="form-label fw-semibold">TFTP Server</label>
-					<input type="text" name="tftp_server" class="form-control" placeholder="192.168.1.10"></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>LDAP</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-ldap" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-ldap" class="d-none mt-3">
-				<div class="mb-2"><label class="form-label fw-semibold">LDAP URI</label>
-					<input type="text" name="ldap_uri" class="form-control" placeholder="ldap://192.168.1.1/dc=example,dc=com"></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Network Booting</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-netboot" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-netboot" class="d-none mt-3">
-				<div class="mb-2 form-check">
-					<input type="checkbox" class="form-check-input" name="netboot_enable" id="netboot_enable_wan">
-					<label class="form-check-label" for="netboot_enable_wan">Enable Network Booting</label>
-				</div>
-				<div class="mb-2"><label class="form-label fw-semibold">Next Server</label>
-					<input type="text" name="next_server" class="form-control" placeholder="192.168.1.100"></div>
-				<div class="mb-2"><label class="form-label fw-semibold">Boot Filename</label>
-					<input type="text" name="filename" class="form-control" placeholder="pxelinux.0"></div>
-				<div class="mb-2"><label class="form-label fw-semibold">Root Path</label>
-					<input type="text" name="root_path" class="form-control" placeholder="/tftpboot"></div>
-			</div>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Custom DHCP Options</label>
-		<div class="form-group-content">
-			<button type="button" data-advanced="dhcp-wan-custom" class="btn btn-outline-secondary btn-sm">
-				<i class="fa fa-gear me-1"></i>Display Advanced
-			</button>
-			<div id="dhcp-wan-custom" class="d-none mt-3">
-				<textarea name="custom_options" class="form-control font-monospace" rows="5"
-				          placeholder="option domain-name-servers 8.8.8.8;&#10;option domain-name &quot;example.com&quot;;"></textarea>
-				<small class="text-muted">Raw ISC DHCP options, one per line.</small>
-			</div>
-		</div>
-	</div>
-</div>
-
-<div class="d-flex gap-2 mt-3">
-	<button type="button" class="btn btn-primary" id="dhcpServerSaveBtn">Save</button>
-</div>
-
-<div class="settings-section">
-	<h5>DHCP Static Mappings</h5>
-	
-	<table class="table-bordered">
-		<thead>
-			<tr>
-				<th>IP Address</th>
-				<th>Hostname</th>
-				<th>MAC Address</th>
-				<th>Description</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody id="static_mappings_body">
-			<tr id="empty_row">
-				<td colspan="5" style="text-align: center; padding: 30px;">
-					<a href="{{ url_for('services.dhcp_static_mapping') }}">
-						<button type="button" class="btn btn-success">Add Static Mapping</button>
-					</a>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+  <div class="ss-save-bar">
+    <button type="button" class="btn btn-primary px-4" id="dhcpServerSaveBtnBottom">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 </div>
 
 <script>
 function getDhcpServerSettingsRoot() {
-	// Capture everything on the DHCP Server page EXCEPT the static mappings table.
-	// We stop at the first "DHCP Static Mappings" section.
-	const allSections = Array.from(document.querySelectorAll('.settings-section'));
-	const untilMappings = [];
-	for (const sec of allSections) {
-		const title = (sec.querySelector('h5')?.textContent || '').trim();
-		if (title === 'DHCP Static Mappings') break;
-		untilMappings.push(sec);
-	}
-	return untilMappings.length ? untilMappings[0].parentElement : document;
+  const allSections = Array.from(document.querySelectorAll('.ss-card'));
+  const untilMappings = [];
+  for (const sec of allSections) {
+    const title = (sec.querySelector('.ss-card-title')?.textContent || '').trim();
+    if (title === 'Static Leases') break;
+    untilMappings.push(sec);
+  }
+  return untilMappings.length ? untilMappings[0].parentElement : document;
 }
 
 function serializeDhcpServerForm() {
-	const allSections = Array.from(document.querySelectorAll('.settings-section'));
-	const targetSections = [];
-	for (const sec of allSections) {
-		const title = (sec.querySelector('h5')?.textContent || '').trim();
-		if (title === 'DHCP Static Mappings') break;
-		targetSections.push(sec);
-	}
-
-	const settings = { fields: {} };
-	const elems = [];
-	targetSections.forEach(sec => {
-		elems.push(...sec.querySelectorAll('input, select, textarea'));
-	});
-
-	// We rely on element ids. If an input lacks an id, we auto-generate a stable key by its position.
-	let anonCounter = 0;
-	elems.forEach(el => {
-		if (el.type === 'button' || el.type === 'submit') return;
-		const key = el.id || `__anon_${anonCounter++}`;
-		if (el.type === 'checkbox') {
-			settings.fields[key] = { type: 'checkbox', value: !!el.checked };
-		} else if (el.type === 'radio') {
-			// for radios, store selected value by group name
-			const group = el.name || key;
-			if (!(group in settings.fields)) settings.fields[group] = { type: 'radio', value: null };
-			if (el.checked) settings.fields[group].value = el.value;
-		} else {
-			settings.fields[key] = { type: (el.tagName || 'input').toLowerCase(), value: el.value };
-		}
-	});
-
-	return settings;
+  const settings = { fields: {} };
+  let anonCounter = 0;
+  document.querySelectorAll('.ss-card:not(:last-child) input, .ss-card:not(:last-child) select, .ss-card:not(:last-child) textarea').forEach(el => {
+    if (el.type === 'button' || el.type === 'submit') return;
+    const key = el.id || `__anon_${anonCounter++}`;
+    if (el.type === 'checkbox') settings.fields[key] = { type: 'checkbox', value: !!el.checked };
+    else settings.fields[key] = { type: el.tagName.toLowerCase(), value: el.value };
+  });
+  return settings;
 }
 
 function applyDhcpServerForm(settings) {
-	settings = settings || {};
-	const fields = settings.fields || {};
-	Object.keys(fields).forEach(key => {
-		const entry = fields[key];
-		if (!entry) return;
-
-		if (entry.type === 'radio') {
-			const name = key;
-			const val = entry.value;
-			if (val == null) return;
-			const radio = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"][value="${CSS.escape(String(val))}"]`);
-			if (radio) radio.checked = true;
-			return;
-		}
-
-		const el = document.getElementById(key);
-		if (!el) return;
-		if (entry.type === 'checkbox') {
-			el.checked = !!entry.value;
-		} else {
-			el.value = entry.value ?? '';
-		}
-	});
+  const fields = (settings || {}).fields || {};
+  Object.keys(fields).forEach(key => {
+    const entry = fields[key]; if (!entry) return;
+    const el = document.getElementById(key); if (!el) return;
+    if (entry.type === 'checkbox') el.checked = !!entry.value;
+    else el.value = entry.value ?? '';
+  });
 }
 
 function loadDhcpServerSettings() {
-	fetch('/services/api/dhcp-server/wan')
-		.then(r => {
-			if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-			return r.json();
-		})
-		.then(json => {
-			if (!json.success) throw new Error(json.error || 'Failed to load DHCP server settings');
-			applyDhcpServerForm(json.settings);
-		})
-		.catch(err => console.error('Error loading DHCP Server settings:', err));
+  fetch('/services/api/dhcp-server/wan').then(r => r.json())
+    .then(json => { if (json.success) applyDhcpServerForm(json.settings); })
+    .catch(err => console.error('Error loading DHCP Server settings:', err));
 }
 
 function saveDhcpServerSettings() {
-	const settings = serializeDhcpServerForm();
-	fetch('/services/api/dhcp-server/wan', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ settings })
-	})
-	.then(r => r.json())
-	.then(json => {
-		if (!json.success) {
-			alert(json.error || 'Failed to save DHCP server settings');
-			return;
-		}
-		alert('DHCP Server settings saved!');
-	})
-	.catch(err => {
-		console.error(err);
-		alert(err.message || String(err));
-	});
+  const settings = serializeDhcpServerForm();
+  fetch('/services/api/dhcp-server/wan', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings })
+  }).then(r => r.json()).then(json => {
+    if (!json.success) { alert(json.error || 'Failed to save'); return; }
+    alert('DHCP Server settings saved!');
+  }).catch(err => alert(err.message || String(err)));
 }
 
-// Load static mappings from localStorage
 function loadStaticMappings() {
-	const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-	const tbody = document.getElementById('static_mappings_body');
-	const emptyRow = document.getElementById('empty_row');
-	
-	if (mappings.length > 0) {
-		emptyRow.style.display = 'none';
-		tbody.innerHTML = mappings.map((mapping, index) => `
-			<tr>
-				<td>${mapping.ip_address}</td>
-				<td>${mapping.hostname}</td>
-				<td>${mapping.mac_address}</td>
-				<td>${mapping.description}</td>
-				<td>
-					<button onclick="editMapping(${index})" class="btn btn-sm btn-primary me-1">Edit</button>
-					<button onclick="deleteMapping(${index})" class="btn btn-sm btn-danger">Delete</button>
-				</td>
-			</tr>
-		`).join('');
-	} else {
-		emptyRow.style.display = 'table-row';
-	}
+  const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
+  const tbody = document.getElementById('static_mappings_body');
+  const emptyRow = document.getElementById('empty_row');
+  if (mappings.length > 0) {
+    emptyRow.style.display = 'none';
+    tbody.innerHTML = mappings.map((m, i) => `
+      <tr>
+        <td style="padding:8px 14px;">${m.ip_address}</td><td>${m.hostname}</td>
+        <td><code>${m.mac_address}</code></td><td>${m.description}</td>
+        <td>
+          <button onclick="editMapping(${i})" class="btn btn-sm btn-primary me-1">Edit</button>
+          <button onclick="deleteMapping(${i})" class="btn btn-sm btn-danger">Delete</button>
+        </td>
+      </tr>`).join('');
+  } else { emptyRow.style.display = 'table-row'; }
 }
 
 function editMapping(index) {
-	const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-	localStorage.setItem('edit_mapping_index', index);
-	window.location.href = '{{ url_for("services.dhcp_static_mapping") }}';
+  localStorage.setItem('edit_mapping_index', index);
+  window.location.href = '{{ url_for("services.dhcp_static_mapping") }}';
 }
-
 function deleteMapping(index) {
-	if (confirm('Are you sure you want to delete this mapping?')) {
-		const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-		mappings.splice(index, 1);
-		localStorage.setItem('dhcp_static_mappings', JSON.stringify(mappings));
-		loadStaticMappings();
-	}
+  if (confirm('Delete this static mapping?')) {
+    const m = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
+    m.splice(index, 1);
+    localStorage.setItem('dhcp_static_mappings', JSON.stringify(m));
+    loadStaticMappings();
+  }
 }
 
-// Load mappings and DHCP server settings when page loads
 document.addEventListener('DOMContentLoaded', function() {
-	loadStaticMappings();
-	loadDhcpServerSettings();
-	const btn = document.getElementById('dhcpServerSaveBtn');
-	if (btn) btn.addEventListener('click', saveDhcpServerSettings);
+  loadStaticMappings();
+  loadDhcpServerSettings();
+  document.getElementById('dhcpServerSaveBtn').addEventListener('click', saveDhcpServerSettings);
+  document.getElementById('dhcpServerSaveBtnBottom').addEventListener('click', saveDhcpServerSettings);
 });
 </script>
 {% endblock %}

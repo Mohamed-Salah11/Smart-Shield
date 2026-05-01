@@ -1,239 +1,214 @@
 {% extends 'base.html' %}
-
 {% block main %}
-
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('interfaces.interfaces') }}">Interfaces</a></li>
-                <li class="breadcrumb-item active" aria-current="page">LAN</li>
-            </ol>
-        </nav>
-        <h1>LAN Interface</h1>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">LAN Interface</h1>
+      <p class="ss-page-desc">Configure the local area network interface settings</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="saveLANConfig()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
+
+  <form method="POST">
+
+    <!-- General Configuration -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-ethernet"></i></div>
+        <div>
+          <div class="ss-card-title">General Configuration</div>
+          <div class="ss-card-subtitle">Interface identity, addressing mode and link settings</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" id="enable" name="enable" checked>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable Interface</p>
+            <p class="ss-toggle-desc">Allow traffic to flow through this interface</p>
+          </div>
+        </div>
+
+        <hr class="ss-divider">
+
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="description">Description</label>
+            <input type="text" id="description" name="description" class="form-control" value="LAN">
+            <p class="ss-hint">Optional label for this interface</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="mac">MAC Address Override</label>
+            <input type="text" id="mac" name="mac" class="form-control" placeholder="00:11:22:33:44:55">
+            <p class="ss-hint">Spoof the hardware MAC address</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="ipv4type">IPv4 Configuration</label>
+            <select id="ipv4type" name="ipv4type" class="form-select">
+              <option value="static" selected>Static IPv4</option>
+              <option value="dhcp">DHCP</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="ipv6type">IPv6 Configuration</label>
+            <select id="ipv6type" name="ipv6type" class="form-select">
+              <option value="none" selected>None</option>
+              <option value="static">Static IPv6</option>
+              <option value="dhcp6">DHCPv6</option>
+              <option value="slaac">SLAAC</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="mtu">MTU</label>
+            <input type="text" id="mtu" name="mtu" class="form-control" placeholder="1500">
+            <p class="ss-hint">Max Transmission Unit — blank = 1500</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="mss">MSS</label>
+            <input type="text" id="mss" name="mss" class="form-control" placeholder="Default">
+            <p class="ss-hint">Max Segment Size — blank = default</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="speed">Speed &amp; Duplex</label>
+            <select id="speed" name="speed" class="form-select">
+              <option value="default" selected>Default (auto-negotiate)</option>
+              <option value="10baseTFD">10baseT full-duplex</option>
+              <option value="100baseTXFD">100baseTX full-duplex</option>
+              <option value="1000baseTFD">1000baseT full-duplex</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <form method="POST">
-
-        <!-- General Configuration Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>General Configuration</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="enable" class="col-sm-3 col-form-label fw-semibold">Enable Interface</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="enable" name="enable" checked>
-                            <label class="form-check-label" for="enable">Enable Interface</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="description" class="col-sm-3 col-form-label fw-semibold">Description</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="description" name="description" class="form-control" value="LAN">
-                        <small class="text-muted">Description of the interface (optional)</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="ipv4type" class="col-sm-3 col-form-label fw-semibold">IPv4 Configuration Type</label>
-                    <div class="col-sm-9">
-                        <select id="ipv4type" name="ipv4type" class="form-select">
-                            <option value="static" selected>Static IPv4</option>
-                            <option value="dhcp">DHCP</option>
-                            <option value="none">None</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="ipv6type" class="col-sm-3 col-form-label fw-semibold">IPv6 Configuration Type</label>
-                    <div class="col-sm-9">
-                        <select id="ipv6type" name="ipv6type" class="form-select">
-                            <option value="none" selected>None</option>
-                            <option value="static">Static IPv6</option>
-                            <option value="dhcp6">DHCP6</option>
-                            <option value="slaac">SLAAC</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="mac" class="col-sm-3 col-form-label fw-semibold">MAC Address</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="mac" name="mac" class="form-control" placeholder="00:11:22:33:44:55">
-                        <small class="text-muted">This field can be used to modify (spoof) the MAC address of this interface</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="mtu" class="col-sm-3 col-form-label fw-semibold">MTU</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="mtu" name="mtu" class="form-control" placeholder="1500" style="max-width: 200px;">
-                        <small class="text-muted">Maximum Transmission Unit (bytes). Leave blank for default (1500)</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="mss" class="col-sm-3 col-form-label fw-semibold">MSS</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="mss" name="mss" class="form-control" placeholder="" style="max-width: 200px;">
-                        <small class="text-muted">Maximum Segment Size (bytes). Leave blank for default</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="speed" class="col-sm-3 col-form-label fw-semibold">Speed and Duplex</label>
-                    <div class="col-sm-9">
-                        <select id="speed" name="speed" class="form-select">
-                            <option value="default" selected>Default (negotiated)</option>
-                            <option value="10baseTFD">10baseT full-duplex</option>
-                            <option value="100baseTXFD">100baseTX full-duplex</option>
-                            <option value="1000baseTFD">1000baseT full-duplex</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
+    <!-- Static IPv4 -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-map-pin"></i></div>
+        <div>
+          <div class="ss-card-title">Static IPv4 Configuration</div>
+          <div class="ss-card-subtitle">IP address and upstream gateway for static mode</div>
         </div>
-
-        <!-- Static IPv4 Configuration Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Static IPv4 Configuration</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="ipv4addr" class="col-sm-3 col-form-label fw-semibold">IPv4 Address</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="ipv4addr" name="ipv4addr" class="form-control" placeholder="192.168.1.1/24">
-                        <small class="text-muted">IPv4 address in CIDR format (e.g., 192.168.1.1/24)</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="ipv4gw" class="col-sm-3 col-form-label fw-semibold">IPv4 Upstream Gateway</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="ipv4gw" name="ipv4gw" class="form-control" placeholder="192.168.1.254">
-                        <small class="text-muted">Enter the upstream gateway IPv4 address (usually not required for LAN)</small>
-                    </div>
-                </div>
-            </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="ipv4addr">IPv4 Address (CIDR)</label>
+            <input type="text" id="ipv4addr" name="ipv4addr" class="form-control" placeholder="192.168.1.1/24">
+            <p class="ss-hint">e.g. 192.168.1.1/24</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="ipv4gw">Upstream Gateway</label>
+            <input type="text" id="ipv4gw" name="ipv4gw" class="form-control" placeholder="192.168.1.254">
+            <p class="ss-hint">Usually not required for LAN</p>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Reserved Networks Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Reserved Networks</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="blockprivate" class="col-sm-3 col-form-label fw-semibold">Block Private Networks</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="blockprivate" name="blockprivate">
-                            <label class="form-check-label" for="blockprivate">Block private networks and loopback addresses</label>
-                        </div>
-                        <small class="text-muted">Blocks traffic from IP addresses that are reserved for private networks per RFC 1918 and loopback addresses</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="blockbogons" class="col-sm-3 col-form-label fw-semibold">Block Bogon Networks</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="blockbogons" name="blockbogons">
-                            <label class="form-check-label" for="blockbogons">Block bogon networks</label>
-                        </div>
-                        <small class="text-muted">Blocks traffic from reserved IP addresses (but not RFC 1918) or not yet assigned by IANA</small>
-                    </div>
-                </div>
-            </div>
+    <!-- Reserved Networks -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div>
+        <div>
+          <div class="ss-card-title">Traffic Blocking</div>
+          <div class="ss-card-subtitle">Drop packets from reserved or unallocated address ranges</div>
         </div>
-
-        <div class="d-flex gap-2" style="margin-top: 20px; margin-bottom: 20px;">
-            <button type="button" class="btn btn-primary" onclick="saveLANConfig()">Save</button>
-            <button type="button" class="btn btn-secondary" onclick="resetLANConfig()">Cancel</button>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" id="blockprivate" name="blockprivate">
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Block Private Networks</p>
+            <p class="ss-toggle-desc">Drop traffic from RFC 1918 private ranges and loopback addresses</p>
+          </div>
         </div>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" id="blockbogons" name="blockbogons">
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Block Bogon Networks</p>
+            <p class="ss-toggle-desc">Drop traffic from reserved or IANA-unassigned address space</p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    </form>
+    <div class="ss-save-bar">
+      <button type="button" class="btn btn-secondary" onclick="resetLANConfig()">
+        <i class="fa-solid fa-rotate-left me-1"></i>Reset
+      </button>
+      <button type="button" class="btn btn-primary px-4" onclick="saveLANConfig()">
+        <i class="fa-solid fa-check me-1"></i>Save
+      </button>
+    </div>
+  </form>
 </div>
 
 <script>
-// Load LAN configuration when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadLANConfig();
-});
+document.addEventListener('DOMContentLoaded', function() { loadLANConfig(); });
 
 function loadLANConfig() {
     fetch('/interfaces/get-lan-config')
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             if (data.status === 'success') {
-                const config = data.data;
-                document.getElementById('enable').checked = config.enable_interface;
-                document.getElementById('description').value = config.description;
-                document.getElementById('ipv4type').value = config.ipv4_config_type;
-                document.getElementById('ipv6type').value = config.ipv6_config_type;
-                document.getElementById('mac').value = config.mac_address;
-                document.getElementById('mtu').value = config.mtu;
-                document.getElementById('mss').value = config.mss;
-                document.getElementById('speed').value = config.speed_and_duplex;
-                document.getElementById('ipv4addr').value = config.ipv4_address;
-                document.getElementById('ipv4gw').value = config.ipv4_upstream_gateway;
-                document.getElementById('blockprivate').checked = config.block_private_networks;
-                document.getElementById('blockbogons').checked = config.block_bogon_networks;
+                const c = data.data;
+                document.getElementById('enable').checked       = c.enable_interface;
+                document.getElementById('description').value    = c.description;
+                document.getElementById('ipv4type').value       = c.ipv4_config_type;
+                document.getElementById('ipv6type').value       = c.ipv6_config_type;
+                document.getElementById('mac').value            = c.mac_address;
+                document.getElementById('mtu').value            = c.mtu;
+                document.getElementById('mss').value            = c.mss;
+                document.getElementById('speed').value          = c.speed_and_duplex;
+                document.getElementById('ipv4addr').value       = c.ipv4_address;
+                document.getElementById('ipv4gw').value         = c.ipv4_upstream_gateway;
+                document.getElementById('blockprivate').checked = c.block_private_networks;
+                document.getElementById('blockbogons').checked  = c.block_bogon_networks;
             }
         })
-        .catch(error => {
-            console.error('Error loading LAN config:', error);
-        });
+        .catch(e => console.error('Error loading LAN config:', e));
 }
 
 function saveLANConfig() {
     const formData = {
-        enableInterface: document.getElementById('enable').checked,
-        description: document.getElementById('description').value,
-        ipv4ConfigType: document.getElementById('ipv4type').value,
-        ipv6ConfigType: document.getElementById('ipv6type').value,
-        macAddress: document.getElementById('mac').value,
-        mtu: document.getElementById('mtu').value,
-        mss: document.getElementById('mss').value,
-        speedAndDuplex: document.getElementById('speed').value,
-        ipv4Address: document.getElementById('ipv4addr').value,
-        ipv4UpstreamGateway: document.getElementById('ipv4gw').value,
+        enableInterface:      document.getElementById('enable').checked,
+        description:          document.getElementById('description').value,
+        ipv4ConfigType:       document.getElementById('ipv4type').value,
+        ipv6ConfigType:       document.getElementById('ipv6type').value,
+        macAddress:           document.getElementById('mac').value,
+        mtu:                  document.getElementById('mtu').value,
+        mss:                  document.getElementById('mss').value,
+        speedAndDuplex:       document.getElementById('speed').value,
+        ipv4Address:          document.getElementById('ipv4addr').value,
+        ipv4UpstreamGateway:  document.getElementById('ipv4gw').value,
         blockPrivateNetworks: document.getElementById('blockprivate').checked,
-        blockBogonNetworks: document.getElementById('blockbogons').checked
+        blockBogonNetworks:   document.getElementById('blockbogons').checked
     };
-
     fetch('/interfaces/save-lan-config', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('LAN configuration saved successfully!');
-        } else {
-            alert('Error: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error saving LAN configuration');
-    });
+    .then(r => r.json())
+    .then(data => alert(data.status === 'success' ? 'LAN configuration saved!' : 'Error: ' + (data.message || 'Unknown error')))
+    .catch(() => alert('Error saving LAN configuration'));
 }
 
-function resetLANConfig() {
-    loadLANConfig();
-}
+function resetLANConfig() { loadLANConfig(); }
 </script>
-
 {% endblock %}

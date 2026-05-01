@@ -437,3 +437,236 @@ def mask_cert_fields(row: dict) -> dict:
     safe.pop("private_key_enc", None)
     safe.pop("cert_pem", None)
     return safe
+
+
+# ---------------------------------------------------------------------------
+# CRL generation
+# ---------------------------------------------------------------------------
+
+_CRL_DIR = "/usr/local/etc/smart-shield/crl"
+
+
+def generate_crl(conn, ca_id: int) -> dict:
+    """
+    Build a PEM-encoded CRL for the given CA containing all revoked certs.
+
+    Returns ``{"ok": bool, "pem": str, "message": str}``.
+    The CRL is also written to ``_CRL_DIR/<ca_id>.crl.pem`` on FreeBSD.
+    """
+    import sys as _sys
+
+    ca_rows = _rows(conn, "SELECT * FROM certificates WHERE id=? AND cert_type='ca'", (ca_id,))
+    if not ca_rows:
+        return {"ok": False, "pem": "", "message": f"CA id={ca_id} not found."}
+    ca_row = ca_rows[0]
+
+    try:
+        ca_cert    = x509.load_pem_x509_certificate(ca_row["cert_pem"].encode())
+        ca_key_pem = decrypt_secret(ca_row["private_key_enc"] or "")
+        if not ca_key_pem:
+            return {"ok": False, "pem": "", "message": "CA private key could not be decrypted."}
+        ca_key = serialization.load_pem_private_key(ca_key_pem.encode(), password=None)
+
+        revoked_rows = _rows(
+            conn,
+            "SELECT serial, revoked_at FROM certificates "
+            "WHERE ca_id=? AND revoked=1 AND serial IS NOT NULL",
+            (ca_id,),
+        )
+
+        builder = x509.CertificateRevocationListBuilder()
+        builder = builder.issuer_name(ca_cert.subject)
+        now     = _now()
+        builder = builder.last_update(now)
+        builder = builder.next_update(now + datetime.timedelta(days=7))
+
+        for row in revoked_rows:
+            try:
+                serial   = int(row["serial"])
+                rev_time = datetime.datetime.fromisoformat(
+                    (row["revoked_at"] or now.isoformat()).replace("Z", "+00:00")
+                )
+                if rev_time.tzinfo is None:
+                    rev_time = rev_time.replace(tzinfo=datetime.timezone.utc)
+                revoked = (
+                    x509.RevokedCertificateBuilder()
+                    .serial_number(serial)
+                    .revocation_date(rev_time)
+                    .build()
+                )
+                builder = builder.add_revoked_certificate(revoked)
+            except Exception:
+                continue
+
+        crl     = builder.sign(ca_key, hashes.SHA256())
+        crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode()
+
+        # Persist to disk on FreeBSD
+        if _sys.platform.startswith("freebsd"):
+            try:
+                import os as _os
+                _os.makedirs(_CRL_DIR, exist_ok=True)
+                crl_path = f"{_CRL_DIR}/{ca_id}.crl.pem"
+                with open(crl_path, "w") as fh:
+                    fh.write(crl_pem)
+            except OSError:
+                pass
+
+        return {"ok": True, "pem": crl_pem, "message": f"CRL generated for CA id={ca_id}."}
+
+    except Exception as exc:
+        return {"ok": False, "pem": "", "message": f"CRL generation failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
+# OCSP stapling
+# ---------------------------------------------------------------------------
+
+def fetch_ocsp_response(cert_pem: str, issuer_pem: str) -> dict:
+    """
+    Fetch a DER-encoded OCSP response for *cert_pem* signed by *issuer_pem*.
+
+    Requires the ``cryptography`` package (already a project dependency).
+    The OCSP responder URL is read from the certificate's AIA extension.
+
+    Returns ``{"ok": bool, "der": bytes|None, "message": str}``.
+    """
+    import urllib.request as _req
+
+    try:
+        from cryptography.x509 import ocsp as _ocsp
+        from cryptography.x509.oid import ExtensionOID as _ExtOID
+        from cryptography.hazmat.primitives import serialization as _ser
+
+        cert   = x509.load_pem_x509_certificate(cert_pem.encode())
+        issuer = x509.load_pem_x509_certificate(issuer_pem.encode())
+
+        # Extract OCSP URL from AIA extension
+        try:
+            aia = cert.extensions.get_extension_for_oid(_ExtOID.AUTHORITY_INFORMATION_ACCESS)
+            ocsp_url = None
+            for desc in aia.value:
+                if desc.access_method.dotted_string == "1.3.6.1.5.5.7.48.1":  # id-ad-ocsp
+                    ocsp_url = desc.access_location.value
+                    break
+        except x509.extensions.ExtensionNotFound:
+            ocsp_url = None
+
+        if not ocsp_url:
+            return {"ok": False, "der": None, "message": "No OCSP URL in certificate AIA extension."}
+
+        # Build OCSP request
+        builder  = _ocsp.OCSPRequestBuilder()
+        builder  = builder.add_certificate(cert, issuer, hashes.SHA256())
+        req      = builder.build()
+        req_der  = req.public_bytes(_ser.Encoding.DER)
+
+        # POST to OCSP responder
+        http_req = _req.Request(
+            ocsp_url,
+            data=req_der,
+            headers={"Content-Type": "application/ocsp-request"},
+            method="POST",
+        )
+        with _req.urlopen(http_req, timeout=10) as resp:
+            resp_der = resp.read()
+
+        return {"ok": True, "der": resp_der, "message": "OCSP response fetched."}
+
+    except Exception as exc:
+        return {"ok": False, "der": None, "message": f"OCSP fetch failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
+# ACME / Let's Encrypt
+# ---------------------------------------------------------------------------
+
+def request_acme_cert(
+    conn,
+    *,
+    domain: str,
+    email: str = "",
+    staging: bool = False,
+    webroot: str = "/usr/local/www/smart-shield/.well-known/acme-challenge",
+) -> dict:
+    """
+    Request or renew a certificate from Let's Encrypt using certbot.
+
+    Requires ``certbot`` to be installed (``pkg install py311-certbot`` on FreeBSD).
+    The issued certificate and key are stored in the ``certificates`` table.
+
+    Returns ``{"ok": bool, "message": str, "id": int|None}``.
+    """
+    import shutil, sys as _sys
+
+    domain = (domain or "").strip()
+    if not domain:
+        return {"ok": False, "message": "domain is required.", "id": None}
+
+    if not _sys.platform.startswith("freebsd"):
+        return {
+            "ok": False,
+            "message": "ACME certificate issuance requires a live FreeBSD host with port 80 reachable.",
+            "id": None,
+        }
+
+    certbot = shutil.which("certbot")
+    if not certbot:
+        return {"ok": False, "message": "certbot not found — install with: pkg install py311-certbot", "id": None}
+
+    from app.services.network_service import run_command, FreeBSDNetworkError
+
+    cmd = [
+        certbot, "certonly",
+        "--webroot", "-w", webroot,
+        "-d", domain,
+        "--non-interactive", "--agree-tos",
+        "--quiet",
+    ]
+    if email:
+        cmd += ["--email", email]
+    else:
+        cmd += ["--register-unsafely-without-email"]
+    if staging:
+        cmd += ["--staging"]
+
+    try:
+        r = run_command(cmd, check=False, timeout_seconds=120)
+        if r.returncode != 0:
+            return {"ok": False, "message": (r.stderr or r.stdout or "certbot failed").strip(), "id": None}
+    except FreeBSDNetworkError as exc:
+        return {"ok": False, "message": str(exc), "id": None}
+
+    # Read the issued cert + key from the certbot live directory
+    live_dir = f"/usr/local/etc/letsencrypt/live/{domain}"
+    try:
+        with open(f"{live_dir}/fullchain.pem") as fh:
+            cert_pem = fh.read()
+        with open(f"{live_dir}/privkey.pem") as fh:
+            key_pem = fh.read()
+    except OSError as exc:
+        return {"ok": False, "message": f"Could not read certbot output: {exc}", "id": None}
+
+    key_enc = encrypt_secret(key_pem)
+    name    = f"acme-{domain}"
+
+    # Upsert into certificates table
+    existing = _rows(conn, "SELECT id FROM certificates WHERE name=?", (name,))
+    if existing:
+        conn.execute(
+            "UPDATE certificates SET cert_pem=?, private_key_enc=? WHERE name=?",
+            (cert_pem, key_enc, name),
+        )
+        conn.commit()
+        return {"ok": True, "message": f"ACME cert for {domain} renewed.", "id": existing[0]["id"]}
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO certificates (name, cert_type, common_name, cert_pem, private_key_enc)
+        VALUES (?, 'server', ?, ?, ?)
+        """,
+        (name, domain, cert_pem, key_enc),
+    )
+    conn.commit()
+    return {"ok": True, "message": f"ACME cert for {domain} issued.", "id": cur.lastrowid}

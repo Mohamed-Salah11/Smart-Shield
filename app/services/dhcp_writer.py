@@ -297,8 +297,9 @@ def apply_dhcpd(conn) -> dict:
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf, "errors": []}
 
-    # 4. Restart service
-    from app.services.service_manager import service_action
+    # 4. Enable service in rc.conf so it starts on reboot, then restart it
+    from app.services.service_manager import service_action, sysrc_set
+    sysrc_set("isc_dhcpd_enable", "YES")
     result = service_action("isc-dhcpd", "restart")
     return {
         "ok": result["ok"],

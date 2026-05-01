@@ -4,15 +4,11 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">User Manager</li>
-            </ol>
-        </nav>
-        <h1>User Manager</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">User Manager</h1>
+        <p class="ss-page-desc">Manage local user accounts and group assignments</p>
+      </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -37,17 +33,19 @@
     {% endwith %}
 
     <!-- Users Section -->
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Users</h2>
-            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                <i class="fa-solid fa-plus me-1"></i>Add User
-            </button>
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+        <div><div class="ss-card-title">Users</div></div>
+        <div class="ss-card-actions">
+          <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="fa-solid fa-plus me-1"></i>Add User
+          </button>
         </div>
-        <div class="section-body" style="padding: 0;">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
                         <tr>
                             <th style="width: 60px;"></th>
                             <th>Username</th>

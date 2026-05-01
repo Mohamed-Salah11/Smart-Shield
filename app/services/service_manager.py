@@ -200,6 +200,19 @@ def get_all_service_health(conn) -> dict:
     except Exception:
         health["ids"] = {"running": False, "state": "unknown", "message": "IDS status unavailable"}
 
+    # PPPoE (best-effort)
+    try:
+        from app.services.pppoe_writer import get_pppoe_status
+        pppoe = get_pppoe_status()
+        health["pppoe"] = {
+            "running":    pppoe.get("running", False),
+            "state":      "running" if pppoe.get("running") else "stopped",
+            "ip_address": pppoe.get("ip_address", ""),
+            "message":    pppoe.get("message", ""),
+        }
+    except Exception:
+        health["pppoe"] = {"running": False, "state": "unknown", "message": "PPPoE status unavailable"}
+
     # Interface state (LAN/WAN from DB + live on FreeBSD)
     interfaces = []
     try:
@@ -283,6 +296,92 @@ def reload_all_services(conn) -> dict:
             results.append({"service": "strongswan-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "strongswan", "ok": False, "message": str(exc)})
+
+    # L2TP (mpd5)
+    try:
+        from app.services.l2tp_writer import write_l2tp_conf
+        l2tp_result = write_l2tp_conf(conn)
+        results.append({"service": "l2tp", "ok": l2tp_result["ok"], "message": l2tp_result["message"]})
+        if l2tp_result["ok"]:
+            r = service_action("mpd5", "restart")
+            results.append({"service": "l2tp-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "l2tp", "ok": False, "message": str(exc)})
+
+    # NTP
+    try:
+        from app.services.ntp_writer import write_ntp_conf
+        ntp_result = write_ntp_conf(conn)
+        results.append({"service": "ntpd", "ok": ntp_result["ok"], "message": ntp_result["message"]})
+        if ntp_result["ok"]:
+            r = service_action("ntpd", "restart")
+            results.append({"service": "ntpd-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "ntpd", "ok": False, "message": str(exc)})
+
+    # IDS / Suricata
+    try:
+        from app.services.ids_writer import write_suricata_config, _cfg as _ids_cfg
+        ids_cfg = _ids_cfg(conn)
+        if ids_cfg.get("enabled"):
+            ids_result = write_suricata_config(conn)
+            results.append({"service": "suricata", "ok": ids_result["ok"], "message": ids_result["message"]})
+            if ids_result["ok"]:
+                r = service_action("suricata", "restart")
+                results.append({"service": "suricata-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "suricata", "ok": False, "message": str(exc)})
+
+    # DDNS (ddclient)
+    try:
+        from app.services.ddns_writer import apply_ddns
+        ddns_result = apply_ddns(conn)
+        results.append({"service": "ddns", "ok": ddns_result["ok"], "message": ddns_result["message"]})
+    except Exception as exc:
+        results.append({"service": "ddns", "ok": False, "message": str(exc)})
+
+    # SNMP (bsnmpd)
+    try:
+        from app.services.snmp_writer import write_snmpd_config
+        snmp_result = write_snmpd_config(conn)
+        results.append({"service": "bsnmpd", "ok": snmp_result["ok"], "message": snmp_result["message"]})
+        if snmp_result["ok"]:
+            r = service_action("bsnmpd", "restart")
+            results.append({"service": "bsnmpd-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "bsnmpd", "ok": False, "message": str(exc)})
+
+    # UPnP (miniupnpd)
+    try:
+        from app.services.upnp_writer import write_upnp_conf
+        upnp_result = write_upnp_conf(conn)
+        results.append({"service": "miniupnpd", "ok": upnp_result["ok"], "message": upnp_result["message"]})
+        if upnp_result["ok"]:
+            r = service_action("miniupnpd", "restart")
+            results.append({"service": "miniupnpd-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "miniupnpd", "ok": False, "message": str(exc)})
+
+    # IGMP proxy
+    try:
+        from app.services.igmp_writer import write_igmp_conf
+        igmp_result = write_igmp_conf(conn)
+        results.append({"service": "igmpproxy", "ok": igmp_result["ok"], "message": igmp_result["message"]})
+        if igmp_result["ok"]:
+            r = service_action("igmpproxy", "restart")
+            results.append({"service": "igmpproxy-restart", "ok": r["ok"], "message": r["message"]})
+    except Exception as exc:
+        results.append({"service": "igmpproxy", "ok": False, "message": str(exc)})
+
+    # Captive portal PF anchor
+    try:
+        from app.services.captive_portal import apply_captive_portal, get_captive_status
+        cp_status = get_captive_status(conn)
+        if cp_status.get("enabled"):
+            cp_result = apply_captive_portal(conn)
+            results.append({"service": "captive_portal", "ok": cp_result["ok"], "message": cp_result["message"]})
+    except Exception as exc:
+        results.append({"service": "captive_portal", "ok": False, "message": str(exc)})
 
     overall_ok = all(r["ok"] for r in results)
     return {"ok": overall_ok, "results": results}

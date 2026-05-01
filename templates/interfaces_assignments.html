@@ -1530,12 +1530,8 @@ function editGroup(groupId) {
 
 function loadInterfaceGroups() {
     fetch('/interfaces/get-interface-groups')
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Response data:', data);
             if (data.status === 'success') {
                 displayInterfaceGroups(data.data);
             } else {

@@ -82,7 +82,6 @@ def filters_index():
 def dns_filter_page():
     conn = get_db()
     rules = get_dns_filter_rules(conn)
-    conn.close()
     return render_template("dns_filter.html", rules=rules, title="DNS Filter")
 
 
@@ -91,7 +90,6 @@ def dns_filter_page():
 def web_filter_page():
     conn = get_db()
     rules = get_web_filter_rules(conn)
-    conn.close()
     return render_template(
         "web_filter.html",
         rules=rules,
@@ -105,7 +103,6 @@ def web_filter_page():
 def app_filter_page():
     conn = get_db()
     rules = get_app_filter_rules(conn)
-    conn.close()
 
     sig_by_category: dict = {}
     for key, sig in APP_SIGNATURES.items():
@@ -144,7 +141,6 @@ def dns_add():
     try:
         conn = get_db()
         row_id = add_dns_filter_rule(conn, domain, action, redirect_ip, category, description)
-        conn.close()
         log_event(
             category="system", action="dns_filter_add",
             username=session.get("username"), remote_addr=request.remote_addr,
@@ -164,7 +160,6 @@ def dns_toggle(rule_id):
     enabled = bool(data.get("enabled", True))
     conn = get_db()
     toggle_dns_filter_rule(conn, rule_id, enabled)
-    conn.close()
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
@@ -173,7 +168,6 @@ def dns_toggle(rule_id):
 def dns_delete(rule_id):
     conn = get_db()
     delete_dns_filter_rule(conn, rule_id)
-    conn.close()
     log_event(
         category="system", action="dns_filter_delete",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -187,7 +181,17 @@ def dns_delete(rule_id):
 def dns_apply():
     conn = get_db()
     result = apply_dns_filter(conn)
-    conn.close()
+    # Regenerate and reload Unbound so the new zones take effect immediately
+    if result.get("ok"):
+        try:
+            from app.services.dns_writer import apply_unbound
+            unbound_result = apply_unbound(conn)
+            result["unbound"] = unbound_result.get("message", "")
+            if not unbound_result.get("ok"):
+                result["ok"] = False
+                result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
+        except Exception as exc:
+            result["unbound_warning"] = str(exc)
     log_event(
         category="system", action="dns_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -217,7 +221,6 @@ def web_add():
     try:
         conn = get_db()
         row_id = add_web_filter_rule(conn, url_pattern, action, category, description)
-        conn.close()
         log_event(
             category="system", action="web_filter_add",
             username=session.get("username"), remote_addr=request.remote_addr,
@@ -237,7 +240,6 @@ def web_toggle(rule_id):
     enabled = bool(data.get("enabled", True))
     conn = get_db()
     toggle_web_filter_rule(conn, rule_id, enabled)
-    conn.close()
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
@@ -246,7 +248,6 @@ def web_toggle(rule_id):
 def web_delete(rule_id):
     conn = get_db()
     delete_web_filter_rule(conn, rule_id)
-    conn.close()
     log_event(
         category="system", action="web_filter_delete",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -260,7 +261,16 @@ def web_delete(rule_id):
 def web_apply():
     conn = get_db()
     result = apply_web_filter(conn)
-    conn.close()
+    if result.get("ok"):
+        try:
+            from app.services.dns_writer import apply_unbound
+            unbound_result = apply_unbound(conn)
+            result["unbound"] = unbound_result.get("message", "")
+            if not unbound_result.get("ok"):
+                result["ok"] = False
+                result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
+        except Exception as exc:
+            result["unbound_warning"] = str(exc)
     log_event(
         category="system", action="web_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -295,7 +305,6 @@ def app_add():
             category=(data.get("category") or "custom").strip(),
             description=(data.get("description") or "").strip(),
         )
-        conn.close()
         log_event(
             category="system", action="app_filter_add",
             username=session.get("username"), remote_addr=request.remote_addr,
@@ -321,7 +330,6 @@ def app_add_signature():
     try:
         conn = get_db()
         row_id = add_app_from_signature(conn, sig_key, action)
-        conn.close()
         sig_name = APP_SIGNATURES.get(sig_key, {}).get("name", sig_key)
         log_event(
             category="system", action="app_filter_add_signature",
@@ -342,7 +350,6 @@ def app_toggle(rule_id):
     enabled = bool(data.get("enabled", True))
     conn = get_db()
     toggle_app_filter_rule(conn, rule_id, enabled)
-    conn.close()
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
@@ -351,7 +358,6 @@ def app_toggle(rule_id):
 def app_delete(rule_id):
     conn = get_db()
     delete_app_filter_rule(conn, rule_id)
-    conn.close()
     log_event(
         category="system", action="app_filter_delete",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -365,7 +371,23 @@ def app_delete(rule_id):
 def app_apply():
     conn = get_db()
     result = apply_app_filter(conn)
-    conn.close()
+    # App filter touches both Unbound (DNS zones) and PF rules — reload both
+    if result.get("ok"):
+        try:
+            from app.services.dns_writer import apply_unbound
+            unbound_result = apply_unbound(conn)
+            result["unbound"] = unbound_result.get("message", "")
+        except Exception as exc:
+            result["unbound_warning"] = str(exc)
+        try:
+            from app.services.pf_generator import reload_pf_rules
+            pf_result = reload_pf_rules(conn)
+            result["pf"] = pf_result.get("message", "")
+            if not pf_result.get("ok"):
+                result["ok"] = False
+                result["message"] = result.get("message", "") + " | PF: " + pf_result.get("message", "")
+        except Exception as exc:
+            result["pf_warning"] = str(exc)
     log_event(
         category="system", action="app_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -400,7 +422,6 @@ def api_conflicts():
     from app.services.filter_conflicts import detect_conflicts
     conn = get_db()
     result = detect_conflicts(conn)
-    conn.close()
     return jsonify({
         "ok": True,
         "has_errors":   bool(result["errors"]),
@@ -416,7 +437,6 @@ def api_preview():
     from app.services.filter_conflicts import get_filter_preview
     conn   = get_db()
     result = get_filter_preview(conn)
-    conn.close()
     return jsonify({"ok": True, **result})
 
 
@@ -430,7 +450,6 @@ def api_export(filter_type: str):
         return jsonify({"ok": False, "error": "filter_type must be dns, web, or app"}), 400
     conn = get_db()
     text = export_filter_list(conn, filter_type)
-    conn.close()
     return Response(
         text,
         mimetype="text/plain",
@@ -465,7 +484,6 @@ def api_import(filter_type: str):
 
     conn   = get_db()
     result = import_filter_list(conn, text, filter_type, action, category)
-    conn.close()
 
     log_event(
         category="system", action=f"{filter_type}_filter_import",

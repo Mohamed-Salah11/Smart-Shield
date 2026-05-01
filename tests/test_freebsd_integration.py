@@ -57,6 +57,8 @@ def _run(cmd, timeout=10):
 
 
 def _is_root():
+    if not hasattr(os, "geteuid"):
+        return False
     return os.geteuid() == 0
 
 

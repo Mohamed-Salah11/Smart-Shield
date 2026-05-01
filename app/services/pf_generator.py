@@ -122,17 +122,20 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
     # Port forwards (rdr)
     for r in _rows(conn, "SELECT * FROM nat_pf WHERE disabled=0 ORDER BY rule_order, id"):
-        iface    = (r.get("interface") or wan_iface).strip() or wan_iface
-        proto    = (r.get("protocol") or "tcp").lower()
-        src      = _addr(r.get("src_address"))
-        dst      = _addr(r.get("dst_address"))
-        redirect = _addr(r.get("redirect_ip"))
-        desc     = (r.get("description") or "").strip()
+        iface       = (r.get("interface") or wan_iface).strip() or wan_iface
+        proto       = (r.get("protocol") or "tcp").lower()
+        src         = _addr(r.get("src_address"))
+        dst         = _addr(r.get("dst_address"))
+        redirect    = _addr(r.get("redirect_ip"))
+        redir_port  = (r.get("redirect_port") or r.get("local_port") or "").strip()
+        dst_port    = _port_line(r.get("dst_port") or r.get("destination_port"))
+        desc        = (r.get("description") or "").strip()
         if not redirect or redirect == "any":
             continue  # skip rules with no redirect target
+        redir_target = f"{redirect} port {redir_port}" if redir_port else redirect
         if desc:
             lines.append(f"# {desc}")
-        lines.append(f"rdr on {iface} proto {proto} from {src} to {dst} -> {redirect}")
+        lines.append(f"rdr on {iface} proto {proto} from {src} to {dst} {dst_port}-> {redir_target}")
 
     # NPt — Network Prefix Translation (IPv6)
     for r in _rows(conn, "SELECT * FROM nat_npt WHERE disabled=0 ORDER BY rule_order, id"):
@@ -178,29 +181,109 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
     for r in _rows(conn, "SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order, id"):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
+        sport  = _port_line(r.get("source_port"))
         dst    = _addr(r.get("destination"))
+        dport  = _port_line(r.get("dest_port"))
         action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
         if desc:
             lines.append(f"# {desc}")
-        lines.append(f"{action} in on {wan_iface} {proto}from {src} to {dst} keep state")
+        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
 
     # LAN
     for r in _rows(conn, "SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order, id"):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
+        sport  = _port_line(r.get("source_port"))
         dst    = _addr(r.get("destination"))
+        dport  = _port_line(r.get("dest_port"))
+        action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
         if desc:
             lines.append(f"# {desc}")
-        lines.append(f"pass in on {lan_iface} {proto}from {src} to {dst} keep state")
+        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
 
     lines.append("")
     return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
-# 4. Application filter PF rules
+# 4. Traffic shaper — altq queue declarations
+# ---------------------------------------------------------------------------
+
+_SCHED_MAP = {
+    "hfsc":  "hfsc",
+    "cbq":   "cbq",
+    "priq":  "priq",
+    "fairq": "fairq",
+}
+
+
+def _build_shaper_queues(conn, wan_iface: str, lan_iface: str) -> str:
+    """
+    Read traffic_shaper_configs from the DB and emit altq queue declarations.
+    One altq line per enabled interface entry, plus child queue lines.
+    Returns an empty string when no shaper configs are present.
+    """
+    try:
+        configs = _rows(
+            conn,
+            "SELECT * FROM traffic_shaper_configs WHERE enable_disable=1 ORDER BY interface_type, id",
+        )
+    except Exception:
+        return ""
+
+    if not configs:
+        return ""
+
+    lines = ["# ── Traffic Shaper (altq) ──"]
+    for cfg in configs:
+        itype    = (cfg.get("interface_type") or "WAN").upper()
+        iface    = wan_iface if itype == "WAN" else lan_iface
+        sched    = _SCHED_MAP.get((cfg.get("scheduler_type") or "hfsc").lower(), "hfsc")
+        bw       = cfg.get("bandwidth") or 100
+        bw_unit  = (cfg.get("bandwidth_unit") or "Mb").rstrip("b").rstrip("B")
+        qlimit   = cfg.get("queue_limit") or 50
+        tbr      = cfg.get("tbr_size") or 0
+        name     = (cfg.get("name") or f"root_{iface}").replace(" ", "_")
+
+        tbr_part = f" tbrsize {tbr}" if tbr else ""
+        lines.append(
+            f"altq on {iface} {sched} bandwidth {bw}{bw_unit}b"
+            f" qlimit {qlimit}{tbr_part} queue {{ {name} }}"
+        )
+        lines.append(f"queue {name} on {iface} {sched} bandwidth 100%")
+
+    # Assignment: match rules that assign traffic to queues
+    try:
+        assigns = _rows(
+            conn,
+            "SELECT * FROM traffic_shaper_queues WHERE enabled=1 ORDER BY id",
+        )
+        if assigns:
+            lines.append("")
+            for q in assigns:
+                proto   = _proto_line(q.get("protocol"))
+                src     = _addr(q.get("source"))
+                dst     = _addr(q.get("destination"))
+                sport   = _port_line(q.get("source_port"))
+                dport   = _port_line(q.get("dest_port"))
+                qname   = (q.get("queue_name") or "").strip()
+                ackq    = q.get("ack_queue") or ""
+                ack_part = f" ackqueue {ackq}" if ackq else ""
+                if qname:
+                    lines.append(
+                        f"match {proto}from {src} {sport}to {dst} {dport}queue {qname}{ack_part}"
+                    )
+    except Exception:
+        pass
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 5. Application filter PF rules
 # ---------------------------------------------------------------------------
 
 def _build_app_filter_rules(conn) -> str:
@@ -273,6 +356,7 @@ def generate_pf_conf(conn) -> str:
 
     return (
         header
+        + _build_shaper_queues(conn, wan_iface, lan_iface)
         + _build_alias_tables(conn)
         + default_nat
         + _build_nat_rules(conn, wan_iface)

@@ -1,290 +1,333 @@
 {% extends 'base.html' %}
 
 {% block main %}
-
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">General Setup</li>
-            </ol>
-        </nav>
-        <h1>General Setup</h1>
+
+  <!-- Page Header -->
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Platform Settings</h1>
+      <p class="ss-page-desc">System identity, DNS, localization and interface preferences</p>
+    </div>
+    <button type="submit" form="settings-form" class="btn btn-primary">
+      <i class="fa-solid fa-check me-1"></i>Save Changes
+    </button>
+  </div>
+
+  <form id="settings-form" method="POST">
+
+    <!-- ── System Identity ── -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-id-card"></i></div>
+        <div>
+          <div class="ss-card-title">System Identity</div>
+          <div class="ss-card-subtitle">Hostname and domain for this appliance</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-2">
+
+          <div class="ss-field">
+            <label class="ss-label" for="hostname">Hostname</label>
+            <input type="text" id="hostname" name="hostname" class="form-control"
+                   value="{{ config.hostname }}" placeholder="smartshield">
+            <p class="ss-hint">Name of this appliance — no domain part</p>
+          </div>
+
+          <div class="ss-field">
+            <label class="ss-label" for="domain">Domain</label>
+            <input type="text" id="domain" name="domain" class="form-control"
+                   value="{{ config.domain }}" placeholder="corp.example.com">
+            <p class="ss-hint">e.g. corp.example.com</p>
+          </div>
+
+        </div>
+      </div>
     </div>
 
-    <form method="POST">
+    <!-- ── DNS Servers ── -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-magnifying-glass-location"></i></div>
+        <div>
+          <div class="ss-card-title">DNS Servers</div>
+          <div class="ss-card-subtitle">Upstream resolvers used by this appliance</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
 
-        <!-- System Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>System</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="hostname" class="col-sm-3 col-form-label fw-semibold">Hostname</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="hostname" name="hostname" class="form-control" value="{{ config.hostname }}">
-                        <small class="text-muted">Name of the firewall host, without domain part</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="domain" class="col-sm-3 col-form-label fw-semibold">Domain</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="domain" name="domain" class="form-control" value="{{ config.domain }}">
-                        <small class="text-muted">Domain name (e.g. mycorp.com)</small>
-                    </div>
-                </div>
-            </div>
+        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+          {% for server in config.dns_servers %}
+          <div class="ss-field">
+            <label class="ss-label">DNS Server {{ loop.index }}</label>
+            <input type="text" name="dns_server" class="form-control"
+                   value="{{ server }}" placeholder="e.g. 1.1.1.1">
+          </div>
+          {% endfor %}
+          <div class="ss-field">
+            <label class="ss-label">Additional DNS Server</label>
+            <input type="text" name="dns_server" class="form-control" placeholder="Add another server…">
+          </div>
         </div>
 
-        <!-- DNS Server Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>DNS Server Settings</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                {% for server in config.dns_servers %}
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">DNS Server {{ loop.index }}</label>
-                    <div class="col-sm-9">
-                        <input type="text" name="dns_server" class="form-control" value="{{ server }}" placeholder="DNS Server">
-                    </div>
-                </div>
-                {% endfor %}
-                
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">DNS Server</label>
-                    <div class="col-sm-9">
-                        <input type="text" name="dns_server" class="form-control" placeholder="Add new DNS Server">
-                    </div>
-                </div>
+        <hr class="ss-divider">
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">DNS Server Override</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="dns_override" name="dns_override" {% if config.dns_override %}checked{% endif %}>
-                            <label class="form-check-label" for="dns_override">Allow DNS server list to be overridden by DHCP/PPP</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="dns_behavior" class="col-sm-3 col-form-label fw-semibold">DNS Resolution Behavior</label>
-                    <div class="col-sm-9">
-                        <select id="dns_behavior" name="dns_behavior" class="form-select">
-                            <option {% if "local" in config.dns_behavior %}selected{% endif %}>Use local DNS (127.0.0.1), fall back to remote DNS Servers (Default)</option>
-                            <option>Only use remote DNS servers</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
+        <!-- DNS Resolution Behavior -->
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="dns_behavior">Resolution Strategy</label>
+            <select id="dns_behavior" name="dns_behavior" class="form-select">
+              <option {% if "local" in config.dns_behavior %}selected{% endif %}>Use local resolver, fall back to remote</option>
+              <option>Only use remote DNS servers</option>
+            </select>
+            <p class="ss-hint">Controls how DNS queries are routed</p>
+          </div>
         </div>
 
-        <!-- Localization Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Localization</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="timezone" class="col-sm-3 col-form-label fw-semibold">Timezone</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="timezone" name="timezone" class="form-control" value="{{ config.timezone }}">
-                        <small class="text-muted">Select the location closest to this firewall</small>
-                    </div>
-                </div>
+        <hr class="ss-divider">
 
-                <div class="mb-3 row align-items-center">
-                    <label for="timeservers" class="col-sm-3 col-form-label fw-semibold">Timeservers</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="timeservers" name="timeservers" class="form-control" value="{{ config.timeservers }}">
-                        <small class="text-muted">Use a space to separate multiple timeservers</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="language" class="col-sm-3 col-form-label fw-semibold">Language</label>
-                    <div class="col-sm-9">
-                        <select id="language" name="language" class="form-select">
-                            <option {% if config.language=='English' %}selected{% endif %}>English</option>
-                            <option>Arabic</option>
-                            <option>French</option>
-                        </select>
-                        <small class="text-muted">Choose a language for the webConfigurator</small>
-                    </div>
-                </div>
-            </div>
+        <!-- Toggle: DNS Override -->
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="dns_override" {% if config.dns_override %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Allow DNS Override</p>
+            <p class="ss-toggle-desc">Permit DHCP/PPP connections to override the DNS server list</p>
+          </div>
         </div>
 
-        <!-- webConfigurator Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>webConfigurator</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label for="theme" class="col-sm-3 col-form-label fw-semibold">Theme</label>
-                    <div class="col-sm-9">
-                        <select id="theme" name="theme" class="form-select">
-                            <option value="Smart Shield" {% if config.theme=="Smart Shield" %}selected{% endif %}>Smart Shield</option>
-                            <option value="Light">Light</option>
-                            <option value="Dark">Dark</option>
-                        </select>
-                    </div>
-                </div>
+      </div>
+    </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label for="top_navigation" class="col-sm-3 col-form-label fw-semibold">Top Navigation</label>
-                    <div class="col-sm-9">
-                        <select id="top_navigation" name="top_navigation" class="form-select">
-                            <option value="scroll" {% if config.top_navigation=="scroll" %}selected{% endif %}>Scrolls with page</option>
-                            <option value="fixed" {% if config.top_navigation=="fixed" %}selected{% endif %}>Fixed at top</option>
-                        </select>
-                    </div>
-                </div>
+    <!-- ── Localization ── -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-earth-americas"></i></div>
+        <div>
+          <div class="ss-card-title">Localization</div>
+          <div class="ss-card-subtitle">Timezone, time servers and display language</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-3">
 
-                <div class="mb-3 row align-items-center">
-                    <label for="hostname_menu" class="col-sm-3 col-form-label fw-semibold">Hostname in Menu</label>
-                    <div class="col-sm-9">
-                        <select id="hostname_menu" name="hostname_menu" class="form-select">
-                            <option value="none" {% if config.hostname_menu=="none" %}selected{% endif %}>Default (No hostname)</option>
-                            <option value="hostname" {% if config.hostname_menu=="hostname" %}selected{% endif %}>Show hostname</option>
-                            <option value="fqdn" {% if config.hostname_menu=="fqdn" %}selected{% endif %}>Show FQDN</option>
-                        </select>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="timezone">Timezone</label>
+            <input type="text" id="timezone" name="timezone" class="form-control"
+                   value="{{ config.timezone }}" placeholder="e.g. America/New_York">
+            <p class="ss-hint">Closest geographic location</p>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label for="dashboard_columns" class="col-sm-3 col-form-label fw-semibold">Dashboard Columns</label>
-                    <div class="col-sm-9">
-                        <input type="number" id="dashboard_columns" name="dashboard_columns" class="form-control" min="1" max="4" value="{{ config.dashboard_columns or 2 }}">
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="timeservers">NTP Servers</label>
+            <input type="text" id="timeservers" name="timeservers" class="form-control"
+                   value="{{ config.timeservers }}" placeholder="pool.ntp.org">
+            <p class="ss-hint">Space-separated list of time servers</p>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Interfaces Sort</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="interfaces_sort" name="interfaces_sort" {% if config.interfaces_sort %}checked{% endif %}>
-                            <label class="form-check-label" for="interfaces_sort">Sort Alphabetically</label>
-                        </div>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="language">Interface Language</label>
+            <select id="language" name="language" class="form-select">
+              <option {% if config.language=='English' %}selected{% endif %}>English</option>
+              <option>Arabic</option>
+              <option>French</option>
+            </select>
+            <p class="ss-hint">Display language for the web UI</p>
+          </div>
 
-                <div class="mb-3 row">
-                    <label class="col-sm-3 col-form-label fw-semibold">Associated Panels</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="widgets" name="widgets" {% if config.widgets %}checked{% endif %}>
-                            <label class="form-check-label" for="widgets">Available Widgets</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="log_filter" name="log_filter" {% if config.log_filter %}checked{% endif %}>
-                            <label class="form-check-label" for="log_filter">Log Filter</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="manage_log" name="manage_log" {% if config.manage_log %}checked{% endif %}>
-                            <label class="form-check-label" for="manage_log">Manage Log</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="monitoring" name="monitoring" {% if config.monitoring %}checked{% endif %}>
-                            <label class="form-check-label" for="monitoring">Monitoring Settings</label>
-                        </div>
-                    </div>
-                </div>
+        </div>
+      </div>
+    </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Require State Filter</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="require_state_filter" name="require_state_filter" {% if config.require_state_filter %}checked{% endif %}>
-                            <label class="form-check-label" for="require_state_filter">Do not display state table without a filter</label>
-                        </div>
-                    </div>
-                </div>
+    <!-- ── Interface Preferences ── -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-palette"></i></div>
+        <div>
+          <div class="ss-card-title">Interface Preferences</div>
+          <div class="ss-card-subtitle">Appearance and behaviour of the web console</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Require Firewall Interface</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="require_firewall_interface" name="require_firewall_interface" {% if config.require_firewall_interface %}checked{% endif %}>
-                            <label class="form-check-label" for="require_firewall_interface">Do not display firewall rules list without selecting interface</label>
-                        </div>
-                    </div>
-                </div>
+        <!-- Row 1: Theme + Nav + Hostname menu + Columns -->
+        <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Left Column Labels</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="left_labels" name="left_labels" {% if config.left_labels %}checked{% endif %}>
-                            <label class="form-check-label" for="left_labels">Active</label>
-                        </div>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="theme">Color Theme</label>
+            <select id="theme" name="theme" class="form-select">
+              <option value="Smart Shield" {% if config.theme=="Smart Shield" %}selected{% endif %}>Smart Shield (default)</option>
+              <option value="Light">Light</option>
+              <option value="Dark">Dark</option>
+            </select>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Alias Popups</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="alias_popups" name="alias_popups" {% if config.alias_popups %}checked{% endif %}>
-                            <label class="form-check-label" for="alias_popups">Disable details in alias popups</label>
-                        </div>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="top_navigation">Top Navigation</label>
+            <select id="top_navigation" name="top_navigation" class="form-select">
+              <option value="scroll" {% if config.top_navigation=="scroll" %}selected{% endif %}>Scrolls with page</option>
+              <option value="fixed" {% if config.top_navigation=="fixed" %}selected{% endif %}>Fixed at top</option>
+            </select>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Disable Dragging</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_drag" name="disable_drag" {% if config.disable_drag %}checked{% endif %}>
-                            <label class="form-check-label" for="disable_drag">Disable dragging of firewall/NAT rules</label>
-                        </div>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="hostname_menu">Hostname in Navigation</label>
+            <select id="hostname_menu" name="hostname_menu" class="form-select">
+              <option value="none" {% if config.hostname_menu=="none" %}selected{% endif %}>Hidden</option>
+              <option value="hostname" {% if config.hostname_menu=="hostname" %}selected{% endif %}>Show hostname</option>
+              <option value="fqdn" {% if config.hostname_menu=="fqdn" %}selected{% endif %}>Show FQDN</option>
+            </select>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label for="login_color" class="col-sm-3 col-form-label fw-semibold">Login Page Color</label>
-                    <div class="col-sm-9">
-                        <select id="login_color" name="login_color" class="form-select">
-                            <option value="Dark Blue" {% if config.login_color=="Dark Blue" %}selected{% endif %}>Dark Blue</option>
-                            <option value="Gray" {% if config.login_color=="Gray" %}selected{% endif %}>Gray</option>
-                        </select>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="dashboard_columns">Dashboard Columns</label>
+            <input type="number" id="dashboard_columns" name="dashboard_columns"
+                   class="form-control" min="1" max="4"
+                   value="{{ config.dashboard_columns or 2 }}">
+            <p class="ss-hint">Number of widget columns on the dashboard</p>
+          </div>
 
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Login Hostname</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="show_hostname" name="show_hostname" {% if config.show_hostname %}checked{% endif %}>
-                            <label class="form-check-label" for="show_hostname">Show hostname on login banner</label>
-                        </div>
-                    </div>
-                </div>
+          <div class="ss-field">
+            <label class="ss-label" for="login_color">Login Page Style</label>
+            <select id="login_color" name="login_color" class="form-select">
+              <option value="Dark Blue" {% if config.login_color=="Dark Blue" %}selected{% endif %}>Dark Blue</option>
+              <option value="Gray" {% if config.login_color=="Gray" %}selected{% endif %}>Gray</option>
+            </select>
+          </div>
 
-                <div class="mb-3 row">
-                    <label for="login_message" class="col-sm-3 col-form-label fw-semibold">Login Message</label>
-                    <div class="col-sm-9">
-                        <textarea id="login_message" name="login_message" class="form-control" rows="4">{{ config.login_message }}</textarea>
-                        <small class="text-muted">Custom message to display on the login page</small>
-                    </div>
-                </div>
-            </div>
+          <div class="ss-field">
+            <label class="ss-label" for="login_message">Login Banner Message</label>
+            <textarea id="login_message" name="login_message" class="form-control"
+                      rows="3" placeholder="Optional message shown at login…">{{ config.login_message }}</textarea>
+            <p class="ss-hint">Displayed on the sign-in screen</p>
+          </div>
+
         </div>
 
-        <!-- Action Buttons -->
-        <div class="d-flex justify-content-end gap-2 mb-4">
-            <button type="submit" class="btn btn-primary">
-                <i class="fa-solid fa-save me-1"></i>Save
-            </button>
+        <hr class="ss-divider">
+
+        <!-- Toggle switches for booleans -->
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="interfaces_sort" {% if config.interfaces_sort %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Sort Interfaces Alphabetically</p>
+            <p class="ss-toggle-desc">Order interface list by name instead of assignment order</p>
+          </div>
         </div>
 
-    </form>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="require_state_filter" {% if config.require_state_filter %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Require State Table Filter</p>
+            <p class="ss-toggle-desc">Do not show the state table without an active filter applied</p>
+          </div>
+        </div>
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="require_firewall_interface" {% if config.require_firewall_interface %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Require Interface Selection for Rules</p>
+            <p class="ss-toggle-desc">Show firewall rules only after an interface is chosen</p>
+          </div>
+        </div>
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="disable_drag" {% if config.disable_drag %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Disable Rule Drag-and-Drop</p>
+            <p class="ss-toggle-desc">Prevent drag-to-reorder on firewall and NAT rule lists</p>
+          </div>
+        </div>
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="alias_popups" {% if config.alias_popups %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Suppress Alias Detail Popups</p>
+            <p class="ss-toggle-desc">Hide expanded alias information in hover tooltips</p>
+          </div>
+        </div>
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="show_hostname" {% if config.show_hostname %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Show Hostname on Login Banner</p>
+            <p class="ss-toggle-desc">Display the appliance hostname on the sign-in page</p>
+          </div>
+        </div>
+
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" name="left_labels" {% if config.left_labels %}checked{% endif %}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable Left Column Labels</p>
+            <p class="ss-toggle-desc">Show labels in the sidebar's collapsed left column</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Dashboard Panels ── -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-table-cells-large"></i></div>
+        <div>
+          <div class="ss-card-title">Dashboard Panels</div>
+          <div class="ss-card-subtitle">Choose which control panels appear on the dashboard</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-check-group">
+          <label class="ss-check-item">
+            <input type="checkbox" name="widgets" {% if config.widgets %}checked{% endif %}>
+            <span>Available Widgets</span>
+          </label>
+          <label class="ss-check-item">
+            <input type="checkbox" name="log_filter" {% if config.log_filter %}checked{% endif %}>
+            <span>Log Filter Panel</span>
+          </label>
+          <label class="ss-check-item">
+            <input type="checkbox" name="manage_log" {% if config.manage_log %}checked{% endif %}>
+            <span>Manage Log Panel</span>
+          </label>
+          <label class="ss-check-item">
+            <input type="checkbox" name="monitoring" {% if config.monitoring %}checked{% endif %}>
+            <span>Monitoring Settings Panel</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="ss-save-bar">
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="fa-solid fa-check me-2"></i>Save Changes
+      </button>
+    </div>
+
+  </form>
 </div>
-
 {% endblock %}

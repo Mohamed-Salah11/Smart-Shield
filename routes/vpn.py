@@ -121,10 +121,6 @@ def ipsec_p1_list():
         return jsonify({"success": True, "tunnels": tunnels})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 @vpn_bp.route("/api/ipsec/p1", methods=["POST"])
 @api_permission_required("api.vpn.edit")
@@ -223,10 +219,6 @@ def ipsec_p1_create():
         return jsonify({"success": True, "id": p1_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 @vpn_bp.route("/api/ipsec/p1/<int:p1_id>", methods=["DELETE"])
 @api_permission_required("api.vpn.edit")
@@ -240,10 +232,6 @@ def ipsec_p1_delete(p1_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-    finally:
-        if db is not None:
-            db.close()
-
 
 @vpn_bp.route("/ipsec/mobile-clients", methods=['GET', 'POST'])
 @login_required
@@ -677,6 +665,56 @@ def get_openvpn_servers():
         }), 500
 
 
+@vpn_bp.route("/api/openvpn/get-server/<int:server_id>", methods=['GET'])
+@login_required
+def get_openvpn_server(server_id):
+    """Get a single OpenVPN server by ID for editing."""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, description, disabled, server_mode, device_mode, protocol, "
+            "interface, local_port, tls_key, tls_key_auto, peer_ca "
+            "FROM openvpn_servers WHERE id=?", (server_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'status': 'error', 'message': 'Server not found'}), 404
+        return jsonify({'status': 'success', 'server': dict(row)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@vpn_bp.route("/api/openvpn/update-server/<int:server_id>", methods=['PUT'])
+@api_permission_required("api.vpn.edit")
+def update_openvpn_server(server_id):
+    """Update an existing OpenVPN server."""
+    try:
+        data = request.get_json()
+        db = get_db()
+        db.execute(
+            """UPDATE openvpn_servers SET
+               description=?, disabled=?, server_mode=?, device_mode=?,
+               protocol=?, interface=?, local_port=?, tls_key=?, tls_key_auto=?, peer_ca=?
+               WHERE id=?""",
+            (
+                data.get('description', ''),
+                1 if data.get('disabled') else 0,
+                data.get('server_mode', 'peer2peer'),
+                data.get('device_mode', 'tun'),
+                data.get('protocol', 'udp4'),
+                data.get('interface', 'wan'),
+                data.get('local_port', 1194),
+                1 if data.get('tls_key') else 0,
+                1 if data.get('tls_key_auto') else 0,
+                data.get('peer_ca', ''),
+                server_id,
+            )
+        )
+        db.commit()
+        return jsonify({'status': 'success', 'message': 'OpenVPN server updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @vpn_bp.route("/api/openvpn/delete-server/<int:server_id>", methods=['DELETE'])
 @api_permission_required("api.vpn.edit")
 def delete_openvpn_server(server_id):
@@ -795,6 +833,68 @@ def get_openvpn_clients():
             'status': 'error',
             'message': str(e)
         }), 500
+
+
+@vpn_bp.route("/api/openvpn/get-client/<int:client_id>", methods=['GET'])
+@login_required
+def get_openvpn_client(client_id):
+    """Get a single OpenVPN client by ID for editing."""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, description, disabled, server_mode, protocol, interface, "
+            "server_hostname, server_port, encryption_algorithm, auth_digest_algorithm, "
+            "inactivity_timeout, ping_method, ping_interval, ping_timeout, "
+            "custom_options, udp_fast_io, send_receive_buffer, verbosity_level "
+            "FROM openvpn_clients WHERE id=?", (client_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'status': 'error', 'message': 'Client not found'}), 404
+        return jsonify({'status': 'success', 'client': dict(row)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@vpn_bp.route("/api/openvpn/update-client/<int:client_id>", methods=['PUT'])
+@api_permission_required("api.vpn.edit")
+def update_openvpn_client(client_id):
+    """Update an existing OpenVPN client."""
+    try:
+        data = request.get_json()
+        db = get_db()
+        db.execute(
+            """UPDATE openvpn_clients SET
+               description=?, disabled=?, server_mode=?, protocol=?, interface=?,
+               server_hostname=?, server_port=?, encryption_algorithm=?,
+               auth_digest_algorithm=?, inactivity_timeout=?, ping_method=?,
+               ping_interval=?, ping_timeout=?, custom_options=?, udp_fast_io=?,
+               send_receive_buffer=?, verbosity_level=?
+               WHERE id=?""",
+            (
+                data.get('description', ''),
+                1 if data.get('disabled') else 0,
+                data.get('server_mode', 'peer2peer'),
+                data.get('protocol', 'udp4'),
+                data.get('interface', 'wan'),
+                data.get('server_hostname', ''),
+                data.get('server_port', 1194),
+                data.get('encryption_algorithm', 'AES-256-CBC'),
+                data.get('auth_digest_algorithm', 'SHA256'),
+                data.get('inactivity_timeout', 300),
+                data.get('ping_method', 'keepalive'),
+                data.get('ping_interval', 10),
+                data.get('ping_timeout', 60),
+                data.get('custom_options', ''),
+                1 if data.get('udp_fast_io') else 0,
+                data.get('send_receive_buffer', 'default'),
+                data.get('verbosity_level', 3),
+                client_id,
+            )
+        )
+        db.commit()
+        return jsonify({'status': 'success', 'message': 'OpenVPN client updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @vpn_bp.route("/api/openvpn/delete-client/<int:client_id>", methods=['DELETE'])
@@ -917,6 +1017,74 @@ def get_openvpn_csos():
             'status': 'error',
             'message': str(e)
         }), 500
+
+
+@vpn_bp.route("/api/openvpn/get-cso/<int:cso_id>", methods=['GET'])
+@login_required
+def get_openvpn_cso(cso_id):
+    """Get a single CSO by ID for editing."""
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT id, description, disabled, common_name, connection_blocking, "
+            "server_list, reset_server_options, ipv4_tunnel_network, ipv6_tunnel_network, "
+            "ipv4_gateway, ipv6_gateway, redirect_ipv4_gateway, redirect_ipv6_gateway, "
+            "ipv4_local_networks, ipv6_local_networks, ipv4_remote_networks, ipv6_remote_networks, "
+            "inactivity_timeout, ping_interval, ping_action, advanced "
+            "FROM openvpn_cso WHERE id=?", (cso_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'status': 'error', 'message': 'CSO not found'}), 404
+        return jsonify({'status': 'success', 'cso': dict(row)})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@vpn_bp.route("/api/openvpn/update-cso/<int:cso_id>", methods=['PUT'])
+@api_permission_required("api.vpn.edit")
+def update_openvpn_cso(cso_id):
+    """Update an existing OpenVPN CSO."""
+    try:
+        data = request.get_json()
+        db = get_db()
+        db.execute(
+            """UPDATE openvpn_cso SET
+               description=?, disabled=?, common_name=?, connection_blocking=?,
+               server_list=?, reset_server_options=?, ipv4_tunnel_network=?,
+               ipv6_tunnel_network=?, ipv4_gateway=?, ipv6_gateway=?,
+               redirect_ipv4_gateway=?, redirect_ipv6_gateway=?,
+               ipv4_local_networks=?, ipv6_local_networks=?,
+               ipv4_remote_networks=?, ipv6_remote_networks=?,
+               inactivity_timeout=?, ping_interval=?, ping_action=?, advanced=?
+               WHERE id=?""",
+            (
+                data.get('description', ''),
+                1 if data.get('disabled') else 0,
+                data.get('common_name', ''),
+                1 if data.get('connection_blocking') else 0,
+                data.get('server_list', ''),
+                data.get('reset_server_options', 'keep'),
+                data.get('ipv4_tunnel_network', ''),
+                data.get('ipv6_tunnel_network', ''),
+                data.get('ipv4_gateway', ''),
+                data.get('ipv6_gateway', ''),
+                1 if data.get('redirect_ipv4_gateway') else 0,
+                1 if data.get('redirect_ipv6_gateway') else 0,
+                data.get('ipv4_local_networks', ''),
+                data.get('ipv6_local_networks', ''),
+                data.get('ipv4_remote_networks', ''),
+                data.get('ipv6_remote_networks', ''),
+                data.get('inactivity_timeout', 300),
+                data.get('ping_interval', 10),
+                data.get('ping_action', 'none'),
+                data.get('advanced', ''),
+                cso_id,
+            )
+        )
+        db.commit()
+        return jsonify({'status': 'success', 'message': 'CSO updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @vpn_bp.route("/api/openvpn/delete-cso/<int:cso_id>", methods=['DELETE'])

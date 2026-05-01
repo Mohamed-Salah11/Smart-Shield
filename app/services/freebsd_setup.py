@@ -295,7 +295,37 @@ def ensure_dirs() -> List[dict]:
         except OSError as exc:
             results.append({"path": path, "created": False, "ok": False, "error": str(exc)})
 
+    # Bootstrap config.json from the example template if it doesn't exist yet.
+    _ensure_config_json()
+
     return results
+
+
+def _ensure_config_json():
+    """Copy config.example.json → config.json on first run if the file is absent."""
+    import json as _json
+
+    cfg_path = os.getenv(
+        "SMARTSHIELD_CONFIG_PATH",
+        "/usr/local/etc/smart-shield/config.json" if _ON_FREEBSD else "config.json",
+    )
+    if os.path.exists(cfg_path):
+        return  # already present
+
+    # Locate the example template relative to this file's package root
+    base     = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    example  = os.path.join(base, "config.example.json")
+    if not os.path.exists(example):
+        return  # nothing to bootstrap from
+
+    try:
+        with open(example, "r", encoding="utf-8") as fh:
+            data = _json.load(fh)
+        os.makedirs(os.path.dirname(os.path.abspath(cfg_path)), exist_ok=True)
+        with open(cfg_path, "w", encoding="utf-8") as fh:
+            _json.dump(data, fh, indent=4)
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------

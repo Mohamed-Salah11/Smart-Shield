@@ -298,6 +298,128 @@ def apply_captive_portal(conn) -> dict:
     return {"ok": True, "message": "Captive portal anchor applied.", "conf": conf}
 
 
+def authenticate_radius(conn, username: str, password: str) -> dict:
+    """
+    Authenticate a user against the RADIUS server configured in
+    captive_portal_config (columns radius_server / radius_secret).
+
+    Uses a raw RADIUS Access-Request over UDP — no third-party library needed.
+    Returns {"ok": bool, "message": str}.
+    """
+    import hashlib
+    import hmac
+    import ipaddress
+    import socket
+    import struct
+
+    username = (username or "").strip()
+    password = (password or "").strip()
+    if not username or not password:
+        return {"ok": False, "message": "Username and password are required."}
+
+    # Load config
+    try:
+        row = conn.execute(
+            "SELECT radius_server, radius_secret FROM captive_portal_config WHERE id=1"
+        ).fetchone()
+    except Exception:
+        row = None
+
+    if not row:
+        # Fall back to service_state blob
+        import json as _json
+        srow = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        settings = _json.loads(srow["value_json"]) if srow else {}
+        radius_server = settings.get("radius_server", "")
+        radius_secret = settings.get("radius_secret", "")
+    else:
+        radius_server = (row["radius_server"] or "").strip()
+        radius_secret = (row["radius_secret"] or "").strip()
+
+    if not radius_server or not radius_secret:
+        return {"ok": False, "message": "RADIUS server not configured."}
+
+    # Parse host:port
+    if ":" in radius_server:
+        host, port_str = radius_server.rsplit(":", 1)
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 1812
+    else:
+        host, port = radius_server, 1812
+
+    secret = radius_secret.encode()
+
+    # Build RADIUS Access-Request packet (RFC 2865)
+    CODE_ACCESS_REQUEST  = 1
+    CODE_ACCESS_ACCEPT   = 2
+    CODE_ACCESS_REJECT   = 3
+    ATTR_USER_NAME       = 1
+    ATTR_USER_PASSWORD   = 2
+    ATTR_NAS_IP_ADDRESS  = 4
+
+    identifier    = secrets.randbelow(256)
+    authenticator = secrets.token_bytes(16)
+
+    # Encode User-Password: XOR with MD5(secret + authenticator)
+    def _encode_password(pw: str, auth: bytes, sec: bytes) -> bytes:
+        pw_bytes = pw.encode("utf-8")
+        # Pad to multiple of 16
+        pad_len  = (16 - (len(pw_bytes) % 16)) % 16
+        pw_bytes = pw_bytes + b"\x00" * pad_len
+        result   = b""
+        prev     = auth
+        for i in range(0, len(pw_bytes), 16):
+            digest = hashlib.md5(sec + prev).digest()
+            chunk  = bytes(a ^ b for a, b in zip(pw_bytes[i:i+16], digest))
+            result += chunk
+            prev    = chunk
+        return result
+
+    enc_pw = _encode_password(password, authenticator, secret)
+
+    def _attr(atype: int, value: bytes) -> bytes:
+        return bytes([atype, len(value) + 2]) + value
+
+    attrs = (
+        _attr(ATTR_USER_NAME, username.encode("utf-8"))
+        + _attr(ATTR_USER_PASSWORD, enc_pw)
+    )
+    try:
+        nas_ip = socket.gethostbyname(socket.gethostname())
+        attrs += _attr(ATTR_NAS_IP_ADDRESS, socket.inet_aton(nas_ip))
+    except Exception:
+        pass
+
+    length  = 20 + len(attrs)
+    packet  = struct.pack("!BBH16s", CODE_ACCESS_REQUEST, identifier, length, authenticator)
+    packet += attrs
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(5)
+        sock.sendto(packet, (host, port))
+        response, _ = sock.recvfrom(4096)
+        sock.close()
+    except socket.timeout:
+        return {"ok": False, "message": "RADIUS server timed out."}
+    except OSError as exc:
+        return {"ok": False, "message": f"RADIUS socket error: {exc}"}
+
+    if len(response) < 20:
+        return {"ok": False, "message": "Malformed RADIUS response."}
+
+    resp_code = response[0]
+    if resp_code == CODE_ACCESS_ACCEPT:
+        return {"ok": True, "message": "RADIUS authentication succeeded."}
+    if resp_code == CODE_ACCESS_REJECT:
+        return {"ok": False, "message": "RADIUS authentication rejected."}
+    return {"ok": False, "message": f"Unexpected RADIUS response code {resp_code}."}
+
+
 def get_captive_status(conn) -> dict:
     active = get_active_sessions(conn)
     expire_sessions(conn)

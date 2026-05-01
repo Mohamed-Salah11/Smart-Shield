@@ -1,282 +1,151 @@
 {% extends 'base.html' %}
-
 {% block main %}
+<div class="container">
 
-<!-- Breadcrumb and notice -->
-<div class="breadcrumb-box d-flex align-items-center justify-content-between mb-3 p-3">
-	<div>
-		<a href="{{ url_for('services.services_home') }}" class="small-muted">Services</a>
-		<span class="small-muted"> / </span>
-		<a href="{{ url_for('services.dns_resolver') }}" class="breadcrumb-link">DNS Resolver</a>
-		<span class="small-muted"> / </span>
-		<span class="breadcrumb-link">General Settings</span>
-	</div>
-	<div class="breadcrumb-actions">
-		<button class="btn btn-sm btn-danger" aria-label="help">?</button>
-	</div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">DNS Resolver</h1>
+      <p class="ss-page-desc">Unbound recursive DNS resolver configuration</p>
+    </div>
+    <button type="submit" form="dns-resolver-form" class="btn btn-primary">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dns_resolver') }}">General Settings</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_advanced') }}">Advanced Settings</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_access_lists') }}">Access Lists</a></li>
+  </ul>
+
+  <form method="post" id="dns-resolver-form">
+
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-magnifying-glass-location"></i></div>
+        <div><div class="ss-card-title">Resolver Settings</div><div class="ss-card-subtitle">Listening ports, interfaces and protocol options</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input class="form-check-input" type="checkbox" id="enable" name="enable"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNS Resolver</p><p class="ss-toggle-desc">Start the Unbound recursive resolver service</p></div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+          <div class="ss-field">
+            <label class="ss-label">Listen Port</label>
+            <input class="form-control" name="listen_port" placeholder="53 (default)">
+            <p class="ss-hint">Leave blank unless another service needs port 53</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">System Domain Local Zone Type</label>
+            <select class="form-select" name="local_zone_type">
+              <option>Transparent</option>
+              <option>Always Transparent</option>
+              <option>Type Transparent</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Listening Interfaces</label>
+            <select class="form-select" name="network_interfaces" multiple size="4">
+              <option>All</option><option>WAN</option><option>LAN</option><option>WAN IPv6 Link-Local</option>
+            </select>
+            <p class="ss-hint">Blank = listen on all with wildcard</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Outgoing Interfaces</label>
+            <select class="form-select" name="outgoing_interfaces" multiple size="4">
+              <option>All</option><option>WAN</option><option>LAN</option><option>WAN IPv6 Link-Local</option>
+            </select>
+            <p class="ss-hint">Interfaces used for upstream queries</p>
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input class="form-check-input" type="checkbox" id="enable_tls" name="enable_tls"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNS-over-TLS (DoT)</p><p class="ss-toggle-desc">Respond to SSL/TLS queries from local clients</p></div>
+        </div>
+        <div class="ss-field-grid ss-field-grid-2" style="margin-top:16px;">
+          <div class="ss-field">
+            <label class="ss-label">SSL/TLS Certificate</label>
+            <select class="form-select" name="tls_cert"><option>GUI default certificate</option></select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">SSL/TLS Listen Port</label>
+            <input class="form-control" name="tls_listen_port" placeholder="853 (default)">
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="strict_binding" name="strict_binding"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Strict Interface Binding</p><p class="ss-toggle-desc">Drop recursive queries if no outgoing interfaces are available</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="dnssec" name="dnssec"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNSSEC Validation</p><p class="ss-toggle-desc">Cryptographically verify DNS responses</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="python_module" name="python_module"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable Python Module</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="query_forwarding" name="query_forwarding"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNS Query Forwarding</p><p class="ss-toggle-desc">Forward queries to upstream resolvers instead of resolving recursively</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="forwarding_ssl" name="forwarding_ssl"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Use SSL/TLS for Forwarding Queries</p><p class="ss-toggle-desc">Encrypts outbound queries to upstream resolvers (port 853)</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="dhcp_reg" name="dhcp_reg"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Register DHCP Leases</p><p class="ss-toggle-desc">Resolve hostnames of DHCP clients locally</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="static_dhcp" name="static_dhcp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Register DHCP Static Mappings</p></div></div>
+        <div class="ss-toggle-row"><label class="ss-toggle"><input class="form-check-input" type="checkbox" id="openvpn_clients" name="openvpn_clients"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Register Connected OpenVPN Clients</p></div></div>
+      </div>
+    </div>
+
+    <!-- Host Overrides -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-house-signal"></i></div>
+        <div><div class="ss-card-title">Host Overrides</div><div class="ss-card-subtitle">Return custom A records for specific hostnames</div></div>
+        <div class="ss-card-actions">
+          <a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_host') }}">
+            <i class="fa-solid fa-plus me-1"></i>Add
+          </a>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr><th style="padding:10px 14px;">Host</th><th>Domain</th><th>IP Address</th><th>Description</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% set hosts = hosts if hosts is defined else [] %}
+            {% if hosts %}{% for h in hosts %}
+            <tr><td style="padding:8px 14px;">{{ h.host }}</td><td>{{ h.domain }}</td><td>{{ h.ip }}</td><td>{{ h.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
+            {% endfor %}{% else %}
+            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">No host overrides configured</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Domain Overrides -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div>
+        <div><div class="ss-card-title">Domain Overrides</div><div class="ss-card-subtitle">Forward specific domains to alternative resolvers</div></div>
+        <div class="ss-card-actions">
+          <a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_domain') }}">
+            <i class="fa-solid fa-plus me-1"></i>Add
+          </a>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr><th style="padding:10px 14px;">Domain</th><th>Lookup Server</th><th>Description</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% set doms = domains if domains is defined else [] %}
+            {% if doms %}{% for d in doms %}
+            <tr><td style="padding:8px 14px;">{{ d.domain }}</td><td>{{ d.server }}</td><td>{{ d.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
+            {% endfor %}{% else %}
+            <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">No domain overrides configured</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="ss-save-bar">
+      <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-check me-1"></i>Save</button>
+    </div>
+  </form>
 </div>
-
-<!-- <div class="notice-alert">
-	ISC DHCP has reached end-of-life and will be removed in a future version of Smart Shield. Visit <a href="#">System &gt; Advanced &gt; Networking</a> to switch DHCP backend.
-</div> -->
-
-<!-- Tabs -->
-<ul class="nav nav-tabs mb-3">
-	<li class="nav-item"><a class="nav-link active" href="{{ url_for('services.dns_resolver') }}">General Settings</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_advanced') }}">Advanced Settings</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ url_for('services.dns_resolver_access_lists') }}">Access Lists</a></li>
-</ul>
-
-<div class="card mb-3">
-	<div class="card-header">General DNS Resolver Options</div>
-	<div class="card-body">
-		<form method="post">
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Enable</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="enable" name="enable">
-						<label class="form-check-label" for="enable">Enable DNS resolver</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Listen Port</label>
-				<div class="col-sm-9">
-					<input class="form-control" name="listen_port" placeholder="53">
-					<div class="option-desc">The port used for responding to DNS queries. It should normally be left blank unless another service needs to bind to TCP/UDP port 53.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Enable SSL/TLS Service</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="enable_tls" name="enable_tls">
-						<label class="form-check-label" for="enable_tls">Respond to incoming SSL/TLS queries from local clients</label>
-					</div>
-				</div>
-			</div>
-
-			<!-- SSL/TLS fields moved out of the enable block to sit under other headers -->
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">SSL/TLS Certificate</label>
-				<div class="col-sm-9">
-					<select class="form-select" name="tls_cert">
-						<option>GUI default (68e626ba9a349)</option>
-					</select>
-				</div>
-			</div>
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">SSL/TLS Listen Port</label>
-				<div class="col-sm-9">
-					<input class="form-control" name="tls_listen_port" placeholder="853">
-					<div class="option-desc">The port used for responding to SSL/TLS DNS queries. It should normally be left blank unless another service needs to bind to TCP/UDP port 853.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Network Interfaces</label>
-				<div class="col-sm-9">
-					<select class="form-select" name="network_interfaces" multiple size="4">
-						<option>All</option>
-						<option>WAN</option>
-						<option>LAN</option>
-						<option>WAN IPv6 Link-Local</option>
-					</select>
-					<div class="option-desc">Interface IP addresses used by the DNS Resolver for responding to queries from clients. If an interface has both IPv4 and IPv6 addresses, both are used.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Outgoing Network Interfaces</label>
-				<div class="col-sm-9">
-					<select class="form-select" name="outgoing_interfaces" multiple size="4">
-						<option>All</option>
-						<option>WAN</option>
-						<option>LAN</option>
-						<option>WAN IPv6 Link-Local</option>
-					</select>
-					<div class="option-desc">Utilize different network interface(s) that the DNS Resolver will use to send queries to authoritative servers and receive their replies.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Strict Outgoing Network Interface Binding</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="strict_binding" name="strict_binding">
-						<label class="form-check-label" for="strict_binding">Do not send recursive queries if none of the selected Outgoing Network Interfaces are available.</label>
-					</div>
-					<div class="option-desc">By default the DNS Resolver sends recursive DNS requests over any available interfaces if none of the selected Outgoing Network Interfaces are available.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">System Domain Local Zone Type</label>
-				<div class="col-sm-9">
-					<select class="form-select" name="local_zone_type">
-						<option>Transparent</option>
-					</select>
-					<div class="option-desc">The local-zone type used for the Smart Shield system domain (System &gt; General Setup). Transparent is the default.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">DNSSEC</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="dnssec" name="dnssec">
-						<label class="form-check-label" for="dnssec">Enable DNSSEC Support</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Python Module</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="python_module" name="python_module">
-						<label class="form-check-label" for="python_module">Enable Python Module</label>
-					</div>
-					<div class="option-desc">Enable the Python Module.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">DNS Query Forwarding</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="query_forwarding" name="query_forwarding">
-						<label class="form-check-label" for="query_forwarding">Enable Forwarding Mode</label>
-					</div>
-					<div class="form-check mt-2">
-						<input class="form-check-input" type="checkbox" id="forwarding_ssl" name="forwarding_ssl">
-						<label class="form-check-label" for="forwarding_ssl">Use SSL/TLS for outgoing DNS Queries to Forwarding Servers</label>
-					</div>
-					<div class="option-desc">When set in conjunction with DNS Query Forwarding, queries to all upstream forwarding DNS servers will be sent using SSL/TLS on the default port of 853.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">DHCP Registration</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="dhcp_reg" name="dhcp_reg">
-						<label class="form-check-label" for="dhcp_reg">Register DHCP leases in the DNS Resolver</label>
-					</div>
-					<div class="option-desc">If this option is set, machines that specify their hostname when requesting an IPv4 DHCP lease will be registered in the DNS Resolver.</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">Static DHCP</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="static_dhcp" name="static_dhcp">
-						<label class="form-check-label" for="static_dhcp">Register DHCP static mappings in the DNS Resolver</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="row mb-3">
-				<label class="col-sm-3 col-form-label">OpenVPN Clients</label>
-				<div class="col-sm-9">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" id="openvpn_clients" name="openvpn_clients">
-						<label class="form-check-label" for="openvpn_clients">Register connected OpenVPN clients in the DNS Resolver</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="mb-3">
-				<button class="btn btn-outline-secondary">Display Custom Options</button>
-			</div>
-
-			<div class="mt-3">
-				<button class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
-			</div>
-
-		</form>
-	</div>
-</div>
-
-<!-- Host Overrides -->
-<div class="card mb-3">
-	<div class="card-header">Host Overrides</div>
-	<div class="card-body p-0">
-		<table class="table mb-0">
-			<thead>
-				<tr>
-					<th>Host</th>
-					<th>Parent domain of host</th>
-					<th>IP to return for host</th>
-					<th>Description</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{% set hosts = hosts if hosts is defined else [] %}
-				{% if hosts %}
-					{% for h in hosts %}
-					<tr>
-						<td>{{ h.host }}</td>
-						<td>{{ h.domain }}</td>
-						<td>{{ h.ip }}</td>
-						<td>{{ h.description }}</td>
-						<td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
-					</tr>
-					{% endfor %}
-				{% else %}
-					<tr>
-						<td colspan="5">&nbsp;</td>
-					</tr>
-				{% endif %}
-			</tbody>
-		</table>
-	</div>
-	<div class="p-3 text-end">
-		<a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_host') }}">+ Add</a>
-	</div>
-</div>
-
-<!-- Domain Overrides -->
-<div class="card mb-3">
-	<div class="card-header">Domain Overrides</div>
-	<div class="card-body p-0">
-		<table class="table mb-0">
-			<thead>
-				<tr>
-					<th>Domain</th>
-					<th>Lookup Server IP Address</th>
-					<th>Description</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{% set doms = domains if domains is defined else [] %}
-				{% if doms %}
-					{% for d in doms %}
-					<tr>
-						<td>{{ d.domain }}</td>
-						<td>{{ d.server }}</td>
-						<td>{{ d.description }}</td>
-						<td><a class="btn btn-sm btn-secondary" href="#">Edit</a></td>
-					</tr>
-					{% endfor %}
-				{% else %}
-					<tr>
-						<td colspan="4">&nbsp;</td>
-					</tr>
-				{% endif %}
-			</tbody>
-		</table>
-	</div>
-	<div class="p-3 text-end">
-		<a class="btn btn-success btn-sm" href="{{ url_for('services.dns_resolver_edit_domain') }}">+ Add</a>
-	</div>
-</div>
-
 {% endblock %}

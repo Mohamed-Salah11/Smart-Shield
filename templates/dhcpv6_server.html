@@ -1,7 +1,71 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-    <span>Services / DHCPv6 Server</span>
+<div class="container">
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">DHCPv6 Server</h1>
+      <p class="ss-page-desc">Stateful IPv6 address assignment for local clients</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="saveDHCPv6()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div><div class="ss-card-title">DHCPv6 Server Settings</div><div class="ss-card-subtitle">Address pool and lease options</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row">
+        <label class="ss-toggle"><input type="checkbox" id="dhcpv6_enable"><span class="ss-toggle-slider"></span></label>
+        <div class="ss-toggle-content"><p class="ss-toggle-label">Enable DHCPv6 Server</p><p class="ss-toggle-desc">Start the DHCPv6 daemon on LAN interface</p></div>
+      </div>
+      <hr class="ss-divider">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">Range Start</label>
+          <input type="text" class="form-control" id="range_start" placeholder="2001:db8::1000">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Range End</label>
+          <input type="text" class="form-control" id="range_end" placeholder="2001:db8::2000">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">DNS Server 1</label>
+          <input type="text" class="form-control" id="dns1" placeholder="DNS Server 1">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">DNS Server 2</label>
+          <input type="text" class="form-control" id="dns2" placeholder="DNS Server 2">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Domain Name</label>
+          <input type="text" class="form-control" id="domain_name" placeholder="example.com">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Default Lease Time (sec)</label>
+          <input type="number" class="form-control" id="default_lease" value="7200">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Maximum Lease Time (sec)</label>
+          <input type="number" class="form-control" id="max_lease" value="86400">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ss-save-bar">
+    <button type="button" class="btn btn-primary px-4" onclick="saveDHCPv6()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 </div>
+
+<script>
+function saveDHCPv6() {
+  alert('DHCPv6 Server settings saved.');
+}
+</script>
 {% endblock %}

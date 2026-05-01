@@ -18,15 +18,11 @@
 
 <div class="container">
     <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Network</li>
-            </ol>
-        </nav>
-        <h1>Advanced Settings</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Advanced Settings</h1>
+        <p class="ss-page-desc">Network optimization and tuning options</p>
+      </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -51,11 +47,12 @@
     <form method="POST" action="{{ url_for('system.advanced_network') }}">
 
         <!-- DHCP Options Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>DHCP Options</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+                <div><div class="ss-card-title">DHCP Options</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Server Backend</label>
                     <div class="col-sm-9">
@@ -135,11 +132,12 @@
         </div>
 
         <!-- IPv6 Options Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>IPv6 Options</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+                <div><div class="ss-card-title">IPv6 Options</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Allow IPv6</label>
                     <div class="col-sm-9">
@@ -191,11 +189,12 @@
         </div>
 
         <!-- Network Interfaces Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Network Interfaces</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-ethernet"></i></div>
+                <div><div class="ss-card-title">Network Interfaces</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Hardware Checksum Offloading</label>
                     <div class="col-sm-9">

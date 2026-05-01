@@ -1,8 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify
 import sqlite3
 from app.auth_utils import login_required
+from app.api_auth import api_permission_required
 from app.db_utils import db_cursor
 from app.database import get_db
+from app.validators import validate_ip, validate_cidr, validate_interface_name, collect_errors
 
 interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
 
@@ -53,24 +55,26 @@ def get_interface_groups():
         return jsonify({'status': 'error', 'message': str(e)}), 400
     
 @interfaces_bp.route("/save-interface-group", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_interface_group():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        name = (data.get('groupName') or '').strip()
+        errs = [] if name else ["Group name is required"]
+        if errs:
+            return jsonify({'status': 'error', 'message': '; '.join(errs)}), 400
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute(
-                '''INSERT INTO interface_groups (group_name, description, members) 
+                '''INSERT INTO interface_groups (group_name, description, members)
                    VALUES (?, ?, ?)''',
                 (
                     data['groupName'],
-                    data['groupDescription'],
-                    ','.join(data['groupMembers'])
+                    data.get('groupDescription', ''),
+                    ','.join(data.get('groupMembers', []))
                 )
             )
-
         return jsonify({'status': 'success', 'message': 'Interface group saved'})
     except Exception as e:
-        print(f"Error: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/get-interface-group/<int:group_id>", methods=['GET'])
@@ -96,10 +100,14 @@ def get_interface_group(group_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-interface-group/<int:group_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_interface_group(group_id):
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        name = (data.get('groupName') or '').strip()
+        errs = [] if name else ["Group name is required"]
+        if errs:
+            return jsonify({'status': 'error', 'message': '; '.join(errs)}), 400
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute(
                 '''UPDATE interface_groups
@@ -107,23 +115,21 @@ def update_interface_group(group_id):
                    WHERE id = ?''',
                 (
                     data['groupName'],
-                    data['groupDescription'],
-                    ','.join(data['groupMembers']),
+                    data.get('groupDescription', ''),
+                    ','.join(data.get('groupMembers', [])),
                     group_id
                 )
             )
-
         return jsonify({'status': 'success', 'message': 'Group updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-interface-group/<int:group_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_interface_group(group_id):
     try:
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute('DELETE FROM interface_groups WHERE id = ?', (group_id,))
-
         return jsonify({'status': 'success', 'message': 'Group deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -154,39 +160,41 @@ def get_interface_assignments():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-interface-assignment", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_interface_assignment():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        iface_type = (data.get('interfaceType') or '').strip()
+        net_port   = (data.get('networkPort') or '').strip()
+        if not iface_type or not net_port:
+            return jsonify({'status': 'error', 'message': 'interfaceType and networkPort are required'}), 400
+        try:
+            validate_interface_name(net_port, allow_empty=False)
+        except ValueError as exc:
+            return jsonify({'status': 'error', 'message': str(exc)}), 400
 
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute(
                 'SELECT id FROM interface_assignments WHERE interface_type = ?',
-                (data['interfaceType'],)
+                (iface_type,)
             )
             existing = cursor.fetchone()
-
             if existing:
                 cursor.execute(
-                    '''UPDATE interface_assignments
-                       SET network_port = ?
-                       WHERE interface_type = ?''',
-                    (data['networkPort'], data['interfaceType'])
+                    'UPDATE interface_assignments SET network_port = ? WHERE interface_type = ?',
+                    (net_port, iface_type)
                 )
             else:
                 cursor.execute(
-                    '''INSERT INTO interface_assignments (interface_type, network_port)
-                       VALUES (?, ?)''',
-                    (data['interfaceType'], data['networkPort'])
+                    'INSERT INTO interface_assignments (interface_type, network_port) VALUES (?, ?)',
+                    (iface_type, net_port)
                 )
-
         return jsonify({'status': 'success', 'message': 'Interface assignment saved'})
     except Exception as e:
-        print(f"Error: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-interface-assignment/<interface_type>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_interface_assignment(interface_type):
     try:
         with db_cursor(commit=True) as (_, cursor):
@@ -211,7 +219,6 @@ def get_wireless_configs():
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, mode, description FROM wireless_configs''')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -228,7 +235,7 @@ def get_wireless_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-wireless-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_wireless_config():
     try:
         data = request.get_json()
@@ -238,7 +245,6 @@ def save_wireless_config():
                           VALUES (?, ?, ?)''', 
                        (data['parentInterface'], data['mode'], data['description']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Wireless config saved'})
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -252,7 +258,6 @@ def get_wireless_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, mode, description FROM wireless_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -266,7 +271,7 @@ def get_wireless_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-wireless-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_wireless_config(config_id):
     try:
         data = request.get_json()
@@ -275,20 +280,18 @@ def update_wireless_config(config_id):
         cursor.execute('''UPDATE wireless_configs SET parent_interface = ?, mode = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['mode'], data['description'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-wireless-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_wireless_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM wireless_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -305,7 +308,6 @@ def get_vlan_configs():
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, vlan_tag, vlan_priority, description FROM vlan_configs''')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -323,7 +325,7 @@ def get_vlan_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-vlan-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_vlan_config():
     try:
         data = request.get_json()
@@ -333,7 +335,6 @@ def save_vlan_config():
                           VALUES (?, ?, ?, ?)''', 
                        (data['parentInterface'], data['vlanTag'], data['vlanPriority'], data['description']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'VLAN config saved'})
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -347,7 +348,6 @@ def get_vlan_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, vlan_tag, vlan_priority, description FROM vlan_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -362,7 +362,7 @@ def get_vlan_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-vlan-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_vlan_config(config_id):
     try:
         data = request.get_json()
@@ -371,20 +371,18 @@ def update_vlan_config(config_id):
         cursor.execute('''UPDATE vlan_configs SET parent_interface = ?, vlan_tag = ?, vlan_priority = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['vlanTag'], data['vlanPriority'], data['description'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-vlan-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_vlan_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM vlan_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -401,7 +399,6 @@ def get_qinq_configs():
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, first_level_tag, add_to_groups, description, member_tags FROM qinq_configs''')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -420,7 +417,7 @@ def get_qinq_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-qinq-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_qinq_config():
     try:
         data = request.get_json()
@@ -430,7 +427,6 @@ def save_qinq_config():
                           VALUES (?, ?, ?, ?, ?)''', 
                        (data['parentInterface'], data['firstLevelTag'], data['addToGroups'], data['description'], ','.join(data['memberTags'])))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'QinQ config saved'})
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -444,7 +440,6 @@ def get_qinq_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, first_level_tag, add_to_groups, description, member_tags FROM qinq_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -460,7 +455,7 @@ def get_qinq_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-qinq-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_qinq_config(config_id):
     try:
         data = request.get_json()
@@ -469,20 +464,18 @@ def update_qinq_config(config_id):
         cursor.execute('''UPDATE qinq_configs SET parent_interface = ?, first_level_tag = ?, add_to_groups = ?, description = ?, member_tags = ? WHERE id = ?''',
                        (data['parentInterface'], data['firstLevelTag'], data['addToGroups'], data['description'], ','.join(data['memberTags']), config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-qinq-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_qinq_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM qinq_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -499,7 +492,6 @@ def get_ppp_configs():
         cursor = conn.cursor()
         cursor.execute('SELECT id, link_type, link_interfaces, description, username, dial_on_demand FROM ppp_configs')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -517,7 +509,7 @@ def get_ppp_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-ppp-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_ppp_config():
     try:
         data = request.get_json()
@@ -527,7 +519,6 @@ def save_ppp_config():
                           VALUES (?, ?, ?, ?, ?, ?)''',
                        (data['linkType'], ','.join(data['linkInterfaces']), data['description'], data['username'], data['password'], data['dialOnDemand']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -540,7 +531,6 @@ def get_ppp_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, link_type, link_interfaces, description, username, password, dial_on_demand FROM ppp_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -557,7 +547,7 @@ def get_ppp_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-ppp-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_ppp_config(config_id):
     try:
         data = request.get_json()
@@ -566,20 +556,18 @@ def update_ppp_config(config_id):
         cursor.execute('''UPDATE ppp_configs SET link_type = ?, link_interfaces = ?, description = ?, username = ?, password = ?, dial_on_demand = ? WHERE id = ?''',
                        (data['linkType'], ','.join(data['linkInterfaces']), data['description'], data['username'], data['password'], data['dialOnDemand'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-ppp-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_ppp_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM ppp_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -596,7 +584,6 @@ def get_gre_configs():
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description FROM gre_configs')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -621,7 +608,7 @@ def get_gre_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-gre-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_gre_config():
     try:
         data = request.get_json()
@@ -631,7 +618,6 @@ def save_gre_config():
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                        (data['parentInterface'], data['greRemoteAddress'], data['greLocalAddress'], data['ipv4TunnelRemoteAddress'], data['ipv4TunnelRemotePrefix'], data['ipv4TunnelLocalAddress'], data['ipv4TunnelLocalPrefix'], data['ipv6TunnelRemoteAddress'], data['ipv6TunnelRemotePrefix'], data['ipv6TunnelLocalAddress'], data['ipv6TunnelLocalPrefix'], data['description']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -644,7 +630,6 @@ def get_gre_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description FROM gre_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -667,7 +652,7 @@ def get_gre_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-gre-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_gre_config(config_id):
     try:
         data = request.get_json()
@@ -676,20 +661,18 @@ def update_gre_config(config_id):
         cursor.execute('''UPDATE gre_configs SET parent_interface = ?, gre_remote_address = ?, gre_local_address = ?, ipv4_tunnel_remote_address = ?, ipv4_tunnel_remote_prefix = ?, ipv4_tunnel_local_address = ?, ipv4_tunnel_local_prefix = ?, ipv6_tunnel_remote_address = ?, ipv6_tunnel_remote_prefix = ?, ipv6_tunnel_local_address = ?, ipv6_tunnel_local_prefix = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['greRemoteAddress'], data['greLocalAddress'], data['ipv4TunnelRemoteAddress'], data['ipv4TunnelRemotePrefix'], data['ipv4TunnelLocalAddress'], data['ipv4TunnelLocalPrefix'], data['ipv6TunnelRemoteAddress'], data['ipv6TunnelRemotePrefix'], data['ipv6TunnelLocalAddress'], data['ipv6TunnelLocalPrefix'], data['description'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-gre-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_gre_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM gre_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -706,7 +689,6 @@ def get_gif_configs():
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description FROM gif_configs')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -727,7 +709,7 @@ def get_gif_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-gif-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_gif_config():
     try:
         data = request.get_json()
@@ -737,7 +719,6 @@ def save_gif_config():
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                        (data['parentInterface'], data['gifRemoteAddress'], data['gifTunnelLocalAddress'], data['gifTunnelRemoteAddress'], data['gifTunnelSubnet'], data['ecnFriendlyBehavior'], data['outerSourceFiltering'], data['description']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -750,7 +731,6 @@ def get_gif_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description FROM gif_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -769,7 +749,7 @@ def get_gif_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-gif-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_gif_config(config_id):
     try:
         data = request.get_json()
@@ -778,20 +758,18 @@ def update_gif_config(config_id):
         cursor.execute('''UPDATE gif_configs SET parent_interface = ?, gif_remote_address = ?, gif_tunnel_local_address = ?, gif_tunnel_remote_address = ?, gif_tunnel_subnet = ?, ecn_friendly_behavior = ?, outer_source_filtering = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['gifRemoteAddress'], data['gifTunnelLocalAddress'], data['gifTunnelRemoteAddress'], data['gifTunnelSubnet'], data['ecnFriendlyBehavior'], data['outerSourceFiltering'], data['description'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-gif-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_gif_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM gif_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -808,7 +786,6 @@ def get_bridge_configs():
         cursor = conn.cursor()
         cursor.execute('SELECT id, member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports FROM bridge_configs')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -830,7 +807,7 @@ def get_bridge_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-bridge-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_bridge_config():
     try:
         data = request.get_json()
@@ -840,7 +817,6 @@ def save_bridge_config():
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                        (','.join(data['memberInterfaces']), data['description'], data['cacheSize'], data['cacheMaxAge'], ','.join(data['spanInterfaces']), ','.join(data['edgeInterfaces']), ','.join(data['autoEdgeInterfaces']), ','.join(data['ptpInterfaces']), data['stickyPorts']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -853,7 +829,6 @@ def get_bridge_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports FROM bridge_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -873,7 +848,7 @@ def get_bridge_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-bridge-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_bridge_config(config_id):
     try:
         data = request.get_json()
@@ -882,20 +857,18 @@ def update_bridge_config(config_id):
         cursor.execute('''UPDATE bridge_configs SET member_interfaces = ?, description = ?, cache_size = ?, cache_max_age = ?, span_interfaces = ?, edge_interfaces = ?, auto_edge_interfaces = ?, ptp_interfaces = ?, sticky_ports = ? WHERE id = ?''',
                        (','.join(data['memberInterfaces']), data['description'], data['cacheSize'], data['cacheMaxAge'], ','.join(data['spanInterfaces']), ','.join(data['edgeInterfaces']), ','.join(data['autoEdgeInterfaces']), ','.join(data['ptpInterfaces']), data['stickyPorts'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-bridge-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_bridge_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM bridge_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -912,7 +885,6 @@ def get_lagg_configs():
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interfaces, aggregation_protocol, description FROM lagg_configs')
         configs = cursor.fetchall()
-        conn.close()
         
         configs_list = [
             {
@@ -928,7 +900,7 @@ def get_lagg_configs():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-lagg-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_lagg_config():
     try:
         data = request.get_json()
@@ -939,7 +911,6 @@ def save_lagg_config():
                        (','.join(data['parentInterfaces']), data['aggregationProtocol'], data['description']))
         conn.commit()
         config_id = cursor.lastrowid
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved', 'id': config_id})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -952,7 +923,6 @@ def get_lagg_config(config_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interfaces, aggregation_protocol, description FROM lagg_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -966,7 +936,7 @@ def get_lagg_config(config_id):
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/update-lagg-config/<int:config_id>", methods=['PUT'])
-@login_required
+@api_permission_required("api.network.edit")
 def update_lagg_config(config_id):
     try:
         data = request.get_json()
@@ -975,20 +945,18 @@ def update_lagg_config(config_id):
         cursor.execute('''UPDATE lagg_configs SET parent_interfaces = ?, aggregation_protocol = ?, description = ? WHERE id = ?''',
                        (','.join(data['parentInterfaces']), data['aggregationProtocol'], data['description'], config_id))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config updated'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/delete-lagg-config/<int:config_id>", methods=['DELETE'])
-@login_required
+@api_permission_required("api.network.edit")
 def delete_lagg_config(config_id):
     try:
         conn = conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM lagg_configs WHERE id = ?', (config_id,))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1010,7 +978,6 @@ def get_wan_config():
         cursor = conn.cursor()
         cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, username, password, dial_on_demand, idle_timeout, block_private_networks, block_bogon_networks FROM wan_config WHERE id = 1')
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -1036,7 +1003,7 @@ def get_wan_config():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-wan-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_wan_config():
     try:
         data = request.get_json()
@@ -1045,7 +1012,6 @@ def save_wan_config():
         cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = ?, dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], data['password'], data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1068,7 +1034,6 @@ def get_lan_config():
         cursor = conn.cursor()
         cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, block_private_networks, block_bogon_networks FROM lan_config WHERE id = 1')
         config = cursor.fetchone()
-        conn.close()
         
         if config:
             return jsonify({'status': 'success', 'data': {
@@ -1090,16 +1055,66 @@ def get_lan_config():
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-lan-config", methods=['POST'])
-@login_required
+@api_permission_required("api.network.edit")
 def save_lan_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE lan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
         conn.commit()
-        conn.close()
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
+# Network apply — write rc.conf block + push config live
+# ---------------------------------------------------------------------------
+
+@interfaces_bp.route("/api/apply-network", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_apply_network():
+    """
+    Persist the current interface configuration to /etc/rc.conf.local so it
+    survives a reboot, then apply IP/gateway changes live via ifconfig/route.
+    """
+    from flask import session
+    from app.audit_log import log_event
+    from app.services.rc_conf_writer import apply_rc_conf
+    from app.services.network_service import apply_interface_config
+
+    conn    = get_db()
+    results = []
+
+    # 1. Write rc.conf.local block
+    rc_result = apply_rc_conf(conn)
+    results.append({"step": "rc.conf", "ok": rc_result["ok"], "message": rc_result["message"]})
+
+    # 2. Apply interface config live
+    try:
+        live_result = apply_interface_config(conn)
+        results.append({"step": "live_apply", "ok": live_result.get("ok", True),
+                         "message": live_result.get("message", "Applied")})
+    except Exception as exc:
+        results.append({"step": "live_apply", "ok": False, "message": str(exc)})
+
+    overall_ok = all(r["ok"] for r in results)
+    log_event(
+        category="system", action="network_apply",
+        username=session.get("username", "system"),
+        remote_addr=request.remote_addr,
+        details={"ok": overall_ok, "results": results},
+    )
+    return jsonify({"ok": overall_ok, "results": results})
+
+
+@interfaces_bp.route("/api/rc-conf-preview", methods=["GET"])
+@login_required
+def api_rc_conf_preview():
+    """Return the rc.conf block that would be written, without applying it."""
+    from app.services.rc_conf_writer import generate_rc_conf_block
+    conn  = get_db()
+    block = generate_rc_conf_block(conn)
+    return jsonify({"ok": True, "block": block})

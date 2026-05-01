@@ -1,604 +1,314 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span id="page-title">Services / NTP / <span id="breadcrumb-section">Settings</span></span>
+<div class="container">
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">NTP Server</h1>
+      <p class="ss-page-desc" id="page-desc">Time synchronization service configuration</p>
+    </div>
+    <button type="submit" form="ntp-form" class="btn btn-primary">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" id="tab-settings"  href="#" onclick="showTab('settings');  return false;">Settings</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-acls"      href="#" onclick="showTab('acls');      return false;">ACLs</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-serialgps" href="#" onclick="showTab('serialgps'); return false;">Serial GPS</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-pps"       href="#" onclick="showTab('pps');       return false;">PPS</a></li>
+  </ul>
+
+  <form id="ntp-form">
+
+    <!-- ── SETTINGS TAB ── -->
+    <div id="content-settings">
+
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <div><div class="ss-card-title">NTP Server Configuration</div></div>
+        </div>
+        <div class="ss-card-body">
+          <div class="ss-toggle-row">
+            <label class="ss-toggle"><input type="checkbox" id="enable_ntp" name="enable_ntp" checked><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content">
+              <p class="ss-toggle-label">Enable NTP Server</p>
+              <p class="ss-toggle-desc">Disable if the host OS (e.g. a hypervisor) is managing the clock instead</p>
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-field-grid ss-field-grid-2">
+            <div class="ss-field">
+              <label class="ss-label">Listen Interfaces</label>
+              <select name="interface" class="form-select" multiple size="3">
+                <option value="WAN" selected>WAN</option>
+                <option value="LAN" selected>LAN</option>
+                <option value="Localhost">Localhost</option>
+              </select>
+              <p class="ss-hint">Select none to listen on all interfaces with a wildcard</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Primary Time Server</label>
+              <input type="text" name="time_server_1" value="2.pool.ntp.org" class="form-control">
+              <p class="ss-hint">Configure 3–5 servers for reliable synchronization</p>
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm">
+              <i class="fa-solid fa-plus me-1"></i>Add Time Server
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-gear"></i></div>
+          <div><div class="ss-card-title">Advanced Configuration</div></div>
+        </div>
+        <div class="ss-card-body">
+          <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+            <div class="ss-field">
+              <label class="ss-label">Max Candidate Pool Peers</label>
+              <input type="number" name="max_peers" value="5" class="form-control">
+              <p class="ss-hint">Default: 5</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Orphan Mode Stratum</label>
+              <input type="text" name="orphan_mode" value="12" class="form-control">
+              <p class="ss-hint">High value = lower priority (default: 12)</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">DNS Resolution</label>
+              <select name="dns_resolution" class="form-select">
+                <option value="Auto" selected>Auto</option>
+                <option value="IPv4">IPv4</option>
+                <option value="IPv6">IPv6</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Minimum Poll Interval</label>
+              <select name="min_poll_interval" class="form-select">
+                <option>Default</option>
+                <option>3: 8 seconds</option>
+                <option>6: 64 seconds</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Maximum Poll Interval</label>
+              <select name="max_poll_interval" class="form-select">
+                <option>Default</option>
+                <option>10: 1,024 seconds</option>
+                <option>17: 131,072 seconds</option>
+              </select>
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-toggle-row">
+            <label class="ss-toggle"><input type="checkbox" id="ntp_graphs" name="ntp_graphs"><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content"><p class="ss-toggle-label">Enable RRD Graphs</p><p class="ss-toggle-desc">Collect and graph NTP statistics over time</p></div>
+          </div>
+          <div class="ss-toggle-row">
+            <label class="ss-toggle"><input type="checkbox" id="log_peer_messages" name="log_peer_messages"><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content"><p class="ss-toggle-label">Log Peer Messages</p><p class="ss-toggle-desc">Write peer activity to the system log</p></div>
+          </div>
+          <div class="ss-toggle-row">
+            <label class="ss-toggle"><input type="checkbox" id="log_system_messages" name="log_system_messages"><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content"><p class="ss-toggle-label">Log System Messages</p><p class="ss-toggle-desc">Write system events to the system log</p></div>
+          </div>
+          <div class="ss-toggle-row">
+            <label class="ss-toggle"><input type="checkbox" id="ntp_auth" name="ntp_auth"><span class="ss-toggle-slider"></span></label>
+            <div class="ss-toggle-content"><p class="ss-toggle-label">NTPv3 Authentication (RFC 1305)</p><p class="ss-toggle-desc">Prevents man-in-the-middle attacks on time sync</p></div>
+          </div>
+          <hr class="ss-divider">
+          <div>
+            <button type="button" data-advanced="ntp-stats-panel" class="btn btn-outline-secondary btn-sm mb-3">
+              <i class="fa fa-gear me-1"></i>Statistics Logging
+            </button>
+            <div id="ntp-stats-panel" class="d-none ss-field-grid ss-field-grid-3">
+              <label class="ss-check-item"><input type="checkbox" name="stats_loopstats" id="loopstats"><span>Loop statistics (loopstats)</span></label>
+              <label class="ss-check-item"><input type="checkbox" name="stats_peerstats" id="peerstats"><span>Peer statistics (peerstats)</span></label>
+              <label class="ss-check-item"><input type="checkbox" name="stats_clockstats" id="clockstats"><span>Clock statistics (clockstats)</span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACLs TAB ── -->
+    <div id="content-acls" style="display:none;">
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-lock"></i></div>
+          <div><div class="ss-card-title">Default Access Restrictions</div><div class="ss-card-subtitle">Applied to all clients not matching a custom ACL</div></div>
+        </div>
+        <div class="ss-card-body">
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="kod"      name="kod"      checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Kiss-o'-death (KOD)</p><p class="ss-toggle-desc">Send KOD packets to rate-limit abusive clients</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="nomodify" name="nomodify" checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Block Runtime Configuration (nomodify)</p><p class="ss-toggle-desc">Prevent ntpq/ntpdc from changing runtime settings</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="noquery"  name="noquery"       ><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Disable Queries (noquery)</p><p class="ss-toggle-desc">Block ntpq and ntpdc query access</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="noserve"  name="noserve"       ><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Disable Service (noserve)</p><p class="ss-toggle-desc">Disable all except ntpq/ntpdc queries</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="nopeer"   name="nopeer"  checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Block Peer Association (nopeer)</p><p class="ss-toggle-desc">Deny packets that attempt peer association</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="notrap"   name="notrap"  checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Disable Trap Service (notrap)</p><p class="ss-toggle-desc">Deny mode 6 control message trap service</p></div></div>
+        </div>
+      </div>
+
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
+          <div><div class="ss-card-title">Custom Access Rules</div></div>
+          <div class="ss-card-actions">
+            <button type="button" class="btn btn-success btn-sm" onclick="addCustomAclRow()">
+              <i class="fa-solid fa-plus me-1"></i>Add Rule
+            </button>
+          </div>
+        </div>
+        <div class="ss-card-body" style="padding:0;">
+          <div style="overflow-x:auto;">
+            <table class="table table-hover mb-0" style="font-size:.85rem;">
+              <thead style="background:var(--border-color-soft);">
+                <tr><th style="padding:10px 14px;">Network / CIDR</th><th>KOD</th><th>nomodify</th><th>noquery</th><th>noserve</th><th>nopeer</th><th>notrap</th><th></th></tr>
+              </thead>
+              <tbody id="custom-acls-table">
+                <tr>
+                  <td style="padding:8px 14px;"><input type="text" name="network_cidr_new" placeholder="e.g. 192.168.1.0/24" class="form-control form-control-sm" style="max-width:200px;"></td>
+                  <td><input type="checkbox" name="new_kod"></td>
+                  <td><input type="checkbox" name="new_nomodify"></td>
+                  <td><input type="checkbox" name="new_noquery"></td>
+                  <td><input type="checkbox" name="new_noserve"></td>
+                  <td><input type="checkbox" name="new_nopeer"></td>
+                  <td><input type="checkbox" name="new_notrap"></td>
+                  <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SERIAL GPS TAB ── -->
+    <div id="content-serialgps" style="display:none;">
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-satellite"></i></div>
+          <div><div class="ss-card-title">Serial GPS Reference Clock</div><div class="ss-card-subtitle">Use a serial GPS as a stratum-0 time source</div></div>
+        </div>
+        <div class="ss-card-body">
+          <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+            <div class="ss-field">
+              <label class="ss-label">GPS Type</label>
+              <select name="gps_type" class="form-select">
+                <option>Default</option><option>Custom</option><option>Generic</option>
+                <option>Garmin</option><option>MediaTek</option><option>SiRF</option>
+                <option>U-Blox</option><option>SureGPS</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Fudge Time 1</label>
+              <input type="text" name="fudge_time_1" value="0.155" class="form-control">
+              <p class="ss-hint">PPS signal offset (default: 0.0)</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Fudge Time 2</label>
+              <input type="text" name="fudge_time_2" value="0.0" class="form-control">
+              <p class="ss-hint">GPS time offset (default: 0.0)</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Stratum (0–16)</label>
+              <input type="text" name="gps_stratum" placeholder="0" class="form-control">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Clock ID</label>
+              <input type="text" name="clock_id" placeholder="GPS (1–4 chars)" class="form-control">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Min Poll Interval</label>
+              <select name="gps_min_poll_interval" class="form-select"><option>Default</option></select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Max Poll Interval</label>
+              <select name="gps_max_poll_interval" class="form-select"><option>Default</option></select>
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="flag_prefer" checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Prefer This Clock</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="flag_enable_pps" checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable PPS Signal Processing</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="flag_kernel_pps" checked><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable Kernel PPS Clock Discipline</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="flag_falling_pps"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Falling Edge PPS Processing (default: rising edge)</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="flag_display_only"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Display Only — Do Not Use for Sync</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PPS TAB ── -->
+    <div id="content-pps" style="display:none;">
+      <div class="ss-card">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="fa-solid fa-wave-square"></i></div>
+          <div><div class="ss-card-title">PPS Reference Clock</div><div class="ss-card-subtitle">Pulse Per Second signal from radio time receivers</div></div>
+        </div>
+        <div class="ss-card-body">
+          <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+            <div class="ss-field">
+              <label class="ss-label">Fudge Time</label>
+              <input type="text" name="pps_fudge_time" placeholder="0.0" class="form-control">
+              <p class="ss-hint">PPS signal offset from actual second</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Stratum</label>
+              <input type="text" name="pps_stratum" placeholder="0" class="form-control">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Clock ID</label>
+              <input type="text" name="pps_clock_id" placeholder="PPS (1–4 chars)" class="form-control">
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Min Poll Interval</label>
+              <select name="pps_min_poll_interval" class="form-select"><option>Default</option><option>3: 8 seconds</option><option>6: 64 seconds</option></select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Max Poll Interval</label>
+              <select name="pps_max_poll_interval" class="form-select"><option>Default</option><option>10: 1,024 seconds</option><option>17: 131,072 seconds</option></select>
+            </div>
+          </div>
+          <hr class="ss-divider">
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="pps_flag_falling_edge"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Falling Edge PPS (default: rising edge)</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="pps_flag_kernel_pps"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Kernel PPS Clock Discipline</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" id="pps_flag_record_timestamp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Record Timestamps for Allan Deviation Plots</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-save-bar">
+      <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-check me-1"></i>Save</button>
+    </div>
+  </form>
 </div>
 
-<ul class="nav nav-tabs mb-3">
-	<li class="nav-item">
-		<a class="nav-link active" id="tab-settings" href="#" onclick="showTab('settings'); return false;">Settings</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link" id="tab-acls" href="#" onclick="showTab('acls'); return false;">ACLs</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link" id="tab-serialgps" href="#" onclick="showTab('serialgps'); return false;">Serial GPS</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link" id="tab-pps" href="#" onclick="showTab('pps'); return false;">PPS</a>
-	</li>
-</ul>
-
-<form id="ntp-form">
-	<div class="tab-content" id="content-settings">
-		<div class="settings-section">
-			<h5>NTP Server Configuration</h5>
-
-			<div class="form-group">
-				<label>Enable</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="enable_ntp" name="enable_ntp" checked>
-						<label class="form-check-label" for="enable_ntp">Enable NTP Server</label>
-					</div>
-					<div class="help-text">You may need to disable NTP if Smart Shield is running in a virtual machine and the host is responsible for the clock.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Interface</label>
-				<div class="form-group-content">
-					<select name="interface" class="form-control" multiple size="3">
-						<option value="WAN" selected>WAN</option>
-						<option value="LAN" selected>LAN</option>
-						<option value="Localhost">Localhost</option>
-					</select>
-					<div class="help-text">Interfaces without an IP address will not be shown. Selecting no interfaces will listen on all interfaces with a wildcard. Selecting all interfaces will explicitly listen only on the interfaces/IPs specified.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Time Servers</label>
-				<div class="form-group-content">
-					<div class="d-flex gap-2 align-items-center mb-2">
-						<input type="text" name="time_server_1" value="2.Smart Shield.pool.ntp.org" class="form-control" style="max-width: 250px;">
-						<div class="form-check">
-							<input type="checkbox" class="form-check-input" name="prefer_1" id="prefer_1">
-							<label class="form-check-label" for="prefer_1">Prefer</label>
-						</div>
-						<div class="form-check">
-							<input type="checkbox" class="form-check-input" name="no_select_1" id="no_select_1">
-							<label class="form-check-label" for="no_select_1">No Select</label>
-						</div>
-						<div class="form-check">
-							<input type="checkbox" class="form-check-input" name="authenticated_1" id="authenticated_1">
-							<label class="form-check-label" for="authenticated_1">Authenticated</label>
-						</div>
-						<select name="type_1" class="form-control" style="max-width: 100px;">
-							<option value="Pool" selected>Pool</option>
-							<option value="Server">Server</option>
-							<option value="Peer">Peer</option>
-						</select>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Add</label>
-				<div class="form-group-content">
-					<button type="button" class="btn btn-success">Add</button>
-					<div class="help-text">NTP will only sync if a majority of the servers agree on the time. For best results you should configure between 3 and 5 servers (NTP support pages recommend at least 4 or 5), or a pool.</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="settings-section">
-			<h5>Advanced Configuration</h5>
-
-			<div class="form-group">
-				<label>Max candidate pool peers</label>
-				<div class="form-group-content">
-					<input type="number" name="max_peers" value="5" class="form-control" style="max-width: 100px;">
-					<div class="help-text">Maximum number of candidate peers in the NTP pool. (Default: 5).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Orphan Mode</label>
-				<div class="form-group-content">
-					<input type="text" name="orphan_mode" value="12" class="form-control" style="max-width: 100px;">
-					<div class="help-text">Orphan mode allows the system clock to be used when no other clocks are available. The number here specifies the stratum reported during orphan mode and should normally be set to a number high enough to insure that any other servers available to clients are preferred over this server (default: 12).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Minimum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="min_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-						<option>3: 8 seconds (00:00:08)</option>
-						<option>6: 64 seconds (00:01:04)</option>
-					</select>
-					<div class="help-text">Minimum poll interval for NTP messages.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Maximum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="max_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-						<option>10: 1,024 seconds (00:17:04)</option>
-						<option>17: 131,072 seconds (1d 22:24:32)</option>
-					</select>
-					<div class="help-text">Maximum poll interval for NTP messages.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>NTP Graphs</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="ntp_graphs" name="ntp_graphs">
-						<label class="form-check-label" for="ntp_graphs">Enable RRD graphs of NTP statistics (default: disabled).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Logging</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="log_peer_messages" name="log_peer_messages">
-						<label class="form-check-label" for="log_peer_messages">Log peer messages (default: disabled).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="log_system_messages" name="log_system_messages">
-						<label class="form-check-label" for="log_system_messages">Log system messages (default: disabled).</label>
-					</div>
-					<div class="help-text">These options enable additional messages from NTP to be written to the System Log.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Statistics Logging</label>
-				<div class="form-group-content">
-					<button type="button" data-advanced="ntp-stats-panel" class="btn btn-outline-secondary btn-sm">
-						<i class="fa fa-gear me-1"></i>Display Advanced
-					</button>
-					<div id="ntp-stats-panel" class="d-none mt-3">
-						<div class="form-check mb-2">
-							<input type="checkbox" class="form-check-input" name="stats_loopstats" id="loopstats">
-							<label class="form-check-label" for="loopstats">Log loop statistics (loopstats)</label>
-						</div>
-						<div class="form-check mb-2">
-							<input type="checkbox" class="form-check-input" name="stats_peerstats" id="peerstats">
-							<label class="form-check-label" for="peerstats">Log peer statistics (peerstats)</label>
-						</div>
-						<div class="form-check">
-							<input type="checkbox" class="form-check-input" name="stats_clockstats" id="clockstats">
-							<label class="form-check-label" for="clockstats">Log clock statistics (clockstats)</label>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Leap seconds</label>
-				<div class="form-group-content">
-					<button type="button" data-advanced="ntp-leap-panel" class="btn btn-outline-secondary btn-sm">
-						<i class="fa fa-gear me-1"></i>Display Advanced
-					</button>
-					<div class="help-text">Leap seconds may be added or subtracted at the end of June or December.</div>
-					<div id="ntp-leap-panel" class="d-none mt-3">
-						<label class="form-label fw-semibold">Leap Seconds File Path</label>
-						<input type="text" name="leap_file" class="form-control" placeholder="/var/db/ntpd.leap-seconds">
-						<small class="text-muted">Download from IANA and specify path. Leave blank to use system default.</small>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>DNS Resolution</label>
-				<div class="form-group-content">
-					<select name="dns_resolution" class="form-control" style="max-width: 200px;">
-						<option value="Auto" selected>Auto</option>
-						<option value="IPv4">IPv4</option>
-						<option value="IPv6">IPv6</option>
-					</select>
-					<div class="help-text">Force NTP peer DNS resolution IP protocol.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Enable NTP Server Authentication</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="ntp_auth" name="ntp_auth">
-						<label class="form-check-label" for="ntp_auth">Enable NTPv3 authentication (RFC 1305)</label>
-					</div>
-					<div class="help-text">Authentication allows the NTP client to confirm it is communicating with the intended server, which protects against man-in-the-middle attacks.</div>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<div class="tab-content" id="content-acls" style="display: none;">
-		<div class="settings-section">
-			<h5>Default Access Restrictions</h5>
-
-			<div class="form-group">
-				<label>Kiss-o'-death</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="kod" name="kod" checked>
-						<label class="form-check-label" for="kod">Enable KOD packets.</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Modifications</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="nomodify" name="nomodify" checked>
-						<label class="form-check-label" for="nomodify">Deny run-time Configuration (nomodify) by ntpq and ntpdc.</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Queries</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="noquery" name="noquery">
-						<label class="form-check-label" for="noquery">Disable ntpq and ntpdc queries (noquery).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Service</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="noserve" name="noserve">
-						<label class="form-check-label" for="noserve">Disable all except ntpq and ntpdc queries (noserve).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Peer Association</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="nopeer" name="nopeer" checked>
-						<label class="form-check-label" for="nopeer">Deny packets that attempt a peer association (nopeer).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Trap Service</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="notrap" name="notrap" checked>
-						<label class="form-check-label" for="notrap">Deny mode 6 control message trap service (notrap).</label>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="settings-section">
-			<h5>Custom Access Restrictions</h5>
-
-			<table class="table-bordered">
-				<thead>
-					<tr>
-						<th>Networks</th>
-						<th>KOD</th>
-						<th>nomodify</th>
-						<th>noquery</th>
-						<th>noserve</th>
-						<th>nopeer</th>
-						<th>notrap</th>
-						<th>Action</th>
-					</tr>
-				</thead>
-				<tbody id="custom-acls-table">
-					<tr>
-						<td>
-							<div class="d-flex gap-2 align-items-center">
-								<input type="text" name="network_cidr_new" placeholder="Network/mask" class="form-control" style="max-width: 150px;">
-								<span>/</span>
-								<select class="form-control" style="max-width: 70px;">
-									<option>24</option>
-									<option>128</option>
-								</select>
-							</div>
-						</td>
-						<td><input type="checkbox" name="new_kod"></td>
-						<td><input type="checkbox" name="new_nomodify"></td>
-						<td><input type="checkbox" name="new_noquery"></td>
-						<td><input type="checkbox" name="new_noserve"></td>
-						<td><input type="checkbox" name="new_nopeer"></td>
-						<td><input type="checkbox" name="new_notrap"></td>
-						<td><button type="button" class="btn btn-danger" onclick="this.closest('tr').remove()">Delete</button></td>
-					</tr>
-				</tbody>
-			</table>
-		</div>
-
-		<div class="d-flex gap-2 mt-3">
-			<button type="button" class="btn btn-success" onclick="addCustomAclRow()">Add</button>
-		</div>
-	</div>
-
-	<div class="tab-content" id="content-serialgps" style="display: none;">
-		<div class="settings-section">
-			<h5>NTP Serial GPS Configuration</h5>
-			<div class="help-text mb-3">
-				A GPS connected via a serial port may be used as a reference clock for NTP. If the GPS also supports PPS and is properly configured, and connected, that GPS may also be used as a Pulse Per Second clock reference. NOTE: A USB GPS may work, but is not recommended due to USB bus timing issues.
-			</div>
-
-			<div class="form-group">
-				<label>GPS Type</label>
-				<div class="form-group-content">
-					<select name="gps_type" class="form-control" style="max-width: 250px;">
-						<option>Default</option>
-						<option>Custom</option>
-						<option>Generic</option>
-						<option>Garmin</option>
-						<option>MediaTek</option>
-						<option>SiRF</option>
-						<option>U-Blox</option>
-						<option>SureGPS</option>
-					</select>
-					<div class="help-text">This option allows a predefined configuration to be selected. Select Generic if the GPS is not listed.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>NMEA Sentences</label>
-				<div class="form-group-content">
-					<textarea name="nmea_sentences" class="form-control" readonly style="max-width: 300px; height: 80px;">All
-RMC
-GGA
-GLL</textarea>
-					<div class="help-text">By default NTP will listen for all supported NMEA sentences. One or more sentences to listen for may be specified.</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Fudge Time 1</label>
-				<div class="form-group-content">
-					<input type="text" name="fudge_time_1" value="0.155" class="form-control" style="max-width: 150px;">
-					<div class="help-text">Fudge time 1 is used to specify the GPS PPS signal offset (default: 0.0).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Fudge Time 2</label>
-				<div class="form-group-content">
-					<input type="text" name="fudge_time_2" value="0.0" class="form-control" style="max-width: 150px;">
-					<div class="help-text">Fudge time 2 is used to specify the GPS time offset (default: 0.0).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Stratum (0-16)</label>
-				<div class="form-group-content">
-					<input type="text" name="gps_stratum" placeholder="0" class="form-control" style="max-width: 100px;">
-					<div class="help-text">This may be used to change the GPS Clock stratum (default: 0).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Minimum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="gps_min_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Maximum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="gps_max_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Flags</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_prefer" checked>
-						<label class="form-check-label" for="flag_prefer">Prefer this clock (default: checked).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_display_only">
-						<label class="form-check-label" for="flag_display_only">Do not use this clock, display for reference only (default: unchecked).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_enable_pps" checked>
-						<label class="form-check-label" for="flag_enable_pps">Enable PPS signal processing (default: checked).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_falling_pps">
-						<label class="form-check-label" for="flag_falling_pps">Enable falling edge PPS signal processing (default: unchecked, rising edge).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_kernel_pps" checked>
-						<label class="form-check-label" for="flag_kernel_pps">Enable kernel PPS clock discipline (default: checked).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_obscure_location">
-						<label class="form-check-label" for="flag_obscure_location">Obscure location in timestamp (default: unchecked, unobscured).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_log_subsecond">
-						<label class="form-check-label" for="flag_log_subsecond">Log the sub-second fraction of the received time stamp (default: unchecked, not logged).</label>
-					</div>
-					<div class="help-text">Enabling this will rapidly fill the log, but is useful for tuning Fudge time 2.</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="flag_display_extended" checked>
-						<label class="form-check-label" for="flag_display_extended">Display extended GPS status (default: checked).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Clock ID</label>
-				<div class="form-group-content">
-					<input type="text" name="clock_id" placeholder="1 to 4 characters" class="form-control" style="max-width: 150px;">
-					<div class="help-text">This may be used to change the GPS Clock ID (default: GPS).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>GPS Initialization</label>
-				<div class="form-group-content">
-					<button type="button" data-advanced="ntp-gps-init-panel" class="btn btn-outline-secondary btn-sm">
-						<i class="fa fa-gear me-1"></i>Display Advanced
-					</button>
-					<div id="ntp-gps-init-panel" class="d-none mt-3">
-						<label class="form-label fw-semibold">GPS Initialization Commands</label>
-						<textarea name="gps_init_commands" class="form-control font-monospace" rows="4"
-						          placeholder="$PUBX,40,GSV,0,0,0,0*59&#10;$PUBX,40,GLL,0,0,0,0*5C"></textarea>
-						<small class="text-muted">NMEA sentences sent at startup to configure the GPS receiver.</small>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<div class="tab-content" id="content-pps" style="display: none;">
-		<div class="settings-section">
-			<h5>NTP PPS Configuration</h5>
-			<div class="help-text mb-3">
-				Devices with a Pulse Per Second output such as radios that receive a time signal from DCF77 (DE), JJY (JP), MSF (GB) or WWVB (US) may be used as a PPS reference for NTP. A serial GPS may also be used, but the serial GPS driver would usually be the better option. A PPS signal only provides a reference to the change of a second, so at least one other source to number the seconds is required.<br>At least 3 additional time sources should be configured under Services > NTP > Settings to reliably supply the time of each PPS pulse.
-			</div>
-
-			<div class="form-group">
-				<label>Fudge Time</label>
-				<div class="form-group-content">
-					<input type="text" name="pps_fudge_time" placeholder="0.0" class="form-control" style="max-width: 150px;">
-					<div class="help-text">Fudge time is used to specify the PPS signal offset from the actual second such as the transmission delay between the transmitter and the receiver (default: 0.0).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Stratum</label>
-				<div class="form-group-content">
-					<input type="text" name="pps_stratum" placeholder="0" class="form-control" style="max-width: 150px;">
-					<div class="help-text">This may be used to change the PPS Clock stratum (default: 0).</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Minimum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="pps_min_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-						<option>3: 8 seconds (00:00:08)</option>
-						<option>6: 64 seconds (00:01:04)</option>
-						<option>10: 1,024 seconds (00:17:04)</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Maximum Poll Interval</label>
-				<div class="form-group-content">
-					<select name="pps_max_poll_interval" class="form-control" style="max-width: 200px;">
-						<option>Default</option>
-						<option>10: 1,024 seconds (00:17:04)</option>
-						<option>17: 131,072 seconds (1d 22:24:32)</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Flags</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="pps_flag_falling_edge">
-						<label class="form-check-label" for="pps_flag_falling_edge">Enable falling edge PPS signal processing (default: unchecked, rising edge).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="pps_flag_kernel_pps">
-						<label class="form-check-label" for="pps_flag_kernel_pps">Enable kernel PPS clock discipline (default: unchecked).</label>
-					</div>
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="pps_flag_record_timestamp">
-						<label class="form-check-label" for="pps_flag_record_timestamp">Record a timestamp once for each second, for constructing Allan deviation plots (default: unchecked).</label>
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Clock ID</label>
-				<div class="form-group-content">
-					<input type="text" name="pps_clock_id" placeholder="1 to 4 characters" class="form-control" style="max-width: 150px;">
-					<div class="help-text">This may be used to change the PPS Clock ID (default: PPS).</div>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="submit" class="btn btn-primary">Save</button>
-	</div>
-</form>
-
 <script>
-	function showTab(tabId) {
-		// Hide all tab contents
-		document.querySelectorAll('.tab-content').forEach(content => {
-			content.style.display = 'none';
-		});
-
-		// Remove active class from all tabs
-		document.querySelectorAll('.nav-link').forEach(link => {
-			link.classList.remove('active');
-		});
-
-		// Show selected tab content
-		document.getElementById('content-' + tabId).style.display = 'block';
-
-		// Add active class to selected tab
-		document.getElementById('tab-' + tabId).classList.add('active');
-
-		// Update breadcrumb
-		const sectionNames = {
-			'settings': 'Settings',
-			'acls': 'ACLs',
-			'serialgps': 'Serial GPS',
-			'pps': 'PPS'
-		};
-		document.getElementById('breadcrumb-section').textContent = sectionNames[tabId];
-	}
-
-	function addCustomAclRow() {
-		const tableBody = document.getElementById('custom-acls-table');
-		const newRow = document.createElement('tr');
-
-		newRow.innerHTML = `
-			<td>
-				<div class="d-flex gap-2 align-items-center">
-					<input type="text" name="network_cidr[]" placeholder="Network/mask" class="form-control" style="max-width: 150px;">
-					<span>/</span>
-					<select class="form-control" style="max-width: 70px;">
-						<option>24</option><option>128</option><option>32</option>
-					</select>
-				</div>
-			</td>
-			<td><input type="checkbox" name="acl_kod[]"></td>
-			<td><input type="checkbox" name="acl_nomodify[]" checked></td>
-			<td><input type="checkbox" name="acl_noquery[]"></td>
-			<td><input type="checkbox" name="acl_noserve[]"></td>
-			<td><input type="checkbox" name="acl_nopeer[]" checked></td>
-			<td><input type="checkbox" name="acl_notrap[]" checked></td>
-			<td><button type="button" class="btn btn-danger" onclick="this.closest('tr').remove()">Delete</button></td>
-		`;
-		tableBody.appendChild(newRow);
-	}
-
-	// Initialize the view on load
-	window.onload = () => showTab('settings');
+function showTab(tabId) {
+  document.querySelectorAll('[id^="content-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+  document.getElementById('content-' + tabId).style.display = '';
+  document.getElementById('tab-' + tabId).classList.add('active');
+}
+function addCustomAclRow() {
+  const tbody = document.getElementById('custom-acls-table');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="padding:8px 14px;"><input type="text" name="network_cidr[]" placeholder="e.g. 10.0.0.0/8" class="form-control form-control-sm" style="max-width:200px;"></td>
+    <td><input type="checkbox" name="acl_kod[]"></td>
+    <td><input type="checkbox" name="acl_nomodify[]" checked></td>
+    <td><input type="checkbox" name="acl_noquery[]"></td>
+    <td><input type="checkbox" name="acl_noserve[]"></td>
+    <td><input type="checkbox" name="acl_nopeer[]" checked></td>
+    <td><input type="checkbox" name="acl_notrap[]" checked></td>
+    <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>`;
+  tbody.appendChild(tr);
+}
+window.onload = () => showTab('settings');
 </script>
-
 {% endblock %}

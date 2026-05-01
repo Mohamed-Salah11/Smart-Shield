@@ -2,149 +2,118 @@
 
 {% block main %}
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Traffic Shaper</li>
-            </ol>
-        </nav>
-        <h1>Traffic Shaper</h1>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">QoS &amp; Shaping</h1>
+      <p class="ss-page-desc">Traffic queue scheduling and bandwidth limiters</p>
     </div>
+  </div>
 
-    <!-- Tabs Navigation -->
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link active" href="#" data-tab="byInterface">By Interface</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="byQueue">By Queue</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="limiters">Limiters</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="#" data-tab="wizards">Wizards</a>
-        </li>
-    </ul>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" href="#" data-tab="byInterface">By Interface</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-tab="byQueue">By Queue</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-tab="limiters">Limiters</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-tab="wizards">Wizards</a></li>
+  </ul>
 
-    <!-- By Interface Tab Content -->
-    <div class="tab-content active" id="byInterface">
-        <!-- WAN Section -->
-        <div class="section mb-4">
-            <div class="section-header d-flex justify-content-between align-items-center">
-                <h2>WAN Configuration</h2>
-                <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('wan')">
-                    <i class="fas fa-plus"></i> Add Queue
-                </button>
-            </div>
-            <div class="section-body" id="wanConfig">
-                <div class="config-entries">
-                    <!-- WAN configs will be inserted here -->
-                </div>
-            </div>
+  <!-- By Interface -->
+  <div class="tab-content active" id="byInterface">
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-arrow-up-wide-short"></i></div>
+        <div><div class="ss-card-title">WAN Configuration</div></div>
+        <div class="ss-card-actions">
+          <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('wan')"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
         </div>
-
-        <!-- LAN Section -->
-        <div class="section">
-            <div class="section-header d-flex justify-content-between align-items-center">
-                <h2>LAN Configuration</h2>
-                <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('lan')">
-                    <i class="fas fa-plus"></i> Add Queue
-                </button>
-            </div>
-            <div class="section-body" id="lanConfig">
-                <div class="config-entries">
-                    <!-- LAN configs will be inserted here -->
-                </div>
-            </div>
-        </div>
+      </div>
+      <div class="ss-card-body" id="wanConfig"><div class="config-entries"></div></div>
     </div>
-
-    <!-- By Queue Tab Content -->
-    <div class="tab-content" id="byQueue">
-        <div class="section">
-            <div class="section-header">
-                <h2>Queue Overview</h2>
-            </div>
-            <div class="section-body">
-                <p class="text-muted text-center py-4">No data available for By Queue view</p>
-            </div>
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-arrow-down-wide-short"></i></div>
+        <div><div class="ss-card-title">LAN Configuration</div></div>
+        <div class="ss-card-actions">
+          <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('lan')"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
         </div>
+      </div>
+      <div class="ss-card-body" id="lanConfig"><div class="config-entries"></div></div>
     </div>
+  </div>
 
-    <!-- Limiters Tab Content -->
-    <div class="tab-content" id="limiters">
-        <div class="section">
-            <div class="section-header d-flex justify-content-between align-items-center">
-                <h2>Limiters</h2>
-                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal"
-                    data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
-                    <i class="fas fa-plus"></i> New Limiter
-                </button>
-            </div>
-            <div class="section-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th style="width:20%">Name</th>
-                                <th style="width:15%">Bandwidth</th>
-                                <th style="width:15%">Mask</th>
-                                <th style="width:15%">Scheduler</th>
-                                <th style="width:20%">Description</th>
-                                <th style="width:15%">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="limitersList">
-                            <!-- Limiters will be inserted here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  <!-- By Queue -->
+  <div class="tab-content" id="byQueue">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-list-ol"></i></div>
+        <div><div class="ss-card-title">Queue Overview</div></div>
+      </div>
+      <div class="ss-card-body">
+        <p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">No data available for By Queue view</p>
+      </div>
     </div>
+  </div>
 
-    <!-- Wizards Tab Content -->
-    <div class="tab-content" id="wizards">
-        <div class="section">
-            <div class="section-header">
-                <h2>Traffic Shaper Wizards</h2>
-            </div>
-            <div class="section-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th style="width:30%">Wizard</th>
-                                <th style="width:70%">Configuration File</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="fw-semibold">Multiple LAN/WAN</td>
-                                <td><a href="#" class="text-primary">traffic_shaper_wizard_multi_all.xml</a></td>
-                            </tr>
-                            <tr>
-                                <td class="fw-semibold">Dedicated Links</td>
-                                <td><a href="#" class="text-primary">traffic_shaper_wizard_dedicated.xml</a></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+  <!-- Limiters -->
+  <div class="tab-content" id="limiters">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <div><div class="ss-card-title">Limiters</div><div class="ss-card-subtitle">Per-host bandwidth caps using dummynet pipes</div></div>
+        <div class="ss-card-actions">
+          <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
+            <i class="fa-solid fa-plus me-1"></i>New Limiter
+          </button>
         </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr>
+              <th style="padding:10px 14px;">Name</th><th>Bandwidth</th><th>Mask</th><th>Scheduler</th><th>Description</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="limitersList"></tbody>
+        </table>
+      </div>
     </div>
+  </div>
+
+  <!-- Wizards -->
+  <div class="tab-content" id="wizards">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <div><div class="ss-card-title">Traffic Shaper Wizards</div></div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr><th style="padding:10px 14px;">Wizard</th><th>Configuration File</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 14px;font-weight:500;">Multiple LAN/WAN</td>
+              <td><a href="#" style="color:var(--primary);">traffic_shaper_wizard_multi_all.xml</a></td>
+            </tr>
+            <tr>
+              <td style="padding:8px 14px;font-weight:500;">Dedicated Links</td>
+              <td><a href="#" style="color:var(--primary);">traffic_shaper_wizard_dedicated.xml</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Limiter Modal -->
-<div class="modal fade" id="limiterModal" tabindex="-1" aria-labelledby="limiterModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="limiterModalLabel">Add / Edit Limiter</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="limiterModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
+                <h5 class="modal-title fw-700" id="limiterModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Add / Edit Limiter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="limiterForm">
@@ -304,12 +273,12 @@
 </div>
 
 <!-- Queue Modal -->
-<div class="modal fade" id="queueModal" tabindex="-1" aria-labelledby="queueModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="queueModalLabel">Edit Queue</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="queueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
+                <h5 class="modal-title fw-700" id="queueModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Edit Queue</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="queueForm">

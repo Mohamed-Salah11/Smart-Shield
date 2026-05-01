@@ -1,9 +1,13 @@
 import os
 import time
 
+# Load .env before config.py class bodies evaluate their os.getenv() calls.
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, g, request, session
 from .database import init_db
-from dotenv import load_dotenv
+from .config import get_config
 from .security import get_csrf_token, validate_csrf_or_abort
 from .audit_log import log_event
 from .uploads import profile_picture_url
@@ -59,7 +63,6 @@ def _activity_summary(is_api_request: bool, method: str, path: str, endpoint: st
 
 
 def create_app():
-    load_dotenv()
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     app = Flask(
@@ -68,10 +71,11 @@ def create_app():
         static_folder=os.path.join(base_dir, "static"),
     )
 
-    app.secret_key = os.getenv("SECRET_KEY")
-    if not app.secret_key:
+    app.config.from_object(get_config())
+
+    if not app.config.get("SECRET_KEY"):
         raise RuntimeError(
-            "SECRET_KEY is not set. Create a .env file (for example: copy .env.example .env) and set SECRET_KEY."
+            "SECRET_KEY is not set. Create a .env file (see .env.example) and set SECRET_KEY."
         )
 
     @app.before_request
@@ -152,11 +156,15 @@ def create_app():
         return response
 
     # Ensure all required directories exist before the DB is opened.
+    from .database import close_db
+    app.teardown_appcontext(close_db)
+
     from .services.freebsd_setup import ensure_dirs
     ensure_dirs()
 
     init_db()
 
+    from routes.setup import setup_bp
     from routes.auth import auth_bp
     from routes.users import users_bp
     from routes.system import system_bp
@@ -170,7 +178,9 @@ def create_app():
     from routes.network_api import network_api_bp
     from routes.ids import ids_bp
     from routes.filters import filters_bp
+    from routes.portal import portal_bp
 
+    app.register_blueprint(setup_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(system_bp)
@@ -184,5 +194,6 @@ def create_app():
     app.register_blueprint(network_api_bp)
     app.register_blueprint(ids_bp)
     app.register_blueprint(filters_bp)
+    app.register_blueprint(portal_bp)
 
     return app
