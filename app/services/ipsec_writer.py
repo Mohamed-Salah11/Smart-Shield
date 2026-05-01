@@ -359,6 +359,8 @@ def apply_ipsec(conn) -> dict:
         return result
     try:
         from app.services.network_service import run_command
+        from app.services.service_manager import sysrc_set
+        sysrc_set("strongswan_enable", "YES")
         # Try 'ipsec reload' first; fall back to full restart
         r = run_command(["ipsec", "reload"], check=False)
         if r.returncode != 0:

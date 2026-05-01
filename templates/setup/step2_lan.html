@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Shield Setup — Step 2: Network Configuration</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    body { background: #1a1d23; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; }
+    .wizard-wrap { max-width: 640px; margin: 60px auto; padding: 0 20px; }
+    .wizard-header { text-align: center; margin-bottom: 40px; }
+    .wizard-header h1 { font-size: 2rem; color: #4fc3f7; margin-bottom: 8px; }
+    .step-indicator { display: flex; justify-content: center; gap: 12px; margin-bottom: 32px; }
+    .step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 0.85rem; font-weight: 600; }
+    .step.active { background: #4fc3f7; color: #1a1d23; }
+    .step.done { background: #43a047; color: #fff; }
+    .step.pending { background: #333; color: #777; border: 2px solid #555; }
+    .card { background: #23262d; border-radius: 8px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 6px; font-weight: 500; color: #bdbdbd; }
+    input, select { width: 100%; padding: 10px 14px; background: #1a1d23; color: #e0e0e0;
+                    border: 1px solid #444; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+    input:focus, select:focus { outline: none; border-color: #4fc3f7; }
+    .hint { font-size: 0.8rem; color: #777; margin-top: 4px; }
+    .section-title { font-size: 1rem; font-weight: 600; color: #4fc3f7; margin: 24px 0 12px;
+                     border-bottom: 1px solid #333; padding-bottom: 6px; }
+    .btn-row { display: flex; gap: 12px; margin-top: 8px; }
+    .btn-primary { flex: 1; padding: 12px; background: #4fc3f7; color: #1a1d23;
+                   border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    .btn-primary:hover { background: #81d4fa; }
+    .btn-secondary { flex: 1; padding: 12px; background: #333; color: #bdbdbd;
+                     border: 1px solid #555; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    .btn-secondary:hover { background: #444; }
+    .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; display: none; }
+    .alert-danger { background: #b71c1c; color: #ffcdd2; }
+    #wan_static_fields { display: none; }
+  </style>
+</head>
+<body>
+<div class="wizard-wrap">
+  <div class="wizard-header">
+    <img src="/static/images/SS.png" alt="Smart Shield" height="48" style="margin-bottom:12px">
+    <h1>Smart Shield Setup</h1>
+  </div>
+
+  <div class="step-indicator">
+    <div class="step done">✓</div>
+    <div class="step active">2</div>
+    <div class="step pending">3</div>
+    <div class="step pending">4</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0; color:#e0e0e0;">Step 2 — Network Configuration</h2>
+
+    <div id="alert" class="alert"></div>
+
+    <div class="section-title">LAN Interface</div>
+    <div class="form-group">
+      <label for="lan_ip">LAN IP Address / Subnet (CIDR) <span style="color:#ef5350">*</span></label>
+      <input type="text" id="lan_ip" value="192.168.1.1/24" placeholder="e.g. 192.168.1.1/24">
+      <div class="hint">This is the gateway address your LAN clients will use.</div>
+    </div>
+
+    <div class="section-title">WAN Interface</div>
+    <div class="form-group">
+      <label for="wan_type">WAN Connection Type</label>
+      <select id="wan_type" onchange="toggleWanFields()">
+        <option value="dhcp">DHCP (automatic — most common)</option>
+        <option value="static">Static IP</option>
+        <option value="pppoe">PPPoE (DSL)</option>
+      </select>
+    </div>
+
+    <div id="wan_static_fields">
+      <div class="form-group">
+        <label for="wan_ip">WAN IP Address / Subnet (CIDR)</label>
+        <input type="text" id="wan_ip" placeholder="e.g. 203.0.113.10/24">
+      </div>
+      <div class="form-group">
+        <label for="wan_gw">Default Gateway</label>
+        <input type="text" id="wan_gw" placeholder="e.g. 203.0.113.1">
+        <div class="hint">Your ISP's gateway IP address.</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="window.location.href='/setup/step1'">← Back</button>
+      <button class="btn-primary" id="btn-next" onclick="saveStep2()">Next: Admin Password →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleWanFields() {
+  const type = document.getElementById('wan_type').value;
+  document.getElementById('wan_static_fields').style.display =
+    type === 'static' ? 'block' : 'none';
+}
+
+async function saveStep2() {
+  const lan_ip  = document.getElementById('lan_ip').value.trim();
+  const wan_type = document.getElementById('wan_type').value;
+  const wan_ip  = document.getElementById('wan_ip').value.trim();
+  const wan_gw  = document.getElementById('wan_gw').value.trim();
+
+  if (!lan_ip) { showAlert('LAN IP/CIDR is required.', 'danger'); return; }
+
+  document.getElementById('btn-next').disabled = true;
+  try {
+    const r = await fetch('/setup/api/step2/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ lan_ip, wan_type, wan_ip, wan_gw })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      window.location.href = '/setup/step3';
+    } else {
+      showAlert(d.message || 'Save failed.', 'danger');
+      document.getElementById('btn-next').disabled = false;
+    }
+  } catch (e) {
+    showAlert('Network error — please try again.', 'danger');
+    document.getElementById('btn-next').disabled = false;
+  }
+}
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alert');
+  el.className = `alert alert-${type}`;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>

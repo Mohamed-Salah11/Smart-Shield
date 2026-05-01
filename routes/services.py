@@ -16,7 +16,6 @@ def _load_service_state(key_name, default):
     cur = db.cursor()
     cur.execute("SELECT value_json FROM service_state WHERE key_name = ?", (key_name,))
     row = cur.fetchone()
-    db.close()
     if not row:
         return default
     try:
@@ -39,7 +38,6 @@ def _save_service_state(key_name, value):
         (key_name, json.dumps(value)),
     )
     db.commit()
-    db.close()
 
 # ----------------------------
 # SERVICES MAIN PAGE
@@ -61,6 +59,69 @@ def auto_config_backup():
     return render_template("auto_config_backup.html")
 
 
+@services_bp.route("/api/config-backup", methods=["POST"])
+@api_permission_required("api.system.edit")
+def api_config_backup_create():
+    """Trigger an immediate config backup (DB export + generated configs)."""
+    import shutil, hashlib, time as _time, os as _os
+    from app.services.config_history import save_config_version
+
+    conn = get_db()
+    results = []
+
+    # Save a versioned snapshot of the three core generated configs
+    for service, gen_fn_path in [
+        ("pf",     ("app.services.pf_generator",  "generate_pf_conf")),
+        ("dhcpd",  ("app.services.dhcp_writer",   "generate_dhcpd_conf")),
+        ("unbound",("app.services.dns_writer",    "generate_unbound_conf")),
+    ]:
+        try:
+            import importlib
+            mod  = importlib.import_module(gen_fn_path[0])
+            fn   = getattr(mod, gen_fn_path[1])
+            text = fn(conn)
+            result = save_config_version(conn, service=service, content=text, notes="manual backup")
+            results.append({"service": service, "ok": bool(result), "message": "saved"})
+        except Exception as exc:
+            results.append({"service": service, "ok": False, "message": str(exc)})
+
+    log_event(category="system", action="config_backup", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"results": results})
+    overall_ok = all(r["ok"] for r in results)
+    return jsonify({"ok": overall_ok, "results": results})
+
+
+@services_bp.route("/api/config-backup/list", methods=["GET"])
+@login_required
+def api_config_backup_list():
+    """List saved config versions."""
+    conn = get_db()
+    try:
+        rows = [dict(r) for r in conn.execute(
+            """
+            SELECT id, service, version_num, notes, content_hash, applied_at
+            FROM config_versions
+            ORDER BY applied_at DESC
+            LIMIT 200
+            """
+        )]
+        return jsonify({"ok": True, "versions": rows})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@services_bp.route("/api/config-backup/<int:version_id>/restore", methods=["POST"])
+@api_permission_required("api.system.edit")
+def api_config_backup_restore(version_id):
+    """Restore a previously saved config version and re-apply it."""
+    from app.services.config_history import rollback_to_config_version
+    conn = get_db()
+    result = rollback_to_config_version(conn, version_id=version_id)
+    log_event(category="system", action="config_restore", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"version_id": version_id, "ok": result.get("ok")})
+    return jsonify(result)
+
+
 # ----------------------------
 # CAPTIVE PORTAL
 # ----------------------------
@@ -69,6 +130,53 @@ def auto_config_backup():
 @login_required
 def captive_portal():
     return render_template("captive_portal.html")
+
+
+# ----------------------------
+# PPPoE
+# ----------------------------
+
+@services_bp.route("/api/pppoe/apply", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_pppoe_apply():
+    """Write ppp.conf and (re)start the PPPoE session."""
+    conn = get_db()
+    from app.services.pppoe_writer import apply_pppoe
+    result = apply_pppoe(conn)
+    log_event(category="system", action="pppoe_apply", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result.get("ok")})
+    return jsonify(result)
+
+
+@services_bp.route("/api/pppoe/status", methods=["GET"])
+@login_required
+def api_pppoe_status():
+    """Return the live PPPoE session status."""
+    from app.services.pppoe_writer import get_pppoe_status
+    return jsonify({"ok": True, **get_pppoe_status()})
+
+
+@services_bp.route("/api/pppoe/disconnect", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_pppoe_disconnect():
+    """Tear down the active PPPoE session."""
+    from app.services.pppoe_writer import disconnect_pppoe
+    result = disconnect_pppoe()
+    log_event(category="system", action="pppoe_disconnect", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result.get("ok")})
+    return jsonify(result)
+
+
+@services_bp.route("/api/pppoe/preview", methods=["GET"])
+@login_required
+def api_pppoe_preview():
+    """Preview the generated ppp.conf (passwords redacted)."""
+    import re as _re
+    conn = get_db()
+    from app.services.pppoe_writer import generate_ppp_conf
+    conf = generate_ppp_conf(conn)
+    masked = _re.sub(r'(set authkey\s+")[^"]+"', r'\1••••••••"', conf)
+    return jsonify({"ok": True, "conf": masked})
 
 
 # ----------------------------
@@ -613,7 +721,14 @@ def api_save_ntp():
         (json.dumps(data),),
     )
     conn.commit()
-    return jsonify({"ok": True, "message": "NTP settings saved."})
+    try:
+        from app.services.ntp_writer import apply_ntp
+        apply_result = apply_ntp(conn)
+        if not apply_result.get("ok"):
+            return jsonify({"ok": True, "message": "NTP settings saved. Apply warning: " + apply_result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": True, "message": f"NTP settings saved. Apply skipped: {exc}"})
+    return jsonify({"ok": True, "message": "NTP settings saved and applied."})
 
 
 @services_bp.route("/api/ntp/validate", methods=["GET"])
@@ -900,7 +1015,14 @@ def api_save_snmp():
         (json.dumps(data),),
     )
     conn.commit()
-    return jsonify({"ok": True, "message": "SNMP settings saved."})
+    try:
+        from app.services.snmp_writer import apply_snmp
+        apply_result = apply_snmp(conn)
+        if not apply_result.get("ok"):
+            return jsonify({"ok": True, "message": "SNMP settings saved. Apply warning: " + apply_result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": True, "message": f"SNMP settings saved. Apply skipped: {exc}"})
+    return jsonify({"ok": True, "message": "SNMP settings saved and applied."})
 
 
 @services_bp.route("/api/snmp/validate", methods=["GET"])
@@ -973,7 +1095,14 @@ def api_save_upnp():
         (json.dumps(data),),
     )
     conn.commit()
-    return jsonify({"ok": True, "message": "UPnP settings saved."})
+    try:
+        from app.services.upnp_writer import apply_upnp
+        apply_result = apply_upnp(conn)
+        if not apply_result.get("ok"):
+            return jsonify({"ok": True, "message": "UPnP settings saved. Apply warning: " + apply_result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": True, "message": f"UPnP settings saved. Apply skipped: {exc}"})
+    return jsonify({"ok": True, "message": "UPnP settings saved and applied."})
 
 
 @services_bp.route("/api/upnp/validate", methods=["GET"])
@@ -1044,7 +1173,14 @@ def api_save_igmp():
         (json.dumps(data),),
     )
     conn.commit()
-    return jsonify({"ok": True, "message": "IGMP Proxy settings saved."})
+    try:
+        from app.services.igmp_writer import apply_igmp
+        apply_result = apply_igmp(conn)
+        if not apply_result.get("ok"):
+            return jsonify({"ok": True, "message": "IGMP Proxy settings saved. Apply warning: " + apply_result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": True, "message": f"IGMP Proxy settings saved. Apply skipped: {exc}"})
+    return jsonify({"ok": True, "message": "IGMP Proxy settings saved and applied."})
 
 
 @services_bp.route("/api/igmp/validate", methods=["GET"])
@@ -1163,6 +1299,48 @@ def api_wol_delete_host(host_id):
 # Captive Portal
 # ---------------------------------------------------------------------------
 
+@services_bp.route("/api/captive-portal/settings", methods=["GET"])
+@login_required
+def api_cp_get_settings():
+    """Return current captive portal settings."""
+    conn  = get_db()
+    row   = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+    ).fetchone()
+    settings = json.loads(row["value_json"]) if row else {}
+    return jsonify({"ok": True, "settings": settings})
+
+
+@services_bp.route("/api/captive-portal/settings", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_cp_save_settings():
+    """Persist captive portal settings (portal_ip, portal_port, lan_interface, enabled, RADIUS)."""
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+
+    allowed_keys = {
+        "enabled", "lan_interface", "portal_ip", "portal_port",
+        "http_redirect_port", "allow_dns", "radius_server", "radius_secret",
+    }
+    settings = {k: v for k, v in data.items() if k in allowed_keys}
+
+    conn.execute(
+        """
+        INSERT INTO service_state (key_name, value_json, updated_at)
+        VALUES ('captive_portal_settings', ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key_name) DO UPDATE SET
+            value_json = excluded.value_json,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (json.dumps(settings),),
+    )
+    conn.commit()
+    log_event(category="system", action="captive_portal_settings_save",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"enabled": settings.get("enabled")})
+    return jsonify({"ok": True, "message": "Captive portal settings saved."})
+
+
 @services_bp.route("/api/captive-portal/status", methods=["GET"])
 @login_required
 def api_cp_status():
@@ -1233,3 +1411,30 @@ def api_cp_preview():
     conn = get_db()
     from app.services.captive_portal import generate_pf_anchor
     return jsonify({"ok": True, "conf": generate_pf_anchor(conn)})
+
+
+@services_bp.route("/api/captive-portal/authenticate", methods=["POST"])
+def api_cp_authenticate():
+    """
+    Public endpoint — called by the portal login form via AJAX or by external
+    systems that need to authenticate a client against RADIUS.
+    Does NOT require admin login.
+    """
+    conn     = get_db()
+    data     = request.get_json(silent=True) or request.form
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    ip       = request.remote_addr or ""
+
+    if not username or not password:
+        return jsonify({"ok": False, "message": "Username and password are required."}), 400
+
+    from app.services.captive_portal import authenticate_radius, authenticate_session
+    result = authenticate_radius(conn, username, password)
+    if result.get("ok"):
+        from routes.portal import _client_mac
+        mac = _client_mac(ip)
+        auth_result = authenticate_session(conn, mac, ip, username=username)
+        return jsonify({"ok": auth_result.get("ok"), "message": auth_result.get("message", "")})
+
+    return jsonify({"ok": False, "message": result.get("message", "Authentication failed.")}), 401

@@ -2,54 +2,51 @@
 
 {% block main %}
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Schedules</li>
-            </ol>
-        </nav>
-        <h1>Firewall Schedules</h1>
-    </div>
 
-    <!-- Schedules Section -->
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Schedules</h2>
-            <button type="button" class="btn btn-success btn-sm" id="schedulesAdd" data-bs-toggle="modal"
-                data-bs-target="#scheduleEditModal">
-                <i class="fas fa-plus"></i> Add Schedule
-            </button>
-        </div>
-        <div class="section-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th style="width:25%">Name</th>
-                            <th style="width:40%">Range: Date / Times / Name</th>
-                            <th style="width:25%">Description</th>
-                            <th style="width:10%">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="schedules-tbody">
-                        <!-- Schedules will be populated here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Time Policies</h1>
+      <p class="ss-page-desc">Named time ranges that can be referenced by firewall rules</p>
     </div>
+    <button type="button" class="btn btn-success" id="schedulesAdd" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
+      <i class="fa-solid fa-plus me-1"></i>Add Schedule
+    </button>
+  </div>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-calendar-days"></i></div>
+      <div><div class="ss-card-title">Schedules</div><div class="ss-card-subtitle">Rules using a schedule are only active during the defined time ranges</div></div>
+      <div class="ss-card-actions">
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
+          <i class="fa-solid fa-plus me-1"></i>Add
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">Name</th>
+            <th>Range: Date / Times / Name</th>
+            <th>Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="schedules-tbody">
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Edit Schedule Modal -->
-<div class="modal fade" id="scheduleEditModal" tabindex="-1" aria-labelledby="scheduleEditModalLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="scheduleEditModalLabel">Add / Edit Schedule</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="scheduleEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
+                <h5 class="modal-title fw-700" id="scheduleEditModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Add / Edit Schedule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <!-- Schedule Information -->
@@ -252,38 +249,13 @@
 </div>
 
 <style>
-    #calendarTable td {
-        cursor: pointer;
-        text-align: center;
-        padding: 8px;
-    }
-
-    #calendarTable td:hover {
-        background-color: #e9ecef;
-    }
-
-    #calendarTable td.selected {
-        background-color: #0d6efd;
-        color: white;
-    }
-
-    #calendarTable td.empty {
-        background-color: #f8f9fa;
-        cursor: default;
-    }
-
-    .calendar-weekday {
-        cursor: pointer;
-    }
-
-    .calendar-weekday:hover {
-        background-color: #e9ecef;
-    }
-
-    /* Actions column: stacked buttons */
-    #schedules-tbody td:last-child .btn {
-        min-width: 80px;
-    }
+    #calendarTable td { cursor:pointer;text-align:center;padding:8px; }
+    #calendarTable td:hover { background:var(--primary-soft); }
+    #calendarTable td.selected { background:var(--primary);color:#fff; }
+    #calendarTable td.empty { background:var(--border-color-soft);cursor:default; }
+    .calendar-weekday { cursor:pointer; }
+    .calendar-weekday:hover { background:var(--primary-soft); }
+    #schedules-tbody td:last-child .btn { min-width:70px; }
 </style>
 
 <script>

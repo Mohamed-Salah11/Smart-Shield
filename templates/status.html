@@ -2,57 +2,35 @@
 
 {% block content %}
 <div class="container">
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Status</li>
-            </ol>
-        </nav>
-        <h1>Status Overview</h1>
-        <p class="lead">Quick access to runtime status pages and log tracking.</p>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Monitoring</h1>
+      <p class="ss-page-desc">Quick access to runtime status pages and log tracking</p>
     </div>
+  </div>
 
-    <div class="row g-3">
-        <div class="col-md-6 col-xl-3">
-            <div class="section h-100">
-                <div class="section-header"><h2>Gateways</h2></div>
-                <div class="section-body p-3">
-                    <p class="text-muted mb-3">Review gateway health and route availability.</p>
-                    <a href="{{ url_for('status.gateways') }}" class="btn btn-sm btn-primary">Open</a>
-                </div>
-            </div>
+  <div class="row g-3">
+    {% set cards = [
+      ('fa-solid fa-route', 'Gateways', url_for('status.gateways'), 'Review gateway health and route availability'),
+      ('fa-solid fa-chart-line', 'System Metrics', url_for('status.monitoring'), 'Inspect interface statistics and monitoring data'),
+      ('fa-solid fa-scroll', 'System Logs', url_for('status.system_logs'), 'View system, security, and session tracking'),
+      ('fa-solid fa-right-to-bracket', 'Auth Events', url_for('status.system_logs', tab='sessions'), 'Track sign-ins, failures, and logout activity'),
+    ] %}
+    {% for icon, title, href, desc in cards %}
+    <div class="col-md-6 col-xl-3">
+      <div class="ss-card h-100" style="display:flex;flex-direction:column;">
+        <div class="ss-card-head">
+          <div class="ss-card-icon"><i class="{{ icon }}"></i></div>
+          <div><div class="ss-card-title">{{ title }}</div></div>
         </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="section h-100">
-                <div class="section-header"><h2>Monitoring</h2></div>
-                <div class="section-body p-3">
-                    <p class="text-muted mb-3">Inspect interface graphs and monitoring data.</p>
-                    <a href="{{ url_for('status.monitoring') }}" class="btn btn-sm btn-primary">Open</a>
-                </div>
-            </div>
+        <div class="ss-card-body" style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+          <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">{{ desc }}</p>
+          <a href="{{ href }}" class="btn btn-primary btn-sm">Open →</a>
         </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="section h-100">
-                <div class="section-header"><h2>System Logs</h2></div>
-                <div class="section-body p-3">
-                    <p class="text-muted mb-3">View system, security, and session tracking tabs.</p>
-                    <a href="{{ url_for('status.system_logs') }}" class="btn btn-sm btn-primary">Open Logs</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-xl-3">
-            <div class="section h-100">
-                <div class="section-header"><h2>Session Logs</h2></div>
-                <div class="section-body p-3">
-                    <p class="text-muted mb-3">Track sign-ins, failures, and logout activity.</p>
-                    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="btn btn-sm btn-primary">Open Sessions</a>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}

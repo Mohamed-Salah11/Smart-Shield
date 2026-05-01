@@ -2,35 +2,31 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Monitoring</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-chart-line me-2 text-primary"></i>Interface Monitoring</h1>
-    <p class="lead">Live packet and error counters per network interface.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">System Metrics</h1>
+      <p class="ss-page-desc">Live packet and error counters per network interface</p>
+    </div>
+    {% if on_freebsd %}
+    <button id="btn-refresh" class="btn btn-outline-primary">
+      <i class="fa-solid fa-rotate me-1"></i>Refresh
+    </button>
+    {% endif %}
   </div>
 
-  <div class="section mb-4">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-signal me-2"></i>Interface Statistics</h2>
-      {% if on_freebsd %}
-      <button id="btn-refresh" class="btn btn-sm btn-outline-primary">
-        <i class="fa fa-rotate me-1"></i>Refresh
-      </button>
-      {% endif %}
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-chart-line"></i></div>
+      <div><div class="ss-card-title">Interface Statistics</div><div class="ss-card-subtitle">Auto-refreshes every 10 seconds</div></div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       <div id="iface-table-wrap">
         {% if on_freebsd %}
-        <div class="p-4 text-center text-muted">
-          <i class="fa fa-spinner fa-spin fa-2x mb-2 d-block"></i>Loading statistics…
+        <div style="padding:28px;text-align:center;color:var(--muted);">
+          <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading statistics…
         </div>
         {% else %}
-        <div class="p-4 text-center text-muted">
-          <i class="fa fa-circle-info fa-2x mb-2 d-block"></i>
+        <div style="padding:28px;text-align:center;color:var(--muted);">
           Live statistics only available on FreeBSD.
         </div>
         {% endif %}
@@ -40,11 +36,12 @@
 
   <!-- Configured interfaces reference -->
   {% if interfaces %}
-  <div class="section">
-    <div class="section-header">
-      <h2 class="mb-0"><i class="fa fa-ethernet me-2"></i>Configured Interfaces</h2>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-ethernet"></i></div>
+      <div><div class="ss-card-title">Configured Interfaces</div></div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead>
@@ -67,6 +64,7 @@
   </div>
   {% endif %}
 </div>
+
 
 <script>
 function renderIfaceTable(stats) {

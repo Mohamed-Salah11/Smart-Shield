@@ -3,15 +3,11 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">Routing — Gateways</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-route me-2 text-primary"></i>Routing</h1>
-    <p class="lead">Manage gateways, static routes, and gateway groups.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Routing</h1>
+      <p class="ss-page-desc">Manage gateways, static routes, and gateway groups</p>
+    </div>
   </div>
 
   <ul class="nav nav-pills mb-4">
@@ -35,14 +31,17 @@
   {% endwith %}
 
   <!-- Gateways table -->
-  <div class="section mb-4">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-server me-2"></i>Gateways</h2>
-      <a href="{{ url_for('routing.gateway_edit') }}" class="btn btn-success btn-sm">
-        <i class="fa fa-plus me-1"></i>Add Gateway
-      </a>
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+      <div><div class="ss-card-title">Gateways</div></div>
+      <div class="ss-card-actions">
+        <a href="{{ url_for('routing.gateway_edit') }}" class="btn btn-success btn-sm">
+          <i class="fa-solid fa-plus me-1"></i>Add Gateway
+        </a>
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       {% if gateways %}
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
@@ -98,19 +97,21 @@
         </table>
       </div>
       {% else %}
-      <div class="p-5 text-center text-muted">
-        <i class="fa fa-route fa-3x mb-3 d-block"></i>
+      <div style="text-align:center;padding:28px;color:var(--muted);">
         No gateways configured.
-        <a href="{{ url_for('routing.gateway_edit') }}" class="d-block mt-2">Add your first gateway →</a>
+        <a href="{{ url_for('routing.gateway_edit') }}" style="color:var(--primary);display:block;margin-top:8px;">Add your first gateway →</a>
       </div>
       {% endif %}
     </div>
   </div>
 
   <!-- Set Default Gateway -->
-  <div class="section mb-4">
-    <div class="section-header"><h2 class="mb-0">Default Gateway</h2></div>
-    <div class="section-body">
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-star"></i></div>
+      <div><div class="ss-card-title">Default Gateway</div></div>
+    </div>
+    <div class="ss-card-body">
       <form method="post" action="{{ url_for('routing.gateway_set_default') }}">
         <div class="row g-3">
           <div class="col-md-6">
@@ -146,16 +147,19 @@
   </div>
 
   <!-- Live route table -->
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-table me-2"></i>Live OS Route Table</h2>
-      <button class="btn btn-sm btn-outline-primary" id="btn-refresh-routes">
-        <i class="fa fa-rotate me-1"></i>Refresh
-      </button>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-table-list"></i></div>
+      <div><div class="ss-card-title">Live OS Route Table</div></div>
+      <div class="ss-card-actions">
+        <button class="btn btn-sm btn-outline-primary" id="btn-refresh-routes">
+          <i class="fa-solid fa-rotate me-1"></i>Refresh
+        </button>
+      </div>
     </div>
-    <div class="section-body p-0" id="live-routes-wrap">
-      <div class="p-3 text-muted text-center">
-        <i class="fa fa-spinner fa-spin me-2"></i>Loading…
+    <div style="overflow-x:auto;" id="live-routes-wrap">
+      <div style="padding:28px;text-align:center;color:var(--muted);">
+        <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading…
       </div>
     </div>
   </div>

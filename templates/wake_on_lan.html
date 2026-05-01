@@ -1,123 +1,104 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / Wake-on-LAN</span>
-</div>
+<div class="container">
 
-<div class="settings-section">
-	<h5>Wake-on-LAN</h5>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Wake on LAN</h1>
+      <p class="ss-page-desc">Send magic packets to wake devices from sleep</p>
+    </div>
+  </div>
 
-	<form method="POST" action="{{ url_for('services.wake_on_lan') }}">
-		<div class="form-group">
-			<label>Interface</label>
-			<div class="form-group-content">
-				<select class="form-control" name="interface" required style="max-width: 200px;">
-					{% if interfaces %}
-						{% for iface in interfaces %}
-						<option value="{{ iface }}">{{ iface }}</option>
-						{% endfor %}
-					{% else %}
-						<option value="">No interfaces available</option>
-					{% endif %}
-				</select>
-				<div class="help-text">Choose which interface the host to be woken up is connected to.</div>
-			</div>
-		</div>
+  <!-- Send WoL Packet -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-power-off"></i></div>
+      <div><div class="ss-card-title">Send Wake Packet</div><div class="ss-card-subtitle">Broadcast a magic packet to the specified MAC address</div></div>
+    </div>
+    <div class="ss-card-body">
+      <form method="POST" action="{{ url_for('services.wake_on_lan') }}">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">Interface</label>
+            <select class="form-select" name="interface" required>
+              {% if interfaces %}{% for iface in interfaces %}
+              <option value="{{ iface }}">{{ iface }}</option>
+              {% endfor %}{% else %}
+              <option value="">No interfaces available</option>
+              {% endif %}
+            </select>
+            <p class="ss-hint">The interface the target device is connected to</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">MAC Address</label>
+            <input type="text" class="form-control" name="mac_address" placeholder="xx:xx:xx:xx:xx:xx"
+                   pattern="([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}" required>
+            <p class="ss-hint">Format: xx:xx:xx:xx:xx:xx</p>
+          </div>
+        </div>
+        <div class="ss-save-bar" style="margin-top:8px;">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="fa-solid fa-bolt me-1"></i>Send Packet
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-		<div class="form-group">
-			<label>MAC address</label>
-			<div class="form-group-content">
-				<input type="text" class="form-control" name="mac_address" placeholder="xx:xx:xx:xx:xx:xx" pattern="([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}" required style="max-width: 250px;">
-				<div class="help-text">Enter a MAC address in the following format: xx:xx:xx:xx:xx:xx</div>
-			</div>
-		</div>
-
-		<div class="d-flex gap-2 mt-3">
-			<button type="submit" class="btn btn-primary">Send</button>
-		</div>
-	</form>
-</div>
-
-<div class="settings-section">
-	<div class="d-flex justify-content-between align-items-center mb-3">
-		<h5>Wake-on-LAN Devices</h5>
-		<small class="text-muted">Click the MAC address to wake up an individual device.</small>
-	</div>
-
-	<table class="table-bordered">
-		<thead>
-			<tr>
-				<th>Interface</th>
-				<th>MAC address</th>
-				<th>Description</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% if devices %}
-				{% for dev in devices %}
-				<tr>
-					<td>{{ dev.interface }}</td>
-					<td><a href="#" class="wake-device" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}">{{ dev.mac }}</a></td>
-					<td>{{ dev.description }}</td>
-					<td>
-						<button type="button" class="btn btn-sm btn-primary wake-device-btn" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}">Wake</button>
-					</td>
-				</tr>
-				{% endfor %}
-			{% else %}
-				<tr>
-					<td colspan="4" style="text-align: center; padding: 20px;">No devices configured.</td>
-				</tr>
-			{% endif %}
-		</tbody>
-	</table>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addDeviceModal">Add</button>
-		<button id="wake-all-btn" type="button" class="btn btn-primary" {% if not devices %}disabled{% endif %}>Wake All Devices</button>
-	</div>
+  <!-- Device List -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-list"></i></div>
+      <div><div class="ss-card-title">Saved Devices</div><div class="ss-card-subtitle">Click the MAC address link to wake a device instantly</div></div>
+      <div class="ss-card-actions">
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+          <i class="fa-solid fa-plus me-1"></i>Add Device
+        </button>
+        <button id="wake-all-btn" type="button" class="btn btn-primary btn-sm" {% if not devices %}disabled{% endif %}>
+          <i class="fa-solid fa-bolt me-1"></i>Wake All
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr><th style="padding:10px 14px;">Interface</th><th>MAC Address</th><th>Description</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% if devices %}{% for dev in devices %}
+          <tr>
+            <td style="padding:8px 14px;">{{ dev.interface }}</td>
+            <td><a href="#" class="wake-device" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}" style="color:var(--primary);font-weight:600;font-family:monospace;">{{ dev.mac }}</a></td>
+            <td>{{ dev.description }}</td>
+            <td><button type="button" class="btn btn-sm btn-primary wake-device-btn" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}"><i class="fa-solid fa-bolt me-1"></i>Wake</button></td>
+          </tr>
+          {% endfor %}{% else %}
+          <tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted);">No devices configured — add one to get started</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
-	// Wake individual device
-	document.querySelectorAll('.wake-device, .wake-device-btn').forEach(function(element) {
-		element.addEventListener('click', function(e) {
-			e.preventDefault();
-			const mac = this.dataset.mac;
-			const iface = this.dataset.interface;
-			
-			if (confirm('Send Wake-on-LAN packet to ' + mac + '?')) {
-				// Send AJAX request to wake device
-				fetch('{{ url_for("services.wake_on_lan") }}', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						mac_address: mac,
-						interface: iface
-					})
-				})
-				.then(response => response.json())
-				.then(data => {
-					alert(data.message || 'Wake-on-LAN packet sent successfully!');
-				})
-				.catch(error => {
-					alert('Error sending Wake-on-LAN packet: ' + error);
-				});
-			}
-		});
-	});
-
-	// Wake all devices
-	document.getElementById('wake-all-btn')?.addEventListener('click', function() {
-		if (confirm('Send Wake-on-LAN packets to all devices?')) {
-			document.querySelectorAll('.wake-device').forEach(function(element) {
-				element.click();
-			});
-		}
-	});
+document.querySelectorAll('.wake-device, .wake-device-btn').forEach(el => {
+  el.addEventListener('click', function(e) {
+    e.preventDefault();
+    const mac = this.dataset.mac, iface = this.dataset.interface;
+    if (confirm('Send Wake-on-LAN packet to ' + mac + '?')) {
+      fetch('{{ url_for("services.wake_on_lan") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac_address: mac, interface: iface })
+      }).then(r => r.json()).then(d => alert(d.message || 'Packet sent!')).catch(e => alert('Error: ' + e));
+    }
+  });
+});
+document.getElementById('wake-all-btn')?.addEventListener('click', function() {
+  if (confirm('Send Wake-on-LAN packets to ALL devices?')) {
+    document.querySelectorAll('.wake-device').forEach(el => el.click());
+  }
+});
 </script>
 {% endblock %}

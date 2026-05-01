@@ -4,15 +4,11 @@
 
 <div class="container">
     <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('system.advanced') }}">Advanced</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Miscellaneous</li>
-            </ol>
-        </nav>
-        <h1>Advanced Settings</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Advanced Settings</h1>
+        <p class="ss-page-desc">Miscellaneous system advanced options</p>
+      </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -37,11 +33,12 @@
     <form method="POST" action="{{ url_for('system.advanced_miscellaneous') }}">
 
         <!-- Proxy Support Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Proxy Support</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+                <div><div class="ss-card-title">Proxy Support</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="proxy_url" class="col-sm-3 col-form-label fw-semibold">Proxy URL</label>
                     <div class="col-sm-9">
@@ -79,11 +76,12 @@
         </div>
 
         <!-- Load Balancing Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Load Balancing</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+                <div><div class="ss-card-title">Load Balancing</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Sticky Connections</label>
                     <div class="col-sm-9">
@@ -107,11 +105,12 @@
         </div>
 
         <!-- Power Savings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Power Savings - PowerD</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-bolt"></i></div>
+                <div><div class="ss-card-title">Power Savings - PowerD</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">PowerD</label>
                     <div class="col-sm-9">
@@ -162,11 +161,12 @@
         </div>
 
         <!-- Cryptographic Hardware Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Cryptographic & Thermal Hardware</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-microchip"></i></div>
+                <div><div class="ss-card-title">Cryptographic &amp; Thermal Hardware</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="cryptographic_hardware" class="col-sm-3 col-form-label fw-semibold">Crypto Hardware</label>
                     <div class="col-sm-9">
@@ -195,11 +195,12 @@
         </div>
 
         <!-- Kernel PTI Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Kernel Page Table Isolation</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div><div class="ss-card-title">Kernel Page Table Isolation</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Kernel PTI</label>
                     <div class="col-sm-9">
@@ -214,11 +215,12 @@
         </div>
 
         <!-- MDS Mitigation Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Microarchitectural Data Sampling Mitigation</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-bug-slash"></i></div>
+                <div><div class="ss-card-title">Microarchitectural Data Sampling Mitigation</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="mds_mode" class="col-sm-3 col-form-label fw-semibold">MDS Mode</label>
                     <div class="col-sm-9">
@@ -235,11 +237,12 @@
         </div>
 
         <!-- Schedules Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Schedules</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                <div><div class="ss-card-title">Schedules</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Schedule States</label>
                     <div class="col-sm-9">
@@ -253,11 +256,12 @@
         </div>
 
         <!-- Gateway Monitoring Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Gateway Monitoring</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+                <div><div class="ss-card-title">Gateway Monitoring</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="state_killing_on_gateway_recovery" class="col-sm-3 col-form-label fw-semibold">On Gateway Recovery</label>
                     <div class="col-sm-9">
@@ -302,11 +306,12 @@
         </div>
 
         <!-- PHP Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>PHP Settings</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-code"></i></div>
+                <div><div class="ss-card-title">PHP Settings</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="memory_limit" class="col-sm-3 col-form-label fw-semibold">Memory Limit</label>
                     <div class="col-sm-9">
@@ -318,11 +323,12 @@
         </div>
 
         <!-- RAM Disk Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>RAM Disk Settings</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-memory"></i></div>
+                <div><div class="ss-card-title">RAM Disk Settings</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="alert alert-warning d-flex align-items-center mb-3">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="me-2 flex-shrink-0" viewBox="0 0 16 16">
                         <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
@@ -359,11 +365,12 @@
         </div>
 
         <!-- Hardware Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Hardware Settings</h2>
+        <div class="ss-card">
+            <div class="ss-card-head">
+                <div class="ss-card-icon"><i class="fa-solid fa-hard-drive"></i></div>
+                <div><div class="ss-card-title">Hardware Settings</div></div>
             </div>
-            <div class="section-body">
+            <div class="ss-card-body">
                 <div class="mb-3 row">
                     <label for="hard_disk_standby_time" class="col-sm-3 col-form-label fw-semibold">Hard Disk Standby</label>
                     <div class="col-sm-9">

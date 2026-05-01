@@ -708,6 +708,33 @@
         }
     }
 
+    // Tracks which record is being edited per NAT type (null = add mode)
+    const editingNatId = { pf: null, '1to1': null, outbound: null, npt: null };
+
+    async function saveNatRule(type, ruleData, modal, formId, reloadFn) {
+        const editing  = editingNatId[type];
+        const endpoint = `/firewall/api/nat/${type}` + (editing ? `/${editing}` : '');
+        const method   = editing ? 'PUT' : 'POST';
+        try {
+            const response = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ruleData)
+            });
+            const result = await response.json();
+            if (result.success) {
+                editingNatId[type] = null;
+                bootstrap.Modal.getInstance(modal).hide();
+                if (formId) document.getElementById(formId).reset();
+                reloadFn();
+            } else {
+                alert('Error saving rule: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Could not connect to the backend server.');
+        }
+    }
+
     // --- PORT FORWARD SAVE ---
     const pfModal = document.getElementById('pfModal');
     document.getElementById('pfRuleSaveBtn').addEventListener('click', async () => {
@@ -724,27 +751,7 @@
             nat_reflection: document.getElementById('pf_nat_reflection').value,
             position: pfAddPosition
         };
-
-        try {
-            const response = await fetch('/firewall/api/nat/pf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(ruleData)
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert('Port forward rule saved successfully!');
-                bootstrap.Modal.getInstance(pfModal).hide();
-                document.getElementById('pfRuleForm').reset();
-                loadPortForwardRules();
-            } else {
-                alert('Error saving rule: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Could not connect to the backend server.');
-        }
+        await saveNatRule('pf', ruleData, pfModal, 'pfRuleForm', loadPortForwardRules);
     });
 
     // --- 1:1 NAT SAVE ---
@@ -759,27 +766,7 @@
             description: document.getElementById('1to1_description').value || 'New 1:1 NAT mapping',
             position: oneToOneAddPosition
         };
-
-        try {
-            const response = await fetch('/firewall/api/nat/1to1', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(ruleData)
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert('1:1 NAT mapping saved successfully!');
-                bootstrap.Modal.getInstance(oneToOneModal).hide();
-                document.getElementById('oneToOneRuleForm').reset();
-                load1to1Rules();
-            } else {
-                alert('Error saving mapping: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Could not connect to the backend server.');
-        }
+        await saveNatRule('1to1', ruleData, oneToOneModal, 'oneToOneRuleForm', load1to1Rules);
     });
 
     // --- OUTBOUND NAT SAVE ---
@@ -795,27 +782,7 @@
             description: document.getElementById('outbound_description').value || 'New outbound NAT rule',
             position: outboundAddPosition
         };
-
-        try {
-            const response = await fetch('/firewall/api/nat/outbound', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(ruleData)
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert('Outbound NAT rule saved successfully!');
-                bootstrap.Modal.getInstance(outboundModal).hide();
-                document.getElementById('outboundRuleForm').reset();
-                loadOutboundRules();
-            } else {
-                alert('Error saving rule: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Could not connect to the backend server.');
-        }
+        await saveNatRule('outbound', ruleData, outboundModal, 'outboundRuleForm', loadOutboundRules);
     });
 
     // --- NPt SAVE ---
@@ -829,27 +796,7 @@
             description: document.getElementById('npt_description').value || 'New NPt mapping',
             position: nptAddPosition
         };
-
-        try {
-            const response = await fetch('/firewall/api/nat/npt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(ruleData)
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert('NPt mapping saved successfully!');
-                bootstrap.Modal.getInstance(nptModal).hide();
-                document.getElementById('nptRuleForm').reset();
-                loadNptRules();
-            } else {
-                alert('Error saving mapping: ' + result.error);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Could not connect to the backend server.');
-        }
+        await saveNatRule('npt', ruleData, nptModal, 'nptRuleForm', loadNptRules);
     });
 
     // --- DELETE BUTTONS ---
@@ -1052,9 +999,69 @@
         }
     }
 
-    // Edit NAT rule function (placeholder)
-    function editNatRule(type, ruleId) {
-        alert(`Edit ${type} NAT rule #${ruleId} - Feature coming soon!`);
+    async function editNatRule(type, ruleId) {
+        try {
+            const response = await fetch(`/firewall/api/nat/${type}/${ruleId}`);
+            const result   = await response.json();
+            if (!result.success) { alert('Could not load rule: ' + (result.error || '')); return; }
+            const rule = result.rule;
+            editingNatId[type] = ruleId;
+
+            if (type === 'pf') {
+                const modal = document.getElementById('pfModal');
+                document.getElementById('pfModalLabel').textContent   = 'Edit Port Forward Rule';
+                document.getElementById('pf_disabled').checked         = !!rule.disabled;
+                document.getElementById('pf_interface').value          = rule.interface     || 'WAN';
+                document.getElementById('pf_protocol').value           = rule.protocol      || 'tcp';
+                document.getElementById('pf_src_type').value           = rule.src_type      || 'any';
+                document.getElementById('pf_src_address').value        = rule.src_address   || '';
+                document.getElementById('pf_dst_type').value           = rule.dst_type      || 'wan_address';
+                document.getElementById('pf_dst_address').value        = rule.dst_address   || '';
+                document.getElementById('pf_redirect_ip').value        = rule.redirect_ip   || '';
+                document.getElementById('pf_description').value        = rule.description   || '';
+                document.getElementById('pf_nat_reflection').value     = rule.nat_reflection || 'default';
+                new bootstrap.Modal(modal).show();
+
+            } else if (type === '1to1') {
+                const modal = document.getElementById('oneToOneModal');
+                const titleEl = modal.querySelector('.modal-title');
+                if (titleEl) titleEl.textContent = 'Edit 1:1 NAT Mapping';
+                document.getElementById('1to1_disabled').checked          = !!rule.disabled;
+                document.getElementById('1to1_interface').value           = rule.interface         || 'WAN';
+                document.getElementById('1to1_external_address').value    = rule.external_address  || '';
+                document.getElementById('1to1_internal_address').value    = rule.internal_address  || '';
+                document.getElementById('1to1_description').value         = rule.description       || '';
+                new bootstrap.Modal(modal).show();
+
+            } else if (type === 'outbound') {
+                const modal = document.getElementById('outboundModal');
+                const titleEl = modal.querySelector('.modal-title');
+                if (titleEl) titleEl.textContent = 'Edit Outbound NAT Rule';
+                document.getElementById('outbound_disabled').checked     = !!rule.disabled;
+                document.getElementById('outbound_interface').value      = rule.interface   || 'WAN';
+                const protoEl = document.getElementById('outbound_protocol');
+                if (protoEl) protoEl.value = rule.protocol || 'any';
+                document.getElementById('outbound_src_address').value    = rule.src_address || '';
+                document.getElementById('outbound_dst_address').value    = rule.dst_address || 'any';
+                const spEl = document.getElementById('outbound_static_port');
+                if (spEl) spEl.checked = !!rule.static_port;
+                document.getElementById('outbound_description').value    = rule.description || '';
+                new bootstrap.Modal(modal).show();
+
+            } else if (type === 'npt') {
+                const modal = document.getElementById('nptModal');
+                const titleEl = modal.querySelector('.modal-title');
+                if (titleEl) titleEl.textContent = 'Edit NPt Mapping';
+                document.getElementById('npt_disabled').checked    = !!rule.disabled;
+                document.getElementById('npt_interface').value     = rule.interface  || 'WAN';
+                document.getElementById('npt_src_prefix').value    = rule.src_prefix || '';
+                document.getElementById('npt_dst_prefix').value    = rule.dst_prefix || '';
+                document.getElementById('npt_description').value   = rule.description || '';
+                new bootstrap.Modal(modal).show();
+            }
+        } catch (e) {
+            alert('Failed to load NAT rule for editing.');
+        }
     }
 
     // Load NPt rules from database

@@ -441,10 +441,19 @@ def update_rules(conn) -> dict:
 # Status
 # ---------------------------------------------------------------------------
 
-def get_ids_status() -> dict:
+def get_ids_status(conn=None) -> dict:
     """Return running status + today's alert count (from eve.json)."""
+    mode = "ids"
+    if conn is not None:
+        try:
+            row = conn.execute("SELECT mode FROM ids_config WHERE id=1").fetchone()
+            if row:
+                mode = (row["mode"] or "ids").lower()
+        except Exception:
+            pass
+
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "running": False, "mode": "ids", "message": "Non-FreeBSD host", "alerts_today": 0}
+        return {"ok": True, "running": False, "mode": mode, "message": "Non-FreeBSD host", "alerts_today": 0}
 
     # Check if process is running
     result = run_command(["pgrep", "-x", "suricata"], check=False)
@@ -466,7 +475,7 @@ def get_ids_status() -> dict:
     return {
         "ok": True,
         "running": running,
-        "mode": "ids",
+        "mode": mode,
         "message": "Running" if running else "Stopped",
         "alerts_today": alerts_today,
     }

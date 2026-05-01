@@ -214,7 +214,62 @@ def apply_dhcpv6(conn) -> dict:
 
     from app.services.service_manager import service_action
     r = service_action("kea-dhcp6", "restart")
+    if r["ok"]:
+        pd_result = apply_pd_routes(conn)
+        if not pd_result["ok"]:
+            return {"ok": False,
+                    "message": r["message"] + " | PD routes: " + pd_result["message"],
+                    "conf": conf, "errors": []}
     return {"ok": r["ok"], "message": r["message"], "conf": conf, "errors": []}
+
+
+def apply_pd_routes(conn) -> dict:
+    """
+    Install IPv6 prefix-delegation routes into the kernel routing table.
+
+    For every enabled DHCPv6 pool that has a pd_prefix configured, adds a
+    static route so traffic for the delegated prefix is forwarded correctly.
+
+    On non-FreeBSD this is a no-op (returns ok=True).
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "Non-FreeBSD — PD routes skipped."}
+
+    pools = _rows(
+        conn,
+        "SELECT pd_prefix, pd_prefix_len, interface_name FROM dhcpv6_pools "
+        "WHERE enabled=1 AND pd_prefix IS NOT NULL AND pd_prefix != ''",
+    )
+    if not pools:
+        return {"ok": True, "message": "No PD pools configured."}
+
+    from app.services.network_service import run_command, FreeBSDNetworkError
+
+    installed = []
+    errors    = []
+    for pool in pools:
+        prefix  = (pool.get("pd_prefix") or "").strip()
+        plen    = pool.get("pd_prefix_len") or 64
+        iface   = (pool.get("interface_name") or "").strip()
+        if not prefix:
+            continue
+        route_net = f"{prefix}/{plen}"
+        try:
+            # Try to add the route; ignore "already exists" (errno 17)
+            r = run_command(
+                ["route", "add", "-inet6", route_net, "-interface", iface or "em0"],
+                check=False,
+            )
+            if r.returncode == 0 or "exists" in (r.stderr or "").lower():
+                installed.append(route_net)
+            else:
+                errors.append(f"{route_net}: {(r.stderr or r.stdout or '').strip()}")
+        except FreeBSDNetworkError as exc:
+            errors.append(f"{route_net}: {exc}")
+
+    if errors:
+        return {"ok": False, "message": "PD route errors: " + "; ".join(errors)}
+    return {"ok": True, "message": f"PD routes installed: {', '.join(installed) or 'none'}"}
 
 
 # ---------------------------------------------------------------------------

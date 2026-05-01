@@ -9,11 +9,11 @@
   --panel:            #ffffff;
   --text-color:       #0f172a;
 
-  /* Brand */
-  --primary:          #2563eb;
-  --primary-dark:     #1d4ed8;
-  --primary-soft:     #eff6ff;
-  --accent:           #0ea5e9;
+  /* Brand — Smart Shield Teal */
+  --primary:          #00b4a0;
+  --primary-dark:     #009688;
+  --primary-soft:     rgba(0,180,160,.08);
+  --accent:           #6366f1;
 
   /* Semantic */
   --secondary:        #64748b;
@@ -23,13 +23,13 @@
   --danger:           #ef4444;
   --danger-dark:      #dc2626;
   --warning:          #f59e0b;
-  --info:             #0ea5e9;
+  --info:             #06b6d4;
 
   /* Borders & text */
   --border-color:     #e2e8f0;
   --border-color-soft:#f1f5f9;
   --muted:            #94a3b8;
-  --heading-blue:     #1e40af;
+  --heading-blue:     #0d7a71;
 
   /* Elevation */
   --shadow-soft: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
@@ -43,24 +43,24 @@
   --shell-max-width:          1320px;
   --shell-gutter:             16px;
 
-  /* ── Sidebar palette (always dark, even in light mode) ── */
-  --sb-bg:            #161616;
-  --sb-header-bg:     #0d0d0d;
-  --sb-border:        rgba(255,255,255,.06);
-  --sb-text:          rgba(203,213,225,.78);
+  /* ── Sidebar palette (always dark navy, Smart Shield brand) ── */
+  --sb-bg:            #0b1829;
+  --sb-header-bg:     #060f1c;
+  --sb-border:        rgba(0,180,160,.12);
+  --sb-text:          rgba(180,210,205,.78);
   --sb-text-active:   #ffffff;
-  --sb-hover:         rgba(255,255,255,.06);
-  --sb-active-bg:     rgba(59,130,246,.18);
-  --sb-active-border: #3b82f6;
-  --sb-group-color:   rgba(148,163,184,.55);
-  --sb-open-bg:       rgba(59,130,246,.08);
-  --sb-open-color:    #93c5fd;
-  --sb-open-border:   rgba(59,130,246,.5);
+  --sb-hover:         rgba(0,180,160,.07);
+  --sb-active-bg:     rgba(0,180,160,.18);
+  --sb-active-border: #00b4a0;
+  --sb-group-color:   rgba(0,180,160,.55);
+  --sb-open-bg:       rgba(0,180,160,.08);
+  --sb-open-color:    #4dd9cd;
+  --sb-open-border:   rgba(0,180,160,.45);
 
   /* Section / card header */
-  --hdr-bg:    linear-gradient(135deg, #1e293b 0%, #243044 100%); /* light-mode header keeps its blue — only dark mode is affected */
+  --hdr-bg:    linear-gradient(135deg, #0b1829 0%, #112237 100%);
   --hdr-color: #ffffff;
-  --hdr-border:#3b82f6;
+  --hdr-border:#00b4a0;
 }
 
 /* ========================================
@@ -73,10 +73,10 @@
   --panel:            #111111;
   --text-color:       #d4d4d4;
 
-  /* Brand */
-  --primary:          #3b82f6;
-  --primary-dark:     #2563eb;
-  --primary-soft:     rgba(59,130,246,.10);
+  /* Brand — brighter teal in dark mode */
+  --primary:          #00c9b3;
+  --primary-dark:     #00b4a0;
+  --primary-soft:     rgba(0,180,160,.10);
 
   /* Semantic */
   --secondary:        #6b7280;
@@ -87,31 +87,31 @@
   --danger:           #ef4444;
   --danger-dark:      #dc2626;
   --warning:          #f59e0b;
-  --info:             #38bdf8;
+  --info:             #22d3ee;
 
   /* Borders & muted text */
   --border-color:     #1e1e1e;
   --border-color-soft:#161616;
   --muted:            #6b7280;
-  --heading-blue:     #93c5fd;
+  --heading-blue:     #4dd9cd;
 
-  /* Shadows — deeper, no colour */
+  /* Shadows — deeper */
   --shadow-soft: 0 1px 3px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.40);
   --shadow-md:   0 4px 6px -1px rgba(0,0,0,.65), 0 2px 4px -1px rgba(0,0,0,.50);
   --shadow-lg:   0 10px 15px -3px rgba(0,0,0,.75), 0 4px 6px -2px rgba(0,0,0,.55);
 
-  /* Sidebar — pure black */
-  --sb-bg:            #0d0d0d;
-  --sb-header-bg:     #050505;
-  --sb-border:        rgba(255,255,255,.05);
-  --sb-text:          rgba(163,163,163,.85);
-  --sb-hover:         rgba(255,255,255,.05);
-  --sb-active-bg:     rgba(59,130,246,.18);
-  --sb-open-bg:       rgba(255,255,255,.04);
+  /* Sidebar — deeper navy in dark mode */
+  --sb-bg:            #050d18;
+  --sb-header-bg:     #030a12;
+  --sb-border:        rgba(0,180,160,.10);
+  --sb-text:          rgba(150,200,195,.8);
+  --sb-hover:         rgba(0,180,160,.08);
+  --sb-active-bg:     rgba(0,180,160,.20);
+  --sb-open-bg:       rgba(0,180,160,.06);
 
   /* Section / card header */
-  --hdr-bg:    linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-  --hdr-border:#3b82f6;
+  --hdr-bg:    linear-gradient(135deg, #050d18 0%, #0b1829 100%);
+  --hdr-border:#00b4a0;
 }
 
 /* ========================================
@@ -214,18 +214,23 @@ small {
 }
 
 /* ========================================
-   SECTION / CARD HEADERS
+   SECTION / CARD HEADERS  (Smart Shield style — no pfSense dark bars)
 ======================================== */
 .section-header,
 .table-header,
 .config-header,
 .edit-header,
 .add-zone-header {
-  background: var(--hdr-bg);
-  color: var(--hdr-color);
-  padding: 10px 16px;
-  margin: 0;
-  border-left: 3px solid var(--hdr-border);
+  background: transparent;
+  color: var(--text-color);
+  padding: 0 0 12px;
+  margin: 0 0 18px;
+  border-left: none;
+  border-bottom: 1px solid var(--border-color-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .section-header h2,
@@ -235,26 +240,240 @@ small {
 .add-zone-header h2,
 .section-header h3 {
   margin: 0;
-  font-size: .9rem;
-  font-weight: 600;
-  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--secondary);
   border: none;
   padding: 0;
+  text-transform: uppercase;
+  letter-spacing: .1em;
 }
 
+/* Section body gets its own padding now that header is inline */
+.section-header + .section-body,
+.table-header + .section-body { padding-top: 0; }
+
 .card-header {
-  background: var(--hdr-bg);
-  color: #fff;
-  font-weight: 600;
-  padding: .7rem 1rem;
-  border-left: 3px solid var(--hdr-border);
-  font-size: .9rem;
+  background: transparent;
+  color: var(--text-color);
+  font-weight: 700;
+  padding: 0 0 12px;
+  border-left: none;
+  border-bottom: 1px solid var(--border-color-soft);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
 }
 .card-header .add-btn {
   background-color: var(--success);
   border-color: var(--success-dark);
 }
 .card-header .add-btn span { font-weight: 700; }
+
+/* ========================================
+   SMART SHIELD DESIGN SYSTEM
+   Modern, clean settings pages
+   Usage: ss-card > ss-card-head + ss-card-body
+======================================== */
+
+/* Page header */
+.ss-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+.ss-page-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--heading-blue);
+  margin: 0 0 4px;
+  letter-spacing: -.025em;
+}
+.ss-page-desc { font-size: .85rem; color: var(--secondary); margin: 0; }
+
+/* Settings card */
+.ss-card {
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+/* Card header — icon + title, NO dark gradient */
+.ss-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-color-soft);
+  background: var(--border-color-soft);
+}
+.ss-card-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 8px;
+  font-size: .85rem;
+  flex-shrink: 0;
+}
+.ss-card-title {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--secondary);
+  margin: 0;
+  line-height: 1.2;
+}
+.ss-card-subtitle {
+  font-size: .78rem;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+.ss-card-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* Card body */
+.ss-card-body { padding: 22px; }
+
+/* Field grid — responsive multi-column */
+.ss-field-grid {
+  display: grid;
+  gap: 20px;
+}
+.ss-field-grid-1 { grid-template-columns: 1fr; }
+.ss-field-grid-2 { grid-template-columns: 1fr 1fr; }
+.ss-field-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.ss-field-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Divider between field groups within a card */
+.ss-divider {
+  border: none;
+  border-top: 1px solid var(--border-color-soft);
+  margin: 20px 0;
+}
+
+/* Single field — label above input */
+.ss-field { display: flex; flex-direction: column; gap: 5px; }
+
+/* Field label */
+.ss-label {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* Help text below inputs */
+.ss-hint {
+  font-size: .76rem;
+  color: var(--muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+/* ── Toggle switch ── */
+.ss-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-color-soft);
+}
+.ss-toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+.ss-toggle-row:first-child { padding-top: 0; }
+
+.ss-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  margin-top: 1px;
+}
+.ss-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.ss-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border-color);
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background .2s, box-shadow .2s;
+}
+.ss-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.ss-toggle input:checked + .ss-toggle-slider {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.ss-toggle input:checked + .ss-toggle-slider::before { transform: translateX(18px); }
+
+.ss-toggle-content { flex: 1; }
+.ss-toggle-label { font-size: .875rem; font-weight: 600; color: var(--text-color); margin: 0; }
+.ss-toggle-desc  { font-size: .78rem; color: var(--muted); margin: 2px 0 0; }
+
+/* ── Checkbox group ── */
+.ss-check-group { display: flex; flex-direction: column; gap: 10px; }
+.ss-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color-soft);
+}
+.ss-check-item:last-child { border-bottom: none; }
+.ss-check-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ss-check-item span { font-size: .875rem; color: var(--text-color); font-weight: 500; }
+
+/* ── Save bar ── */
+.ss-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 0 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border-color-soft);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .ss-field-grid-2,
+  .ss-field-grid-3,
+  .ss-field-grid-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .ss-field-grid-2,
+  .ss-field-grid-3,
+  .ss-field-grid-4 { grid-template-columns: 1fr; }
+  .ss-card-head { padding: 12px 14px; }
+  .ss-card-body { padding: 14px; }
+}
 
 /* ========================================
    TOPBAR / NAVBAR
@@ -548,9 +767,9 @@ small {
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 99px;
-  background: rgba(59,130,246,.2);
-  color: #93c5fd;
-  border: 1px solid rgba(59,130,246,.25);
+  background: rgba(0,180,160,.2);
+  color: #4dd9cd;
+  border: 1px solid rgba(0,180,160,.3);
 }
 .sidebar-close-btn {
   display: inline-flex;
@@ -597,7 +816,7 @@ small {
 }
 .side-group > summary::-webkit-details-marker { display: none; }
 .side-group > summary:focus-visible {
-  outline: 2px solid rgba(59,130,246,.4);
+  outline: 2px solid rgba(0,180,160,.4);
   outline-offset: -2px;
   border-radius: 6px;
 }

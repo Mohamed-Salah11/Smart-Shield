@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{ title if title else "Firewall Panel" }}</title>
+    <title>{{ title if title else "Smart Shield" }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -32,23 +32,31 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-<!-- Desktop Only Message for Mobile Users -->
+
+<!-- Desktop-only guard -->
 <div class="mobile-block-message">
-    <div class="icon">🖥️</div>
-    <h1>Desktop Only</h1>
-    <p>Smart Shield Firewall Panel is designed for desktop devices. Please access this application from a computer for the best experience.</p>
+    <div class="icon"><i class="fa-solid fa-shield-halved" style="font-size:3.5rem;color:#00b4a0;"></i></div>
+    <h1>Desktop Required</h1>
+    <p>Smart Shield is a professional network defense platform designed for desktop browsers. Please open this on a computer.</p>
 </div>
 
-<!-- Top Navigation Bar -->
+<!-- ════════════════════════════════════════
+     TOP NAVBAR
+════════════════════════════════════════ -->
 <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
+        <!-- Hamburger -->
         <button class="navbar-toggler" type="button" id="sidebarToggle" aria-label="Toggle sidebar">
             <span class="navbar-toggler-icon"></span>
         </button>
+
+        <!-- Brand (center) -->
         <a class="navbar-brand" href="{{ url_for('system.dashboard') }}">
-            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Logo">
-            <!-- <span class="label">Smart Shield</span> -->
+            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield">
+            <span class="label">Smart Shield</span>
         </a>
+
+        <!-- Right controls -->
         <ul class="navbar-nav ms-auto">
             <!-- Dark Mode Toggle -->
             <li class="nav-item d-flex align-items-center me-3">
@@ -61,13 +69,17 @@
                     </label>
                 </div>
             </li>
+
+            <!-- User dropdown -->
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#"
+                   id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="user-avatar me-2">
                         {% if session.get('user_avatar') %}
                             <img src="{{ session.get('user_avatar') }}" alt="User" class="rounded-circle">
                         {% else %}
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor"
+                                 class="bi bi-person-circle" viewBox="0 0 16 16">
                                 <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
                                 <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
                             </svg>
@@ -77,26 +89,14 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                     <li><a class="dropdown-item" href="{{ url_for('diagnostics.backup_restore', tab='backup') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download me-2" viewBox="0 0 16 16">
-                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                        </svg>
-                        Backup
+                        <i class="fa-solid fa-download me-2 text-muted"></i>Backup Config
                     </a></li>
                     <li><a class="dropdown-item" href="{{ url_for('diagnostics.backup_restore', tab='restore') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-upload me-2" viewBox="0 0 16 16">
-                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                            <path d="M7.646 4.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V14.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3z"/>
-                        </svg>
-                        Restore
+                        <i class="fa-solid fa-upload me-2 text-muted"></i>Restore Config
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="{{ url_for('system.logout') }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right me-2" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-                            <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
-                        </svg>
-                        Log Out
+                        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Sign Out
                     </a></li>
                 </ul>
             </li>
@@ -104,10 +104,15 @@
     </div>
 </nav>
 
-<!-- App Shell with Sidebar -->
+<!-- ════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════ -->
 <div class="app-shell sidebar-open" id="appShell">
-    <!-- Sidebar -->
+
+    <!-- ── SIDEBAR ── -->
     <aside class="sidebar" id="sidebar">
+
+        <!-- Sidebar header with brand + tagline -->
         <div class="sidebar-header">
             <a class="sidebar-brand" href="{{ url_for('system.dashboard') }}">
                 <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield" width="28" height="28">
@@ -116,138 +121,338 @@
             <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">&times;</button>
         </div>
 
+        <!-- Sidebar tagline strip -->
+        <div style="padding:6px 16px 10px;font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+                    color:rgba(0,180,160,.6);border-bottom:1px solid rgba(0,180,160,.1);display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-shield-halved" style="color:#00b4a0;font-size:.75rem;"></i>
+            Network Defense Platform
+        </div>
+
         <nav class="sidebar-nav">
-            <!-- System -->
+
+            <!-- ── Platform ── -->
             <details class="side-group">
-                <summary><span class="label">System</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-layer-group sg-icon"></i>
+                    <span class="label">Platform</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-                    <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">Advanced</a></li>
-                    <li><a href="{{ url_for('system.certificates') }}">Certificates</a></li>
-                    <li><a href="{{ url_for('system.general_setup') }}">General Setup</a></li>
-                    <li><a href="{{ url_for('system.high_availability') }}">High Availability</a></li>
-                    <li><a href="{{ url_for('system.package_manager') }}">Package Manager</a></li>
-                    <li><a href="{{ url_for('system.preflight') }}">Preflight Check</a></li>
-                    <li><a href="{{ url_for('routing.routing_index') }}">Routing</a></li>
-                    <li><a href="{{ url_for('system.setup_wizard') }}">Setup Wizard</a></li>
+                    <li><a href="{{ url_for('system.dashboard') }}">
+                        <i class="fa-solid fa-gauge-high fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Dashboard
+                    </a></li>
+                    <li><a href="{{ url_for('system.general_setup') }}">
+                        <i class="fa-solid fa-sliders fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Platform Settings
+                    </a></li>
+                    <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">
+                        <i class="fa-solid fa-user-shield fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Security Hardening
+                    </a></li>
+                    <li><a href="{{ url_for('system.certificates') }}">
+                        <i class="fa-solid fa-certificate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Certificates
+                    </a></li>
+                    <li><a href="{{ url_for('system.high_availability') }}">
+                        <i class="fa-solid fa-server fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Cluster &amp; HA
+                    </a></li>
+                    <li><a href="{{ url_for('system.package_manager') }}">
+                        <i class="fa-solid fa-puzzle-piece fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Extensions
+                    </a></li>
+                    <li><a href="{{ url_for('system.preflight') }}">
+                        <i class="fa-solid fa-stethoscope fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Health Check
+                    </a></li>
+                    <li><a href="{{ url_for('routing.routing_index') }}">
+                        <i class="fa-solid fa-route fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Routing
+                    </a></li>
+                    <li><a href="{{ url_for('system.setup_wizard') }}">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Setup Assistant
+                    </a></li>
                     {% if session.get('is_superuser') %}
-                    <li><a href="{{ url_for('users.user_manager') }}">User Manager</a></li>
+                    <li><a href="{{ url_for('users.user_manager') }}">
+                        <i class="fa-solid fa-users fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        User Manager
+                    </a></li>
                     {% endif %}
                 </ul>
             </details>
 
-            <!-- Interfaces -->
+            <!-- ── Network ── -->
             <details class="side-group">
-                <summary><span class="label">Interfaces</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-network-wired sg-icon"></i>
+                    <span class="label">Network</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('interfaces.interfaces_lan') }}">LAN</a></li>
-                    <li><a href="{{ url_for('interfaces.interfaces_wan') }}">WAN</a></li>
-                    <li><a href="{{ url_for('interfaces.interfaces_assignments') }}">Assignments</a></li>
+                    <li><a href="{{ url_for('interfaces.interfaces_lan') }}">
+                        <i class="fa-solid fa-ethernet fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        LAN Interface
+                    </a></li>
+                    <li><a href="{{ url_for('interfaces.interfaces_wan') }}">
+                        <i class="fa-solid fa-globe fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        WAN Interface
+                    </a></li>
+                    <li><a href="{{ url_for('interfaces.interfaces_assignments') }}">
+                        <i class="fa-solid fa-diagram-project fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Port Mapping
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- Firewall -->
+            <!-- ── Access Control ── -->
             <details class="side-group">
-                <summary><span class="label">Firewall</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-shield-halved sg-icon"></i>
+                    <span class="label">Access Control</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('firewall.rules') }}">Rules</a></li>
-                    <li><a href="{{ url_for('firewall.nat') }}">NAT</a></li>
-                    <li><a href="{{ url_for('firewall.aliases') }}">Aliases</a></li>
-                    <li><a href="{{ url_for('firewall.schedules') }}">Schedules</a></li>
-                    <li><a href="{{ url_for('firewall.traffic_shaper') }}">Traffic Shaper</a></li>
-                    <li><a href="{{ url_for('firewall.virtual_ips') }}">Virtual IPs</a></li>
+                    <li><a href="{{ url_for('firewall.rules') }}">
+                        <i class="fa-solid fa-list-check fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Rule Sets
+                    </a></li>
+                    <li><a href="{{ url_for('firewall.nat') }}">
+                        <i class="fa-solid fa-arrows-left-right fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        NAT &amp; Forwarding
+                    </a></li>
+                    <li><a href="{{ url_for('firewall.aliases') }}">
+                        <i class="fa-solid fa-tags fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Address Groups
+                    </a></li>
+                    <li><a href="{{ url_for('firewall.schedules') }}">
+                        <i class="fa-solid fa-clock fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Time Policies
+                    </a></li>
+                    <li><a href="{{ url_for('firewall.traffic_shaper') }}">
+                        <i class="fa-solid fa-gauge fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        QoS &amp; Shaping
+                    </a></li>
+                    <li><a href="{{ url_for('firewall.virtual_ips') }}">
+                        <i class="fa-solid fa-circle-nodes fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Virtual Addresses
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- Services -->
+            <!-- ── Network Services ── -->
             <details class="side-group">
-                <summary><span class="label">Services</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-server sg-icon"></i>
+                    <span class="label">Network Services</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('services.auto_config_backup') }}">Auto Config Backup</a></li>
-                    <li><a href="{{ url_for('services.captive_portal') }}">Captive Portal</a></li>
-                    <li><a href="{{ url_for('services.dhcp_relay') }}">DHCP Relay</a></li>
-                    <li><a href="{{ url_for('services.dhcp_server') }}">DHCP Server</a></li>
-                    <li><a href="{{ url_for('services.dhcpv6_relay') }}">DHCPv6 Relay</a></li>
-                    <li><a href="{{ url_for('services.dhcpv6_server') }}">DHCPv6 Server</a></li>
-                    <li><a href="{{ url_for('services.dns_forwarder') }}">DNS Forwarder</a></li>
-                    <li><a href="{{ url_for('services.dns_resolver') }}">DNS Resolver</a></li>
-                    <li><a href="{{ url_for('services.dynamic_dns') }}">Dynamic DNS</a></li>
-                    <li><a href="{{ url_for('services.igmp_proxy') }}">IGMP Proxy</a></li>
-                    <li><a href="{{ url_for('services.ntp') }}">NTP</a></li>
-                    <li><a href="{{ url_for('services.openvpn_server') }}">OpenVPN Server</a></li>
-                    <li><a href="{{ url_for('services.router_advertisement') }}">Router Advertisement</a></li>
-                    <li><a href="{{ url_for('services.snmp') }}">SNMP</a></li>
-                    <li><a href="{{ url_for('services.upnp_igd_pcp') }}">UPnP IGD &amp; PCP</a></li>
-                    <li><a href="{{ url_for('services.wake_on_lan') }}">Wake-on-LAN</a></li>
+                    <li><a href="{{ url_for('services.auto_config_backup') }}">
+                        <i class="fa-solid fa-floppy-disk fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Config Backup
+                    </a></li>
+                    <li><a href="{{ url_for('services.captive_portal') }}">
+                        <i class="fa-solid fa-door-open fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Captive Portal
+                    </a></li>
+                    <li><a href="{{ url_for('services.dhcp_server') }}">
+                        <i class="fa-solid fa-ip fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DHCP Server
+                    </a></li>
+                    <li><a href="{{ url_for('services.dhcp_relay') }}">
+                        <i class="fa-solid fa-arrows-turn-to-dots fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DHCP Relay
+                    </a></li>
+                    <li><a href="{{ url_for('services.dhcpv6_server') }}">
+                        <i class="fa-solid fa-6 fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DHCPv6 Server
+                    </a></li>
+                    <li><a href="{{ url_for('services.dhcpv6_relay') }}">
+                        <i class="fa-solid fa-arrows-turn-right fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DHCPv6 Relay
+                    </a></li>
+                    <li><a href="{{ url_for('services.dns_resolver') }}">
+                        <i class="fa-solid fa-magnifying-glass-location fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DNS Resolver
+                    </a></li>
+                    <li><a href="{{ url_for('services.dns_forwarder') }}">
+                        <i class="fa-solid fa-share fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DNS Forwarder
+                    </a></li>
+                    <li><a href="{{ url_for('services.dynamic_dns') }}">
+                        <i class="fa-solid fa-rotate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Dynamic DNS
+                    </a></li>
+                    <li><a href="{{ url_for('services.igmp_proxy') }}">
+                        <i class="fa-solid fa-broadcast-tower fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Multicast Proxy
+                    </a></li>
+                    <li><a href="{{ url_for('services.ntp') }}">
+                        <i class="fa-solid fa-clock-rotate-left fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        NTP Server
+                    </a></li>
+                    <li><a href="{{ url_for('services.openvpn_server') }}">
+                        <i class="fa-solid fa-link-slash fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        OpenVPN Server
+                    </a></li>
+                    <li><a href="{{ url_for('services.router_advertisement') }}">
+                        <i class="fa-solid fa-rss fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        IPv6 Announcements
+                    </a></li>
+                    <li><a href="{{ url_for('services.snmp') }}">
+                        <i class="fa-solid fa-chart-bar fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        SNMP
+                    </a></li>
+                    <li><a href="{{ url_for('services.upnp_igd_pcp') }}">
+                        <i class="fa-solid fa-plug fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        UPnP / PCP
+                    </a></li>
+                    <li><a href="{{ url_for('services.wake_on_lan') }}">
+                        <i class="fa-solid fa-power-off fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Wake on LAN
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- VPN -->
+            <!-- ── Secure Tunnels ── -->
             <details class="side-group">
-                <summary><span class="label">VPN</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-lock sg-icon"></i>
+                    <span class="label">Secure Tunnels</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('vpn.openvpn') }}">OpenVPN</a></li>
-                    <li><a href="{{ url_for('vpn.ipsec') }}">IPsec</a></li>
-                    <li><a href="{{ url_for('vpn.l2tp') }}">L2TP</a></li>
+                    <li><a href="{{ url_for('vpn.openvpn') }}">
+                        <i class="fa-solid fa-key fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        OpenVPN
+                    </a></li>
+                    <li><a href="{{ url_for('vpn.ipsec') }}">
+                        <i class="fa-solid fa-shield fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        IPsec
+                    </a></li>
+                    <li><a href="{{ url_for('vpn.l2tp') }}">
+                        <i class="fa-solid fa-tunnel fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        L2TP
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- IDS / IPS -->
+            <!-- ── Threat Detection ── -->
             <details class="side-group">
-                <summary><span class="label">IDS / IPS</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-binoculars sg-icon"></i>
+                    <span class="label">Threat Detection</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">Overview</a></li>
-                    <li><a href="{{ url_for('ids.ids_index', tab='config') }}">Configuration</a></li>
-                    <li><a href="{{ url_for('ids.ids_index', tab='rules') }}">Rulesets</a></li>
+                    <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">
+                        <i class="fa-solid fa-eye fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Overview
+                    </a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='config') }}">
+                        <i class="fa-solid fa-gear fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Configuration
+                    </a></li>
+                    <li><a href="{{ url_for('ids.ids_index', tab='rules') }}">
+                        <i class="fa-solid fa-triangle-exclamation fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Detection Rules
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- Security Profiles -->
+            <!-- ── Content Policies ── -->
             <details class="side-group">
-                <summary><span class="label">Security Profiles</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-filter sg-icon"></i>
+                    <span class="label">Content Policies</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('filters.dns_filter_page') }}" data-match-pattern="/filters/dns">DNS Filter</a></li>
-                    <li><a href="{{ url_for('filters.web_filter_page') }}" data-match-pattern="/filters/web">Web Filter</a></li>
-                    <li><a href="{{ url_for('filters.app_filter_page') }}" data-match-pattern="/filters/app">Application Filter</a></li>
+                    <li><a href="{{ url_for('filters.dns_filter_page') }}" data-match-pattern="/filters/dns">
+                        <i class="fa-solid fa-earth-americas fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        DNS Policy
+                    </a></li>
+                    <li><a href="{{ url_for('filters.web_filter_page') }}" data-match-pattern="/filters/web">
+                        <i class="fa-solid fa-globe fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Web Policy
+                    </a></li>
+                    <li><a href="{{ url_for('filters.app_filter_page') }}" data-match-pattern="/filters/app">
+                        <i class="fa-solid fa-mobile-screen fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        App Policy
+                    </a></li>
                 </ul>
             </details>
 
-            <!-- Status -->
+            <!-- ── Monitoring ── -->
             <details class="side-group">
-                <summary><span class="label">Status</span><span class="chev">▾</span></summary>
+                <summary>
+                    <i class="fa-solid fa-chart-line sg-icon"></i>
+                    <span class="label">Monitoring</span>
+                    <span class="chev">▾</span>
+                </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('status.status_home') }}">Overview</a></li>
-                    <li><a href="{{ url_for('status.carp_failover') }}">CARP (failover)</a></li>
-                    <li><a href="{{ url_for('status.gateways') }}">Gateways</a></li>
-                    <li><a href="{{ url_for('status.monitoring') }}">Monitoring</a></li>
-                    <li><a href="{{ url_for('status.queues') }}">Queues</a></li>
-                    <li><a href="{{ url_for('status.traffic_graph') }}">Traffic Graph</a></li>
-                    <li><a href="{{ url_for('status.dhcp_leases') }}">DHCP Leases</a></li>
-                    <li><a href="{{ url_for('status.system_logs') }}">Live Log Monitor</a></li>
-                    <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">Session Logs</a></li>
+                    <li><a href="{{ url_for('status.status_home') }}">
+                        <i class="fa-solid fa-circle-info fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Overview
+                    </a></li>
+                    <li><a href="{{ url_for('status.carp_failover') }}">
+                        <i class="fa-solid fa-arrows-rotate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Failover Status
+                    </a></li>
+                    <li><a href="{{ url_for('status.gateways') }}">
+                        <i class="fa-solid fa-gateway fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Gateways
+                    </a></li>
+                    <li><a href="{{ url_for('status.monitoring') }}">
+                        <i class="fa-solid fa-microchip fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        System Metrics
+                    </a></li>
+                    <li><a href="{{ url_for('status.queues') }}">
+                        <i class="fa-solid fa-layer-group fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        QoS Queues
+                    </a></li>
+                    <li><a href="{{ url_for('status.traffic_graph') }}">
+                        <i class="fa-solid fa-wave-square fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Bandwidth Monitor
+                    </a></li>
+                    <li><a href="{{ url_for('status.dhcp_leases') }}">
+                        <i class="fa-solid fa-list fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Active Leases
+                    </a></li>
+                    <li><a href="{{ url_for('status.system_logs') }}">
+                        <i class="fa-solid fa-terminal fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Live Events
+                    </a></li>
+                    <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">
+                        <i class="fa-solid fa-user-clock fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Auth Events
+                    </a></li>
                 </ul>
             </details>
+
         </nav>
     </aside>
 
-    <!-- Mobile Backdrop -->
+    <!-- Mobile backdrop -->
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <!-- Main Content -->
+    <!-- Main content -->
     <main class="main-content">
         {% block content %}{% endblock %}
         {% block main %}{% endblock %}
     </main>
 </div>
 
-<!-- Bootstrap JS bundle (includes Popper) -->
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function() {
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
     const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
-    // Inject token into all non-GET forms.
+    // Inject CSRF into all non-GET forms
     document.querySelectorAll('form').forEach((form) => {
         const method = (form.getAttribute('method') || 'GET').toUpperCase();
         if (method === 'GET') return;
@@ -259,12 +464,12 @@
         form.appendChild(input);
     });
 
-    const appShell = document.getElementById('appShell');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarClose = document.getElementById('sidebarClose');
-    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const appShell       = document.getElementById('appShell');
+    const sidebarToggle  = document.getElementById('sidebarToggle');
+    const sidebarClose   = document.getElementById('sidebarClose');
+    const sidebarBackdrop= document.getElementById('sidebarBackdrop');
 
-    // Restore sidebar state from localStorage
+    // Restore sidebar state
     const sidebarState = localStorage.getItem('sidebarOpen');
     if (sidebarState === 'false') {
         appShell.classList.remove('sidebar-open');
@@ -272,199 +477,121 @@
         appShell.classList.add('sidebar-open');
     }
 
-    function openSidebar() {
-        appShell.classList.add('sidebar-open');
-        localStorage.setItem('sidebarOpen', 'true');
-    }
-    function closeSidebar() {
-        appShell.classList.remove('sidebar-open');
-        localStorage.setItem('sidebarOpen', 'false');
-    }
+    function openSidebar()  { appShell.classList.add('sidebar-open');    localStorage.setItem('sidebarOpen', 'true');  }
+    function closeSidebar() { appShell.classList.remove('sidebar-open'); localStorage.setItem('sidebarOpen', 'false'); }
 
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            if (appShell.classList.contains('sidebar-open')) {
-                closeSidebar();
-            } else {
-                openSidebar();
-            }
-        });
-    }
-    if (sidebarClose) {
-        sidebarClose.addEventListener('click', closeSidebar);
-    }
-    if (sidebarBackdrop) {
-        sidebarBackdrop.addEventListener('click', closeSidebar);
-    }
+    if (sidebarToggle)   sidebarToggle.addEventListener('click', () => appShell.classList.contains('sidebar-open') ? closeSidebar() : openSidebar());
+    if (sidebarClose)    sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
 
-    // Accordion behavior for sidebar menu groups
+    // ── Accordion for sidebar groups ──
     (function setupAccordion() {
         const sideGroups = document.querySelectorAll('.side-group');
-        
         sideGroups.forEach(group => {
             const summary = group.querySelector('summary');
             const content = group.querySelector('.side-links');
-            
-            if (summary && content) {
-                // Wrap content for animation
-                content.style.overflow = 'hidden';
-                content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                
-                // Set initial state
-                if (group.hasAttribute('open')) {
+            if (!summary || !content) return;
+
+            content.style.overflow   = 'hidden';
+            content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
+            content.style.maxHeight  = group.hasAttribute('open') ? content.scrollHeight + 'px' : '0';
+            content.style.opacity    = group.hasAttribute('open') ? '1' : '0';
+
+            summary.addEventListener('click', function(e) {
+                e.preventDefault();
+                const isOpening = !group.hasAttribute('open');
+                if (isOpening) {
+                    sideGroups.forEach(other => {
+                        if (other !== group && other.hasAttribute('open')) {
+                            const oc = other.querySelector('.side-links');
+                            if (oc) { oc.style.maxHeight = '0'; oc.style.opacity = '0'; }
+                            setTimeout(() => other.removeAttribute('open'), 300);
+                        }
+                    });
+                    group.setAttribute('open', '');
                     content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.opacity = '1';
+                    content.style.opacity   = '1';
                 } else {
                     content.style.maxHeight = '0';
-                    content.style.opacity = '0';
+                    content.style.opacity   = '0';
+                    setTimeout(() => group.removeAttribute('open'), 300);
                 }
-                
-                summary.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const isOpening = !group.hasAttribute('open');
-                    
-                    if (isOpening) {
-                        // Close all other groups with animation
-                        sideGroups.forEach(otherGroup => {
-                            if (otherGroup !== group && otherGroup.hasAttribute('open')) {
-                                const otherContent = otherGroup.querySelector('.side-links');
-                                if (otherContent) {
-                                    otherContent.style.maxHeight = '0';
-                                    otherContent.style.opacity = '0';
-                                }
-                                setTimeout(() => {
-                                    otherGroup.removeAttribute('open');
-                                }, 300);
-                            }
-                        });
-                        
-                        // Open this group
-                        group.setAttribute('open', '');
-                        content.style.maxHeight = content.scrollHeight + 'px';
-                        content.style.opacity = '1';
-                    } else {
-                        // Close this group
-                        content.style.maxHeight = '0';
-                        content.style.opacity = '0';
-                        setTimeout(() => {
-                            group.removeAttribute('open');
-                        }, 300);
-                    }
-                });
-            }
+            });
         });
     })();
 
-    // Highlight active menu item based on current URL
+    // ── Highlight active menu item ──
     (function highlightActiveMenu() {
-        const currentPath = window.location.pathname.replace(/\/$/, ''); // Remove trailing slash
+        const currentPath  = window.location.pathname.replace(/\/$/, '');
         const sidebarLinks = document.querySelectorAll('.side-links a');
-        const sideGroups = document.querySelectorAll('.side-group');
-        
-        let bestMatch = null;
-        let bestMatchLength = 0;
-        
-        // First, find the best matching link
+        const sideGroups   = document.querySelectorAll('.side-group');
+
+        let bestMatch = null, bestMatchLength = 0;
+
         sidebarLinks.forEach(link => {
             let linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
             const matchPatternAttr = link.getAttribute('data-match-pattern');
-            const matchPatterns = matchPatternAttr ? matchPatternAttr.split(',') : [];
-            
-            // Check if the current path matches exactly or starts with the link path
-            let isMatch = currentPath === linkPath || 
+            const matchPatterns    = matchPatternAttr ? matchPatternAttr.split(',') : [];
+
+            let isMatch = currentPath === linkPath ||
                 (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath + '/')) ||
                 (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath));
-            
             let matchedLength = linkPath.length;
-            
-            // Also check the data-match-pattern attribute for alternative URL patterns
+
             if (!isMatch && matchPatterns.length > 0) {
                 for (const pattern of matchPatterns) {
-                    const trimmedPattern = pattern.trim();
-                    if (currentPath === trimmedPattern || 
-                        currentPath.startsWith(trimmedPattern + '/') || 
-                        currentPath.startsWith(trimmedPattern)) {
+                    const tp = pattern.trim();
+                    if (currentPath === tp || currentPath.startsWith(tp + '/') || currentPath.startsWith(tp)) {
                         isMatch = true;
-                        matchedLength = Math.max(matchedLength, trimmedPattern.length);
+                        matchedLength = Math.max(matchedLength, tp.length);
                         break;
                     }
                 }
             }
-            
-            if (isMatch) {
-                // Find the best (longest) matching path
-                if (matchedLength > bestMatchLength) {
-                    bestMatch = link;
-                    bestMatchLength = matchedLength;
-                }
+
+            if (isMatch && matchedLength > bestMatchLength) {
+                bestMatch       = link;
+                bestMatchLength = matchedLength;
             }
         });
-        
-        // Determine which group should be open
-        let activeGroup = null;
-        if (bestMatch) {
-            activeGroup = bestMatch.closest('.side-group');
-        }
-        
-        // Close all groups except the active one (no animation flicker)
+
+        const activeGroup = bestMatch ? bestMatch.closest('.side-group') : null;
+
         sideGroups.forEach(group => {
             const content = group.querySelector('.side-links');
-            if (group === activeGroup) {
-                // Keep the active group open immediately (no animation)
-                group.setAttribute('open', '');
-                if (content) {
-                    content.style.transition = 'none'; // Disable transition for initial load
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.opacity = '1';
-                    // Re-enable transition after a frame
-                    requestAnimationFrame(() => {
-                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                    });
-                }
-            } else {
-                // Close other groups immediately (no animation)
-                group.removeAttribute('open');
-                if (content) {
-                    content.style.transition = 'none'; // Disable transition for initial load
-                    content.style.maxHeight = '0';
-                    content.style.opacity = '0';
-                    // Re-enable transition after a frame
-                    requestAnimationFrame(() => {
-                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                    });
-                }
+            const isActive = group === activeGroup;
+            if (isActive)  group.setAttribute('open', '');
+            else           group.removeAttribute('open');
+            if (content) {
+                content.style.transition = 'none';
+                content.style.maxHeight  = isActive ? content.scrollHeight + 'px' : '0';
+                content.style.opacity    = isActive ? '1' : '0';
+                requestAnimationFrame(() => { content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out'; });
             }
         });
-        
-        // Apply active class to the best match
+
         if (bestMatch) {
             bestMatch.classList.add('active');
         } else {
-            // If no active link found, open the System group by default
             const firstGroup = document.querySelector('.side-group');
             if (firstGroup) {
                 firstGroup.setAttribute('open', '');
-                const content = firstGroup.querySelector('.side-links');
-                if (content) {
-                    content.style.transition = 'none';
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.opacity = '1';
-                    requestAnimationFrame(() => {
-                        content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-                    });
+                const fc = firstGroup.querySelector('.side-links');
+                if (fc) {
+                    fc.style.transition = 'none';
+                    fc.style.maxHeight  = fc.scrollHeight + 'px';
+                    fc.style.opacity    = '1';
+                    requestAnimationFrame(() => { fc.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out'; });
                 }
             }
         }
     })();
 })();
 
-// Dark Mode Toggle + User Theme Restoration
+// ── Dark Mode ──
 (function() {
     const darkModeSwitch = document.getElementById('darkModeSwitch');
     const html = document.documentElement;
-
-    // Check for saved preference or system preference
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -473,7 +600,6 @@
         if (darkModeSwitch) darkModeSwitch.checked = true;
     }
 
-    // Restore custom theme colors saved by the Theme Editor
     try {
         const userTheme = localStorage.getItem('userTheme');
         if (userTheme) {
@@ -483,9 +609,8 @@
                 if (v !== '_name' && v !== 'data-theme') html.style.setProperty(v, val);
             });
         }
-    } catch(e) { /* ignore corrupt data */ }
+    } catch(e) {}
 
-    // Toggle handler
     if (darkModeSwitch) {
         darkModeSwitch.addEventListener('change', function() {
             if (this.checked) {
@@ -495,7 +620,6 @@
                 html.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
             }
-            // Update stored data-theme in userTheme if present
             try {
                 const ut = localStorage.getItem('userTheme');
                 if (ut) {
@@ -508,14 +632,7 @@
     }
 })();
 
-// ── Display Advanced toggle (global) ─────────────────────────────────────────
-// Usage in any template:
-//   <button data-advanced="my-section-id" class="btn btn-outline-secondary btn-sm">
-//     <i class="fa fa-gear me-1"></i>Display Advanced
-//   </button>
-//   <div id="my-section-id" class="d-none advanced-panel mt-3">
-//     ... advanced fields ...
-//   </div>
+// ── Display Advanced toggle (global) ──
 (function () {
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-advanced]');
@@ -525,9 +642,7 @@
         if (!panel) return;
         const nowHidden = panel.classList.toggle('d-none');
         const icon = '<i class="fa fa-gear me-1"></i>';
-        btn.innerHTML = nowHidden
-            ? icon + 'Display Advanced'
-            : icon + 'Hide Advanced';
+        btn.innerHTML = nowHidden ? icon + 'Display Advanced' : icon + 'Hide Advanced';
     });
 })();
 </script>

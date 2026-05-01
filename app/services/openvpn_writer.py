@@ -368,7 +368,8 @@ def apply_openvpn(conn) -> dict:
     if not result["ok"] or not _on_freebsd():
         return result
     try:
-        from app.services.service_manager import service_action
+        from app.services.service_manager import service_action, sysrc_set
+        sysrc_set("openvpn_enable", "YES")
         r = service_action("openvpn", "restart")
         return {"ok": r["ok"],
                 "message": result["message"] + " | Service: " + r["message"],

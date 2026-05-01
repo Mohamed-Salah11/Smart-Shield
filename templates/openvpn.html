@@ -932,30 +932,29 @@
 					peer_ca: document.getElementById('ovpn_peer_ca') ? document.getElementById('ovpn_peer_ca').value : ''
 				};
 
-				fetch('/vpn/api/openvpn/save-server', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(formData)
-				})
+				const modalEl  = document.getElementById('openvpnAddServerModal');
+					const editId   = modalEl ? modalEl._editServerId : null;
+					const endpoint = editId ? `/vpn/api/openvpn/update-server/${editId}` : '/vpn/api/openvpn/save-server';
+					const method   = editId ? 'PUT' : 'POST';
+
+					fetch(endpoint, {
+						method,
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(formData)
+					})
 					.then(response => response.json())
 					.then(data => {
 						if (data.status === 'success') {
-							alert('OpenVPN server saved successfully!');
-							const modal = bootstrap.Modal.getInstance(document.getElementById('openvpnAddServerModal'));
-							modal.hide();
-							loadOpenVPNServers();
-							// Clear form
+							if (modalEl) modalEl._editServerId = null;
+							const modal = bootstrap.Modal.getInstance(modalEl);
+							if (modal) modal.hide();
 							form.reset();
+							loadOpenVPNServers();
 						} else {
 							alert('Error: ' + (data.message || 'Unknown error'));
 						}
 					})
-					.catch(error => {
-						console.error('Error:', error);
-						alert('Error saving OpenVPN server');
-					});
+					.catch(() => alert('Error saving OpenVPN server'));
 			});
 		}
 	});
@@ -1012,9 +1011,36 @@
 		});
 	}
 
-	function editServer(serverId) {
-		// TODO: Implement edit functionality
-		alert('Edit functionality coming soon. Server ID: ' + serverId);
+	async function editServer(serverId) {
+		try {
+			const response = await fetch(`/vpn/api/openvpn/get-server/${serverId}`);
+			const data = await response.json();
+			if (data.status !== 'success') { alert('Could not load server: ' + (data.message || '')); return; }
+			const s = data.server;
+
+			// Populate the Add modal fields
+			const modal = document.getElementById('openvpnAddServerModal');
+			const titleEl = modal ? modal.querySelector('.modal-title') : null;
+			if (titleEl) titleEl.textContent = 'Edit OpenVPN Server';
+
+			const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+			const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+			setVal('ovpn_description', s.description);
+			setChk('ovpn_disabled',    s.disabled);
+			setVal('ovpn_server_mode', s.server_mode);
+			setVal('ovpn_device_mode', s.device_mode);
+			setVal('ovpn_protocol',    s.protocol);
+			setVal('ovpn_interface',   s.interface);
+			setVal('ovpn_local_port',  s.local_port);
+			setVal('ovpn_peer_ca',     s.peer_ca);
+			setChk('ovpn_tls_key_auto', s.tls_key_auto);
+
+			// Tag the modal so the save handler knows it's an edit
+			modal._editServerId = serverId;
+			new bootstrap.Modal(modal).show();
+		} catch (e) {
+			alert('Failed to load server for editing.');
+		}
 	}
 
 	function deleteServer(serverId) {

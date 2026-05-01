@@ -1,226 +1,136 @@
 {% extends 'base.html' %}
-
 {% block main %}
-
 <script>
-    function toggleAllCheckboxes(source) {
-        const checkboxes = document.querySelectorAll('input[name="sync_options"]');
-        for (let i = 0; i < checkboxes.length; i++) {
-            checkboxes[i].checked = source.checked;
-        }
-    }
+function toggleAllCheckboxes(source) {
+  document.querySelectorAll('input[name="sync_options"]').forEach(cb => cb.checked = source.checked);
+}
 </script>
-
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item active" aria-current="page">High Availability</li>
-            </ol>
-        </nav>
-        <h1>High Availability</h1>
-        <p class="text-muted">This page allows you to configure state and configuration synchronization for setting up a firewall cluster for failover.</p>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Cluster &amp; High Availability</h1>
+      <p class="ss-page-desc">State synchronization and configuration replication between firewall nodes</p>
+    </div>
+    <button type="submit" form="ha-form" class="btn btn-primary">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
+
+  <form action="{{ url_for('system.high_availability') }}" method="POST" id="ha-form">
+
+    <!-- State Sync -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+        <div><div class="ss-card-title">State Synchronization (SS-Sync)</div><div class="ss-card-subtitle">Keeps firewall connection tables in sync across cluster nodes</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" id="SS-Sync_enabled" name="SS-Sync_enabled" checked><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Enable State Synchronization</p><p class="ss-toggle-desc">Transfers state insertion, update and deletion messages between nodes</p></div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="sync_interface">Sync Interface</label>
+            <select id="sync_interface" name="sync_interface" class="form-select">
+              <option value="WAN" selected>WAN</option>
+              <option value="LAN">LAN</option>
+              <option value="SYNC_DEDICATED">SYNC (Dedicated)</option>
+            </select>
+            <p class="ss-hint">A dedicated sync interface is recommended for best reliability</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="filter_host_id">Filter Host ID</label>
+            <input type="text" id="filter_host_id" name="filter_host_id" class="form-control" value="fa94412b" placeholder="Up to 8 hex chars">
+            <p class="ss-hint">Unique non-zero hex ID per node — must differ across the cluster</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="SS-Sync_peer_ip">Peer IP Address</label>
+            <input type="text" id="SS-Sync_peer_ip" name="SS-Sync_peer_ip" class="form-control" placeholder="e.g. 192.168.1.2">
+            <p class="ss-hint">Force unicast to this IP; blank = directed multicast</p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <form action="{{ url_for('system.high_availability') }}" method="POST">
-
-        <!-- State Synchronization Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>State Synchronization Settings (SS-Sync)</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Synchronize States</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="SS-Sync_enabled" name="SS-Sync_enabled" checked>
-                            <label class="form-check-label" for="SS-Sync_enabled">SS-Sync transfers state insertion, update, and deletion messages between firewalls.</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="sync_interface" class="col-sm-3 col-form-label fw-semibold">Synchronize Interface</label>
-                    <div class="col-sm-9">
-                        <select id="sync_interface" name="sync_interface" class="form-select">
-                            <option value="WAN" selected>WAN</option>
-                            <option value="LAN">LAN</option>
-                            <option value="SYNC_DEDICATED">SYNC (Dedicated)</option>
-                        </select>
-                        <small class="text-muted">Recommended to set this to an interface other than LAN. A dedicated interface works best. An IP must be assigned to the interface on all participating sync nodes.</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="filter_host_id" class="col-sm-3 col-form-label fw-semibold">Filter Host ID</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="filter_host_id" name="filter_host_id" class="form-control" value="fa94412b" placeholder="Max 8 hex chars">
-                        <small class="text-muted">Custom SS host identifier (max 8 non-zero hexadecimal characters) to uniquely identify which host created a firewall state. Each node must have a different ID.</small>
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="SS-Sync_peer_ip" class="col-sm-3 col-form-label fw-semibold">SS-Sync Synchronize Peer IP</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="SS-Sync_peer_ip" name="SS-Sync_peer_ip" class="form-control" placeholder="e.g., 192.168.1.2">
-                        <small class="text-muted">Setting this option will force SS-Sync to synchronize its state table to this IP address. The default is directed multicast.</small>
-                    </div>
-                </div>
-            </div>
+    <!-- Config Sync -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-copy"></i></div>
+        <div><div class="ss-card-title">Configuration Synchronization (XMLRPC Sync)</div><div class="ss-card-subtitle">Push configuration changes to the secondary node automatically</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="alert alert-warning d-flex gap-2 mb-4" style="border-radius:10px;font-size:.875rem;">
+          <i class="fa-solid fa-triangle-exclamation flex-shrink-0" style="margin-top:2px;"></i>
+          <div>Only configure XMLRPC sync on the <strong>primary node</strong>. Do not enable on backup cluster members, or configuration loops may occur.</div>
         </div>
-
-        <!-- Configuration Synchronization Settings Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Configuration Synchronization Settings (XMLRPC Sync)</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="alert alert-warning mb-4">
-                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                    XMLRPC sync is currently only supported over connections using the same protocol and port as this system. <strong>Do not use the Synchronize Config to IP and password option on backup cluster members!</strong>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="sync_config_ip" class="col-sm-3 col-form-label fw-semibold">Synchronize Config to IP</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="sync_config_ip" name="sync_config_ip" class="form-control" placeholder="e.g., 192.168.1.2">
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="remote_username" class="col-sm-3 col-form-label fw-semibold">Remote System Username</label>
-                    <div class="col-sm-9">
-                        <input type="text" id="remote_username" name="remote_username" class="form-control" placeholder="Enter the WebConfigurator username">
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label for="remote_password" class="col-sm-3 col-form-label fw-semibold">Remote System Password</label>
-                    <div class="col-sm-9">
-                        <input type="password" id="remote_password" name="remote_password" class="form-control mb-2" placeholder="Remote System Password">
-                        <input type="password" id="remote_password_confirm" name="remote_password_confirm" class="form-control" placeholder="Confirm Password">
-                    </div>
-                </div>
-
-                <div class="mb-3 row align-items-center">
-                    <label class="col-sm-3 col-form-label fw-semibold">Synchronize Admin</label>
-                    <div class="col-sm-9">
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="sync_admin" name="sync_admin">
-                            <label class="form-check-label" for="sync_admin">Synchronize admin accounts and autoupdate sync password</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="sync_config_ip">Sync Config to IP</label>
+            <input type="text" id="sync_config_ip" name="sync_config_ip" class="form-control" placeholder="Secondary node IP address">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="remote_username">Remote Username</label>
+            <input type="text" id="remote_username" name="remote_username" class="form-control" placeholder="Admin username on remote node">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="remote_password">Remote Password</label>
+            <input type="password" id="remote_password" name="remote_password" class="form-control" placeholder="Password">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="remote_password_confirm">Confirm Password</label>
+            <input type="password" id="remote_password_confirm" name="remote_password_confirm" class="form-control" placeholder="Confirm password">
+          </div>
         </div>
-
-        <!-- Sync Options Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Select Options to Sync</h2>
-            </div>
-            <div class="section-body" style="padding: 20px;">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="user_managers" id="sync_user_managers">
-                            <label class="form-check-label" for="sync_user_managers">User managers and groups</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="auth_servers" id="sync_auth_servers">
-                            <label class="form-check-label" for="sync_auth_servers">Authentication servers (e.g. LDAP, RADIUS)</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="certs_ca_crl" id="sync_certs">
-                            <label class="form-check-label" for="sync_certs">Certificate Authorities, Certificates, and CRLs</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="firewall_rules" id="sync_firewall_rules" checked>
-                            <label class="form-check-label" for="sync_firewall_rules">Firewall rules</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="firewall_schedules" id="sync_firewall_schedules">
-                            <label class="form-check-label" for="sync_firewall_schedules">Firewall schedules</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="firewall_aliases" id="sync_firewall_aliases">
-                            <label class="form-check-label" for="sync_firewall_aliases">Firewall aliases</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="nat_config" id="sync_nat" checked>
-                            <label class="form-check-label" for="sync_nat">NAT configuration</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="ipsec_config" id="sync_ipsec">
-                            <label class="form-check-label" for="sync_ipsec">IPsec configuration</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="openvpn_config" id="sync_openvpn">
-                            <label class="form-check-label" for="sync_openvpn">OpenVPN configuration</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="dhcp_server" id="sync_dhcp_server">
-                            <label class="form-check-label" for="sync_dhcp_server">DHCP Server settings</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="dhcp_relay" id="sync_dhcp_relay">
-                            <label class="form-check-label" for="sync_dhcp_relay">DHCP Relay settings</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="dns_forwarder" id="sync_dns">
-                            <label class="form-check-label" for="sync_dns">DNS Forwarder and DNS Resolver</label>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="dhcpv6_relay" id="sync_dhcpv6">
-                            <label class="form-check-label" for="sync_dhcpv6">DHCPv6 Relay settings</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="wol_server" id="sync_wol">
-                            <label class="form-check-label" for="sync_wol">WoL Server settings</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="static_routes" id="sync_routes">
-                            <label class="form-check-label" for="sync_routes">Static Route configuration</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="virtual_ips" id="sync_vips">
-                            <label class="form-check-label" for="sync_vips">Virtual IPs</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="traffic_shaper" id="sync_shaper">
-                            <label class="form-check-label" for="sync_shaper">Traffic Shaper configuration</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input type="checkbox" class="form-check-input" name="sync_options" value="captive_portal" id="sync_captive">
-                            <label class="form-check-label" for="sync_captive">Captive Portal</label>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="my-3">
-
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="toggle_all" onclick="toggleAllCheckboxes(this)">
-                    <label class="form-check-label fw-semibold" for="toggle_all">Toggle All</label>
-                </div>
-            </div>
+        <hr class="ss-divider">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" id="sync_admin" name="sync_admin"><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content"><p class="ss-toggle-label">Sync Admin Account</p><p class="ss-toggle-desc">Keep the admin account and sync password consistent across nodes</p></div>
         </div>
+      </div>
+    </div>
 
-        <!-- Action Buttons -->
-        <div class="d-flex justify-content-end gap-2 mb-4">
-            <button type="submit" class="btn btn-primary">
-                <i class="fa-solid fa-save me-1"></i>Save
-            </button>
+    <!-- What to sync -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div><div class="ss-card-title">What to Synchronize</div><div class="ss-card-subtitle">Choose which configuration areas are pushed to the secondary node</div></div>
+        <div class="ss-card-actions">
+          <label class="ss-check-item" style="margin:0;">
+            <input type="checkbox" id="toggle_all" onclick="toggleAllCheckboxes(this)">
+            <span style="font-size:.8rem;font-weight:700;">Toggle All</span>
+          </label>
         </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-3">
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="user_managers"      id="sync_user_managers"><span>User managers &amp; groups</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="auth_servers"       id="sync_auth_servers"><span>Authentication servers (LDAP, RADIUS)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="certs_ca_crl"       id="sync_certs"><span>Certificates, CAs &amp; CRLs</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_rules"     id="sync_firewall_rules"     checked><span>Firewall rule sets</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_schedules" id="sync_firewall_schedules"><span>Time policies (schedules)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_aliases"   id="sync_firewall_aliases"><span>Address groups (aliases)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="nat_config"         id="sync_nat"                checked><span>NAT &amp; forwarding rules</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="ipsec_config"       id="sync_ipsec"><span>IPsec tunnels</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="openvpn_config"     id="sync_openvpn"><span>OpenVPN configuration</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_server"        id="sync_dhcp_server"><span>DHCP server settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_relay"         id="sync_dhcp_relay"><span>DHCP relay settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dns_forwarder"      id="sync_dns"><span>DNS resolver &amp; forwarder</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcpv6_relay"       id="sync_dhcpv6"><span>DHCPv6 relay settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="wol_server"         id="sync_wol"><span>Wake on LAN</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="static_routes"      id="sync_routes"><span>Static routes</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="virtual_ips"        id="sync_vips"><span>Virtual addresses (VIPs)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="traffic_shaper"     id="sync_shaper"><span>QoS &amp; traffic shaping</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="captive_portal"     id="sync_captive"><span>Captive portal</span></label>
+        </div>
+      </div>
+    </div>
 
-    </form>
+    <div class="ss-save-bar">
+      <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-check me-1"></i>Save</button>
+    </div>
+  </form>
 </div>
-
 {% endblock %}

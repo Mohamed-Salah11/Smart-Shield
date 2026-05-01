@@ -371,3 +371,26 @@ def api_live_routes():
         return jsonify({"ok": True, "routes": routes, "on_freebsd": True})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@routing_bp.route("/api/apply-all", methods=["POST"])
+@login_required
+def api_apply_all_static_routes():
+    """
+    Apply all enabled static routes to the live OS and persist them in
+    rc.conf via apply_static_routes() from rc_conf_writer.
+    """
+    conn = get_db()
+    try:
+        from app.services.rc_conf_writer import apply_static_routes
+        result = apply_static_routes(conn)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+    log_event(
+        category="network", action="static_routes_apply_all",
+        username=None, remote_addr=request.remote_addr,
+        details={"ok": result.get("ok"), "message": result.get("message", "")},
+    )
+    status = 200 if result.get("ok") else 500
+    return jsonify(result), status

@@ -25,7 +25,6 @@ def login():
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cur.fetchone()
-        conn.close()
 
         if user and check_password_hash(user["password"], password):
             session["username"] = user["username"]

@@ -1,169 +1,159 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / SNMP</span>
-</div>
+<div class="container">
 
-<div class="settings-section">
-	<h5>SNMP Daemon</h5>
-	
-	<div class="form-group">
-		<label>Enable SNMP</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="snmpEnable">
-				<label class="form-check-label" for="snmpEnable">Enable SNMP Daemon and its controls</label>
-			</div>
-		</div>
-	</div>
-</div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">SNMP</h1>
+      <p class="ss-page-desc">Simple Network Management Protocol monitoring daemon</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="saveSNMP()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 
-<div class="settings-section" id="snmpSettings">
-	<h5>SNMP Daemon Settings</h5>
+  <!-- Enable -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-chart-bar"></i></div>
+      <div><div class="ss-card-title">SNMP Daemon</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row">
+        <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="snmpEnable"><span class="ss-toggle-slider"></span></label>
+        <div class="ss-toggle-content"><p class="ss-toggle-label">Enable SNMP Daemon</p><p class="ss-toggle-desc">Start the bsnmpd monitoring agent</p></div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Polling Port</label>
-		<div class="form-group-content">
-			<input type="number" class="form-control" id="snmpPort" placeholder="161" style="max-width: 150px;">
-		</div>
-	</div>
+  <!-- Settings -->
+  <div class="ss-card" id="snmpSettings">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+      <div><div class="ss-card-title">Daemon Settings</div><div class="ss-card-subtitle">Port, identity and community string</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">Polling Port</label>
+          <input type="number" class="form-control" id="snmpPort" placeholder="161" style="max-width:140px;">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Read Community String</label>
+          <input type="text" class="form-control" id="readCommunity" placeholder="public">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">System Location</label>
+          <input type="text" class="form-control" id="systemLocation" placeholder="Server Room">
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">System Contact</label>
+          <input type="text" class="form-control" id="systemContact" placeholder="admin@example.com">
+        </div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>System Location</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="systemLocation" placeholder="Server Room" style="max-width: 300px;">
-		</div>
-	</div>
+  <!-- Modules -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+      <div><div class="ss-card-title">SNMP Modules</div><div class="ss-card-subtitle">Select which MIB modules to load</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-check-group">
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="moduleMBIL"><span>MBIL — Multi-Bridge Interface Layer</span></label>
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="moduleNetgraph"><span>Netgraph — kernel networking framework</span></label>
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="modulePF"><span>PF — Packet Filter firewall statistics</span></label>
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="moduleHostRes"><span>Host Resources (hrMIB)</span></label>
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="moduleUCD"><span>UCD — system load, memory and disk</span></label>
+        <label class="ss-check-item"><input type="checkbox" class="form-check-input" id="moduleRegex"><span>Regex — regular expression filtering</span></label>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>System Contact</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="systemContact" placeholder="admin@example.com" style="max-width: 300px;">
-		</div>
-	</div>
+  <!-- Traps -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-bell"></i></div>
+      <div><div class="ss-card-title">SNMP Traps</div><div class="ss-card-subtitle">Send asynchronous event notifications to a management station</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-toggle-row">
+        <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="snmpTrapEnable"><span class="ss-toggle-slider"></span></label>
+        <div class="ss-toggle-content"><p class="ss-toggle-label">Enable SNMP Trap Notifications</p></div>
+      </div>
+    </div>
+  </div>
 
-	<div class="form-group">
-		<label>Read Community String</label>
-		<div class="form-group-content">
-			<input type="text" class="form-control" id="readCommunity" placeholder="public" style="max-width: 300px;">
-		</div>
-	</div>
-</div>
+  <!-- Interface Binding -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div><div class="ss-card-title">Interface Binding</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">IP Protocol</label>
+          <select class="form-select" id="ipProtocol" style="max-width:180px;">
+            <option>IPv4</option><option>IPv6</option>
+          </select>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Bind Interface</label>
+          <select class="form-select" id="bindInterface" style="max-width:180px;">
+            <option>All</option><option>WAN</option><option>LAN</option><option>Localhost</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<div class="settings-section">
-	<h5>SNMP Traps</h5>
-	
-	<div class="form-group">
-		<label>Enable SNMP Traps</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="snmpTrapEnable">
-				<label class="form-check-label" for="snmpTrapEnable">Enable SNMP Trap and its controls</label>
-			</div>
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>SNMP Modules</h5>
-	
-	<div class="form-group">
-		<label>Modules</label>
-		<div class="form-group-content">
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="moduleMBIL">
-				<label class="form-check-label" for="moduleMBIL">MBIL</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="moduleNetgraph">
-				<label class="form-check-label" for="moduleNetgraph">Netgraph</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="modulePF">
-				<label class="form-check-label" for="modulePF">PF</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="moduleHostRes">
-				<label class="form-check-label" for="moduleHostRes">Host Resources</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="moduleUCD">
-				<label class="form-check-label" for="moduleUCD">UCD</label>
-			</div>
-			<div class="form-check">
-				<input type="checkbox" class="form-check-input" id="moduleRegex">
-				<label class="form-check-label" for="moduleRegex">Regex</label>
-			</div>
-		</div>
-	</div>
-</div>
-
-<div class="settings-section">
-	<h5>Interface Binding</h5>
-
-	<div class="form-group">
-		<label>Internet Protocol</label>
-		<div class="form-group-content">
-			<select class="form-control" id="ipProtocol" style="max-width: 200px;">
-				<option>IPv4</option>
-				<option>IPv6</option>
-			</select>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label>Bind Interfaces</label>
-		<div class="form-group-content">
-			<select class="form-control" id="bindInterface" style="max-width: 200px;">
-				<option>All</option>
-				<option>WAN</option>
-				<option>LAN</option>
-				<option>Localhost</option>
-			</select>
-		</div>
-	</div>
-</div>
-
-<div class="d-flex gap-2 mt-3">
-	<button type="button" class="btn btn-primary" onclick="saveSNMP()">Save</button>
+  <div class="ss-save-bar">
+    <button type="button" class="btn btn-primary px-4" onclick="saveSNMP()">
+      <i class="fa-solid fa-check me-1"></i>Save
+    </button>
+  </div>
 </div>
 
 <script>
 document.getElementById('snmpEnable').addEventListener('change', function() {
-	const enabled = this.checked;
-	document.querySelectorAll('#snmpSettings input').forEach(inp => inp.disabled = !enabled);
+  document.querySelectorAll('#snmpSettings input').forEach(inp => inp.disabled = !this.checked);
 });
-
 document.getElementById('snmpTrapEnable').addEventListener('change', function() {
-	const trapEnabled = this.checked;
-	document.querySelectorAll('.checkbox-group input').forEach(inp => inp.disabled = !trapEnabled);
+  document.querySelectorAll('.checkbox-group input').forEach(inp => inp.disabled = !this.checked);
 });
 
-function saveSNMP() {
-	const config = {
-		snmpEnabled: document.getElementById('snmpEnable').checked,
-		port: document.getElementById('snmpPort').value,
-		location: document.getElementById('systemLocation').value,
-		contact: document.getElementById('systemContact').value,
-		community: document.getElementById('readCommunity').value,
-		trapsEnabled: document.getElementById('snmpTrapEnable').checked,
-		modules: {
-			mbil: document.getElementById('moduleMBIL').checked,
-			netgraph: document.getElementById('moduleNetgraph').checked,
-			pf: document.getElementById('modulePF').checked,
-			hostResources: document.getElementById('moduleHostRes').checked,
-			ucd: document.getElementById('moduleUCD').checked,
-			regex: document.getElementById('moduleRegex').checked
-		},
-		interfaceBinding: {
-			ipProtocol: document.getElementById('ipProtocol').value,
-			bindInterface: document.getElementById('bindInterface').value
-		}
-	};
-	console.log('SNMP Configuration:', config);
-	alert('SNMP settings saved (check console for details).');
+async function saveSNMP() {
+  const config = {
+    snmpEnabled:  document.getElementById('snmpEnable').checked,
+    port:         document.getElementById('snmpPort').value,
+    location:     document.getElementById('systemLocation').value,
+    contact:      document.getElementById('systemContact').value,
+    community:    document.getElementById('readCommunity').value,
+    trapsEnabled: document.getElementById('snmpTrapEnable').checked,
+    modules: {
+      mbil: document.getElementById('moduleMBIL').checked,
+      netgraph: document.getElementById('moduleNetgraph').checked,
+      pf: document.getElementById('modulePF').checked,
+      hostResources: document.getElementById('moduleHostRes').checked,
+      ucd: document.getElementById('moduleUCD').checked,
+      regex: document.getElementById('moduleRegex').checked
+    },
+    interfaceBinding: {
+      ipProtocol: document.getElementById('ipProtocol').value,
+      bindInterface: document.getElementById('bindInterface').value
+    }
+  };
+  try {
+    const r = await fetch('/services/api/snmp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config)
+    });
+    const result = await r.json();
+    if (result.ok) alert('SNMP settings saved successfully.');
+    else alert('Error saving SNMP settings: ' + (result.message || 'Unknown error'));
+  } catch (e) { alert('Could not reach the server. Please try again.'); }
 }
 </script>
-
 {% endblock %}

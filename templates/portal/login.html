@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Access — Smart Shield</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+  }
+  .card-header {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 1.5rem 2rem;
+    text-align: center;
+  }
+  .card-header h1 { font-size: 1.4rem; font-weight: 600; }
+  .card-header p  { font-size: .85rem; opacity: .75; margin-top: .25rem; }
+  .card-body { padding: 2rem; }
+
+  .tabs {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1.5rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    padding: .25rem;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: .5rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .875rem;
+    color: #64748b;
+    transition: background .2s, color .2s;
+  }
+  .tab-btn.active { background: #fff; color: #1e3a5f; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  label { display: block; font-size: .875rem; font-weight: 500; color: #374151; margin-bottom: .25rem; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: .625rem .75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: .95rem;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    margin-bottom: 1rem;
+  }
+  input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+
+  .btn {
+    width: 100%;
+    padding: .75rem;
+    background: #1e3a5f;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn:hover { background: #2d5a8f; }
+
+  .alert {
+    padding: .75rem 1rem;
+    border-radius: 6px;
+    font-size: .875rem;
+    margin-bottom: 1rem;
+  }
+  .alert-error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+  .voucher-hint { font-size: .8rem; color: #6b7280; margin-top: -.75rem; margin-bottom: 1rem; }
+  .footer { text-align: center; font-size: .8rem; color: #9ca3af; padding: 1rem 2rem; border-top: 1px solid #f1f5f9; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <h1>&#128274; Smart Shield</h1>
+    <p>Sign in to access the network</p>
+  </div>
+  <div class="card-body">
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    {% if message %}
+    <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('credentials', this)">Username / Password</button>
+      <button class="tab-btn" onclick="switchTab('voucher', this)">Voucher Code</button>
+    </div>
+
+    <!-- Credentials tab -->
+    <div id="tab-credentials" class="tab-panel active">
+      <form method="POST" action="/portal/auth">
+        <input type="hidden" name="auth_type" value="credentials">
+        <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required placeholder="your username">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="••••••••">
+        <button type="submit" class="btn">Sign In</button>
+      </form>
+    </div>
+
+    <!-- Voucher tab -->
+    <div id="tab-voucher" class="tab-panel">
+      <form method="POST" action="/portal/auth">
+        <input type="hidden" name="auth_type" value="voucher">
+        <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
+        <label for="voucher_code">Voucher Code</label>
+        <input type="text" id="voucher_code" name="voucher_code" placeholder="e.g. AB12CD34" autocomplete="off"
+               style="text-transform:uppercase; letter-spacing:.1em;">
+        <p class="voucher-hint">Enter the 8-character code you received.</p>
+        <button type="submit" class="btn">Redeem &amp; Connect</button>
+      </form>
+    </div>
+  </div>
+  <div class="footer">Protected by Smart Shield &middot; Network Firewall Appliance</div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

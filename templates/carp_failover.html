@@ -1,60 +1,69 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Status / CARP (Failover)</span>
-</div>
+<div class="container">
 
-{% if line1 or line2 %}
-<div class="alert alert-warning alert-dismissible fade show" role="alert">
-	{% if line1 %}
-	<div>{{ line1 }}</div>
-	{% endif %}
-	{% if line2 %}
-	<div>{{ line2 }}</div>
-	{% endif %}
-	<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endif %}
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Failover Status</h1>
+      <p class="ss-page-desc">CARP virtual IP failover state across cluster nodes</p>
+    </div>
+  </div>
 
-<div class="settings-section" style="padding: 20px;">
-	<h5>CARP Status</h5>
-	
-	{% if carp_interfaces %}
-	<table>
-		<thead>
-			<tr>
-				<th>Interface</th>
-				<th>Virtual IP</th>
-				<th>Status</th>
-				<th>VHID</th>
-				<th>Advskew</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% for interface in carp_interfaces %}
-			<tr>
-				<td>{{ interface.name }}</td>
-				<td>{{ interface.vip }}</td>
-				<td>
-					<span class="badge bg-{{ 'success' if interface.status == 'MASTER' else 'warning' }}">
-						{{ interface.status }}
-					</span>
-				</td>
-				<td>{{ interface.vhid }}</td>
-				<td>{{ interface.advskew }}</td>
-				<td>
-					<button class="btn btn-sm btn-primary">Toggle</button>
-				</td>
-			</tr>
-			{% endfor %}
-		</tbody>
-	</table>
-	{% else %}
-	<div class="text-center text-muted py-4">
-		No CARP interfaces defined.
-	</div>
-	{% endif %}
+  {% if line1 or line2 %}
+  <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+    {% if line1 %}<div>{{ line1 }}</div>{% endif %}
+    {% if line2 %}<div>{{ line2 }}</div>{% endif %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div><div class="ss-card-title">CARP Status</div><div class="ss-card-subtitle">Green = MASTER — active node handling traffic</div></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">Interface</th>
+            <th>Virtual IP</th>
+            <th>Status</th>
+            <th>VHID</th>
+            <th>Advskew</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if carp_interfaces %}
+          {% for iface in carp_interfaces %}
+          <tr>
+            <td style="padding:8px 14px;font-weight:500;">{{ iface.name }}</td>
+            <td style="font-family:monospace;font-size:.8rem;">{{ iface.vip }}</td>
+            <td>
+              {% if iface.status == 'MASTER' %}
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(0,180,160,.1);color:var(--success);border:1px solid var(--success);border-radius:20px;font-size:.75rem;font-weight:600;">
+                <span style="width:7px;height:7px;background:var(--success);border-radius:50%;"></span>MASTER
+              </span>
+              {% else %}
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(255,193,7,.1);color:#e6a817;border:1px solid #e6a817;border-radius:20px;font-size:.75rem;font-weight:600;">
+                <span style="width:7px;height:7px;background:#e6a817;border-radius:50%;"></span>BACKUP
+              </span>
+              {% endif %}
+            </td>
+            <td>{{ iface.vhid }}</td>
+            <td>{{ iface.advskew }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary">Toggle</button>
+            </td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No CARP interfaces defined</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}

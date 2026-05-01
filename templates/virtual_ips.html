@@ -2,53 +2,52 @@
 
 {% block main %}
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/firewall">Firewall</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Virtual IPs</li>
-            </ol>
-        </nav>
-        <h1>Virtual IPs</h1>
-    </div>
 
-    <!-- Virtual IPs Section -->
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Virtual IP Addresses</h2>
-            <button type="button" class="btn btn-success btn-sm" id="virtualIpsAdd" data-bs-toggle="modal" data-bs-target="#viModal">
-                <i class="fas fa-plus"></i> Add Virtual IP
-            </button>
-        </div>
-        <div class="section-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th style="width:20%">Interface</th>
-                            <th style="width:15%">Type</th>
-                            <th style="width:25%">Address</th>
-                            <th style="width:25%">Description</th>
-                            <th style="width:15%">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="virtual-ips-tbody">
-                        <!-- Virtual IPs will be populated here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Virtual Addresses</h1>
+      <p class="ss-page-desc">IP Alias, CARP, Proxy ARP and other virtual IP assignments</p>
     </div>
+    <button type="button" class="btn btn-success" id="virtualIpsAdd" data-bs-toggle="modal" data-bs-target="#viModal">
+      <i class="fa-solid fa-plus me-1"></i>Add Virtual IP
+    </button>
+  </div>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div><div class="ss-card-title">Virtual IP Addresses</div><div class="ss-card-subtitle">CARP VIPs show MASTER/BACKUP failover state</div></div>
+      <div class="ss-card-actions">
+        <button type="button" class="btn btn-success btn-sm" id="virtualIpsAdd2" data-bs-toggle="modal" data-bs-target="#viModal">
+          <i class="fa-solid fa-plus me-1"></i>Add
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">Interface</th>
+            <th>Type</th>
+            <th>Address</th>
+            <th>Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="virtual-ips-tbody">
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Virtual IP Modal -->
-<div class="modal fade" id="viModal" tabindex="-1" aria-labelledby="viModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="viModalLabel">Add / Edit Virtual IP</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="viModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
+            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
+                <h5 class="modal-title fw-700" id="viModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Add / Edit Virtual IP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="viForm">

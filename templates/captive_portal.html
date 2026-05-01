@@ -1,52 +1,97 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Status / Captive Portal</span>
-</div>
+<div class="container">
 
-<div class="settings-section" style="padding: 20px;">
-	<h5>Users Logged In (0)</h5>
-	
-	<table>
-		<thead>
-			<tr>
-				<th>IP address</th>
-				<th>MAC address</th>
-				<th>Username</th>
-				<th>Session start</th>
-				<th>Actions</th>
-			</tr>
-		</thead>
-		<tbody>
-			<tr>
-				<td colspan="5" class="text-center text-muted">No users currently logged in</td>
-			</tr>
-		</tbody>
-	</table>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Captive Portal Sessions</h1>
+      <p class="ss-page-desc">Active authenticated portal sessions</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary" onclick="loadSessions()">
+        <i class="fa-solid fa-rotate me-1"></i>Refresh
+      </button>
+      <button type="button" class="btn btn-danger" onclick="disconnectAll()">
+        <i class="fa-solid fa-plug-circle-xmark me-1"></i>Disconnect All
+      </button>
+    </div>
+  </div>
 
-	<div class="d-flex gap-2 mt-3">
-		<button type="button" class="btn btn-info btn-show-activity">Show Last Activity</button>
-		<button type="button" class="btn btn-danger btn-disconnect-all">Disconnect All Users</button>
-	</div>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+      <div>
+        <div class="ss-card-title">Active Sessions</div>
+        <div class="ss-card-subtitle" id="session-count">Loading…</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">IP Address</th>
+            <th>MAC Address</th>
+            <th>Username</th>
+            <th>Session Start</th>
+            <th>Duration</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading sessions…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-	const btnShowActivity = document.querySelector('.btn-show-activity');
-	const btnDisconnectAll = document.querySelector('.btn-disconnect-all');
-	
-	if (btnShowActivity) {
-		btnShowActivity.addEventListener('click', function() {
-			alert('No users to show activity for.');
-		});
-	}
-	
-	if (btnDisconnectAll) {
-		btnDisconnectAll.addEventListener('click', function() {
-			alert('No users to disconnect.');
-		});
-	}
-});
+function loadSessions() {
+  fetch('/services/api/captive-portal/sessions')
+    .then(r => r.json())
+    .then(data => {
+      const sessions = data.sessions || [];
+      document.getElementById('session-count').textContent = sessions.length + ' user' + (sessions.length === 1 ? '' : 's') + ' logged in';
+      const tbody = document.getElementById('sessions-tbody');
+      if (!sessions.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+        return;
+      }
+      tbody.innerHTML = sessions.map(s => `
+        <tr>
+          <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${escapeHtml(s.ip)}</td>
+          <td style="font-family:monospace;font-size:.8rem;">${escapeHtml(s.mac || '—')}</td>
+          <td>${escapeHtml(s.username)}</td>
+          <td>${escapeHtml(s.session_start)}</td>
+          <td>${escapeHtml(s.duration || '—')}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="disconnectUser('${escapeHtml(s.mac || s.ip)}')"><i class="fa-solid fa-plug-circle-xmark"></i></button></td>
+        </tr>`).join('');
+    })
+    .catch(() => {
+      document.getElementById('session-count').textContent = '0 users logged in';
+      document.getElementById('sessions-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+    });
+}
+
+function disconnectUser(identifier) {
+  if (!confirm('Disconnect this user?')) return;
+  fetch('/services/api/captive-portal/disconnect', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({identifier})
+  }).then(() => loadSessions());
+}
+
+function disconnectAll() {
+  if (!confirm('Disconnect all portal users?')) return;
+  fetch('/services/api/captive-portal/disconnect-all', {method:'POST'})
+    .then(() => loadSessions());
+}
+
+function escapeHtml(t) {
+  if (!t) return '';
+  return String(t).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+document.addEventListener('DOMContentLoaded', loadSessions);
 </script>
 {% endblock %}

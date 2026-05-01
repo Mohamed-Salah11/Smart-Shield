@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Shield Setup — Step 4: Apply</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style>
+    body { background: #1a1d23; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; }
+    .wizard-wrap { max-width: 640px; margin: 60px auto; padding: 0 20px; }
+    .wizard-header { text-align: center; margin-bottom: 40px; }
+    .wizard-header h1 { font-size: 2rem; color: #4fc3f7; margin-bottom: 8px; }
+    .step-indicator { display: flex; justify-content: center; gap: 12px; margin-bottom: 32px; }
+    .step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 0.85rem; font-weight: 600; }
+    .step.active { background: #4fc3f7; color: #1a1d23; }
+    .step.done { background: #43a047; color: #fff; }
+    .card { background: #23262d; border-radius: 8px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .summary-list { list-style: none; padding: 0; margin: 0 0 24px; }
+    .summary-list li { padding: 8px 0; border-bottom: 1px solid #333; font-size: 0.95rem; color: #bdbdbd; }
+    .summary-list li:last-child { border-bottom: none; }
+    .summary-list li strong { color: #e0e0e0; }
+    .btn-primary { width: 100%; padding: 14px; background: #43a047; color: #fff;
+                   border: none; border-radius: 6px; font-size: 1.05rem; font-weight: 700;
+                   cursor: pointer; margin-top: 8px; }
+    .btn-primary:hover { background: #66bb6a; }
+    .btn-primary:disabled { background: #555; color: #999; cursor: default; }
+    .btn-secondary { width: 100%; padding: 12px; background: #333; color: #bdbdbd;
+                     border: 1px solid #555; border-radius: 6px; font-size: 1rem;
+                     cursor: pointer; margin-top: 8px; }
+    .progress-wrap { margin: 20px 0; display: none; }
+    .progress-bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #4fc3f7; width: 0; transition: width 0.5s; }
+    .step-log { background: #1a1d23; border-radius: 6px; padding: 12px; margin-top: 12px;
+                font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; }
+    .step-log .ok   { color: #43a047; }
+    .step-log .fail { color: #ef5350; }
+    .done-banner { background: #1b5e20; color: #c8e6c9; border-radius: 8px; padding: 24px;
+                   text-align: center; display: none; margin-top: 20px; }
+    .done-banner h3 { margin: 0 0 8px; font-size: 1.3rem; }
+    .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; display: none; }
+    .alert-danger { background: #b71c1c; color: #ffcdd2; }
+  </style>
+</head>
+<body>
+<div class="wizard-wrap">
+  <div class="wizard-header">
+    <img src="/static/images/SS.png" alt="Smart Shield" height="48" style="margin-bottom:12px">
+    <h1>Smart Shield Setup</h1>
+  </div>
+
+  <div class="step-indicator">
+    <div class="step done">✓</div>
+    <div class="step done">✓</div>
+    <div class="step done">✓</div>
+    <div class="step active">4</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0; color:#e0e0e0;">Step 4 — Apply Configuration</h2>
+    <p style="color:#9e9e9e; margin-bottom:20px;">
+      Review your settings, then click <strong>Apply &amp; Finish</strong> to write
+      the configuration and start all services.
+    </p>
+
+    <ul class="summary-list">
+      <li>✓ <strong>Interfaces</strong> assigned in Step 1</li>
+      <li>✓ <strong>LAN / WAN</strong> configured in Step 2</li>
+      <li>✓ <strong>Admin password</strong> set in Step 3</li>
+      <li>→ PF firewall, DHCP, DNS will be started</li>
+      <li>→ Network config will be written to <code>/etc/rc.conf.local</code></li>
+    </ul>
+
+    <div id="alert" class="alert"></div>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="step-log" id="step-log"></div>
+    </div>
+
+    <div class="done-banner" id="done-banner">
+      <h3>🎉 Setup Complete!</h3>
+      <p>Smart Shield is now configured. Redirecting to the dashboard…</p>
+    </div>
+
+    <button class="btn-secondary" id="btn-back" onclick="window.location.href='/setup/step3'">← Back</button>
+    <button class="btn-primary" id="btn-apply" onclick="applyConfig()">
+      ✓ Apply &amp; Finish
+    </button>
+  </div>
+</div>
+
+<script>
+async function applyConfig() {
+  document.getElementById('btn-apply').disabled = true;
+  document.getElementById('btn-back').disabled  = true;
+  document.getElementById('progress-wrap').style.display = 'block';
+
+  const log = document.getElementById('step-log');
+  const fill = document.getElementById('progress-fill');
+
+  function addLog(msg, ok) {
+    const line = document.createElement('div');
+    line.className = ok ? 'ok' : 'fail';
+    line.textContent = (ok ? '✓ ' : '✗ ') + msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  fill.style.width = '20%';
+  addLog('Sending configuration…', true);
+
+  try {
+    const r = await fetch('/setup/api/step4/apply', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+
+    fill.style.width = '80%';
+    (d.results || []).forEach(res => addLog(res.step + ': ' + res.details, res.ok));
+
+    fill.style.width = '100%';
+
+    if (d.ok) {
+      addLog('All services started successfully.', true);
+      document.getElementById('done-banner').style.display = 'block';
+      setTimeout(() => { window.location.href = d.redirect || '/system/dashboard'; }, 2500);
+    } else {
+      addLog('Setup finished with warnings — check results above.', false);
+      document.getElementById('btn-apply').disabled = false;
+      document.getElementById('btn-back').disabled  = false;
+    }
+  } catch (e) {
+    addLog('Network error: ' + e.message, false);
+    document.getElementById('btn-apply').disabled = false;
+    document.getElementById('btn-back').disabled  = false;
+  }
+}
+</script>
+</body>
+</html>

@@ -370,28 +370,30 @@
                 verbosity_level: parseInt(document.getElementById('clientVerbosityLevel').value) || 3
             };
 
-            fetch('/vpn/api/openvpn/save-client', {
-                method: 'POST',
+            const modalEl  = document.getElementById('openvpnAddClientModal');
+            const editId   = modalEl ? modalEl._editClientId : null;
+            const endpoint = editId ? `/vpn/api/openvpn/update-client/${editId}` : '/vpn/api/openvpn/save-client';
+            const method   = editId ? 'PUT' : 'POST';
+
+            fetch(endpoint, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('OpenVPN client saved successfully!');
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('openvpnAddClientModal'));
-                        modal.hide();
+                        if (modalEl) modalEl._editClientId = null;
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
                         loadOpenVPNClients();
-                        // Clear form
-                        document.querySelector('#openvpnAddClientModal form').reset();
+                        const form = modalEl ? modalEl.querySelector('form') : null;
+                        if (form) form.reset();
                     } else {
                         alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error saving OpenVPN client');
-                });
+                .catch(() => alert('Error saving OpenVPN client'));
         });
     });
 
@@ -447,8 +449,40 @@
         });
     }
 
-    function editClient(clientId) {
-        alert('Edit functionality coming soon. Client ID: ' + clientId);
+    async function editClient(clientId) {
+        try {
+            const response = await fetch(`/vpn/api/openvpn/get-client/${clientId}`);
+            const data = await response.json();
+            if (data.status !== 'success') { alert('Could not load client: ' + (data.message || '')); return; }
+            const c = data.client;
+
+            const modalEl = document.getElementById('openvpnAddClientModal');
+            const titleEl = modalEl ? modalEl.querySelector('.modal-title') : null;
+            if (titleEl) titleEl.textContent = 'Edit OpenVPN Client';
+
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+            const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+            setVal('clientDescription',       c.description);
+            setChk('clientDisabled',          c.disabled);
+            setVal('clientServerMode',        c.server_mode);
+            setVal('clientProtocol',          c.protocol);
+            setVal('clientInterface',         c.interface);
+            setVal('clientServerHostname',    c.server_hostname);
+            setVal('clientServerPort',        c.server_port);
+            setVal('clientInactivityTimeout', c.inactivity_timeout);
+            setVal('clientPingMethod',        c.ping_method);
+            setVal('clientPingInterval',      c.ping_interval);
+            setVal('clientPingTimeout',       c.ping_timeout);
+            setVal('clientCustomOptions',     c.custom_options);
+            setChk('clientUdpFastIo',         c.udp_fast_io);
+            setVal('clientSendReceiveBuffer', c.send_receive_buffer);
+            setVal('clientVerbosityLevel',    c.verbosity_level);
+
+            modalEl._editClientId = clientId;
+            new bootstrap.Modal(modalEl).show();
+        } catch (e) {
+            alert('Failed to load client for editing.');
+        }
     }
 
     function deleteClient(clientId) {

@@ -381,28 +381,30 @@
                 advanced: document.getElementById('csoAdvanced').value
             };
 
-            fetch('/vpn/api/openvpn/save-cso', {
-                method: 'POST',
+            const modalEl  = document.getElementById('openvpnAddCsoModal');
+            const editId   = modalEl ? modalEl._editCsoId : null;
+            const endpoint = editId ? `/vpn/api/openvpn/update-cso/${editId}` : '/vpn/api/openvpn/save-cso';
+            const method   = editId ? 'PUT' : 'POST';
+
+            fetch(endpoint, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('Client Specific Override saved successfully!');
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('openvpnAddCsoModal'));
-                        modal.hide();
+                        if (modalEl) modalEl._editCsoId = null;
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
                         loadOpenVPNCsos();
-                        // Clear form
-                        document.querySelector('#openvpnAddCsoModal form').reset();
+                        const form = modalEl ? modalEl.querySelector('form') : null;
+                        if (form) form.reset();
                     } else {
                         alert('Error: ' + (data.message || 'Unknown error'));
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error saving Client Specific Override');
-                });
+                .catch(() => alert('Error saving Client Specific Override'));
         });
     });
 
@@ -462,8 +464,45 @@
         });
     }
 
-    function editCso(csoId) {
-        alert('Edit functionality coming soon. CSO ID: ' + csoId);
+    async function editCso(csoId) {
+        try {
+            const response = await fetch(`/vpn/api/openvpn/get-cso/${csoId}`);
+            const data = await response.json();
+            if (data.status !== 'success') { alert('Could not load CSO: ' + (data.message || '')); return; }
+            const c = data.cso;
+
+            const modalEl = document.getElementById('openvpnAddCsoModal');
+            const titleEl = modalEl ? modalEl.querySelector('.modal-title') : null;
+            if (titleEl) titleEl.textContent = 'Edit Client Specific Override';
+
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+            const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+            setVal('csoDescription',           c.description);
+            setChk('csoDisable',               c.disabled);
+            setVal('csoCommonName',            c.common_name);
+            setChk('csoConnectionBlocking',    c.connection_blocking);
+            setVal('csoServerList',            c.server_list);
+            setVal('csoResetServerOptions',    c.reset_server_options);
+            setVal('csoIpv4TunnelNetwork',     c.ipv4_tunnel_network);
+            setVal('csoIpv6TunnelNetwork',     c.ipv6_tunnel_network);
+            setVal('csoIpv4Gateway',           c.ipv4_gateway);
+            setVal('csoIpv6Gateway',           c.ipv6_gateway);
+            setChk('csoRedirectIpv4Gateway',   c.redirect_ipv4_gateway);
+            setChk('csoRedirectIpv6Gateway',   c.redirect_ipv6_gateway);
+            setVal('csoIpv4LocalNetworks',     c.ipv4_local_networks);
+            setVal('csoIpv6LocalNetworks',     c.ipv6_local_networks);
+            setVal('csoIpv4RemoteNetworks',    c.ipv4_remote_networks);
+            setVal('csoIpv6RemoteNetworks',    c.ipv6_remote_networks);
+            setVal('csoInactivityTimeout',     c.inactivity_timeout);
+            setVal('csoPingInterval',          c.ping_interval);
+            setVal('csoPingAction',            c.ping_action);
+            setVal('csoAdvanced',              c.advanced);
+
+            modalEl._editCsoId = csoId;
+            new bootstrap.Modal(modalEl).show();
+        } catch (e) {
+            alert('Failed to load CSO for editing.');
+        }
     }
 
     function deleteCso(csoId) {

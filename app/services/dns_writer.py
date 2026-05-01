@@ -274,8 +274,9 @@ def apply_unbound(conn) -> dict:
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
 
-    # Reload
-    from app.services.service_manager import service_action
+    # Enable in rc.conf for reboot persistence, then reload
+    from app.services.service_manager import service_action, sysrc_set
+    sysrc_set("unbound_enable", "YES")
     result = service_action("unbound", "reload")
     return {
         "ok": result["ok"],

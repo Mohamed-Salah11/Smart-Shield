@@ -597,7 +597,6 @@ def get_interfaces():
         """
     )
     wan = cur.fetchone()
-    conn.close()
 
     return jsonify(
         {
@@ -762,7 +761,6 @@ def update_interface(interface_type):
             )
 
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": f"{interface_type} updated"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -777,7 +775,6 @@ def get_dhcp():
         "SELECT interface_type, enabled, start_ip, end_ip, gateway_ip, dns_servers, lease_time FROM dhcp_pools"
     )
     rows = cur.fetchall()
-    conn.close()
 
     data = {}
     for row in rows:
@@ -834,7 +831,6 @@ def update_dhcp(interface_type):
             ),
         )
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": f"DHCP updated for {interface_type}"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -853,7 +849,6 @@ def get_leases():
         """
     )
     rows = cur.fetchall()
-    conn.close()
     return jsonify({"status": "success", "data": [dict(row) for row in rows]})
 
 
@@ -882,7 +877,6 @@ def add_lease():
             ),
         )
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": "Static lease added"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
@@ -895,7 +889,6 @@ def delete_lease(lease_id):
     cur = conn.cursor()
     cur.execute("DELETE FROM static_leases WHERE id = ?", (lease_id,))
     conn.commit()
-    conn.close()
     return jsonify({"status": "success", "message": "Static lease deleted"})
 
 
@@ -937,10 +930,6 @@ def list_hosts():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
-
 
 @network_api_bp.route("/hosts/refresh", methods=["POST"])
 @api_permission_required("api.network.edit")
@@ -969,10 +958,6 @@ def refresh_hosts():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
-
 
 @network_api_bp.route("/web-activity", methods=["GET"])
 @login_required
@@ -1088,10 +1073,6 @@ def web_activity():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
-
 
 @network_api_bp.route("/apply", methods=["POST"])
 @api_permission_required("api.network.apply")
@@ -1152,7 +1133,6 @@ def apply_network():
             from app.services.pppoe_writer import apply_pppoe
             conn = get_db()
             result = apply_pppoe(conn)
-            conn.close()
             status = "success" if result["ok"] else "error"
             code = 200 if result["ok"] else 400
             return jsonify({"status": status, "message": result["message"]}), code
@@ -1211,7 +1191,6 @@ def get_interface_snapshot(interface_type: str):
             (interface_type,),
         )
         row = cur.fetchone()
-        conn.close()
         if not row:
             return jsonify({"status": "success", "snapshot": None})
         import json as _json
@@ -1250,7 +1229,6 @@ def confirm_interface_apply(interface_type: str):
             (interface_type,),
         )
         conn.commit()
-        conn.close()
         return jsonify({"status": "success", "message": f"{interface_type} change confirmed."})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 400
@@ -1278,7 +1256,6 @@ def rollback_interface(interface_type: str):
         )
         row = cur.fetchone()
         if not row:
-            conn.close()
             return jsonify({"status": "error", "message": "No snapshot to roll back to."}), 404
 
         snap = _json.loads(row["snapshot_json"])
@@ -1320,7 +1297,6 @@ def rollback_interface(interface_type: str):
         # Delete the snapshot after rollback
         cur.execute("DELETE FROM pending_interface_changes WHERE id=?", (row["id"],))
         conn.commit()
-        conn.close()
 
         from app.audit_log import log_event
         log_event(

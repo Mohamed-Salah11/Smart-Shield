@@ -1,325 +1,148 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span>Services / Router Advertisement</span>
-</div>
+<div class="container">
 
-<ul class="nav nav-tabs mb-3">
-	<li class="nav-item">
-		<a class="nav-link active" id="tab-wan" href="#" onclick="switchTab('WAN'); return false;">WAN</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link" id="tab-lan" href="#" onclick="switchTab('LAN'); return false;">LAN</a>
-	</li>
-</ul>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">IPv6 Announcements</h1>
+      <p class="ss-page-desc">Router Advertisement daemon for stateless IPv6 address assignment</p>
+    </div>
+  </div>
 
-<!-- WAN TAB -->
-<div id="WAN" class="tab-content">
-	<div class="settings-section">
-		<h5>Router Advertisement</h5>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" id="tab-WAN" href="#" onclick="switchTab('WAN');return false;">WAN</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-LAN" href="#" onclick="switchTab('LAN');return false;">LAN</a></li>
+  </ul>
 
-		<div class="form-group">
-			<label>Router Mode</label>
-			<div class="form-group-content">
-				<select class="form-control">
-					<option>Disabled</option>
-					<option>Enabled</option>
-				</select>
-			</div>
-		</div>
+  {% for iface in ['WAN','LAN'] %}
+  <div id="tab-content-{{ iface }}" style="{{ 'display:none;' if not loop.first else '' }}">
 
-		<div class="form-group">
-			<label>Router Priority</label>
-			<div class="form-group-content">
-				<select class="form-control">
-					<option>Low</option>
-					<option>Medium</option>
-					<option>High</option>
-				</select>
-			</div>
-		</div>
+    <!-- RA Settings -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div><div class="ss-card-title">Router Advertisement — {{ iface }}</div><div class="ss-card-subtitle">Mode, priority and timing parameters</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-3">
+          <div class="ss-field">
+            <label class="ss-label">Router Mode</label>
+            <select class="form-select" name="{{ iface }}_router_mode">
+              <option>Disabled</option><option>Enabled</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Router Priority</label>
+            <select class="form-select" name="{{ iface }}_priority">
+              <option>Low</option><option>Medium</option><option>High</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Valid Lifetime (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_valid_lifetime" value="86400">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Preferred Lifetime (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_preferred_lifetime" value="14400">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Min RA Interval (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_min_interval" value="200">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Max RA Interval (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_max_interval" value="600">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Router Lifetime (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_router_lifetime" value="1800">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">NAT64 Prefix</label>
+            <input type="text" class="form-control" name="{{ iface }}_nat64_prefix" value="64:ff9b::/96">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">NAT64 Prefix Lifetime (sec)</label>
+            <input type="number" class="form-control" name="{{ iface }}_nat64_lifetime" value="1800">
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-field">
+          <label class="ss-label">RA Subnets</label>
+          <div id="raSubnets{{ iface }}" class="mb-2"></div>
+          <button type="button" class="btn btn-success btn-sm" onclick="addRASubnet('{{ iface }}')">
+            <i class="fa-solid fa-plus me-1"></i>Add Subnet
+          </button>
+        </div>
+      </div>
+    </div>
 
-		<div class="form-group">
-			<label>Valid Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="86400" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
+    <!-- DNS Configuration -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+        <div><div class="ss-card-title">DNS Configuration</div><div class="ss-card-subtitle">Advertise DNS servers via RA</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-check-group mb-3">
+          <label class="ss-check-item"><input class="form-check-input" type="checkbox" name="{{ iface }}_dns_enable"><span>Enable DNS via RA Daemon</span></label>
+          <label class="ss-check-item"><input class="form-check-input" type="checkbox" name="{{ iface }}_mirror_dhcp"><span>Mirror DHCPv6 DNS Configuration</span></label>
+        </div>
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">DNS Server 1</label>
+            <input type="text" class="form-control" name="{{ iface }}_dns1" placeholder="DNS Server 1">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">DNS Server 2</label>
+            <input type="text" class="form-control" name="{{ iface }}_dns2" placeholder="DNS Server 2">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">DNS Server 3</label>
+            <input type="text" class="form-control" name="{{ iface }}_dns3" placeholder="DNS Server 3">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">DNS Server 4</label>
+            <input type="text" class="form-control" name="{{ iface }}_dns4" placeholder="DNS Server 4">
+          </div>
+          <div class="ss-field" style="grid-column:span 2;">
+            <label class="ss-label">Domain Search List</label>
+            <input type="text" class="form-control" name="{{ iface }}_domain_search" placeholder="example.com;sub.example.com">
+            <p class="ss-hint">Semicolon-separated list of search domains</p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-		<div class="form-group">
-			<label>Preferred Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="14400" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
+    <div class="ss-save-bar">
+      <button type="button" class="btn btn-primary px-4" onclick="saveRA('{{ iface }}')">
+        <i class="fa-solid fa-check me-1"></i>Save
+      </button>
+    </div>
 
-		<div class="form-group">
-			<label>Minimum RA Interval (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="200" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Maximum RA Interval (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="600" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Router Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>NAT64 Prefix</label>
-			<div class="form-group-content">
-				<input type="text" value="64:ff9b::/96" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>NAT64 Prefix Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>RA Subnet(s)</label>
-			<div class="form-group-content">
-				<div id="raSubnetsWAN"></div>
-				<button type="button" class="btn btn-success mt-2" onclick="addRASubnet('WAN')">Add RA Subnet</button>
-			</div>
-		</div>
-	</div>
-
-	<div class="settings-section">
-		<h5>DNS Configuration</h5>
-
-		<div class="form-group">
-			<label>DNS Options</label>
-			<div class="form-group-content">
-				<div class="form-check">
-					<input type="checkbox" class="form-check-input" id="dnsEnableWAN">
-					<label class="form-check-label" for="dnsEnableWAN">Enable DNS via RA Daemon</label>
-				</div>
-				<div class="form-check">
-					<input type="checkbox" class="form-check-input" id="mirrorDHCPWAN">
-					<label class="form-check-label" for="mirrorDHCPWAN">Mirror DHCPv6 DNS Configuration</label>
-				</div>
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 1</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 1" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 2</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 2" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 3</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 3" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 4</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 4" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Domain Search List</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="example.com;sub.example.com" class="form-control" style="max-width: 350px;">
-			</div>
-		</div>
-	</div>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="submit" class="btn btn-primary">Save</button>
-	</div>
-</div>
-
-<!-- LAN TAB -->
-<div id="LAN" class="tab-content" style="display:none;">
-	<div class="settings-section">
-		<h5>Router Advertisement</h5>
-
-		<div class="form-group">
-			<label>Router Mode</label>
-			<div class="form-group-content">
-				<select class="form-control">
-					<option>Disabled</option>
-					<option>Enabled</option>
-				</select>
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Router Priority</label>
-			<div class="form-group-content">
-				<select class="form-control">
-					<option>Low</option>
-					<option>Medium</option>
-					<option>High</option>
-				</select>
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Valid Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="86400" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Preferred Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="14400" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Minimum RA Interval (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="200" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Maximum RA Interval (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="600" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Router Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>NAT64 Prefix</label>
-			<div class="form-group-content">
-				<input type="text" value="64:ff9b::/96" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>NAT64 Prefix Lifetime (seconds)</label>
-			<div class="form-group-content">
-				<input type="number" value="1800" class="form-control" style="max-width: 150px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>RA Subnet(s)</label>
-			<div class="form-group-content">
-				<div id="raSubnetsLAN"></div>
-				<button type="button" class="btn btn-success mt-2" onclick="addRASubnet('LAN')">Add RA Subnet</button>
-			</div>
-		</div>
-	</div>
-
-	<div class="settings-section">
-		<h5>DNS Configuration</h5>
-
-		<div class="form-group">
-			<label>DNS Options</label>
-			<div class="form-group-content">
-				<div class="form-check">
-					<input type="checkbox" class="form-check-input" id="dnsEnableLAN">
-					<label class="form-check-label" for="dnsEnableLAN">Enable DNS via RA Daemon</label>
-				</div>
-				<div class="form-check">
-					<input type="checkbox" class="form-check-input" id="mirrorDHCPv6LAN">
-					<label class="form-check-label" for="mirrorDHCPv6LAN">Mirror DHCPv6 DNS Configuration</label>
-				</div>
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 1</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 1" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 2</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 2" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 3</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 3" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>DNS Server 4</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="DNS Server 4" class="form-control" style="max-width: 250px;">
-			</div>
-		</div>
-
-		<div class="form-group">
-			<label>Domain Search List</label>
-			<div class="form-group-content">
-				<input type="text" placeholder="example.com;sub.example.com" class="form-control" style="max-width: 350px;">
-			</div>
-		</div>
-	</div>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="submit" class="btn btn-primary">Save</button>
-	</div>
+  </div>
+  {% endfor %}
 </div>
 
 <script>
-function switchTab(tabName) {
-	document.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
-	document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-	document.getElementById('tab-' + tabName.toLowerCase()).classList.add('active');
-	document.getElementById(tabName).style.display = 'block';
+function switchTab(tab) {
+  ['WAN','LAN'].forEach(t => {
+    document.getElementById('tab-content-' + t).style.display = t === tab ? '' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
 }
 
-function addRASubnet(tab) {
-	const container = document.getElementById('raSubnets' + tab);
-	const div = document.createElement('div');
-	div.className = 'd-flex gap-2 mb-2';
-	div.innerHTML = `
-		<input type="text" placeholder="RA Subnet (CIDR)" class="form-control" style="max-width: 200px;">
-		<input type="number" placeholder="/128" value="128" class="form-control" style="max-width: 80px;">
-		<button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">Delete</button>
-	`;
-	container.appendChild(div);
+function addRASubnet(iface) {
+  const container = document.getElementById('raSubnets' + iface);
+  const div = document.createElement('div');
+  div.className = 'd-flex gap-2 mb-2 align-items-center';
+  div.innerHTML = `<input type="text" placeholder="e.g. 2001:db8::/64" class="form-control" style="max-width:260px;">
+    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.d-flex').remove()"><i class="fa-solid fa-trash"></i></button>`;
+  container.appendChild(div);
 }
 
-// Initialize WAN tab on page load
-window.onload = () => switchTab('WAN');
+function saveRA(iface) {
+  alert('RA settings for ' + iface + ' saved.');
+}
 </script>
-
 {% endblock %}

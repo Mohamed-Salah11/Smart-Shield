@@ -2,23 +2,22 @@
 
 {% block main %}
 <div class="container">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">Dashboard</a></li>
-        <li class="breadcrumb-item active">DHCP Leases</li>
-      </ol>
-    </nav>
-    <h1><i class="fa fa-network-wired me-2 text-primary"></i>DHCP Leases</h1>
-    <p class="lead">Active address pools and static lease assignments.</p>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Active Leases</h1>
+      <p class="ss-page-desc">Active address pools and static lease assignments</p>
+    </div>
   </div>
 
-  <div class="section mb-4">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-server me-2"></i>Address Pools</h2>
-      <span class="badge bg-primary">{{ pools|length }} pool{{ 's' if pools|length != 1 }}</span>
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+      <div><div class="ss-card-title">Address Pools</div></div>
+      <div class="ss-card-actions">
+        <span style="padding:3px 12px;background:var(--primary-soft);color:var(--primary);border-radius:20px;font-size:.8rem;font-weight:600;">{{ pools|length }} pool{{ 's' if pools|length != 1 }}</span>
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       {% if pools %}
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
@@ -53,12 +52,15 @@
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-header d-flex justify-content-between align-items-center">
-      <h2 class="mb-0"><i class="fa fa-thumbtack me-2"></i>Static Mappings</h2>
-      <span class="badge bg-secondary">{{ static_leases|length }} static</span>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-thumbtack"></i></div>
+      <div><div class="ss-card-title">Static Mappings</div></div>
+      <div class="ss-card-actions">
+        <span style="padding:3px 12px;background:var(--border-color-soft);border-radius:20px;font-size:.8rem;font-weight:600;">{{ static_leases|length }} static</span>
+      </div>
     </div>
-    <div class="section-body p-0">
+    <div style="overflow-x:auto;">
       {% if static_leases %}
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">

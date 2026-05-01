@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Shield — Login</title>
+    <title>Smart Shield — Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
@@ -12,13 +12,23 @@
 </head>
 <body>
 
+    <!-- Ambient glow scene -->
+    <div class="login-scene"></div>
+
     <div class="login-box">
+
+        <!-- Shield logo -->
         <div class="logo">
             <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield">
         </div>
 
         <h2>Smart Shield</h2>
-        <p class="login-subtitle">Firewall Management Portal</p>
+        <p class="login-subtitle">Network Defense Platform</p>
+
+        <div class="login-edition">
+            <i class="fa-solid fa-shield-halved"></i>
+            Firewall OS
+        </div>
 
         {% if error %}
         <div class="error">{{ error }}</div>
@@ -38,12 +48,15 @@
             </div>
 
             <div class="login-btn-wrap">
-                <button type="submit">Sign In</button>
+                <button type="submit">
+                    <i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:8px;"></i>
+                    Sign In
+                </button>
             </div>
         </form>
     </div>
 
-    <footer>&copy; 2025 Smart Shield Portal</footer>
+    <footer>Smart Shield &nbsp;·&nbsp; Network Defense Platform &nbsp;·&nbsp; &copy; 2025</footer>
 
 </body>
 </html>

@@ -1,171 +1,132 @@
 {% extends 'base.html' %}
-
 {% block main %}
-<div class="breadcrumb">
-	<span id="page-title">Services / IGMP Proxy</span>
-</div>
+<div class="container">
 
-<div id="main-view">
-	<div class="settings-section">
-		<h5>General IGMP Options</h5>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Multicast Proxy</h1>
+      <p class="ss-page-desc">IGMP proxy for routing multicast traffic between interfaces</p>
+    </div>
+  </div>
 
-		<form id="igmp-general-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
-			<div class="form-group">
-				<label>Enable</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="enable_igmp" name="enable_igmp">
-						<label class="form-check-label" for="enable_igmp">Enable IGMP</label>
-					</div>
-				</div>
-			</div>
+  <!-- General Options -->
+  <div id="main-view">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-broadcast-tower"></i></div>
+        <div><div class="ss-card-title">General Options</div></div>
+      </div>
+      <div class="ss-card-body">
+        <form id="igmp-general-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_igmp" name="enable_igmp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable IGMP Multicast Proxy</p></div></div>
+          <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="verbose_logging" name="verbose_logging"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Verbose Logging</p><p class="ss-toggle-desc">Write detailed multicast routing decisions to the system log</p></div></div>
+        </form>
+      </div>
+    </div>
 
-			<div class="form-group">
-				<label>Verbose Logging</label>
-				<div class="form-group-content">
-					<div class="form-check">
-						<input type="checkbox" class="form-check-input" id="verbose_logging" name="verbose_logging">
-						<label class="form-check-label" for="verbose_logging">Enable verbose logging (Default is less logged)</label>
-					</div>
-				</div>
-			</div>
-		</form>
-	</div>
+    <!-- Proxy Interfaces -->
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-arrows-left-right"></i></div>
+        <div><div class="ss-card-title">Proxy Interfaces</div><div class="ss-card-subtitle">One upstream interface and one or more downstream interfaces required</div></div>
+        <div class="ss-card-actions">
+          <button class="btn btn-success btn-sm" onclick="showEditForm()">
+            <i class="fa-solid fa-plus me-1"></i>Add Interface
+          </button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr><th style="padding:10px 14px;">Name</th><th>Type</th><th>Networks</th><th>Description</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">No proxy interfaces configured</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-	<div class="settings-section">
-		<h5>IGMP Proxy</h5>
+    <div class="ss-save-bar">
+      <button type="submit" form="igmp-general-form" class="btn btn-primary px-4">
+        <i class="fa-solid fa-check me-1"></i>Save
+      </button>
+    </div>
+  </div>
 
-		<table class="table-bordered">
-			<thead>
-				<tr>
-					<th>Name</th>
-					<th>Type</th>
-					<th>Values</th>
-					<th>Description</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td colspan="5" style="text-align: center; padding: 20px;">
-						No IGMP Proxy entries configured.
-					</td>
-				</tr>
-			</tbody>
-		</table>
-	</div>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="submit" form="igmp-general-form" class="btn btn-primary">Save</button>
-		<button class="btn btn-success" onclick="showEditForm()">+ Add</button>
-	</div>
-</div>
-
-<div id="edit-view" style="display: none;">
-	<div class="settings-section">
-		<h5>IGMP Proxy Edit / Add</h5>
-
-		<form id="proxy-edit-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
-
-			<div class="form-group">
-				<label>Interface</label>
-				<div class="form-group-content">
-					<select name="proxy_interface" class="form-control">
-						<option value="WAN" selected>WAN</option>
-						<option value="LAN">LAN</option>
-						<option value="OPT1">OPT1</option>
-					</select>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Description</label>
-				<div class="form-group-content">
-					<input type="text" class="form-control" name="proxy_description"
-						placeholder="A description may be entered here for administrative reference (not parsed)">
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Type</label>
-				<div class="form-group-content">
-					<select name="proxy_type" class="form-control">
-						<option value="upstream" selected>Upstream Interface</option>
-						<option value="downstream">Downstream Interface</option>
-					</select>
-					<div class="help-text">
-						The upstream network interface is the outgoing interface which is responsible for
-						communicating to available multicast data sources. There can only be one upstream
-						interface. Downstream interfaces are the distribution interfaces to the destination
-						networks, where multicast hosts can join groups and receive multicast data. One or more
-						downstream interfaces must be configured.
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Threshold</label>
-				<div class="form-group-content">
-					<input type="number" class="form-control" name="threshold" value="1" min="1" max="32" style="max-width: 100px;">
-					<div class="help-text">
-						Defines the TTL threshold for the network interface. Packets with a lower TTL than the
-						threshold value will be ignored. This setting is optional, and by default the threshold is 1.
-					</div>
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Networks</label>
-				<div class="form-group-content">
-					<div class="d-flex gap-2 mb-2">
-						<input type="text" class="form-control" name="network_cidr" placeholder="Network/CIDR" style="max-width: 250px;">
-						<button type="button" class="btn btn-success" onclick="addNetworkField()">+ Add Network</button>
-					</div>
-					<div id="networks-container"></div>
-				</div>
-			</div>
-		</form>
-	</div>
-
-	<div class="d-flex gap-2 mt-3">
-		<button type="submit" form="proxy-edit-form" class="btn btn-primary">Save</button>
-		<button type="button" class="btn btn-secondary" onclick="showMainView()">Cancel</button>
-	</div>
+  <!-- Edit Form -->
+  <div id="edit-view" style="display:none;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+        <div><div class="ss-card-title">Add / Edit Interface</div></div>
+      </div>
+      <div class="ss-card-body">
+        <form id="proxy-edit-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
+          <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+            <div class="ss-field">
+              <label class="ss-label">Interface</label>
+              <select name="proxy_interface" class="form-select">
+                <option value="WAN">WAN</option><option value="LAN">LAN</option><option value="OPT1">OPT1</option>
+              </select>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Type</label>
+              <select name="proxy_type" class="form-select">
+                <option value="upstream">Upstream Interface</option>
+                <option value="downstream">Downstream Interface</option>
+              </select>
+              <p class="ss-hint">Only one upstream; one or more downstream required</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">TTL Threshold</label>
+              <input type="number" class="form-control" name="threshold" value="1" min="1" max="32" style="max-width:120px;">
+              <p class="ss-hint">Ignore packets with TTL below this value</p>
+            </div>
+            <div class="ss-field">
+              <label class="ss-label">Description</label>
+              <input type="text" class="form-control" name="proxy_description" placeholder="Optional note">
+            </div>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Networks (CIDR)</label>
+            <div class="d-flex gap-2 mb-2">
+              <input type="text" class="form-control" name="network_cidr" placeholder="e.g. 239.0.0.0/8" style="max-width:260px;">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addNetworkField()">
+                <i class="fa-solid fa-plus me-1"></i>Add Network
+              </button>
+            </div>
+            <div id="networks-container"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="ss-save-bar">
+      <button type="button" class="btn btn-secondary" onclick="showMainView()">Cancel</button>
+      <button type="submit" form="proxy-edit-form" class="btn btn-primary px-4">
+        <i class="fa-solid fa-check me-1"></i>Save Interface
+      </button>
+    </div>
+  </div>
 </div>
 
 <script>
-	const mainView = document.getElementById('main-view');
-	const editView = document.getElementById('edit-view');
-	const networksContainer = document.getElementById('networks-container');
-	const pageTitle = document.getElementById('page-title');
+const mainView = document.getElementById('main-view');
+const editView = document.getElementById('edit-view');
 
-	function showEditForm() {
-		mainView.style.display = 'none';
-		editView.style.display = 'block';
-		pageTitle.textContent = 'Services / IGMP Proxy Edit / Add';
-		document.getElementById('proxy-edit-form').reset();
-		networksContainer.innerHTML = '';
-		addNetworkField();
-	}
-
-	function showMainView() {
-		editView.style.display = 'none';
-		mainView.style.display = 'block';
-		pageTitle.textContent = 'Services / IGMP Proxy';
-	}
-
-	function addNetworkField() {
-		const div = document.createElement('div');
-		div.className = 'mb-2';
-		const input = document.createElement('input');
-		input.type = 'text';
-		input.name = 'networks[]';
-		input.className = 'form-control';
-		input.placeholder = 'Network/CIDR';
-		input.style.maxWidth = '250px';
-		div.appendChild(input);
-		networksContainer.appendChild(div);
-	}
+function showEditForm() {
+  mainView.style.display = 'none'; editView.style.display = '';
+  document.getElementById('proxy-edit-form').reset();
+  document.getElementById('networks-container').innerHTML = '';
+  addNetworkField();
+}
+function showMainView() { editView.style.display = 'none'; mainView.style.display = ''; }
+function addNetworkField() {
+  const div = document.createElement('div');
+  div.className = 'mb-2 d-flex gap-2';
+  div.innerHTML = `<input type="text" name="networks[]" class="form-control" placeholder="Network/CIDR" style="max-width:260px;">
+    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('div').remove()"><i class="fa-solid fa-trash"></i></button>`;
+  document.getElementById('networks-container').appendChild(div);
+}
 </script>
-
 {% endblock %}

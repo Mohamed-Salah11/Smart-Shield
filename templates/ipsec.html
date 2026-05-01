@@ -1,57 +1,49 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="breadcrumb">
-	Dashboard / VPN / IPsec / Tunnels
-</div>
+<div class="container">
 
-<ul class="nav nav-tabs">
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}"
-			href="{{ url_for('vpn.ipsec') }}">Tunnels</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}"
-			href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}"
-			href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a>
-	</li>
-	<li class="nav-item">
-		<a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}"
-			href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a>
-	</li>
-</ul>
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">IPsec</h1>
+      <p class="ss-page-desc">IKEv1/IKEv2 site-to-site and mobile VPN tunnels</p>
+    </div>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">
+      <i class="fa-solid fa-plus me-1"></i>Add P1
+    </button>
+  </div>
 
-<div class="settings-section">
-	<h5 class="openvpn-section-title">IPsec Tunnels</h5>
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'tunnels' else '' }}" href="{{ url_for('vpn.ipsec') }}">Tunnels</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'mobile_clients' else '' }}" href="{{ url_for('vpn.ipsec_mobile_clients') }}">Mobile Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'psk' else '' }}" href="{{ url_for('vpn.ipsec_pre_shared_keys') }}">Pre-Shared Keys</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'advanced' else '' }}" href="{{ url_for('vpn.ipsec_advanced_settings') }}">Advanced Settings</a></li>
+  </ul>
 
-	<div class="openvpn-section-body">
-		<table class="table table-bordered">
-			<thead>
-				<tr>
-					<th>ID</th>
-					<th>IKE</th>
-					<th>Remote Gateway</th>
-					<th>Auth/Mode</th>
-					<th>P1 Protocol</th>
-					<th>P1 Transforms</th>
-					<th>P1 DH-Group</th>
-					<th>P1 Description</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody id="ipsecTunnelsTable">
-				<!-- rows injected by JS -->
-			</tbody>
-		</table>
-
-		<div class="d-flex justify-content-start">
-			<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">Add
-				P1</button>
-		</div>
-	</div>
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-lock"></i></div>
+      <div><div class="ss-card-title">IPsec Tunnels</div><div class="ss-card-subtitle">Phase 1 (IKE) security associations</div></div>
+      <div class="ss-card-actions">
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">
+          <i class="fa-solid fa-plus me-1"></i>Add P1
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover mb-0" style="font-size:.85rem;">
+        <thead style="background:var(--border-color-soft);">
+          <tr>
+            <th style="padding:10px 14px;">ID</th><th>IKE</th><th>Remote Gateway</th>
+            <th>Auth/Mode</th><th>P1 Protocol</th><th>P1 Transforms</th>
+            <th>P1 DH-Group</th><th>P1 Description</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="ipsecTunnelsTable">
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="ipsecAddP1Modal" tabindex="-1" aria-labelledby="ipsecAddP1ModalLabel" aria-hidden="true">

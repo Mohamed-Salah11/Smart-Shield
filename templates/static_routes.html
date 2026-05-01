@@ -4,16 +4,11 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('system.dashboard') }}">System</a></li>
-                <li class="breadcrumb-item"><a href="/system/routing">Routing</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Static Routes</li>
-            </ol>
-        </nav>
-        <h1>Routing</h1>
+    <div class="ss-page-header">
+      <div>
+        <h1 class="ss-page-title">Routing</h1>
+        <p class="ss-page-desc">Static routes, gateways, and gateway groups</p>
+      </div>
     </div>
 
     <!-- Navigation Pills -->
@@ -30,17 +25,19 @@
     </ul>
 
     <!-- Static Routes Section -->
-    <div class="section">
-        <div class="section-header d-flex justify-content-between align-items-center">
-            <h2>Static Routes</h2>
-            <a href="{{ url_for('routing.static_route_edit') }}" class="btn btn-success btn-sm">
-                <i class="fa-solid fa-plus me-1"></i>Add Route
-            </a>
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-route"></i></div>
+        <div><div class="ss-card-title">Static Routes</div></div>
+        <div class="ss-card-actions">
+          <a href="{{ url_for('routing.static_route_edit') }}" class="btn btn-success btn-sm">
+            <i class="fa-solid fa-plus me-1"></i>Add Route
+          </a>
         </div>
-        <div class="section-body" style="padding: 0;">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
                         <tr>
                             <th>Network</th>
                             <th>Gateway</th>
@@ -81,16 +78,13 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="5" class="text-center py-5">
-                                    <i class="fa-solid fa-route fa-3x text-muted mb-3"></i>
-                                    <p class="text-muted mb-0">No static routes defined.</p>
-                                </td>
+                                <td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">No static routes defined</td>
                             </tr>
                         {% endif %}
                     </tbody>
                 </table>
-            </div>
         </div>
+      </div>
     </div>
 
 </div>
