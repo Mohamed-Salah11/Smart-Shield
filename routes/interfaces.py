@@ -215,7 +215,7 @@ def delete_interface_assignment(interface_type):
 @login_required
 def get_wireless_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, mode, description FROM wireless_configs''')
         configs = cursor.fetchall()
@@ -239,7 +239,7 @@ def get_wireless_configs():
 def save_wireless_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO wireless_configs (parent_interface, mode, description) 
                           VALUES (?, ?, ?)''', 
@@ -254,7 +254,7 @@ def save_wireless_config():
 @login_required
 def get_wireless_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, mode, description FROM wireless_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -275,7 +275,7 @@ def get_wireless_config(config_id):
 def update_wireless_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE wireless_configs SET parent_interface = ?, mode = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['mode'], data['description'], config_id))
@@ -288,7 +288,7 @@ def update_wireless_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_wireless_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM wireless_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -304,7 +304,7 @@ def delete_wireless_config(config_id):
 @login_required
 def get_vlan_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, vlan_tag, vlan_priority, description FROM vlan_configs''')
         configs = cursor.fetchall()
@@ -329,7 +329,7 @@ def get_vlan_configs():
 def save_vlan_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO vlan_configs (parent_interface, vlan_tag, vlan_priority, description) 
                           VALUES (?, ?, ?, ?)''', 
@@ -344,7 +344,7 @@ def save_vlan_config():
 @login_required
 def get_vlan_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, vlan_tag, vlan_priority, description FROM vlan_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -366,7 +366,7 @@ def get_vlan_config(config_id):
 def update_vlan_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE vlan_configs SET parent_interface = ?, vlan_tag = ?, vlan_priority = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['vlanTag'], data['vlanPriority'], data['description'], config_id))
@@ -379,7 +379,7 @@ def update_vlan_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_vlan_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM vlan_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -395,7 +395,7 @@ def delete_vlan_config(config_id):
 @login_required
 def get_qinq_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''SELECT id, parent_interface, first_level_tag, add_to_groups, description, member_tags FROM qinq_configs''')
         configs = cursor.fetchall()
@@ -421,7 +421,7 @@ def get_qinq_configs():
 def save_qinq_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO qinq_configs (parent_interface, first_level_tag, add_to_groups, description, member_tags) 
                           VALUES (?, ?, ?, ?, ?)''', 
@@ -436,7 +436,7 @@ def save_qinq_config():
 @login_required
 def get_qinq_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, first_level_tag, add_to_groups, description, member_tags FROM qinq_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -459,7 +459,7 @@ def get_qinq_config(config_id):
 def update_qinq_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE qinq_configs SET parent_interface = ?, first_level_tag = ?, add_to_groups = ?, description = ?, member_tags = ? WHERE id = ?''',
                        (data['parentInterface'], data['firstLevelTag'], data['addToGroups'], data['description'], ','.join(data['memberTags']), config_id))
@@ -472,7 +472,7 @@ def update_qinq_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_qinq_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM qinq_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -488,7 +488,7 @@ def delete_qinq_config(config_id):
 @login_required
 def get_ppp_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, link_type, link_interfaces, description, username, dial_on_demand FROM ppp_configs')
         configs = cursor.fetchall()
@@ -513,7 +513,7 @@ def get_ppp_configs():
 def save_ppp_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO ppp_configs (link_type, link_interfaces, description, username, password, dial_on_demand)
                           VALUES (?, ?, ?, ?, ?, ?)''',
@@ -527,7 +527,7 @@ def save_ppp_config():
 @login_required
 def get_ppp_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, link_type, link_interfaces, description, username, password, dial_on_demand FROM ppp_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -551,7 +551,7 @@ def get_ppp_config(config_id):
 def update_ppp_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE ppp_configs SET link_type = ?, link_interfaces = ?, description = ?, username = ?, password = ?, dial_on_demand = ? WHERE id = ?''',
                        (data['linkType'], ','.join(data['linkInterfaces']), data['description'], data['username'], data['password'], data['dialOnDemand'], config_id))
@@ -564,7 +564,7 @@ def update_ppp_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_ppp_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM ppp_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -580,7 +580,7 @@ def delete_ppp_config(config_id):
 @login_required
 def get_gre_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description FROM gre_configs')
         configs = cursor.fetchall()
@@ -612,7 +612,7 @@ def get_gre_configs():
 def save_gre_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO gre_configs (parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -626,7 +626,7 @@ def save_gre_config():
 @login_required
 def get_gre_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description FROM gre_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -656,7 +656,7 @@ def get_gre_config(config_id):
 def update_gre_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE gre_configs SET parent_interface = ?, gre_remote_address = ?, gre_local_address = ?, ipv4_tunnel_remote_address = ?, ipv4_tunnel_remote_prefix = ?, ipv4_tunnel_local_address = ?, ipv4_tunnel_local_prefix = ?, ipv6_tunnel_remote_address = ?, ipv6_tunnel_remote_prefix = ?, ipv6_tunnel_local_address = ?, ipv6_tunnel_local_prefix = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['greRemoteAddress'], data['greLocalAddress'], data['ipv4TunnelRemoteAddress'], data['ipv4TunnelRemotePrefix'], data['ipv4TunnelLocalAddress'], data['ipv4TunnelLocalPrefix'], data['ipv6TunnelRemoteAddress'], data['ipv6TunnelRemotePrefix'], data['ipv6TunnelLocalAddress'], data['ipv6TunnelLocalPrefix'], data['description'], config_id))
@@ -669,7 +669,7 @@ def update_gre_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_gre_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM gre_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -685,7 +685,7 @@ def delete_gre_config(config_id):
 @login_required
 def get_gif_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description FROM gif_configs')
         configs = cursor.fetchall()
@@ -713,7 +713,7 @@ def get_gif_configs():
 def save_gif_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO gif_configs (parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -727,7 +727,7 @@ def save_gif_config():
 @login_required
 def get_gif_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description FROM gif_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -753,7 +753,7 @@ def get_gif_config(config_id):
 def update_gif_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE gif_configs SET parent_interface = ?, gif_remote_address = ?, gif_tunnel_local_address = ?, gif_tunnel_remote_address = ?, gif_tunnel_subnet = ?, ecn_friendly_behavior = ?, outer_source_filtering = ?, description = ? WHERE id = ?''',
                        (data['parentInterface'], data['gifRemoteAddress'], data['gifTunnelLocalAddress'], data['gifTunnelRemoteAddress'], data['gifTunnelSubnet'], data['ecnFriendlyBehavior'], data['outerSourceFiltering'], data['description'], config_id))
@@ -766,7 +766,7 @@ def update_gif_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_gif_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM gif_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -782,7 +782,7 @@ def delete_gif_config(config_id):
 @login_required
 def get_bridge_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports FROM bridge_configs')
         configs = cursor.fetchall()
@@ -811,7 +811,7 @@ def get_bridge_configs():
 def save_bridge_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO bridge_configs (member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -825,7 +825,7 @@ def save_bridge_config():
 @login_required
 def get_bridge_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports FROM bridge_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -852,7 +852,7 @@ def get_bridge_config(config_id):
 def update_bridge_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE bridge_configs SET member_interfaces = ?, description = ?, cache_size = ?, cache_max_age = ?, span_interfaces = ?, edge_interfaces = ?, auto_edge_interfaces = ?, ptp_interfaces = ?, sticky_ports = ? WHERE id = ?''',
                        (','.join(data['memberInterfaces']), data['description'], data['cacheSize'], data['cacheMaxAge'], ','.join(data['spanInterfaces']), ','.join(data['edgeInterfaces']), ','.join(data['autoEdgeInterfaces']), ','.join(data['ptpInterfaces']), data['stickyPorts'], config_id))
@@ -865,7 +865,7 @@ def update_bridge_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_bridge_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM bridge_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -881,7 +881,7 @@ def delete_bridge_config(config_id):
 @login_required
 def get_lagg_configs():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interfaces, aggregation_protocol, description FROM lagg_configs')
         configs = cursor.fetchall()
@@ -904,7 +904,7 @@ def get_lagg_configs():
 def save_lagg_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO lagg_configs (parent_interfaces, aggregation_protocol, description) 
                           VALUES (?, ?, ?)''',
@@ -919,7 +919,7 @@ def save_lagg_config():
 @login_required
 def get_lagg_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT id, parent_interfaces, aggregation_protocol, description FROM lagg_configs WHERE id = ?', (config_id,))
         config = cursor.fetchone()
@@ -940,7 +940,7 @@ def get_lagg_config(config_id):
 def update_lagg_config(config_id):
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE lagg_configs SET parent_interfaces = ?, aggregation_protocol = ?, description = ? WHERE id = ?''',
                        (','.join(data['parentInterfaces']), data['aggregationProtocol'], data['description'], config_id))
@@ -953,7 +953,7 @@ def update_lagg_config(config_id):
 @api_permission_required("api.network.edit")
 def delete_lagg_config(config_id):
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM lagg_configs WHERE id = ?', (config_id,))
         conn.commit()
@@ -974,7 +974,7 @@ def interfaces_wan():
 @login_required
 def get_wan_config():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, username, password, dial_on_demand, idle_timeout, block_private_networks, block_bogon_networks FROM wan_config WHERE id = 1')
         config = cursor.fetchone()
@@ -1007,7 +1007,7 @@ def get_wan_config():
 def save_wan_config():
     try:
         data = request.get_json()
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = ?, dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], data['password'], data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
@@ -1030,7 +1030,7 @@ def interfaces_lan():
 @login_required
 def get_lan_config():
     try:
-        conn = conn = get_db()
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, block_private_networks, block_bogon_networks FROM lan_config WHERE id = 1')
         config = cursor.fetchone()

@@ -93,24 +93,13 @@ def auth():
         if radius_result.get("ok"):
             result = authenticate_session(conn, mac, ip, username=username)
         else:
-            # Local user check
-            import hashlib, hmac as _hmac
+            # Local user check — use correct column names from the users table
+            from werkzeug.security import check_password_hash as _chk
             row = conn.execute(
-                "SELECT password_hash FROM users WHERE username=? AND disabled=0",
+                "SELECT password FROM users WHERE username=? AND (status IS NULL OR status='active')",
                 (username,),
             ).fetchone()
-            if not row:
-                return render_template(
-                    "portal/login.html",
-                    error="Invalid username or password.",
-                    orig_url=orig_url,
-                )
-            import bcrypt
-            try:
-                valid = bcrypt.checkpw(password.encode(), row["password_hash"].encode())
-            except Exception:
-                valid = False
-            if not valid:
+            if not row or not _chk(row["password"], password):
                 return render_template(
                     "portal/login.html",
                     error="Invalid username or password.",
@@ -119,6 +108,16 @@ def auth():
             result = authenticate_session(conn, mac, ip, username=username)
 
     if not result.get("ok"):
+        # Decide which template to return to (block page or generic login page)
+        back_template = request.form.get("back_template", "login")
+        domain = request.form.get("domain", "")
+        if back_template == "block":
+            return render_template(
+                "portal/block.html",
+                error=result.get("message", "Authentication failed."),
+                domain=domain,
+                orig_url=orig_url,
+            )
         return render_template(
             "portal/login.html",
             error=result.get("message", "Authentication failed."),
@@ -126,13 +125,41 @@ def auth():
         )
 
     session["portal_authenticated"] = True
+    session["content_filter_authenticated"] = True
     session["portal_ip"] = ip
-    return redirect(url_for("portal.success", url=orig_url) if not orig_url else orig_url)
+
+    # If came from block page, go back to block success view
+    back_template = request.form.get("back_template", "login")
+    domain = request.form.get("domain", "")
+    if back_template == "block":
+        return render_template("portal/block.html", authenticated=True, domain=domain, orig_url=orig_url)
+
+    return redirect(orig_url if orig_url else url_for("portal.success"))
 
 
 @portal_bp.route("/success", methods=["GET"])
 def success():
     return render_template("portal/success.html")
+
+
+@portal_bp.route("/block", methods=["GET"])
+def block():
+    """
+    Content Police block page.
+    Shown when a client's browser hits Smart Shield's LAN IP after DNS redirects a
+    blocked domain here.  No portal-enabled check — this page must always be
+    reachable so blocked clients can authenticate.
+    """
+    domain   = request.args.get("domain", "").strip()
+    orig_url = request.args.get("url",    "").strip()
+
+    # If the user already authenticated in this session, let them through
+    if session.get("content_filter_authenticated") or session.get("portal_authenticated"):
+        if orig_url:
+            return redirect(orig_url)
+        return render_template("portal/block.html", authenticated=True, domain=domain, orig_url=orig_url)
+
+    return render_template("portal/block.html", domain=domain, orig_url=orig_url)
 
 
 @portal_bp.route("/logout", methods=["GET", "POST"])

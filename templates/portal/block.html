@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Access Blocked — Smart Shield</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    width: 100%;
+    max-width: 460px;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  .card-header {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 1.5rem 2rem;
+    text-align: center;
+  }
+  .card-header .shield-icon {
+    font-size: 2.2rem;
+    display: block;
+    margin-bottom: .4rem;
+  }
+  .card-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .02em; }
+  .card-header p  { font-size: .82rem; opacity: .7; margin-top: .2rem; }
+
+  /* ── Block notice ── */
+  .block-notice {
+    background: #fef2f2;
+    border-left: 4px solid #dc2626;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+  }
+  .block-notice .icon { font-size: 1.4rem; flex-shrink: 0; }
+  .block-notice h2 { font-size: .95rem; font-weight: 700; color: #991b1b; margin-bottom: .25rem; }
+  .block-notice p  { font-size: .82rem; color: #b91c1c; line-height: 1.45; }
+  .block-notice code {
+    display: inline-block;
+    background: #fee2e2;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: .85rem;
+    color: #7f1d1d;
+    word-break: break-all;
+  }
+
+  /* ── Success notice ── */
+  .success-notice {
+    background: #f0fdf4;
+    border-left: 4px solid #16a34a;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+  }
+  .success-notice .icon { font-size: 1.4rem; flex-shrink: 0; }
+  .success-notice h2 { font-size: .95rem; font-weight: 700; color: #166534; margin-bottom: .25rem; }
+  .success-notice p  { font-size: .82rem; color: #166534; line-height: 1.45; }
+
+  /* ── Body ── */
+  .card-body { padding: 1.5rem 2rem 1.75rem; }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    color: #9ca3af;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin: 1.25rem 0;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+  }
+
+  label { display: block; font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: .3rem; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: .6rem .75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: .92rem;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    margin-bottom: 1rem;
+  }
+  input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+
+  .btn-primary {
+    width: 100%;
+    padding: .7rem;
+    background: #1e3a5f;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: .95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-primary:hover { background: #2d5a8f; }
+
+  .btn-link {
+    display: inline-block;
+    margin-top: .75rem;
+    padding: .65rem 1.25rem;
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    font-size: .9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .2s;
+    width: 100%;
+    text-align: center;
+  }
+  .btn-link:hover { background: #dcfce7; }
+
+  .alert-error {
+    padding: .65rem 1rem;
+    border-radius: 6px;
+    font-size: .82rem;
+    margin-bottom: 1rem;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
+
+  .hint {
+    font-size: .75rem;
+    color: #6b7280;
+    text-align: center;
+    margin-top: 1rem;
+    line-height: 1.5;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    font-size: .75rem;
+    color: #9ca3af;
+    padding: .9rem 2rem;
+    border-top: 1px solid #f1f5f9;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+  <div class="card-header">
+    <span class="shield-icon">🛡️</span>
+    <h1>Smart Shield — Content Police</h1>
+    <p>Network access control &amp; content filtering</p>
+  </div>
+
+  {% if authenticated %}
+  <!-- ── Authenticated view ── -->
+  <div class="success-notice">
+    <span class="icon">✅</span>
+    <div>
+      <h2>Access Granted</h2>
+      <p>You have successfully authenticated. You may now access the requested content.</p>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if orig_url %}
+    <a href="{{ orig_url }}" class="btn-link">↗ Continue to {{ domain or orig_url }}</a>
+    {% elif domain %}
+    <a href="http://{{ domain }}" class="btn-link">↗ Continue to {{ domain }}</a>
+    {% endif %}
+    <p class="hint">Your session is active. Access will remain open until you log out or close your browser.</p>
+  </div>
+
+  {% else %}
+  <!-- ── Blocked view ── -->
+  <div class="block-notice">
+    <span class="icon">🚫</span>
+    <div>
+      <h2>This site has been blocked</h2>
+      {% if domain %}
+      <p><code>{{ domain }}</code> is restricted by the Content Police filter.<br>
+      Authorized users may sign in below to gain access.</p>
+      {% else %}
+      <p>The requested site is restricted by the Content Police filter.<br>
+      Authorized users may sign in below to gain access.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-body">
+    {% if error %}
+    <div class="alert-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="divider">Sign in to access</div>
+
+    <form method="POST" action="/portal/auth">
+      <input type="hidden" name="auth_type"     value="credentials">
+      <input type="hidden" name="back_template" value="block">
+      <input type="hidden" name="domain"        value="{{ domain|default('') }}">
+      <input type="hidden" name="orig_url"      value="{{ orig_url|default('') }}">
+
+      <label for="username">Smart Shield Username</label>
+      <input type="text" id="username" name="username"
+             autocomplete="username" required placeholder="your username">
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password"
+             autocomplete="current-password" required placeholder="••••••••">
+
+      <button type="submit" class="btn-primary">Sign In &amp; Access Site</button>
+    </form>
+
+    <p class="hint">Only users with a Smart Shield account can bypass this block.<br>
+    Contact your network administrator if you need access.</p>
+  </div>
+  {% endif %}
+
+  <div class="footer">Protected by Smart Shield &middot; Content Police Filter</div>
+</div>
+</body>
+</html>

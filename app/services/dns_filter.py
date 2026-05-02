@@ -39,11 +39,27 @@ def _sanitize_domain(raw: str) -> str:
 # Unbound config line generator (consumed by dns_writer.py)
 # ---------------------------------------------------------------------------
 
+def _block_page_ip(conn) -> str:
+    """Return the Smart Shield LAN IP (without prefix) to use as the DNS redirect target."""
+    try:
+        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
+        addr = (row["ipv4_address"] if row else "") or ""
+        return addr.split("/")[0].strip()
+    except Exception:
+        return ""
+
+
 def generate_dns_filter_zones(conn) -> list:
     """
     Return a list of Unbound server-block lines for all enabled DNS filter rules.
     These are injected into unbound.conf by dns_writer.generate_unbound_conf().
+
+    For "block" rules: redirect to Smart Shield's LAN IP so the browser hits the
+    /portal/block page instead of getting a raw NXDOMAIN.  Falls back to
+    always_nxdomain when no LAN IP is configured.
     """
+    block_ip = _block_page_ip(conn)
+
     rules = _rows(conn, """
         SELECT domain, action, redirect_ip
         FROM filter_dns_rules
@@ -59,7 +75,12 @@ def generate_dns_filter_zones(conn) -> list:
             continue
         fqdn = domain + "."
         if action == "block":
-            lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+            if block_ip:
+                # Redirect to Smart Shield so the block/login page is served
+                lines.append(f'    local-zone: "{fqdn}" redirect')
+                lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+            else:
+                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
         elif action == "redirect" and redirect_ip:
             lines.append(f'    local-zone: "{fqdn}" redirect')
             lines.append(f'    local-data: "{fqdn} A {redirect_ip}"')
