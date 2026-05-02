@@ -163,6 +163,9 @@ SMARTSHIELD_ENABLE_NETWORK_APPLY=0
 SMARTSHIELD_NETWORK_DRY_RUN=0
 BOOTSTRAP_ADMIN_USERNAME=admin
 BOOTSTRAP_ADMIN_PASSWORD=changeme
+# Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
+ABUSECH_AUTH_KEY=
+ABUSECH_DRY_RUN=1
 EOF
         chmod 0600 "${ENV_FILE}"
         warn "Set a strong BOOTSTRAP_ADMIN_PASSWORD in ${ENV_FILE} before starting."
@@ -170,6 +173,14 @@ EOF
 else
     info "Env file already exists: ${ENV_FILE}"
     chmod 0600 "${ENV_FILE}"
+fi
+
+# Warn (non-fatal) when ABUSECH_AUTH_KEY is not yet configured
+if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
+    warn "ABUSECH_AUTH_KEY is not set in ${ENV_FILE}."
+    warn "Abuse.ch threat intelligence (URLhaus / MalwareBazaar / ThreatFox) will"
+    warn "be unavailable until you add:  ABUSECH_AUTH_KEY=<your-key>"
+    warn "Get your key at: https://abuse.ch/"
 fi
 
 CONFIG_FILE="${ETC_DIR}/config.json"
@@ -314,6 +325,9 @@ Next steps:
   1. Edit ${ENV_FILE}
        — Set a strong BOOTSTRAP_ADMIN_PASSWORD (used only on first DB init)
        — Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 when ready for live network changes
+       — Set ABUSECH_AUTH_KEY=<your-key>  (get it at https://abuse.ch/)
+         Leave ABUSECH_DRY_RUN=1 until you want live threat intel lookups.
+         Store the key here (mode 0600) or in your secret manager — never in Git.
 
   2. Start the service:
        service smart_shield start

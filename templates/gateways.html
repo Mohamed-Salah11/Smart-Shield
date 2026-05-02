@@ -25,9 +25,9 @@
             <dt class="col-sm-4">IP Address</dt>
             <dd class="col-sm-8"><code>{{ wan.ipv4_address or '—' }}</code></dd>
             <dt class="col-sm-4">Gateway</dt>
-            <dd class="col-sm-8"><code>{{ wan.ipv4_gateway or '—' }}</code></dd>
+            <dd class="col-sm-8"><code>{{ wan.ipv4_upstream_gateway or '—' }}</code></dd>
             <dt class="col-sm-4">Type</dt>
-            <dd class="col-sm-8">{{ wan.config_type or 'Static' }}</dd>
+            <dd class="col-sm-8">{{ wan.ipv4_config_type or 'Static' }}</dd>
             <dt class="col-sm-4">Description</dt>
             <dd class="col-sm-8">{{ wan.description or '—' }}</dd>
           </dl>
@@ -51,8 +51,8 @@
             <dd class="col-sm-8"><code>{{ lan.assigned_port or '—' }}</code></dd>
             <dt class="col-sm-4">IP Address</dt>
             <dd class="col-sm-8"><code>{{ lan.ipv4_address or '—' }}</code></dd>
-            <dt class="col-sm-4">Subnet Mask</dt>
-            <dd class="col-sm-8"><code>{{ lan.subnet_mask or '—' }}</code></dd>
+            <dt class="col-sm-4">Type</dt>
+            <dd class="col-sm-8">{{ lan.ipv4_config_type or 'Static' }}</dd>
             <dt class="col-sm-4">Description</dt>
             <dd class="col-sm-8">{{ lan.description or '—' }}</dd>
           </dl>

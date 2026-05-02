@@ -116,6 +116,8 @@ Copy `.env.example` to `.env` and set the following:
 | `SMARTSHIELD_ENABLE_NETWORK_APPLY` | Actually write system configs (`1` / `0`) | No (default: `0`) |
 | `SMARTSHIELD_NETWORK_DRY_RUN` | Dry-run mode for config writers | No (default: `0`) |
 | `SMARTSHIELD_MASTER_KEY` | Base64-encoded 32-byte key for secret encryption | No (auto-generated) |
+| `ABUSECH_AUTH_KEY` | Personal Auth-Key for abuse.ch APIs (URLhaus / MalwareBazaar / ThreatFox) | Yes (for threat intel) |
+| `ABUSECH_DRY_RUN` | `1` = log-only, no blocking actions (default); `0` = live API calls | No (default: `1`) |
 
 Generate a secure secret key:
 ```bash
@@ -126,6 +128,47 @@ Generate a master key for secret encryption:
 ```bash
 python -c "import secrets,base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"
 ```
+
+---
+
+## Abuse.ch Threat Intelligence Setup
+
+Smart Shield integrates with three abuse.ch feeds: **URLhaus** (malicious URLs/hosts), **MalwareBazaar** (file hashes), and **ThreatFox** (IOCs).  
+The integration defaults to **dry-run mode** — lookups are logged but no blocking actions are taken until you explicitly enable live mode.
+
+### 1. Get your Auth-Key
+
+Sign up or log in at [https://abuse.ch/](https://abuse.ch/) and copy your personal Auth-Key from your account dashboard.
+
+### 2. Add the key to your local `.env`
+
+```bash
+# .env (never commit this file — it is listed in .gitignore)
+ABUSECH_AUTH_KEY=your_real_key_here
+ABUSECH_DRY_RUN=1   # keep as 1 until you're ready for live lookups
+```
+
+### 3. Production deployment
+
+Store the key in your server's secret manager rather than a file on disk.  
+On FreeBSD you can set it as an rc.conf variable:
+
+```sh
+# /etc/rc.conf.d/smart_shield
+smart_shield_env="ABUSECH_AUTH_KEY=your_real_key_here"
+```
+
+Or inject it via your hosting platform's secret manager (AWS Secrets Manager, HashiCorp Vault, etc.) as the environment variable `ABUSECH_AUTH_KEY`.
+
+### 4. Security rules
+
+| Rule | Detail |
+|---|---|
+| Never hardcode the key | The key is always read from `ABUSECH_AUTH_KEY` at call time |
+| Header only | The key is sent exclusively as `Auth-Key: <value>` in HTTP request headers |
+| Logs are redacted | The key value never appears in app logs or error messages |
+| Dry-run by default | Set `ABUSECH_DRY_RUN=0` only when you want live blocking |
+| Tests use a fake key | `ABUSECH_AUTH_KEY=test_key_123` — the real key is never in the test suite |
 
 ---
 

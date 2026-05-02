@@ -188,6 +188,17 @@
         <i class="fa-solid fa-list-check me-1"></i>Rulesets
       </a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab=='feeds' %}active{% endif %}"
+         href="#" onclick="showTab('feeds',this);return false;">
+        <i class="fa-solid fa-satellite-dish me-1"></i>Threat Feeds
+        {% if feeds_has_key %}
+        <span class="badge bg-success ms-1" style="font-size:.65rem;vertical-align:middle;">Key set</span>
+        {% else %}
+        <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;vertical-align:middle;">No key</span>
+        {% endif %}
+      </a>
+    </li>
   </ul>
 
   <!-- ── Tab: Status & Alerts ── -->
@@ -373,6 +384,84 @@
     </div>
   </div>
 
+  <!-- ── Tab: Threat Feeds ── -->
+  <div class="tab-pane {% if active_tab=='feeds' %}d-block{% else %}d-none{% endif %}" id="tab-feeds">
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+        <div>
+          <div class="ss-card-title">Threat Intelligence Feeds</div>
+          <div class="ss-card-subtitle" style="font-size:.8rem;color:var(--muted);">
+            URLhaus &nbsp;·&nbsp; MalwareBazaar &nbsp;·&nbsp; ThreatFox
+          </div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+
+        <!-- Key status banner -->
+        <div id="feedsStatusBanner" class="alert {% if feeds_has_key %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center gap-2 mb-4" style="font-size:.875rem;">
+          <i class="fa-solid {% if feeds_has_key %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
+          <span id="feedsStatusText">
+            {% if feeds_has_key %}
+              Auth-Key is configured. Lookups will authenticate with abuse.ch.
+            {% else %}
+              No Auth-Key set. Abuse.ch API calls will fail until you add a key below.
+            {% endif %}
+          </span>
+        </div>
+
+        <!-- Auth-Key input -->
+        <div class="mb-3 row align-items-center">
+          <label class="col-sm-3 col-form-label fw-semibold">
+            Abuse.ch Auth-Key
+          </label>
+          <div class="col-sm-9">
+            <div class="input-group" style="max-width:520px;">
+              <input type="password" id="feedsAuthKey" class="form-control"
+                     placeholder="{% if feeds_has_key %}Key already stored — paste new key to replace{% else %}Paste your Auth-Key here{% endif %}"
+                     autocomplete="new-password">
+              <button class="btn btn-outline-secondary" type="button" id="btnShowKey" title="Show / hide">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+            <div class="mt-1" style="font-size:.8rem;color:var(--muted);">
+              Get your key at
+              <a href="https://abuse.ch/" target="_blank" rel="noopener">abuse.ch</a>.
+              The key is stored encrypted (AES-256-GCM) and never logged.
+            </div>
+          </div>
+        </div>
+
+        <!-- Dry-run note -->
+        <div class="mb-4 row">
+          <div class="col-sm-9 offset-sm-3">
+            <div class="alert alert-secondary py-2 px-3 mb-0" style="font-size:.8rem;">
+              <i class="fa-solid fa-flask me-1"></i>
+              <strong>Dry-run mode is active by default.</strong>
+              Lookups are logged but no blocking actions are taken until
+              <code>ABUSECH_DRY_RUN=0</code> is set in your environment.
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="row">
+          <div class="col-sm-9 offset-sm-3 d-flex gap-2">
+            <button type="button" class="btn btn-primary" id="btnSaveFeeds">
+              <i class="fa-solid fa-save me-1"></i>Save Key
+            </button>
+            {% if feeds_has_key %}
+            <button type="button" class="btn btn-outline-danger" id="btnClearFeeds">
+              <i class="fa-solid fa-trash me-1"></i>Clear Key
+            </button>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Add Ruleset Modal -->
@@ -528,6 +617,79 @@ document.getElementById('btnUpdateRules').addEventListener('click', async functi
 /* Init */
 if (document.getElementById('tab-status').classList.contains('d-block')) {
   loadAlerts();
+}
+
+/* ── Threat Feeds ── */
+const btnShowKey = document.getElementById('btnShowKey');
+if (btnShowKey) {
+  btnShowKey.addEventListener('click', function() {
+    const inp = document.getElementById('feedsAuthKey');
+    const icon = this.querySelector('i');
+    if (inp.type === 'password') {
+      inp.type = 'text';
+      icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+      inp.type = 'password';
+      icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+  });
+}
+
+function _setFeedsStatus(hasKey) {
+  const banner = document.getElementById('feedsStatusBanner');
+  const text   = document.getElementById('feedsStatusText');
+  if (!banner) return;
+  if (hasKey) {
+    banner.className = 'alert alert-success d-flex align-items-center gap-2 mb-4';
+    banner.querySelector('i').className = 'fa-solid fa-circle-check';
+    text.textContent = 'Auth-Key is configured. Lookups will authenticate with abuse.ch.';
+  } else {
+    banner.className = 'alert alert-warning d-flex align-items-center gap-2 mb-4';
+    banner.querySelector('i').className = 'fa-solid fa-triangle-exclamation';
+    text.textContent = 'No Auth-Key set. Abuse.ch API calls will fail until you add a key below.';
+  }
+}
+
+const btnSaveFeeds = document.getElementById('btnSaveFeeds');
+if (btnSaveFeeds) {
+  btnSaveFeeds.addEventListener('click', async function() {
+    const key = document.getElementById('feedsAuthKey').value.trim();
+    if (!key) { alert('Please enter an Auth-Key before saving.'); return; }
+    this.disabled = true;
+    const res = await apiFetch('{{ url_for("ids.ids_feeds_save") }}', {
+      method: 'POST',
+      body: JSON.stringify({abusech_auth_key: key}),
+    }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
+    this.disabled = false;
+    if (res.ok) {
+      document.getElementById('feedsAuthKey').value = '';
+      document.getElementById('feedsAuthKey').placeholder = 'Key already stored — paste new key to replace';
+      _setFeedsStatus(true);
+    } else {
+      alert('Error saving key: ' + (res.message || 'Unknown error'));
+    }
+  });
+}
+
+const btnClearFeeds = document.getElementById('btnClearFeeds');
+if (btnClearFeeds) {
+  btnClearFeeds.addEventListener('click', async function() {
+    if (!confirm('Remove the stored Auth-Key? Abuse.ch lookups will stop working.')) return;
+    this.disabled = true;
+    const res = await apiFetch('{{ url_for("ids.ids_feeds_save") }}', {
+      method: 'POST',
+      body: JSON.stringify({abusech_auth_key: ''}),
+    }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
+    this.disabled = false;
+    if (res.ok) {
+      document.getElementById('feedsAuthKey').value = '';
+      document.getElementById('feedsAuthKey').placeholder = 'Paste your Auth-Key here';
+      _setFeedsStatus(false);
+      this.remove();
+    } else {
+      alert('Error clearing key: ' + (res.message || 'Unknown error'));
+    }
+  });
 }
 </script>
 {% endblock %}
