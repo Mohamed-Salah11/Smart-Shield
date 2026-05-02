@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 class SchemaVersionError(RuntimeError):
@@ -184,6 +184,18 @@ def _migration_v5(conn):
     """)
 
 
+def _migration_v6(conn):
+    """Phase 6: ids_threat_feeds table for encrypted abuse.ch Auth-Key storage."""
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS ids_threat_feeds (
+        id               INTEGER PRIMARY KEY CHECK (id = 1),
+        abusech_auth_key TEXT    DEFAULT '',
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    conn.execute("INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)")
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -191,6 +203,7 @@ MIGRATIONS = [
     (3, _migration_v3),
     (4, _migration_v4),
     (5, _migration_v5),
+    (6, _migration_v6),
 ]
 
 
