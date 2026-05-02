@@ -22,6 +22,13 @@ def _rulesets(conn):
 
 # ── Main IDS/IPS page ──────────────────────────────────────────────────────
 
+def _feeds_has_key(conn) -> bool:
+    row = conn.execute(
+        "SELECT abusech_auth_key FROM ids_threat_feeds WHERE id=1"
+    ).fetchone()
+    return bool(row and row["abusech_auth_key"])
+
+
 @ids_bp.route("/", methods=["GET"])
 @login_required
 def ids_index():
@@ -43,6 +50,7 @@ def ids_index():
         rulesets=rulesets,
         status=status,
         nics=nics,
+        feeds_has_key=_feeds_has_key(conn),
         active_tab=request.args.get("tab", "status"),
     )
 
@@ -186,6 +194,38 @@ def ids_update_rules():
 def ids_status():
     from app.services.ids_writer import get_ids_status
     return jsonify(get_ids_status())
+
+
+# ── Threat Feeds (abuse.ch Auth-Key) ─────────────────────────────────────
+
+@ids_bp.route("/api/feeds", methods=["GET"])
+@login_required
+def ids_feeds_get():
+    conn = get_db()
+    return jsonify({"ok": True, "has_key": _feeds_has_key(conn)})
+
+
+@ids_bp.route("/api/feeds", methods=["POST"])
+@api_permission_required("api.ids.edit")
+def ids_feeds_save():
+    data    = request.get_json(silent=True) or {}
+    raw_key = (data.get("abusech_auth_key") or "").strip()
+
+    from app.secret_store import encrypt_secret
+    conn = get_db()
+    conn.execute(
+        "UPDATE ids_threat_feeds SET abusech_auth_key=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+        (encrypt_secret(raw_key) if raw_key else "",),
+    )
+    conn.commit()
+
+    log_event(
+        category="system", action="abusech_key_update",
+        username=session.get("username"),
+        remote_addr=request.remote_addr,
+        details={"key_set": bool(raw_key)},
+    )
+    return jsonify({"ok": True, "has_key": bool(raw_key)})
 
 
 # ── Alert log viewer (tail eve.json) ─────────────────────────────────────

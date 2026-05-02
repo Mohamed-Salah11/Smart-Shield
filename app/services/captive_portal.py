@@ -64,8 +64,11 @@ def authenticate_session(
     ip    = (ip or "").strip()
     uname = (username or "").strip()
 
-    if not mac or not ip:
-        return {"ok": False, "message": "MAC and IP are required."}
+    if not ip:
+        return {"ok": False, "message": "IP address is required."}
+    # MAC is optional — use the IP as a fallback key so dev mode works without ARP
+    if not mac:
+        mac = f"ip:{ip}"
 
     expires_at = _now_ts() + duration_minutes * 60
     conn.execute(

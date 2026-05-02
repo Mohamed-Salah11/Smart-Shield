@@ -199,7 +199,7 @@ def init_db():
         mtu TEXT DEFAULT '',
         mss TEXT DEFAULT '',
         speed_and_duplex TEXT DEFAULT 'default',
-        ipv4_address TEXT DEFAULT '192.168.1.1/24',
+        ipv4_address TEXT DEFAULT '',
         ipv4_upstream_gateway TEXT DEFAULT '',
         block_private_networks INTEGER DEFAULT 0,
         block_bogon_networks INTEGER DEFAULT 0
@@ -1247,14 +1247,6 @@ CREATE TABLE IF NOT EXISTS dhcp_pools (
 )
 """)
 
-    cursor.execute("SELECT COUNT(*) AS c FROM dhcp_pools")
-    if cursor.fetchone()["c"] == 0:
-        cursor.execute("""
-            INSERT INTO dhcp_pools (interface_type, enabled, start_ip, end_ip, gateway_ip, dns_servers, lease_time)
-            VALUES
-            ('LAN', 0, '192.168.1.100', '192.168.1.200', '192.168.1.1', '1.1.1.1,8.8.8.8', 86400),
-            ('WAN', 0, '0.0.0.0', '0.0.0.0', '', '', 86400)
-        """)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS static_leases (
@@ -1340,23 +1332,17 @@ ON static_leases(mac_address)
     )
     """)
 
-    # Seed default rulesets if none exist
-    cursor.execute("SELECT COUNT(*) AS c FROM ids_rulesets")
-    if cursor.fetchone()["c"] == 0:
-        cursor.executemany(
-            "INSERT OR IGNORE INTO ids_rulesets (name, enabled, url, description) VALUES (?,?,?,?)",
-            [
-                ("Emerging Threats Open", 1,
-                 "https://rules.emergingthreats.net/open/suricata/emerging.rules.tar.gz",
-                 "Community-maintained detection rules covering current threats"),
-                ("ET Pro Telemetry Edition", 0,
-                 "https://rules.emergingthreatspro.com/open-nogpl/suricata/emerging.rules.tar.gz",
-                 "Enhanced ruleset with telemetry (free with registration)"),
-                ("Abuse.ch SSL Blacklist", 1,
-                 "https://sslbl.abuse.ch/blacklist/sslipblacklist.rules",
-                 "Blocks SSL connections to known malware C2 servers"),
-            ],
-        )
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ids_threat_feeds (
+        id               INTEGER PRIMARY KEY CHECK (id = 1),
+        abusech_auth_key TEXT    DEFAULT '',
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cursor.execute(
+        "INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)"
+    )
 
     # ── Routing: Gateways ─────────────────────────────────────────────────────
     cursor.execute("""
