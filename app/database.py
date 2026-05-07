@@ -150,6 +150,25 @@ def init_db():
     if wan_columns and "assigned_port" not in wan_columns:
         cursor.execute("ALTER TABLE wan_config ADD COLUMN assigned_port TEXT DEFAULT ''")
 
+    # Firewall rule table schema migrations — add missing columns to existing DBs.
+    cursor.execute("PRAGMA table_info(firewall_rules_floating)")
+    _fw_float_cols = {row["name"] for row in cursor.fetchall()}
+    if _fw_float_cols and "action" not in _fw_float_cols:
+        cursor.execute("ALTER TABLE firewall_rules_floating ADD COLUMN action TEXT DEFAULT 'pass'")
+
+    cursor.execute("PRAGMA table_info(firewall_rules_wan)")
+    _fw_wan_cols = {row["name"] for row in cursor.fetchall()}
+    if _fw_wan_cols:
+        if "source_port" not in _fw_wan_cols:
+            cursor.execute("ALTER TABLE firewall_rules_wan ADD COLUMN source_port TEXT")
+        if "dest_port" not in _fw_wan_cols:
+            cursor.execute("ALTER TABLE firewall_rules_wan ADD COLUMN dest_port TEXT")
+
+    cursor.execute("PRAGMA table_info(firewall_rules_lan)")
+    _fw_lan_cols = {row["name"] for row in cursor.fetchall()}
+    if _fw_lan_cols and "action" not in _fw_lan_cols:
+        cursor.execute("ALTER TABLE firewall_rules_lan ADD COLUMN action TEXT DEFAULT 'pass'")
+
     # Keep lan_config/wan_config assigned_port in sync with interface_assignments.
     # Only run when all three tables already exist (skip on fresh install).
     cursor.execute(
@@ -949,6 +968,7 @@ ON interface_assignments(interface_type)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS firewall_rules_floating (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT DEFAULT 'pass',
         disabled INTEGER DEFAULT 0,
         interface TEXT,
         protocol TEXT,
@@ -972,7 +992,9 @@ ON interface_assignments(interface_type)
         disabled INTEGER DEFAULT 0,
         protocol TEXT,
         source TEXT,
+        source_port TEXT,
         destination TEXT,
+        dest_port TEXT,
         description TEXT,
         rule_order INTEGER DEFAULT 0
     )
@@ -982,6 +1004,7 @@ ON interface_assignments(interface_type)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS firewall_rules_lan (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT DEFAULT 'pass',
         disabled INTEGER DEFAULT 0,
         interface TEXT,
         protocol TEXT,

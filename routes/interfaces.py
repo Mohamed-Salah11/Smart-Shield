@@ -4,6 +4,7 @@ from app.auth_utils import login_required
 from app.api_auth import api_permission_required
 from app.db_utils import db_cursor
 from app.database import get_db
+from app.secret_store import encrypt_secret
 from app.validators import validate_ip, validate_cidr, validate_interface_name, collect_errors
 
 interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
@@ -31,6 +32,50 @@ def interfaces():
 @login_required
 def interfaces_assignments():
     return render_template("interfaces_assignments.html")
+
+@interfaces_bp.route("/available-ports", methods=['GET'])
+@login_required
+def available_ports():
+    """Return physical NICs for assignment dropdowns."""
+    try:
+        from app.services.network_service import list_physical_nics
+
+        ports = []
+        for nic in list_physical_nics():
+            name = (nic.get("name") or "").strip()
+            if not name:
+                continue
+
+            ether = (nic.get("ether") or "").strip()
+            status = (nic.get("status") or "").strip()
+            media = (nic.get("media") or "").strip()
+
+            details = []
+            if ether:
+                details.append(ether)
+            if status:
+                details.append(f"status: {status}")
+            if media:
+                details.append(media)
+
+            label = name if not details else f"{name} ({', '.join(details)})"
+            ports.append({
+                "name": name,
+                "label": label,
+                "ether": ether,
+                "status": status,
+                "media": media,
+            })
+
+        if not ports:
+            ports = [
+                {"name": "em0", "label": "em0", "ether": "", "status": "", "media": ""},
+                {"name": "em1", "label": "em1", "ether": "", "status": "", "media": ""},
+            ]
+
+        return jsonify({"status": "success", "ports": ports})
+    except Exception as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
 
 @interfaces_bp.route("/get-interface-groups", methods=['GET'])
 @login_required
@@ -164,32 +209,55 @@ def get_interface_assignments():
 def save_interface_assignment():
     try:
         data = request.get_json() or {}
-        iface_type = (data.get('interfaceType') or '').strip()
+        iface_type = (data.get('interfaceType') or '').strip().upper()
         net_port   = (data.get('networkPort') or '').strip()
-        if not iface_type or not net_port:
-            return jsonify({'status': 'error', 'message': 'interfaceType and networkPort are required'}), 400
+
+        if iface_type not in {"WAN", "LAN"}:
+            return jsonify({'status': 'error', 'message': 'interfaceType must be WAN or LAN'}), 400
+        if not net_port:
+            return jsonify({'status': 'error', 'message': 'networkPort is required'}), 400
+
         try:
             validate_interface_name(net_port, allow_empty=False)
         except ValueError as exc:
             return jsonify({'status': 'error', 'message': str(exc)}), 400
 
+        opposite = "LAN" if iface_type == "WAN" else "WAN"
+
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute(
-                'SELECT id FROM interface_assignments WHERE interface_type = ?',
-                (iface_type,)
+                'SELECT network_port FROM interface_assignments WHERE interface_type = ?',
+                (opposite,)
             )
-            existing = cursor.fetchone()
-            if existing:
+            other = cursor.fetchone()
+            if other and (other["network_port"] or "").strip() == net_port:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'{net_port} is already assigned to {opposite}',
+                }), 400
+
+            cursor.execute(
+                '''
+                INSERT INTO interface_assignments (interface_type, network_port)
+                VALUES (?, ?)
+                ON CONFLICT(interface_type) DO UPDATE SET
+                    network_port = excluded.network_port
+                ''',
+                (iface_type, net_port)
+            )
+
+            if iface_type == "WAN":
                 cursor.execute(
-                    'UPDATE interface_assignments SET network_port = ? WHERE interface_type = ?',
-                    (net_port, iface_type)
+                    'UPDATE wan_config SET assigned_port = ? WHERE id = 1',
+                    (net_port,)
                 )
             else:
                 cursor.execute(
-                    'INSERT INTO interface_assignments (interface_type, network_port) VALUES (?, ?)',
-                    (iface_type, net_port)
+                    'UPDATE lan_config SET assigned_port = ? WHERE id = 1',
+                    (net_port,)
                 )
-        return jsonify({'status': 'success', 'message': 'Interface assignment saved'})
+
+        return jsonify({'status': 'success', 'message': f'{iface_type} assigned to {net_port}'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
@@ -197,13 +265,22 @@ def save_interface_assignment():
 @api_permission_required("api.network.edit")
 def delete_interface_assignment(interface_type):
     try:
+        iface_type = (interface_type or '').strip().upper()
+        if iface_type not in {"WAN", "LAN"}:
+            return jsonify({'status': 'error', 'message': 'interface_type must be WAN or LAN'}), 400
+
         with db_cursor(commit=True) as (_, cursor):
             cursor.execute(
                 'DELETE FROM interface_assignments WHERE interface_type = ?',
-                (interface_type,)
+                (iface_type,)
             )
 
-        return jsonify({'status': 'success', 'message': 'Interface assignment deleted'})
+            if iface_type == "WAN":
+                cursor.execute("UPDATE wan_config SET assigned_port = '' WHERE id = 1")
+            else:
+                cursor.execute("UPDATE lan_config SET assigned_port = '' WHERE id = 1")
+
+        return jsonify({'status': 'success', 'message': f'{iface_type} assignment deleted'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
@@ -976,27 +1053,28 @@ def get_wan_config():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, username, password, dial_on_demand, idle_timeout, block_private_networks, block_bogon_networks FROM wan_config WHERE id = 1')
+        cursor.execute('SELECT assigned_port, enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, username, password, dial_on_demand, idle_timeout, block_private_networks, block_bogon_networks FROM wan_config WHERE id = 1')
         config = cursor.fetchone()
         
         if config:
             return jsonify({'status': 'success', 'data': {
-                'enable_interface': bool(config[0]),
-                'description': config[1],
-                'ipv4_config_type': config[2],
-                'ipv6_config_type': config[3],
-                'mac_address': config[4],
-                'mtu': config[5],
-                'mss': config[6],
-                'speed_and_duplex': config[7],
-                'ipv4_address': config[8],
-                'ipv4_upstream_gateway': config[9],
-                'username': config[10],
-                'password': config[11],
-                'dial_on_demand': bool(config[12]),
-                'idle_timeout': config[13],
-                'block_private_networks': bool(config[14]),
-                'block_bogon_networks': bool(config[15])
+                'assigned_port': config[0],
+                'enable_interface': bool(config[1]),
+                'description': config[2],
+                'ipv4_config_type': config[3],
+                'ipv6_config_type': config[4],
+                'mac_address': config[5],
+                'mtu': config[6],
+                'mss': config[7],
+                'speed_and_duplex': config[8],
+                'ipv4_address': config[9],
+                'ipv4_upstream_gateway': config[10],
+                'username': config[11],
+                'has_password': bool(config[12]),
+                'dial_on_demand': bool(config[13]),
+                'idle_timeout': config[14],
+                'block_private_networks': bool(config[15]),
+                'block_bogon_networks': bool(config[16])
             }})
         return jsonify({'status': 'error', 'message': 'Config not found'}), 404
     except Exception as e:
@@ -1006,12 +1084,11 @@ def get_wan_config():
 @api_permission_required("api.network.edit")
 def save_wan_config():
     try:
-        data = request.get_json()
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = ?, dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
-                       (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], data['password'], data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
-        conn.commit()
+        data = request.get_json() or {}
+        encrypted_password = encrypt_secret(data.get('password')) if data.get('password') else None
+        with db_cursor(commit=True) as (_, cursor):
+            cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = COALESCE(NULLIF(?, ''), password), dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
+                           (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], encrypted_password, data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
         return jsonify({'status': 'success', 'message': 'Config saved'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
@@ -1032,23 +1109,24 @@ def get_lan_config():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('SELECT enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, block_private_networks, block_bogon_networks FROM lan_config WHERE id = 1')
+        cursor.execute('SELECT assigned_port, enable_interface, description, ipv4_config_type, ipv6_config_type, mac_address, mtu, mss, speed_and_duplex, ipv4_address, ipv4_upstream_gateway, block_private_networks, block_bogon_networks FROM lan_config WHERE id = 1')
         config = cursor.fetchone()
-        
+
         if config:
             return jsonify({'status': 'success', 'data': {
-                'enable_interface': bool(config[0]),
-                'description': config[1],
-                'ipv4_config_type': config[2],
-                'ipv6_config_type': config[3],
-                'mac_address': config[4],
-                'mtu': config[5],
-                'mss': config[6],
-                'speed_and_duplex': config[7],
-                'ipv4_address': config[8],
-                'ipv4_upstream_gateway': config[9],
-                'block_private_networks': bool(config[10]),
-                'block_bogon_networks': bool(config[11])
+                'assigned_port': config[0],
+                'enable_interface': bool(config[1]),
+                'description': config[2],
+                'ipv4_config_type': config[3],
+                'ipv6_config_type': config[4],
+                'mac_address': config[5],
+                'mtu': config[6],
+                'mss': config[7],
+                'speed_and_duplex': config[8],
+                'ipv4_address': config[9],
+                'ipv4_upstream_gateway': config[10],
+                'block_private_networks': bool(config[11]),
+                'block_bogon_networks': bool(config[12])
             }})
         return jsonify({'status': 'error', 'message': 'Config not found'}), 404
     except Exception as e:

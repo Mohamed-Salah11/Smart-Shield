@@ -45,8 +45,7 @@
                             <td><strong class="text-primary">WAN</strong></td>
                             <td>
                                 <select class="form-select" id="wanSelect" style="max-width: 350px;">
-                                    <option>em0 (00:0c:29:ed:cb:ae)</option>
-                                    <option>em1 (00:0c:29:ed:cb:b8)</option>
+                                    <option value="">-- loading ports --</option>
                                 </select>
                             </td>
                         </tr>
@@ -55,8 +54,7 @@
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <select class="form-select" id="lanSelect" style="max-width: 350px;">
-                                        <option>em1 (00:0c:29:ed:cb:b8)</option>
-                                        <option>em0 (00:0c:29:ed:cb:ae)</option>
+                                        <option value="">-- loading ports --</option>
                                     </select>
                                     <button class="btn btn-danger btn-sm" onclick="deleteLANAssignment()"><i class="fas fa-trash-alt"></i> Delete</button>
                                 </div>
@@ -411,7 +409,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
                     <div class="col-sm-9">
                         <select class="form-select" id="vlanParentInterface">
-                            <option>em0 (00:0c:29:ed:cb:ae) - wan</option>
+                            <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Only VLAN capable interfaces will be shown.</small>
                     </div>
@@ -459,7 +457,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Parent Interface</label>
                     <div class="col-sm-9">
                         <select class="form-select" id="qinqParentInterface">
-                            <option>em0 (00:0c:29:ed:cb:ae)</option>
+                            <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Only QinQ capable interfaces will be shown.</small>
                     </div>
@@ -531,8 +529,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Link Interface(s)</label>
                     <div class="col-sm-9">
                         <select class="form-select" id="pppLinkInterfaces" multiple style="height: 80px;">
-                            <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
-                            <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+                            <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Select the interface for the PPP connection.</small>
                     </div>
@@ -892,8 +889,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Parent Interface(s)</label>
                     <div class="col-sm-9">
                         <select multiple class="form-select" id="laggParentInterfaces" style="height: 100px;">
-                            <option>em0 (00:0c:29:ed:cb:ae) - WAN</option>
-                            <option>em1 (00:0c:29:ed:cb:b8) - LAN</option>
+                            <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Choose the members that will be used for the link aggregation.</small>
                     </div>
@@ -933,6 +929,62 @@
 // INTERFACE ASSIGNMENTS FUNCTIONS
 // ----------------------------
 
+function populatePortSelect(selectId, ports, placeholder) {
+    const select = document.getElementById(selectId);
+    if (!select) {
+        return;
+    }
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    ports.forEach(port => {
+        const option = document.createElement('option');
+        option.value = port.name;
+        option.textContent = port.label;
+        select.appendChild(option);
+    });
+}
+
+async function loadAvailablePorts() {
+    const wanSelect = document.getElementById('wanSelect');
+    const lanSelect = document.getElementById('lanSelect');
+
+    wanSelect.innerHTML = '<option value="">-- loading ports --</option>';
+    lanSelect.innerHTML = '<option value="">-- loading ports --</option>';
+
+    try {
+        const response = await fetch('/interfaces/available-ports');
+        const data = await response.json();
+
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Could not load interfaces');
+        }
+
+        const ports = data.ports || [];
+        populatePortSelect('wanSelect', ports, '-- select WAN port --');
+        populatePortSelect('lanSelect', ports, '-- select LAN port --');
+        populatePortSelect('vlanParentInterface', ports, '-- select parent port --');
+        populatePortSelect('qinqParentInterface', ports, '-- select parent port --');
+        populatePortSelect('pppLinkInterfaces', ports, '-- select link ports --');
+        populatePortSelect('laggParentInterfaces', ports, '-- select member ports --');
+
+        if (ports[0]) {
+            wanSelect.value = ports[0].name;
+            const vlanParent = document.getElementById('vlanParentInterface');
+            const qinqParent = document.getElementById('qinqParentInterface');
+            if (vlanParent) vlanParent.value = ports[0].name;
+            if (qinqParent) qinqParent.value = ports[0].name;
+        }
+        if (ports[1]) {
+            lanSelect.value = ports[1].name;
+        } else if (ports[0]) {
+            lanSelect.value = ports[0].name;
+        }
+    } catch (error) {
+        console.error('Error loading available ports:', error);
+        wanSelect.innerHTML = '<option value="">No ports found</option>';
+        lanSelect.innerHTML = '<option value="">No ports found</option>';
+    }
+}
+
 function loadInterfaceAssignments() {
     fetch('/interfaces/get-interface-assignments')
         .then(response => response.json())
@@ -947,25 +999,18 @@ function loadInterfaceAssignments() {
 }
 
 function displayInterfaceAssignments(assignments) {
-    // Find WAN and LAN assignments
     const wanAssignment = assignments.find(a => a.interface_type === 'WAN');
     const lanAssignment = assignments.find(a => a.interface_type === 'LAN');
-    
-    // Update WAN select
-    const wanSelect = document.querySelector('td:has(> select) select');
+
+    const wanSelect = document.getElementById('wanSelect');
+    const lanSelect = document.getElementById('lanSelect');
+
     if (wanSelect && wanAssignment) {
         wanSelect.value = wanAssignment.network_port;
     }
-    
-    // Update LAN select
-    const lanRow = Array.from(document.querySelectorAll('tr')).find(tr => 
-        tr.textContent.includes('LAN')
-    );
-    if (lanRow) {
-        const lanSelect = lanRow.querySelector('select');
-        if (lanSelect && lanAssignment) {
-            lanSelect.value = lanAssignment.network_port;
-        }
+
+    if (lanSelect && lanAssignment) {
+        lanSelect.value = lanAssignment.network_port;
     }
 }
 
@@ -1266,7 +1311,7 @@ function saveVLANConfig() {
         if (data.status === 'success') {
             alert(configId ? 'VLAN config updated successfully!' : 'VLAN config saved successfully!');
             delete modal.dataset.configId;
-            document.getElementById('vlanParentInterface').value = 'em0 (00:0c:29:ed:cb:ae) - wan';
+            document.getElementById('vlanParentInterface').selectedIndex = 0;
             document.getElementById('vlanTag').value = '1';
             document.getElementById('vlanPriority').value = '0';
             document.getElementById('vlanDescription').value = '';
@@ -1413,7 +1458,7 @@ function saveQinQConfig() {
         if (data.status === 'success') {
             alert(configId ? 'QinQ config updated successfully!' : 'QinQ config saved successfully!');
             delete modal.dataset.configId;
-            document.getElementById('qinqParentInterface').value = 'em0 (00:0c:29:ed:cb:ae)';
+            document.getElementById('qinqParentInterface').selectedIndex = 0;
             document.getElementById('qinqFirstLevelTag').value = '';
             document.getElementById('qinqAddToGroups').checked = false;
             document.getElementById('qinqDescription').value = '';
@@ -2310,8 +2355,9 @@ function deleteLAGGConfig(configId) {
 }
 
 // Load groups when page loads
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadInterfaceGroups();
+    await loadAvailablePorts();
     loadInterfaceAssignments();
     loadWirelessConfigs();
     loadVLANConfigs();

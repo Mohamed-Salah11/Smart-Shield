@@ -1,26 +1,33 @@
-# Python bytecode/cache
+# ============================================================
+# Smart Shield — .gitignore
+# ============================================================
+
+# ── Python bytecode / cache ──────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.py[cod]
+*.pyi
 
-# Virtual environments
+# ── Virtual environments ─────────────────────────────────────
 .venv/
 venv/
 env/
 ENV/
 
-# Local environment/config (keep templates)
+# ── Environment / secrets (keep templates) ───────────────────
 .env
 .env.*
+*.env
 !.env.example
 config.json
 
-# Runtime data/logs/uploads
+# ── Runtime data / logs / uploads ────────────────────────────
 *.log
 logs/
 instance/
+flask_session/
 static/uploads/
 uploads/
 backups/
@@ -30,27 +37,52 @@ backups/
 *.db
 data.db
 
-# Secrets
+# ── Secrets and credentials ──────────────────────────────────
 master.key
 *.key
+*.psk
+*.p8
+ipsec.secrets
+*.ovpn
+!*.example.*
 
-# Test/coverage/cache artifacts
+# ── TLS / PKI artifacts (keep .example variants) ─────────────
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+!*.example.*
+
+# ── Test / coverage / linting cache ─────────────────────────
 .pytest_cache/
 tests/.tmp/
+tests/fixtures/*.db
+tests/fixtures/*.sqlite
 .coverage
 .coverage.*
 htmlcov/
 .mypy_cache/
 .ruff_cache/
 .cache/
+.hypothesis/
+pip-log.txt
 
-# Build/distribution artifacts
+# ── Build / distribution artifacts ───────────────────────────
 build/
 dist/
 *.egg-info/
 pip-wheel-metadata/
 
-# Editor/OS files
+# ── Rust build artifacts (used by cryptography wheel) ────────
+target/
+Cargo.lock
+
+# ── Documentation build ──────────────────────────────────────
+docs/_build/
+docs/_autosummary/
+
+# ── Editor / OS files ────────────────────────────────────────
 .vscode/
 .idea/
 .DS_Store
@@ -58,7 +90,7 @@ Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
 
-# Editor swap/backup files
+# ── Editor swap / backup files ───────────────────────────────
 *.swp
 *.swo
 *~
@@ -67,23 +99,15 @@ $RECYCLE.BIN/
 *.tmp
 *.temp
 
-# Process output
+# ── Process output ───────────────────────────────────────────
 nohup.out
 
-# Generated certificate/key files (keep .example variants)
-*.pem
-*.crt
-*.csr
-*.p12
-*.pfx
-!*.example.*
-
-# Claude Code local machine state (never shared)
+# ── Claude Code local machine state (never shared) ───────────
 .claude/settings.local.json
 .claude/settings.local.json.bak
 .claude/keybindings.json
 
-# Local/generated project artifacts
+# ── Local / generated project artifacts ──────────────────────
 edits.txt
 paths.txt
 project steps.txt
@@ -91,10 +115,17 @@ integrations_steps_source.txt
 integrations steps of the vpns ids ips and every other service included in the project.pdf
 smart-shield-transfer-*.tar.gz
 
-# Generic archive outputs
+# ── Generic archive outputs ───────────────────────────────────
 *.zip
 *.tar
 *.tar.gz
 *.tgz
 *.7z
 *.rar
+
+# ── VM / disk images ─────────────────────────────────────────
+*.vmdk
+*.vdi
+*.ova
+*.qcow2
+*.iso

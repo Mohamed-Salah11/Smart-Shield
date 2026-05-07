@@ -218,6 +218,7 @@
     <div class="divider">Sign in to access</div>
 
     <form method="POST" action="/portal/auth">
+      <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}">
       <input type="hidden" name="auth_type"     value="credentials">
       <input type="hidden" name="back_template" value="block">
       <input type="hidden" name="domain"        value="{{ domain|default('') }}">

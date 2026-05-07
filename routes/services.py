@@ -1370,6 +1370,29 @@ def api_cp_logout(session_id):
               details={"session_id": session_id})
     return jsonify(result)
 
+@services_bp.route("/api/captive-portal/sessions/logout-all", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_cp_logout_all():
+    conn = get_db()
+    from app.services.captive_portal import get_active_sessions, logout_session
+
+    sessions = get_active_sessions(conn)
+    count = 0
+
+    for s in sessions:
+        result = logout_session(conn, s["id"])
+        if result.get("ok"):
+            count += 1
+
+    log_event(
+        category="system",
+        action="captive_portal_logout_all",
+        username=session.get("username"),
+        remote_addr=request.remote_addr,
+        details={"count": count},
+    )
+
+    return jsonify({"ok": True, "count": count})
 
 @services_bp.route("/api/captive-portal/vouchers", methods=["POST"])
 @api_permission_required("api.network.edit")
@@ -1399,7 +1422,14 @@ def api_cp_list_vouchers():
 @services_bp.route("/api/captive-portal/apply", methods=["POST"])
 @api_permission_required("api.network.edit")
 def api_cp_apply():
-    conn   = get_db()
+    conn = get_db()
+
+    # Reload the main PF config first so rdr-anchor/anchor hooks exist.
+    from app.services.pf_generator import reload_pf_rules
+    pf_result = reload_pf_rules(conn)
+    if not pf_result.get("ok"):
+        return jsonify(pf_result), 500
+
     from app.services.captive_portal import apply_captive_portal
     result = apply_captive_portal(conn)
     return jsonify(result)

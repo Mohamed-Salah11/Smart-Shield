@@ -13,6 +13,7 @@ GET  /portal/logout        → end session and remove from PF table
 """
 
 import sys
+from urllib.parse import urlparse
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, session, jsonify,
@@ -38,6 +39,35 @@ def _client_mac(ip: str) -> str:
         pass
     return ""
 
+def _safe_redirect_target(url: str) -> str:
+    """Only redirect to relative URLs or the same Smart Shield host."""
+    url = (url or "").strip()
+    if not url:
+        return url_for("portal.success")
+
+    parsed = urlparse(url)
+
+    # Allow relative URLs.
+    if not parsed.netloc:
+        return url
+
+    # Allow only same host.
+    if parsed.netloc == request.host:
+        return url
+
+    return url_for("portal.success")
+
+
+def _policy_context(source) -> dict:
+    policy = (source.get("policy") or "").strip().lower()
+    if policy != "content":
+        policy = ""
+    return {
+        "policy": policy,
+        "domain": (source.get("domain") or "").strip().lower(),
+        "orig_url": (source.get("url") or source.get("orig_url") or "").strip(),
+    }
+
 
 def _portal_enabled(conn) -> bool:
     import json
@@ -45,11 +75,13 @@ def _portal_enabled(conn) -> bool:
         "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
     ).fetchone()
     if not row:
-        return False
+        return True  # no settings yet → treat as enabled so the page is reachable
     try:
-        return bool(json.loads(row["value_json"]).get("enabled", False))
+        settings = json.loads(row["value_json"])
+        # Only disabled when the admin explicitly set enabled=False
+        return bool(settings.get("enabled", True))
     except Exception:
-        return False
+        return True
 
 
 @portal_bp.route("/", methods=["GET"])
@@ -57,8 +89,7 @@ def login():
     conn = get_db()
     if not _portal_enabled(conn):
         return render_template("portal/disabled.html"), 503
-    orig_url = request.args.get("url", "")
-    return render_template("portal/login.html", orig_url=orig_url)
+    return render_template("portal/login.html", **_policy_context(request.args))
 
 
 @portal_bp.route("/auth", methods=["POST"])
@@ -66,7 +97,8 @@ def auth():
     conn     = get_db()
     ip       = request.remote_addr or ""
     mac      = _client_mac(ip)
-    orig_url = request.form.get("orig_url", "")
+    context  = _policy_context(request.form)
+    orig_url = context["orig_url"]
 
     auth_type = request.form.get("auth_type", "credentials")
 
@@ -85,7 +117,7 @@ def auth():
             return render_template(
                 "portal/login.html",
                 error="Username and password are required.",
-                orig_url=orig_url,
+                **context,
             )
 
         # Try RADIUS first; fall back to local user table
@@ -103,43 +135,43 @@ def auth():
                 return render_template(
                     "portal/login.html",
                     error="Invalid username or password.",
-                    orig_url=orig_url,
+                    **context,
                 )
             result = authenticate_session(conn, mac, ip, username=username)
 
     if not result.get("ok"):
         # Decide which template to return to (block page or generic login page)
         back_template = request.form.get("back_template", "login")
-        domain = request.form.get("domain", "")
         if back_template == "block":
             return render_template(
                 "portal/block.html",
                 error=result.get("message", "Authentication failed."),
-                domain=domain,
-                orig_url=orig_url,
+                **context,
             )
         return render_template(
             "portal/login.html",
             error=result.get("message", "Authentication failed."),
-            orig_url=orig_url,
+            **context,
         )
 
     session["portal_authenticated"] = True
     session["content_filter_authenticated"] = True
     session["portal_ip"] = ip
 
+    if context["policy"] == "content":
+        return render_template("portal/success.html", **context)
+
     # If came from block page, go back to block success view
     back_template = request.form.get("back_template", "login")
-    domain = request.form.get("domain", "")
     if back_template == "block":
-        return render_template("portal/block.html", authenticated=True, domain=domain, orig_url=orig_url)
+        return render_template("portal/block.html", authenticated=True, **context)
 
-    return redirect(orig_url if orig_url else url_for("portal.success"))
+    return redirect(_safe_redirect_target(orig_url))
 
 
 @portal_bp.route("/success", methods=["GET"])
 def success():
-    return render_template("portal/success.html")
+    return render_template("portal/success.html", **_policy_context(request.args))
 
 
 @portal_bp.route("/block", methods=["GET"])
@@ -153,13 +185,24 @@ def block():
     domain   = request.args.get("domain", "").strip()
     orig_url = request.args.get("url",    "").strip()
 
-    # If the user already authenticated in this session, let them through
-    if session.get("content_filter_authenticated") or session.get("portal_authenticated"):
-        if orig_url:
-            return redirect(orig_url)
-        return render_template("portal/block.html", authenticated=True, domain=domain, orig_url=orig_url)
+    # Fallback: derive domain from the Host header (browser DNS-redirect path)
+    if not domain:
+        import ipaddress as _ip
+        raw = (request.headers.get("Host") or "").split(":")[0].strip().lower()
+        try:
+            _ip.ip_address(raw)  # it's an IP — don't treat as a blocked domain
+        except ValueError:
+            if raw and "." in raw:
+                domain = raw
+                if not orig_url:
+                    orig_url = request.url
 
-    return render_template("portal/block.html", domain=domain, orig_url=orig_url)
+    # Already authenticated — let the user through
+    context = {"policy": "content", "domain": domain, "orig_url": orig_url}
+    if session.get("content_filter_authenticated") or session.get("portal_authenticated"):
+        return render_template("portal/success.html", **context)
+
+    return redirect(url_for("portal.login", policy="content", domain=domain, url=orig_url))
 
 
 @portal_bp.route("/logout", methods=["GET", "POST"])
@@ -176,4 +219,9 @@ def logout():
             logout_session(conn, row["id"])
     session.pop("portal_authenticated", None)
     session.pop("portal_ip", None)
-    return render_template("portal/login.html", message="You have been logged out.")
+    session.pop("content_filter_authenticated", None)
+    return render_template(
+        "portal/login.html",
+        message="You have been logged out.",
+        **_policy_context(request.args),
+    )

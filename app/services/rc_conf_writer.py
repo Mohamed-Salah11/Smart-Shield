@@ -74,7 +74,7 @@ def generate_rc_conf_block(conn) -> str:
         wan_iface   = (wan.get("assigned_port") or "em0").strip()
         wan_type    = (wan.get("ipv4_config_type") or "dhcp").lower()
         wan_ip_cidr = (wan.get("ipv4_address") or "").strip()
-        wan_gw      = (wan.get("ipv4_gateway") or "").strip()
+        wan_gw = (wan.get("ipv4_upstream_gateway") or "").strip()
         wan_mtu     = (wan.get("mtu") or "").strip()
 
         if wan_type == "dhcp":

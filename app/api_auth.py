@@ -95,5 +95,6 @@ API_PERMISSION_CATALOG = [
     ("api.network.edit",    "Network",   "/api/network/*",  "Update interfaces, DHCP pools, static leases, PPPoE"),
     ("api.network.apply",   "Network",   "/api/network/apply", "Apply live interface / routing changes on FreeBSD"),
     # IDS / IPS
+    ("api.system.edit", "System", "/services/api/*", "Run config backup, restore, and system service actions"),
     ("api.ids.edit",        "IDS/IPS",   "/ids/api/*",      "Toggle IDS, manage rulesets, trigger rule updates"),
 ]

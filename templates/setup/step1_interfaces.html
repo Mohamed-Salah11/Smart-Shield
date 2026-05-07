@@ -84,6 +84,7 @@
 </div>
 
 <script>
+  const CSRF_TOKEN = "{{ csrf_token() }}";
 async function loadPorts() {
   try {
     const r = await fetch('/setup/api/step1/available-ports');
@@ -93,13 +94,21 @@ async function loadPorts() {
     ['wan_port', 'lan_port'].forEach(id => {
       const sel = document.getElementById(id);
       sel.innerHTML = '<option value="">— select port —</option>';
-      ports.forEach(p => {
-        sel.innerHTML += `<option value="${p}">${p}</option>`;
+      ports.forEach(port => {
+        const name = typeof port === 'string' ? port : port.name;
+        const label = typeof port === 'string' ? port : (port.label || port.name);
+        if (!name) return;
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = label;
+        sel.appendChild(option);
       });
     });
-    document.getElementById('lan_port').value = ports[1] || ports[0] || '';
+    const portName = port => typeof port === 'string' ? port : (port?.name || '');
+    document.getElementById('wan_port').value = portName(ports[0]);
+    document.getElementById('lan_port').value = portName(ports[1]) || portName(ports[0]);
     document.getElementById('port-list').textContent =
-      `Detected ${ports.length} interface(s): ${ports.join(', ')}`;
+      `Detected ${ports.length} interface(s): ${ports.map(portName).filter(Boolean).join(', ')}`;
   } catch (e) {
     showAlert('Could not load interfaces. Is the server running?', 'danger');
   }
@@ -115,7 +124,11 @@ async function saveStep1() {
   try {
     const r = await fetch('/setup/api/step1/save', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': CSRF_TOKEN
+    },
+      credentials: 'same-origin',
       body: JSON.stringify({ wan_port: wan, lan_port: lan })
     });
     const d = await r.json();

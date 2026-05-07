@@ -7,7 +7,7 @@
 #   2. Run as root: sh /usr/local/share/smart-shield/bsd/install.sh
 #
 # What this script does:
-#   1. Installs every required and optional package via pkg
+#   1. Installs all required packages via pkg
 #   2. Creates all required directory paths with correct permissions
 #   3. Copies environment template if not already present
 #   4. Copies config.json template if not already present
@@ -54,25 +54,17 @@ section "1. Package Installation"
 info "Updating pkg repository..."
 pkg update -q
 
-# Required packages — the app will not work without these
-REQUIRED_PKGS="python3 git sqlite3 ca_root_nss"
+REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nginx"
 info "Installing required packages: ${REQUIRED_PKGS}"
 # shellcheck disable=SC2086
 pkg install -y ${REQUIRED_PKGS}
-
-# Optional service packages — install all; features that aren't configured
-# simply won't be used
-OPTIONAL_PKGS="isc-dhcp44-server unbound openvpn strongswan suricata nginx"
-info "Installing optional service packages: ${OPTIONAL_PKGS}"
-# shellcheck disable=SC2086
-pkg install -y ${OPTIONAL_PKGS} || warn "Some optional packages could not be installed — continuing."
 
 # suricata-update: package name varies by Python version
 PYTHON_VER=$(python3 -c "import sys; print('%d%d' % sys.version_info[:2])" 2>/dev/null || echo "311")
 SURICATA_UPDATE_PKG="py${PYTHON_VER}-suricata-update"
 pkg install -y "${SURICATA_UPDATE_PKG}" 2>/dev/null \
-    || pkg install -y py311-suricata-update 2>/dev/null \
-    || warn "suricata-update package not found — install manually after."
+    || pkg install -y py311-suricata-update \
+    || fatal "suricata-update package not found — cannot continue."
 
 section "2. Directory Creation"
 
@@ -92,6 +84,19 @@ do
         info "Exists:  ${DIR}"
     fi
 done
+
+# Ensure all Smart Shield directories are owned by root:wheel (root runtime).
+for DIR in \
+    "${APP_ROOT}" \
+    "${ETC_DIR}" \
+    "${DATA_DIR}" \
+    "${DATA_DIR}/uploads/profile_pictures" \
+    "${LOG_DIR}" \
+    "${RUN_DIR}"
+do
+    chown -R root:wheel "${DIR}" 2>/dev/null || true
+done
+info "Ownership set to root:wheel for Smart Shield paths."
 
 # PF — /etc already exists; no dir needed
 
@@ -148,7 +153,7 @@ SMARTSHIELD_NETWORK_DRY_RUN=0
 EOF
         chmod 0600 "${ENV_FILE}"
         info "Created: ${ENV_FILE} (SECRET_KEY set automatically, mode 0600)"
-        warn "Edit ${ENV_FILE} to set BOOTSTRAP_ADMIN_PASSWORD before first run."
+        info "Admin account will be created on first run via the setup wizard."
     else
         warn "No .env.example found — creating minimal env file."
         SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || echo "changeme")
@@ -161,14 +166,12 @@ SMARTSHIELD_UPLOAD_DIR=/var/db/smart-shield/uploads/profile_pictures
 SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smart-shield/audit.log
 SMARTSHIELD_ENABLE_NETWORK_APPLY=0
 SMARTSHIELD_NETWORK_DRY_RUN=0
-BOOTSTRAP_ADMIN_USERNAME=admin
-BOOTSTRAP_ADMIN_PASSWORD=changeme
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
 EOF
         chmod 0600 "${ENV_FILE}"
-        warn "Set a strong BOOTSTRAP_ADMIN_PASSWORD in ${ENV_FILE} before starting."
+        info "Admin account will be created on first run via the setup wizard."
     fi
 else
     info "Env file already exists: ${ENV_FILE}"
@@ -193,6 +196,14 @@ else
 fi
 
 section "4. Python Virtual Environment"
+
+# cryptography requires Rust to build from source — install rust before pip
+if ! command -v rustc >/dev/null 2>&1; then
+    info "Installing rust (required to build cryptography)..."
+    pkg install -y rust
+else
+    info "Rust already installed: $(rustc --version)"
+fi
 
 if [ ! -x "${VENV}/bin/python3" ]; then
     info "Creating virtual environment at ${VENV}..."
@@ -231,7 +242,7 @@ for TOOL in smartshieldctl smartshield-cli; do
 done
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
-section "5a. Privilege Separation (sudoers)"
+section "5a. sudo / Sudoers (optional fallback)"
 
 # Ensure sudo is installed
 if ! command -v sudo >/dev/null 2>&1; then
@@ -243,10 +254,9 @@ SUDOERS_DIR="/usr/local/etc/sudoers.d"
 SUDOERS_SRC="${APP_ROOT}/bsd/etc/sudoers.d/smartshield"
 SUDOERS_DEST="${SUDOERS_DIR}/smartshield"
 
-if [ ! -d "${SUDOERS_DIR}" ]; then
-    install -d -m 0750 "${SUDOERS_DIR}"
-    info "Created: ${SUDOERS_DIR}"
-fi
+mkdir -p "${SUDOERS_DIR}"
+chmod 0750 "${SUDOERS_DIR}"
+info "Ensured: ${SUDOERS_DIR} (mode 0750)"
 
 if [ -f "${SUDOERS_SRC}" ]; then
     # Validate syntax before installing
@@ -273,19 +283,17 @@ if [ -f "${SUDOERS_MAIN}" ]; then
     fi
 fi
 
-# Create the smartshield system user if it doesn't exist
-if ! id smartshield >/dev/null 2>&1; then
-    pw useradd -n smartshield -d /nonexistent -s /usr/sbin/nologin \
-        -c "Smart Shield web application" -w no
-    info "Created system user: smartshield"
-else
-    info "User smartshield already exists."
-fi
+# Note: the smartshield system user is not created in root-runtime deployments.
+# If reverting to unprivileged operation, add: pw useradd -n smartshield ...
 
 section "6. Enable Service"
 
 sysrc smart_shield_enable=YES
 info "smart_shield_enable=YES written to rc.conf"
+
+# unbound must be running for content policy DNS blocking to work
+sysrc unbound_enable=YES
+info "unbound_enable=YES written to rc.conf"
 
 section "7. Preflight Verification"
 
@@ -323,7 +331,6 @@ printf "\n${BOLD}Smart Shield installation complete.${NC}\n\n"
 cat << EOF
 Next steps:
   1. Edit ${ENV_FILE}
-       — Set a strong BOOTSTRAP_ADMIN_PASSWORD (used only on first DB init)
        — Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 when ready for live network changes
        — Set ABUSECH_AUTH_KEY=<your-key>  (get it at https://abuse.ch/)
          Leave ABUSECH_DRY_RUN=1 until you want live threat intel lookups.
@@ -333,8 +340,10 @@ Next steps:
        service smart_shield start
        service smart_shield status
 
-  3. Open the web UI:
+  3. Open the web UI and complete the setup wizard:
        http://<LAN-IP>:5000
+       (You will be redirected to the setup wizard on first visit — create your
+        admin account in step 3 of the wizard.)
 
   4. Check the Preflight page in the web UI:
        System → Preflight Check

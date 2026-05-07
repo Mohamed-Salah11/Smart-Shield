@@ -33,7 +33,7 @@
             <th>MAC Address</th>
             <th>Username</th>
             <th>Session Start</th>
-            <th>Duration</th>
+            <th>Expires</th>
             <th></th>
           </tr>
         </thead>
@@ -58,14 +58,18 @@ function loadSessions() {
         return;
       }
       tbody.innerHTML = sessions.map(s => `
-        <tr>
-          <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${escapeHtml(s.ip)}</td>
-          <td style="font-family:monospace;font-size:.8rem;">${escapeHtml(s.mac || '—')}</td>
-          <td>${escapeHtml(s.username)}</td>
-          <td>${escapeHtml(s.session_start)}</td>
-          <td>${escapeHtml(s.duration || '—')}</td>
-          <td><button class="btn btn-sm btn-danger" onclick="disconnectUser('${escapeHtml(s.mac || s.ip)}')"><i class="fa-solid fa-plug-circle-xmark"></i></button></td>
-        </tr>`).join('');
+  <tr>
+    <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${escapeHtml(s.ip_address)}</td>
+    <td style="font-family:monospace;font-size:.8rem;">${escapeHtml(s.mac_address || '—')}</td>
+    <td>${escapeHtml(s.username || '—')}</td>
+    <td>${escapeHtml(s.created_at || '—')}</td>
+    <td>${escapeHtml(formatExpiry(s.expires_at))}</td>
+    <td>
+      <button class="btn btn-sm btn-danger" onclick="disconnectUser(${Number(s.id)})">
+        <i class="fa-solid fa-plug-circle-xmark"></i>
+      </button>
+    </td>
+  </tr>`).join('');
     })
     .catch(() => {
       document.getElementById('session-count').textContent = '0 users logged in';
@@ -73,18 +77,23 @@ function loadSessions() {
     });
 }
 
-function disconnectUser(identifier) {
+function disconnectUser(sessionId) {
   if (!confirm('Disconnect this user?')) return;
-  fetch('/services/api/captive-portal/disconnect', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({identifier})
+  fetch(`/services/api/captive-portal/sessions/${sessionId}/logout`, {
+    method: 'POST'
   }).then(() => loadSessions());
 }
 
 function disconnectAll() {
   if (!confirm('Disconnect all portal users?')) return;
-  fetch('/services/api/captive-portal/disconnect-all', {method:'POST'})
+  fetch('/services/api/captive-portal/sessions/logout-all', {method:'POST'})
     .then(() => loadSessions());
+}
+function formatExpiry(ts) {
+  if (!ts) return '—';
+  const d = new Date(Number(ts) * 1000);
+  if (isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString();
 }
 
 function escapeHtml(t) {

@@ -104,9 +104,9 @@ def run_command(
         except Exception:
             pass
 
-    # On FreeBSD the web process runs as the unprivileged `smartshield` user.
-    # Privileged binaries (pfctl, ifconfig, service, sysrc, route) require sudo.
-    # The sudoers file at bsd/etc/sudoers.d/smartshield grants the exact allowlist.
+    # On FreeBSD, when running as root, privileged binaries are called directly.
+    # In non-root deployments the sudoers allowlist (bsd/etc/sudoers.d/smartshield)
+    # grants the exact set of permitted commands via sudo.
     _PRIVILEGED_BINS = {
         "/sbin/pfctl", "pfctl",
         "/sbin/ifconfig", "ifconfig",
@@ -120,11 +120,12 @@ def run_command(
     actual_cmd = list(cmd)
     if (
         sys.platform.startswith("freebsd")
+        and os.getuid() != 0
         and actual_cmd
         and actual_cmd[0] in _PRIVILEGED_BINS
-        and actual_cmd[0] != "/usr/bin/sudo"
+        and actual_cmd[0] not in {"/usr/bin/sudo", "/usr/local/bin/sudo"}
     ):
-        actual_cmd = ["/usr/bin/sudo"] + actual_cmd
+        actual_cmd = ["/usr/local/bin/sudo"] + actual_cmd
 
     try:
         proc = subprocess.run(
@@ -696,4 +697,49 @@ def normalize_interface_payload(data, interface_type):
             data.get("block_bogon_networks", base["block_bogon_networks"])
         ),
         "assigned_port": (data.get("assigned_port") or "").strip(),
+    }
+
+
+def apply_interface_config(conn) -> dict:
+    """
+    Read LAN and WAN config from the DB and apply each interface live.
+    Skips DHCP/PPPoE WAN (those are managed by dhclient/mpd, not ifconfig).
+    Returns a combined result dict with ok/message keys.
+    """
+    results = []
+
+    lan = conn.execute(
+        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type "
+        "FROM lan_config LIMIT 1"
+    ).fetchone()
+
+    wan = conn.execute(
+        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type "
+        "FROM wan_config LIMIT 1"
+    ).fetchone()
+
+    for label, row in (("LAN", lan), ("WAN", wan)):
+        if not row:
+            continue
+        iface   = (row["assigned_port"] or "").strip()
+        cidr    = (row["ipv4_address"] or "").strip()
+        gateway = (row["ipv4_upstream_gateway"] or "").strip()
+        mode    = (row["ipv4_config_type"] or "static").lower()
+
+        if not iface or not cidr or mode != "static":
+            results.append({
+                "iface": label,
+                "ok": True,
+                "message": f"{label}: skipped (mode={mode}, iface={iface or 'unset'})",
+            })
+            continue
+
+        r = apply_interface_with_rollback(iface, cidr, gateway)
+        results.append({"iface": label, **r})
+
+    overall_ok = all(r["ok"] for r in results)
+    return {
+        "ok": overall_ok,
+        "message": "; ".join(r["message"] for r in results) if results else "Nothing to apply",
+        "details": results,
     }
