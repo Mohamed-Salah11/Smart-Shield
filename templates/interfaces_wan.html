@@ -40,6 +40,11 @@
 
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
+            <label class="ss-label" for="assignedPort">Assigned Port</label>
+            <input type="text" id="assignedPort" class="form-control" readonly>
+            <p class="ss-hint">Change this from Interfaces -> Assignments.</p>
+          </div>
+          <div class="ss-field">
             <label class="ss-label" for="description">Description</label>
             <input type="text" id="description" name="description" class="form-control" value="WAN">
             <p class="ss-hint">Optional label for this interface</p>
@@ -209,6 +214,7 @@ function loadWANConfig() {
         .then(data => {
             if (data.status === 'success') {
                 const c = data.data;
+                document.getElementById('assignedPort').value = c.assigned_port || 'Not assigned';
                 document.getElementById('enable').checked       = c.enable_interface;
                 document.getElementById('description').value    = c.description;
                 document.getElementById('ipv4type').value       = c.ipv4_config_type;
@@ -220,7 +226,8 @@ function loadWANConfig() {
                 document.getElementById('ipv4addr').value       = c.ipv4_address;
                 document.getElementById('ipv4gw').value         = c.ipv4_upstream_gateway;
                 document.getElementById('pppoeuser').value      = c.username;
-                document.getElementById('pppoepass').value      = c.password;
+                document.getElementById('pppoepass').value      = '';
+                document.getElementById('pppoepass').placeholder = c.has_password ? 'Saved password unchanged' : 'Password';
                 document.getElementById('pppoerelay').checked   = c.dial_on_demand;
                 document.getElementById('idletimeout').value    = c.idle_timeout;
                 document.getElementById('blockprivate').checked = c.block_private_networks;

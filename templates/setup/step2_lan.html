@@ -93,6 +93,7 @@
 </div>
 
 <script>
+  const CSRF_TOKEN = "{{ csrf_token() }}";
 function toggleWanFields() {
   const type = document.getElementById('wan_type').value;
   document.getElementById('wan_static_fields').style.display =
@@ -111,7 +112,11 @@ async function saveStep2() {
   try {
     const r = await fetch('/setup/api/step2/save', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': CSRF_TOKEN
+      },
+      credentials: 'same-origin',
       body: JSON.stringify({ lan_ip, wan_type, wan_ip, wan_gw })
     });
     const d = await r.json();

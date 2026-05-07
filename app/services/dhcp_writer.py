@@ -48,6 +48,37 @@ def _parse_cidr(cidr: str):
         return None, None
 
 
+def _auto_pool_from_cidr(cidr: str) -> dict:
+    """
+    Derive sensible DHCP pool defaults from an interface CIDR.
+
+    Reserves the first 99 host addresses for static assignments (gateway,
+    servers, printers, etc.) and gives the remainder to the dynamic pool.
+    For small subnets (< 10 hosts) splits at the midpoint instead.
+
+    Returns a dict with: gateway_ip, start_ip, end_ip, dns_servers.
+    Returns {} on parse failure.
+    """
+    try:
+        iface  = ipaddress.ip_interface(cidr)
+        gw     = str(iface.ip)
+        hosts  = list(iface.network.hosts())
+        if not hosts:
+            return {}
+        # Reserve first 99 addresses (or 1/4 of the range, whichever is smaller)
+        offset = min(99, max(1, len(hosts) // 4))
+        start  = str(hosts[min(offset, len(hosts) - 1)])
+        end    = str(hosts[-1])
+        return {
+            "gateway_ip":  gw,
+            "start_ip":    start,
+            "end_ip":      end,
+            "dns_servers": gw,   # Smart Shield / Unbound is the LAN DNS resolver
+        }
+    except Exception:
+        return {}
+
+
 def _ip(s: str):
     """Return IPv4Address or None."""
     try:
@@ -199,15 +230,19 @@ def generate_dhcpd_conf(conn) -> str:
         if not subnet:
             continue
 
-        start_ip = (pool.get("start_ip") or "").strip()
-        end_ip   = (pool.get("end_ip")   or "").strip()
+        # Auto-derive missing fields from the interface CIDR so the pool works
+        # out of the box even when the admin only toggled "enabled".
+        auto = _auto_pool_from_cidr(iface_cidr)
+
+        start_ip = (pool.get("start_ip") or "").strip() or auto.get("start_ip", "")
+        end_ip   = (pool.get("end_ip")   or "").strip() or auto.get("end_ip",   "")
         if not start_ip or not end_ip:
             continue
 
-        gateway  = (pool.get("gateway_ip")  or "").strip()
+        gateway  = (pool.get("gateway_ip")  or "").strip() or auto.get("gateway_ip",  "")
         dns_raw  = (pool.get("dns_servers") or "").strip()
         lease    = pool.get("lease_time") or 86400
-        dns_list = _dns_list(dns_raw)
+        dns_list = _dns_list(dns_raw) or _dns_list(auto.get("dns_servers", ""))
 
         lines.append(f"# {itype} pool ({iface_port or itype})")
         lines.append(f"subnet {subnet} netmask {netmask} {{")
@@ -381,3 +416,110 @@ def get_live_leases() -> list:
 
     # Return only active leases
     return [l for l in leases if l.get("state", "active") == "active"]
+
+
+# ---------------------------------------------------------------------------
+# Auto-configure pool from LAN interface + ARP discovery
+# ---------------------------------------------------------------------------
+
+def auto_configure_pool(conn, interface_type: str = "LAN") -> dict:
+    """
+    Derive DHCP pool settings from the interface CIDR and persist them to the
+    dhcp_pools table.  Also runs an ARP scan so any already-online devices are
+    registered in tracked_hosts (and can be promoted to static leases by the
+    admin if desired).
+
+    Returns {"ok": bool, "message": str, "pool": dict, "discovered": list}.
+    """
+    itype = interface_type.upper()
+
+    # 1. Read interface CIDR
+    if itype == "LAN":
+        row = conn.execute(
+            "SELECT ipv4_address, assigned_port FROM lan_config WHERE id=1"
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT ipv4_address, assigned_port FROM wan_config WHERE id=1"
+        ).fetchone()
+
+    cidr = (row["ipv4_address"] if row else "") or ""
+    if not cidr:
+        return {"ok": False, "message": f"{itype} interface has no IP configured.", "pool": {}, "discovered": []}
+
+    pool = _auto_pool_from_cidr(cidr)
+    if not pool:
+        return {"ok": False, "message": f"Could not derive pool from CIDR '{cidr}'.", "pool": {}, "discovered": []}
+
+    # 2. Persist to dhcp_pools (enable the pool, keep any existing lease_time)
+    existing = conn.execute(
+        "SELECT lease_time FROM dhcp_pools WHERE interface_type=?", (itype,)
+    ).fetchone()
+    lease_time = (existing["lease_time"] if existing else None) or 86400
+
+    conn.execute(
+        """
+        INSERT INTO dhcp_pools (interface_type, enabled, start_ip, end_ip, gateway_ip, dns_servers, lease_time)
+        VALUES (?, 1, ?, ?, ?, ?, ?)
+        ON CONFLICT(interface_type) DO UPDATE SET
+            enabled    = 1,
+            start_ip   = excluded.start_ip,
+            end_ip     = excluded.end_ip,
+            gateway_ip = excluded.gateway_ip,
+            dns_servers = excluded.dns_servers,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (itype, pool["start_ip"], pool["end_ip"], pool["gateway_ip"], pool["dns_servers"], lease_time),
+    )
+    conn.commit()
+
+    # 3. ARP scan to discover currently-online devices on this interface
+    discovered = []
+    try:
+        from app.services.network_service import list_arp_neighbors
+        neighbors = list_arp_neighbors()
+        iface_port = (row["assigned_port"] if row else "") or ""
+        iface_net  = ipaddress.ip_interface(cidr).network
+
+        for nb in neighbors:
+            ip_str = nb.get("ip_address", "")
+            try:
+                ip_obj = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+            if ip_obj not in iface_net:
+                continue
+            # Upsert into tracked_hosts
+            conn.execute(
+                """
+                INSERT INTO tracked_hosts
+                    (interface_type, interface_name, ip_address, mac_address, hostname, discovered_via, last_seen)
+                VALUES (?, ?, ?, ?, ?, 'arp', CURRENT_TIMESTAMP)
+                ON CONFLICT(interface_type, ip_address) DO UPDATE SET
+                    mac_address   = excluded.mac_address,
+                    hostname      = excluded.hostname,
+                    interface_name = excluded.interface_name,
+                    discovered_via = 'arp',
+                    last_seen      = CURRENT_TIMESTAMP
+                """,
+                (itype, iface_port, ip_str,
+                 nb.get("mac_address", ""), nb.get("hostname", "")),
+            )
+            discovered.append(nb)
+        conn.commit()
+    except Exception:
+        pass
+
+    pool["lease_time"] = lease_time
+    pool["interface_type"] = itype
+    return {
+        "ok": True,
+        "message": (
+            f"{itype} pool auto-configured from {cidr}: "
+            f"{pool['start_ip']} – {pool['end_ip']}, "
+            f"gateway {pool['gateway_ip']}. "
+            f"{len(discovered)} device(s) discovered on LAN."
+        ),
+        "pool": pool,
+        "discovered": discovered,
+    }

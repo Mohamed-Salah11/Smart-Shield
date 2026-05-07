@@ -119,7 +119,10 @@
     <!-- Credentials tab -->
     <div id="tab-credentials" class="tab-panel active">
       <form method="POST" action="/portal/auth">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="auth_type" value="credentials">
+        <input type="hidden" name="policy" value="{{ policy|default('') }}">
+        <input type="hidden" name="domain" value="{{ domain|default('') }}">
         <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" autocomplete="username" required placeholder="your username">
@@ -132,7 +135,10 @@
     <!-- Voucher tab -->
     <div id="tab-voucher" class="tab-panel">
       <form method="POST" action="/portal/auth">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="auth_type" value="voucher">
+        <input type="hidden" name="policy" value="{{ policy|default('') }}">
+        <input type="hidden" name="domain" value="{{ domain|default('') }}">
         <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
         <label for="voucher_code">Voucher Code</label>
         <input type="text" id="voucher_code" name="voucher_code" placeholder="e.g. AB12CD34" autocomplete="off"

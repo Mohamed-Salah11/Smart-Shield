@@ -21,6 +21,7 @@ configured from the browser before any users exist.  Once complete, all
 
 import json
 import os
+import ipaddress
 
 from flask import (
     Blueprint,
@@ -33,6 +34,35 @@ from flask import (
 )
 
 from app.database import get_db
+from app.validators import validate_interface_name
+
+
+def _port_payload_from_nics(nics):
+    ports = []
+    for nic in nics:
+        name = (nic.get("name") or "").strip()
+        if not name:
+            continue
+
+        ether = (nic.get("ether") or "").strip()
+        status = (nic.get("status") or "").strip()
+        media = (nic.get("media") or "").strip()
+        details = []
+        if ether:
+            details.append(ether)
+        if status:
+            details.append(f"status: {status}")
+        if media:
+            details.append(media)
+
+        ports.append({
+            "name": name,
+            "label": name if not details else f"{name} ({', '.join(details)})",
+            "ether": ether,
+            "status": status,
+            "media": media,
+        })
+    return ports
 
 setup_bp = Blueprint("setup", __name__, url_prefix="/setup")
 
@@ -66,6 +96,17 @@ def _mark_setup_complete(conn):
         """
     )
     conn.commit()
+
+
+def _get_saved_setup_ports(conn):
+    rows = conn.execute(
+        "SELECT interface_type, network_port FROM interface_assignments"
+    ).fetchall()
+    ports = {
+        (row["interface_type"] or "").upper(): (row["network_port"] or "").strip()
+        for row in rows
+    }
+    return ports.get("WAN", ""), ports.get("LAN", "")
 
 
 def _wizard_guard():
@@ -105,19 +146,22 @@ def api_step1_ports():
     guard = _wizard_guard()
     if guard:
         return jsonify({"ok": False, "message": "Setup already complete."}), 403
-    ports = []
+
     try:
-        import sys
-        if sys.platform.startswith("freebsd"):
-            from app.services.network_service import run_command
-            r = run_command(["ifconfig", "-l"], check=False)
-            ports = (r.stdout or "").split()
-        else:
-            # Dev: return placeholder names
-            ports = ["em0", "em1", "em2", "vtnet0", "vtnet1"]
+        from app.services.network_service import list_physical_nics
+        ports = _port_payload_from_nics(list_physical_nics())
+        if not ports:
+            ports = [
+                {"name": "em0", "label": "em0", "ether": "", "status": "", "media": ""},
+                {"name": "em1", "label": "em1", "ether": "", "status": "", "media": ""},
+            ]
     except Exception:
-        ports = ["em0", "em1"]
-    return jsonify({"ok": True, "ports": ports})
+        ports = [
+            {"name": "em0", "label": "em0", "ether": "", "status": "", "media": ""},
+            {"name": "em1", "label": "em1", "ether": "", "status": "", "media": ""},
+        ]
+
+    return jsonify({"ok": True, "status": "success", "ports": ports})
 
 
 @setup_bp.route("/api/step1/save", methods=["POST"])
@@ -134,6 +178,11 @@ def api_step1_save():
         return jsonify({"ok": False, "message": "Both WAN and LAN ports are required."}), 400
     if wan_port == lan_port:
         return jsonify({"ok": False, "message": "WAN and LAN must be different ports."}), 400
+    try:
+        validate_interface_name(wan_port, allow_empty=False)
+        validate_interface_name(lan_port, allow_empty=False)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
 
     conn = get_db()
     for itype, port in [("WAN", wan_port), ("LAN", lan_port)]:
@@ -146,6 +195,22 @@ def api_step1_save():
             """,
             (itype, port),
         )
+    conn.execute(
+        """
+        UPDATE wan_config
+        SET assigned_port = ?
+        WHERE id = 1
+        """,
+        (wan_port,),
+    )
+    conn.execute(
+        """
+        UPDATE lan_config
+        SET assigned_port = ?
+        WHERE id = 1
+        """,
+        (lan_port,),
+    )
     conn.commit()
     session["setup_wan_port"] = wan_port
     session["setup_lan_port"] = lan_port
@@ -180,36 +245,82 @@ def api_step2_save():
         return jsonify({"ok": False, "message": "LAN IP/CIDR is required."}), 400
 
     try:
-        import ipaddress
-        iface = ipaddress.ip_interface(lan_cidr)
+        ipaddress.ip_interface(lan_cidr)
     except ValueError:
         return jsonify({"ok": False, "message": f"Invalid LAN CIDR: {lan_cidr!r}"}), 400
 
-    wan_port = session.get("setup_wan_port", "em0")
-    lan_port = session.get("setup_lan_port", "em1")
+    if wan_type not in {"dhcp", "static", "pppoe"}:
+        return jsonify({"ok": False, "message": "Invalid WAN type."}), 400
+
+    if wan_type == "static":
+        if not wan_ip:
+            return jsonify({"ok": False, "message": "WAN static IP/CIDR is required."}), 400
+        try:
+            ipaddress.ip_interface(wan_ip)
+        except ValueError:
+            return jsonify({"ok": False, "message": f"Invalid WAN CIDR: {wan_ip!r}"}), 400
+        if wan_gw:
+            try:
+                ipaddress.ip_address(wan_gw)
+            except ValueError:
+                return jsonify({"ok": False, "message": f"Invalid WAN gateway: {wan_gw!r}"}), 400
+    else:
+        wan_ip = ""
+        wan_gw = ""
 
     conn = get_db()
+    wan_port, lan_port = _get_saved_setup_ports(conn)
+    wan_port = wan_port or session.get("setup_wan_port", "")
+    lan_port = lan_port or session.get("setup_lan_port", "")
+
+    if not wan_port or not lan_port:
+        return jsonify({
+            "ok": False,
+            "message": "WAN/LAN ports are not assigned. Go back to Step 1.",
+        }), 400
+
     conn.execute(
         """
-        INSERT INTO lan_config (assigned_port, ipv4_address)
-        VALUES (?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            assigned_port = excluded.assigned_port,
-            ipv4_address  = excluded.ipv4_address
-        """,
+         INSERT INTO lan_config
+             (id, assigned_port, ipv4_config_type, ipv4_address)
+        VALUES (1, ?, 'static', ?)
+         ON CONFLICT(id) DO UPDATE SET
+             assigned_port     = excluded.assigned_port,
+             ipv4_config_type  = excluded.ipv4_config_type,
+             ipv4_address      = excluded.ipv4_address
+         """,
         (lan_port, lan_cidr),
     )
     conn.execute(
-        """
-        INSERT INTO wan_config (assigned_port, ipv4_config_type, ipv4_address, ipv4_gateway)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            assigned_port    = excluded.assigned_port,
-            ipv4_config_type = excluded.ipv4_config_type,
-            ipv4_address     = excluded.ipv4_address,
-            ipv4_gateway     = excluded.ipv4_gateway
-        """,
+          """
+          INSERT INTO wan_config
+             (id, assigned_port, ipv4_config_type, ipv4_address, ipv4_upstream_gateway)
+           VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                 assigned_port          = excluded.assigned_port,
+                  ipv4_config_type       = excluded.ipv4_config_type,
+                  ipv4_address           = excluded.ipv4_address,
+                 ipv4_upstream_gateway  = excluded.ipv4_upstream_gateway
+         """,
         (wan_port, wan_type, wan_ip, wan_gw),
+    )
+    conn.execute(
+        """
+        INSERT INTO interface_assignments (interface_type, network_port)
+        VALUES ('WAN', ?)
+        ON CONFLICT(interface_type) DO UPDATE SET
+            network_port = excluded.network_port
+        """,
+        (wan_port,),
+    )
+    conn.execute(
+        """
+        INSERT INTO interface_assignments (interface_type, network_port)
+        VALUES ('LAN', ?)
+        ON CONFLICT(interface_type) DO UPDATE SET
+            network_port = excluded.network_port
+        """,
+        (lan_port,),
     )
     conn.commit()
     return jsonify({"ok": True, "message": "Network configuration saved."})
@@ -287,22 +398,48 @@ def api_step4_apply():
     results = []
 
     try:
+        from app.services.rc_conf_writer import apply_rc_conf
+        rc_result = apply_rc_conf(conn)
+        results.append({
+            "step": "rc_conf",
+            "ok": rc_result.get("ok", False),
+            "details": rc_result.get("message", ""),
+        })
+    except Exception as exc:
+        results.append({"step": "rc_conf", "ok": False, "details": str(exc)})
+
+    try:
+        from app.services.network_service import apply_interface_config
+        iface_result = apply_interface_config(conn)
+        results.append({
+            "step": "interfaces",
+            "ok": iface_result.get("ok", False),
+            "details": iface_result.get("message", ""),
+        })
+    except Exception as exc:
+        results.append({"step": "interfaces", "ok": False, "details": str(exc)})
+
+    try:
         from app.services.service_manager import reload_all_services
         svc_result = reload_all_services(conn)
-        results.append({"step": "services", "ok": svc_result["ok"],
-                         "details": svc_result.get("results", [])})
+        results.append({
+            "step": "services",
+            "ok": svc_result.get("ok", False),
+            "details": svc_result.get("results", []),
+        })
     except Exception as exc:
         results.append({"step": "services", "ok": False, "details": str(exc)})
 
-    _mark_setup_complete(conn)
-
     overall_ok = all(r.get("ok", False) for r in results)
+    if overall_ok:
+        _mark_setup_complete(conn)
+
     return jsonify({
         "ok": overall_ok,
         "message": "Setup complete! Redirecting to dashboard." if overall_ok
                    else "Setup finished with warnings — check results.",
         "results": results,
-        "redirect": url_for("system.dashboard"),
+        "redirect": url_for("system.dashboard") if overall_ok else None,
     })
 
 

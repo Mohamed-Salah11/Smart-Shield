@@ -13,8 +13,20 @@ def index():
     return redirect(url_for("auth.login"))
 
 
+def _no_users_exist() -> bool:
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()
+        return row["c"] == 0
+    except Exception:
+        return False
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if _no_users_exist():
+        return redirect(url_for("setup.wizard_index"))
+
     error = None
 
     if request.method == "POST":

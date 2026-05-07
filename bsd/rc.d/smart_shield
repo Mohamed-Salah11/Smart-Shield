@@ -31,10 +31,9 @@ rcvar="${name}_enable"
 load_rc_config "${name}"
 
 : ${smart_shield_enable:="NO"}
-: ${smart_shield_user:="root"}
-: ${smart_shield_group:="wheel"}
-# NOTE: root is required for pfctl, sysrc, and service management.
-# This is standard for dedicated firewall appliances (pfSense also runs as root).
+# The service runs as root. Privileged commands (pfctl, service, sysrc, etc.)
+# are executed directly. sudo remains installed as a fallback for non-root
+# deployments.
 # App root where run.py/wsgi.py live in deployed system.
 : ${smart_shield_app_root:="/usr/local/share/smart-shield"}
 # Environment file containing SECRET_KEY and DB path vars.
@@ -52,7 +51,7 @@ load_rc_config "${name}"
 
 required_files="${smart_shield_gunicorn}"
 pidfile="${smart_shield_pidfile}"
-procname="${smart_shield_gunicorn}"
+procname="/usr/sbin/daemon"
 command="/usr/sbin/daemon"
 command_args="-f -P ${pidfile} -o ${smart_shield_logdir}/app.log \
     ${smart_shield_gunicorn} \
@@ -85,16 +84,23 @@ smart_shield_prestart()
     upload_dir="${SMARTSHIELD_UPLOAD_DIR}"
     audit_parent="$(dirname "${SMARTSHIELD_AUDIT_LOG_PATH}")"
 
-    # Ensure runtime/data/config/log directories exist with correct ownership.
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_rundir}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${smart_shield_logdir}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${db_parent}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${cfg_parent}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${upload_dir}"
-    install -d -m 0755 -o "${smart_shield_user}" -g "${smart_shield_group}" "${audit_parent}"
+    # Remove a stale PID file left by a crash (daemon already gone).
+    if [ -f "${pidfile}" ]; then
+        _pid=$(cat "${pidfile}" 2>/dev/null)
+        if [ -n "${_pid}" ] && ! kill -0 "${_pid}" 2>/dev/null; then
+            rm -f "${pidfile}"
+        fi
+    fi
+
+    # Ensure runtime/data/config/log directories exist (root:wheel by default).
+    install -d -m 0755 "${smart_shield_rundir}"
+    install -d -m 0755 "${smart_shield_logdir}"
+    install -d -m 0755 "${db_parent}"
+    install -d -m 0755 "${cfg_parent}"
+    install -d -m 0755 "${upload_dir}"
+    install -d -m 0755 "${audit_parent}"
 
     touch "${SMARTSHIELD_AUDIT_LOG_PATH}"
-    chown "${smart_shield_user}:${smart_shield_group}" "${SMARTSHIELD_AUDIT_LOG_PATH}"
 
     # Export variables used by app startup logic.
     export FLASK_DEBUG
