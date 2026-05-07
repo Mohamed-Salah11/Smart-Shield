@@ -40,6 +40,11 @@
 
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
+            <label class="ss-label" for="assignedPort">Assigned Port</label>
+            <input type="text" id="assignedPort" class="form-control" readonly>
+            <p class="ss-hint">Change this from Interfaces -> Assignments.</p>
+          </div>
+          <div class="ss-field">
             <label class="ss-label" for="description">Description</label>
             <input type="text" id="description" name="description" class="form-control" value="LAN">
             <p class="ss-hint">Optional label for this interface</p>
@@ -167,6 +172,7 @@ function loadLANConfig() {
         .then(data => {
             if (data.status === 'success') {
                 const c = data.data;
+                document.getElementById('assignedPort').value = c.assigned_port || 'Not assigned';
                 document.getElementById('enable').checked       = c.enable_interface;
                 document.getElementById('description').value    = c.description;
                 document.getElementById('ipv4type').value       = c.ipv4_config_type;

@@ -221,7 +221,7 @@ def get_wan_rules():
         db = get_db()
         cursor = db.cursor()
         cursor.execute("""
-            SELECT id, action, disabled, protocol, source, destination, description
+            SELECT id, action, disabled, protocol, source, source_port, destination, dest_port, description
             FROM firewall_rules_wan
             ORDER BY rule_order
         """)
@@ -316,7 +316,7 @@ def get_wan_rule(rule_id):
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "SELECT id, action, disabled, protocol, source, destination, description "
+            "SELECT id, action, disabled, protocol, source, source_port, destination, dest_port, description "
             "FROM firewall_rules_wan WHERE id=?", (rule_id,)
         )
         row = cursor.fetchone()
@@ -1879,6 +1879,15 @@ def firewall_apply():
     try:
         from app.services.pf_generator import reload_pf_rules
         result = reload_pf_rules(conn)
+        # Sync Unbound DNS filter zones so DNS and PF stay consistent.
+        if result.get("ok"):
+            try:
+                from app.services.dns_writer import apply_unbound
+                dns_result = apply_unbound(conn)
+                if not dns_result.get("ok"):
+                    result["dns_warning"] = dns_result.get("message", "DNS sync failed")
+            except Exception as dns_exc:
+                result["dns_warning"] = str(dns_exc)
         log_event(
             category="system",
             action="firewall_apply",
@@ -1921,6 +1930,61 @@ def firewall_rollback():
         return jsonify(result)
     except Exception as exc:
         return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@firewall_bp.route("/api/apply/all", methods=["POST"])
+@api_permission_required("api.firewall.edit")
+def firewall_apply_all():
+    """
+    Apply all policy layers together: PF firewall, Unbound DNS filter zones,
+    and Suricata IDS config (if running). Single endpoint to push all subsystems.
+    Returns {"ok": bool, "results": {"pf": {...}, "dns": {...}, "ids": {...}}}
+    """
+    from flask import session
+    from app.audit_log import log_event
+    conn = get_db()
+    results = {}
+    overall_ok = True
+
+    try:
+        from app.services.pf_generator import reload_pf_rules
+        pf = reload_pf_rules(conn)
+        results["pf"] = {"ok": pf["ok"], "message": pf["message"]}
+        if not pf["ok"]:
+            overall_ok = False
+    except Exception as exc:
+        results["pf"] = {"ok": False, "message": str(exc)}
+        overall_ok = False
+
+    try:
+        from app.services.dns_writer import apply_unbound
+        dns = apply_unbound(conn)
+        results["dns"] = {"ok": dns["ok"], "message": dns.get("message", "")}
+        if not dns["ok"]:
+            overall_ok = False
+    except Exception as exc:
+        results["dns"] = {"ok": False, "message": str(exc)}
+        overall_ok = False
+
+    try:
+        from app.services.ids_writer import write_suricata_config, get_ids_status
+        ids_status = get_ids_status(conn)
+        if ids_status.get("running"):
+            ids = write_suricata_config(conn)
+            results["ids"] = {"ok": ids["ok"], "message": ids.get("message", "")}
+        else:
+            results["ids"] = {"ok": True, "message": "IDS not running — skipped"}
+    except Exception as exc:
+        results["ids"] = {"ok": False, "message": str(exc)}
+
+    log_event(
+        category="system",
+        action="apply_all_policies",
+        username=session.get("username", "system"),
+        remote_addr=request.remote_addr,
+        details={"ok": overall_ok, "results": results},
+    )
+    return jsonify({"ok": overall_ok, "results": results})
 
 
 @firewall_bp.route("/api/apply/preview", methods=["GET"])

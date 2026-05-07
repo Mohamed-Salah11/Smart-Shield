@@ -212,6 +212,37 @@ class TestGeneratePfConf:
         conf = generate_pf_conf(conn)
         assert "scrub in all" in conf
 
+    def test_pf_sections_are_ordered_for_pfctl(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        import json
+
+        fresh_conn.execute("DELETE FROM firewall_aliases WHERE name='ORDERTEST'")
+        fresh_conn.execute("DELETE FROM nat_outbound")
+        fresh_conn.execute("DELETE FROM nat_pf")
+        fresh_conn.execute(
+            "INSERT INTO firewall_aliases (name, type, alias_values)"
+            " VALUES ('ORDERTEST', 'host', ?)",
+            (json.dumps(["1.2.3.4"]),),
+        )
+        fresh_conn.execute(
+            "INSERT INTO nat_pf (disabled, interface, protocol, src_address, dst_address, redirect_ip)"
+            " VALUES (0, 'em0', 'tcp', 'any', 'any', '192.168.1.100')"
+        )
+        fresh_conn.commit()
+
+        conf = generate_pf_conf(fresh_conn)
+        table_pos = conf.index("table <authenticated_clients>")
+        alias_pos = conf.index("table <ORDERTEST>")
+        options_pos = conf.index("set block-policy drop")
+        scrub_pos = conf.index("scrub in all")
+        nat_pos = conf.index("nat on $WAN")
+        rdr_pos = conf.index("rdr on em0 proto tcp")
+        rdr_anchor_pos = conf.index('rdr-anchor "captive_portal"')
+        filter_anchor_pos = conf.index('anchor "captive_portal"')
+
+        assert table_pos < alias_pos < options_pos < scrub_pos
+        assert scrub_pos < nat_pos < rdr_pos < rdr_anchor_pos < filter_anchor_pos
+
 
 # ---------------------------------------------------------------------------
 # Validation (pfctl is mocked — only tests non-FreeBSD path)

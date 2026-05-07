@@ -17,6 +17,7 @@ reload_all_services(conn)          -> dict   {"ok", "results": [...]}
 
 import sys
 from app.services.network_service import run_command, FreeBSDNetworkError
+from app.services.priv_helper import run_privileged, PrivilegedActionError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,12 +43,14 @@ def sysrc_get(key: str):
     """Read an rc.conf value. Returns string value or None."""
     if not _on_freebsd():
         return None
+
     try:
-        result = run_command(["sysrc", "-n", key], check=False)
+        result = run_privileged("sysrc.get", key=key)
         if result.returncode == 0:
             return result.stdout.strip() or None
         return None
-    except FreeBSDNetworkError:
+
+    except (FreeBSDNetworkError, PrivilegedActionError):
         return None
 
 
@@ -55,10 +58,14 @@ def sysrc_set(key: str, value: str) -> dict:
     """Set a persistent rc.conf value via sysrc."""
     if not _on_freebsd():
         return _ok(f"Non-FreeBSD — skipped sysrc {key}={value}")
+
     try:
-        run_command(["sysrc", f"{key}={value}"], check=True)
-        return _ok(f"sysrc: {key}={value}")
-    except FreeBSDNetworkError as exc:
+        result = run_privileged("sysrc.set", key=key, value=value)
+        ok = result.returncode == 0
+        msg = (result.stdout or result.stderr or "").strip()
+        return {"ok": ok, "message": msg or f"sysrc: {key}={value}"}
+
+    except (FreeBSDNetworkError, PrivilegedActionError) as exc:
         return _err(str(exc))
 
 
@@ -87,11 +94,11 @@ def service_action(name: str, action: str) -> dict:
         return sysrc_set(f"{name}_enable", "NO")
 
     try:
-        result = run_command(["service", name, action], check=False)
+        result = run_privileged("service.action", service_name=name, action=action)
         ok = result.returncode == 0
         msg = (result.stdout or result.stderr or "").strip()
         return {"ok": ok, "message": msg or f"service {name} {action} completed"}
-    except FreeBSDNetworkError as exc:
+    except (FreeBSDNetworkError, PrivilegedActionError) as exc:
         return _err(str(exc))
 
 
@@ -310,12 +317,13 @@ def reload_all_services(conn) -> dict:
 
     # NTP
     try:
-        from app.services.ntp_writer import write_ntp_conf
-        ntp_result = write_ntp_conf(conn)
-        results.append({"service": "ntpd", "ok": ntp_result["ok"], "message": ntp_result["message"]})
-        if ntp_result["ok"]:
-            r = service_action("ntpd", "restart")
-            results.append({"service": "ntpd-restart", "ok": r["ok"], "message": r["message"]})
+        from app.services.ntp_writer import apply_ntp
+        ntp_result = apply_ntp(conn)
+        results.append({
+           "service": "ntpd",
+             "ok": ntp_result["ok"],
+             "message": ntp_result["message"],
+        })
     except Exception as exc:
         results.append({"service": "ntpd", "ok": False, "message": str(exc)})
 
@@ -342,34 +350,25 @@ def reload_all_services(conn) -> dict:
 
     # SNMP (bsnmpd)
     try:
-        from app.services.snmp_writer import write_snmpd_config
-        snmp_result = write_snmpd_config(conn)
+        from app.services.snmp_writer import apply_snmp
+        snmp_result = apply_snmp(conn)
         results.append({"service": "bsnmpd", "ok": snmp_result["ok"], "message": snmp_result["message"]})
-        if snmp_result["ok"]:
-            r = service_action("bsnmpd", "restart")
-            results.append({"service": "bsnmpd-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "bsnmpd", "ok": False, "message": str(exc)})
 
     # UPnP (miniupnpd)
     try:
-        from app.services.upnp_writer import write_upnp_conf
-        upnp_result = write_upnp_conf(conn)
+        from app.services.upnp_writer import apply_upnp
+        upnp_result = apply_upnp(conn)
         results.append({"service": "miniupnpd", "ok": upnp_result["ok"], "message": upnp_result["message"]})
-        if upnp_result["ok"]:
-            r = service_action("miniupnpd", "restart")
-            results.append({"service": "miniupnpd-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "miniupnpd", "ok": False, "message": str(exc)})
 
     # IGMP proxy
     try:
-        from app.services.igmp_writer import write_igmp_conf
-        igmp_result = write_igmp_conf(conn)
+        from app.services.igmp_writer import apply_igmp
+        igmp_result = apply_igmp(conn)
         results.append({"service": "igmpproxy", "ok": igmp_result["ok"], "message": igmp_result["message"]})
-        if igmp_result["ok"]:
-            r = service_action("igmpproxy", "restart")
-            results.append({"service": "igmpproxy-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "igmpproxy", "ok": False, "message": str(exc)})
 

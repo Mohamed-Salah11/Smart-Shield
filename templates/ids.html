@@ -458,6 +458,42 @@
           </div>
         </div>
 
+        <hr class="my-4">
+
+        <!-- abuse.ch lookups -->
+        <div class="row">
+          <div class="col-sm-9 offset-sm-3">
+            <h6 class="fw-bold mb-2">
+              <i class="fa-solid fa-magnifying-glass me-1"></i>Abuse.ch Lookup
+            </h6>
+
+            <div class="input-group mb-2" style="max-width:720px;">
+              <select id="abusechLookupType" class="form-select" style="max-width:150px;">
+                <option value="url">URLhaus URL</option>
+                <option value="host">URLhaus Host/IP</option>
+                <option value="hash">MalwareBazaar Hash</option>
+                <option value="ioc">ThreatFox IOC</option>
+              </select>
+
+              <input id="abusechLookupValue"
+                     class="form-control"
+                     placeholder="Paste URL, host/IP, hash, or IOC">
+
+              <button type="button" class="btn btn-secondary" id="btnAbusechLookup">
+                Lookup
+              </button>
+
+              <button type="button" class="btn btn-outline-secondary" id="btnAbusechRecent">
+                Recent
+              </button>
+            </div>
+
+            <pre id="abusechResult"
+                 class="d-none"
+                 style="max-height:320px;overflow:auto;font-size:.78rem;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px;padding:12px;"></pre>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -670,7 +706,62 @@ if (btnSaveFeeds) {
     }
   });
 }
+function _showAbusechResult(obj) {
+  const box = document.getElementById('abusechResult');
+  if (!box) return;
 
+  box.classList.remove('d-none');
+  box.textContent = JSON.stringify(obj, null, 2);
+}
+
+const btnAbusechLookup = document.getElementById('btnAbusechLookup');
+if (btnAbusechLookup) {
+  btnAbusechLookup.addEventListener('click', async function() {
+    const type = document.getElementById('abusechLookupType').value;
+    const value = document.getElementById('abusechLookupValue').value.trim();
+
+    if (!value) {
+      alert('Enter a URL, host/IP, hash, or IOC first.');
+      return;
+    }
+
+    this.disabled = true;
+    this.textContent = 'Looking up...';
+
+    const res = await apiFetch('{{ url_for("ids.ids_abusech_lookup") }}', {
+      method: 'POST',
+      body: JSON.stringify({type, value}),
+    }).then(r => r.json()).catch(e => ({
+      ok: false,
+      message: String(e),
+    }));
+
+    this.disabled = false;
+    this.textContent = 'Lookup';
+
+    _showAbusechResult(res);
+  });
+}
+
+const btnAbusechRecent = document.getElementById('btnAbusechRecent');
+if (btnAbusechRecent) {
+  btnAbusechRecent.addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = 'Loading...';
+
+    const res = await apiFetch('{{ url_for("ids.ids_abusech_recent") }}?limit=20&days=1')
+      .then(r => r.json())
+      .catch(e => ({
+        ok: false,
+        message: String(e),
+      }));
+
+    this.disabled = false;
+    this.textContent = 'Recent';
+
+    _showAbusechResult(res);
+  });
+}
 const btnClearFeeds = document.getElementById('btnClearFeeds');
 if (btnClearFeeds) {
   btnClearFeeds.addEventListener('click', async function() {

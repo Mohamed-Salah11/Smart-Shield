@@ -91,6 +91,7 @@
 </div>
 
 <script>
+  const CSRF_TOKEN = "{{ csrf_token() }}";
 async function applyConfig() {
   document.getElementById('btn-apply').disabled = true;
   document.getElementById('btn-back').disabled  = true;
@@ -113,13 +114,20 @@ async function applyConfig() {
   try {
     const r = await fetch('/setup/api/step4/apply', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': CSRF_TOKEN
+        },
+        credentials: 'same-origin',
       body: JSON.stringify({})
     });
     const d = await r.json();
 
     fill.style.width = '80%';
-    (d.results || []).forEach(res => addLog(res.step + ': ' + res.details, res.ok));
+    (d.results || []).forEach(res => {
+      const details = typeof res.details === 'string' ? res.details : JSON.stringify(res.details);
+      addLog(res.step + ': ' + details, res.ok);
+    });
 
     fill.style.width = '100%';
 
