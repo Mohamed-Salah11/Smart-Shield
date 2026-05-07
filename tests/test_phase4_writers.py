@@ -611,7 +611,20 @@ class TestCaptivePortal:
         anchor = generate_pf_anchor(conn)
         assert "authenticated_clients" in anchor
         assert "rdr on" in anchor
-        assert "block in on" in anchor
+        assert "block in quick on" in anchor
+
+    def test_generate_pf_anchor_redirects_http_only(self, conn):
+        from app.services.captive_portal import generate_pf_anchor
+        anchor = generate_pf_anchor(conn)
+        assert "port 80" in anchor
+        assert "port 443" not in anchor
+
+    def test_generate_pf_anchor_defaults_to_lan_ip(self, conn):
+        from app.services.captive_portal import generate_pf_anchor
+        conn.execute("UPDATE lan_config SET ipv4_address='192.168.50.1/24' WHERE id=1")
+        conn.commit()
+        anchor = generate_pf_anchor(conn)
+        assert "-> 192.168.50.1 port 5000" in anchor
 
     def test_apply_dry_run(self, conn):
         from app.services.captive_portal import apply_captive_portal

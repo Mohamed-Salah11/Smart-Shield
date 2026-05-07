@@ -58,8 +58,16 @@
   </div>
   <div class="card-body">
     <div class="icon">&#10004;&#65039;</div>
+    {% if policy == 'content' %}
+    <div class="title">Access granted</div>
+    <div class="subtitle">
+      Your device has been granted a content-policy bypass{% if domain %} for {{ domain }}{% endif %}.<br>
+      You may close this window and browse normally.
+    </div>
+    {% else %}
     <div class="title">You are connected!</div>
     <div class="subtitle">Your device has been granted network access.<br>You may close this window and browse normally.</div>
+    {% endif %}
     <a href="/portal/logout" class="btn-logout">Disconnect / Log out</a>
   </div>
   <div class="footer">Protected by Smart Shield &middot; Network Firewall Appliance</div>

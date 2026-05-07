@@ -5,14 +5,16 @@ Least-privilege privileged command executor.
 
 Architecture
 ------------
-The Smart Shield web process runs as an unprivileged ``smartshield`` user.
+The Smart Shield web process runs as root (or as the unprivileged
+``smartshield`` user in non-root deployments).
 Operations that require root (pfctl, service, ifconfig, etc.) are gated
 through this module, which:
 
   1. Validates all inputs against a per-action allowlist.
   2. Constructs the exact command from a template (no user-supplied strings
      injected raw into the command vector).
-  3. Calls the command via ``sudo`` (see bsd/etc/sudoers.d/smartshield).
+  3. Executes the command directly when running as root; falls back to
+     ``sudo`` (see bsd/etc/sudoers.d/smartshield) for non-root deployments.
   4. Logs every privileged action to the audit log.
   5. Rejects any action not in the allowlist with a clear error.
 
@@ -40,6 +42,14 @@ from app.services.network_service import (
     _network_dry_run_enabled,
     run_command,
 )
+
+
+def _maybe_sudo(cmd: List[str]) -> List[str]:
+    """Return cmd unchanged when root (uid 0); otherwise prepend sudo -n."""
+    if os.getuid() == 0:
+        return cmd
+    return ["/usr/local/bin/sudo", "-n"] + cmd
+
 
 # ---------------------------------------------------------------------------
 # Input validators — each raises ValueError on bad input
@@ -105,7 +115,7 @@ def _val_service_name(v: str) -> str:
     """Only allow known FreeBSD service names managed by Smart Shield."""
     _KNOWN_SERVICES = {
         "isc-dhcpd", "unbound", "openvpn", "strongswan",
-        "suricata", "ntpd", "miniupnpd", "igmpproxy",
+        "suricata", "ntpd", "miniupnpd", "igmpproxy", "mpd5",
         "ddclient", "kea-dhcp6", "rtadvd", "bsnmpd",
         "smart_shield", "nginx", "pf", "pflog",
     }
@@ -213,11 +223,21 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "flush"],
         "params": {"table": _val_table_name},
     },
+    "pf.table_show": {
+        "description": "Show all IPs in a PF table.",
+        "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "show"],
+        "params": {"table": _val_table_name},
+    },
     # Services
     "service.action": {
         "description": "Run a service action (start/stop/restart/reload).",
         "cmd": ["/usr/sbin/service", "{service_name}", "{action}"],
         "params": {"service_name": _val_service_name, "action": _val_service_action},
+    },
+    "sysrc.get": {
+    "description": "Read an rc.conf variable.",
+    "cmd": ["/usr/sbin/sysrc", "-n", "{key}"],
+    "params": {"key": _val_sysrc_key},
     },
     # sysrc
     "sysrc.set": {
@@ -277,13 +297,15 @@ def list_allowed_actions() -> List[str]:
 
 
 def is_privileged_available() -> bool:
-    """True if sudo is accessible (FreeBSD, non-dry-run)."""
+    """True if privileged commands can be executed (root or sudo on FreeBSD, non-dry-run)."""
     if not sys.platform.startswith("freebsd"):
         return False
     if _network_dry_run_enabled():
         return False
+    if os.getuid() == 0:
+        return True
     try:
-        r = run_command(["/usr/bin/sudo", "-n", "-l"], check=False, timeout_seconds=3)
+        r = run_command(["/usr/local/bin/sudo", "-n", "-l"], check=False, timeout_seconds=3)
         return r.returncode == 0
     except Exception:
         return False
@@ -354,9 +376,9 @@ def run_privileged(priv_action: str, audit_username: str = "system", **params) -
     if action == "sysrc.set":
         cmd = ["/usr/sbin/sysrc", f"{validated['key']}={validated['value']}"]
 
-    # Prepend sudo on FreeBSD (non-dry-run)
+    # Prepend sudo on FreeBSD non-root deployments (no-op when running as root)
     if sys.platform.startswith("freebsd") and not _network_dry_run_enabled():
-        cmd = ["/usr/bin/sudo"] + cmd
+        cmd = _maybe_sudo(cmd)
 
     # Audit every privileged call
     try:

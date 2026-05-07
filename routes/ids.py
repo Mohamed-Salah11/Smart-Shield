@@ -227,7 +227,116 @@ def ids_feeds_save():
     )
     return jsonify({"ok": True, "has_key": bool(raw_key)})
 
+# -- abuse.ch live lookups --------------------------------------------------
 
+@ids_bp.route("/api/feeds/abusech/recent", methods=["GET"])
+@login_required
+def ids_abusech_recent():
+    """Fetch recent abuse.ch threat-intel samples for the IDS Threat Feeds tab."""
+    try:
+        limit = min(max(int(request.args.get("limit", 20)), 1), 100)
+    except ValueError:
+        limit = 20
+
+    try:
+        days = min(max(int(request.args.get("days", 1)), 1), 7)
+    except ValueError:
+        days = 1
+
+    try:
+        from app.services.abusech_client import (
+            is_dry_run,
+            malwarebazaar_recent,
+            threatfox_recent_iocs,
+            urlhaus_recent,
+        )
+
+        payload = {
+            "ok": True,
+            "dry_run": is_dry_run(),
+            "urlhaus": urlhaus_recent(limit=limit),
+            "malwarebazaar": malwarebazaar_recent(limit=limit),
+            "threatfox": threatfox_recent_iocs(days=days),
+        }
+        return jsonify(payload)
+
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"abuse.ch request failed: {exc}"}), 502
+
+
+@ids_bp.route("/api/feeds/abusech/lookup", methods=["POST"])
+@login_required
+def ids_abusech_lookup():
+    """Look up a URL, host/IP, hash, or generic IOC through abuse.ch services."""
+    data = request.get_json(silent=True) or {}
+
+    lookup_type = (data.get("type") or "").strip().lower()
+    value = (data.get("value") or "").strip()
+
+    if lookup_type not in {"url", "host", "hash", "ioc"}:
+        return jsonify({
+            "ok": False,
+            "message": "type must be one of: url, host, hash, ioc",
+        }), 400
+
+    if not value:
+        return jsonify({"ok": False, "message": "value is required"}), 400
+
+    if len(value) > 2048:
+        return jsonify({"ok": False, "message": "value is too long"}), 400
+
+    try:
+        from app.services.abusech_client import (
+            is_dry_run,
+            malwarebazaar_lookup_hash,
+            threatfox_search_ioc,
+            urlhaus_lookup_host,
+            urlhaus_lookup_url,
+        )
+
+        if lookup_type == "url":
+            result = urlhaus_lookup_url(value)
+            service = "urlhaus"
+
+        elif lookup_type == "host":
+            result = urlhaus_lookup_host(value)
+            service = "urlhaus"
+
+        elif lookup_type == "hash":
+            result = malwarebazaar_lookup_hash(value)
+            service = "malwarebazaar"
+
+        else:
+            result = threatfox_search_ioc(value)
+            service = "threatfox"
+
+        log_event(
+            category="system",
+            action="abusech_lookup",
+            username=session.get("username"),
+            remote_addr=request.remote_addr,
+            details={
+                "type": lookup_type,
+                "service": service,
+                "dry_run": is_dry_run(),
+            },
+        )
+
+        return jsonify({
+            "ok": True,
+            "service": service,
+            "dry_run": is_dry_run(),
+            "result": result,
+        })
+
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"abuse.ch lookup failed: {exc}"}), 502
 # ── Alert log viewer (tail eve.json) ─────────────────────────────────────
 
 @ids_bp.route("/api/alerts", methods=["GET"])

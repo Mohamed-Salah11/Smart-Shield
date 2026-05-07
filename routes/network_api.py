@@ -751,6 +751,16 @@ def update_interface(interface_type):
 
         assigned_port = payload["assigned_port"]
         if assigned_port:
+            validate_interface_name(assigned_port)
+            opposite = "LAN" if interface_type == "WAN" else "WAN"
+            cur.execute(
+                "SELECT network_port FROM interface_assignments WHERE interface_type = ?",
+                (opposite,),
+            )
+            other = cur.fetchone()
+            if other and (other["network_port"] or "").strip() == assigned_port:
+                raise ValueError(f"{assigned_port} is already assigned to {opposite}")
+
             cur.execute(
                 """
                 INSERT INTO interface_assignments (interface_type, network_port)
@@ -759,9 +769,39 @@ def update_interface(interface_type):
                 """,
                 (interface_type, assigned_port),
             )
+            if interface_type == "WAN":
+                cur.execute(
+                    "UPDATE wan_config SET assigned_port = ? WHERE id = 1",
+                    (assigned_port,),
+                )
+            else:
+                cur.execute(
+                    "UPDATE lan_config SET assigned_port = ? WHERE id = 1",
+                    (assigned_port,),
+                )
 
         conn.commit()
         return jsonify({"status": "success", "message": f"{interface_type} updated"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@network_api_bp.route("/dhcp/auto/<interface_type>", methods=["POST"])
+@api_permission_required("api.network.edit")
+def dhcp_auto_configure(interface_type):
+    """
+    Auto-configure the DHCP pool from the interface CIDR and run an ARP scan
+    to discover already-online devices.  Saves the derived pool to the DB and
+    enables it.
+    """
+    try:
+        validate_interface_type(interface_type)
+        conn = get_db()
+        from app.services.dhcp_writer import auto_configure_pool
+        result = auto_configure_pool(conn, interface_type)
+        status = "success" if result["ok"] else "error"
+        code   = 200 if result["ok"] else 400
+        return jsonify({"status": status, **result}), code
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 

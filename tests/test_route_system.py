@@ -59,6 +59,12 @@ class TestSetupWizard:
     def test_step1_available_ports(self, client):
         r = client.get("/setup/api/step1/available-ports")
         assert r.status_code in (200, 403)
+        if r.status_code == 200:
+            data = r.get_json()
+            assert data["status"] == "success"
+            assert data["ok"] is True
+            assert data["ports"][0]["name"] == "em0"
+            assert "label" in data["ports"][0]
 
     def test_step1_save_missing_ports(self, client):
         r = client.post("/setup/api/step1/save", json={})

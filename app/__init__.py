@@ -1,11 +1,14 @@
+import ipaddress
 import os
+import socket
 import time
+from urllib.parse import urlencode
 
 # Load .env before config.py class bodies evaluate their os.getenv() calls.
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, g, request, session
+from flask import Flask, g, redirect, request, session
 from .database import init_db
 from .config import get_config
 from .security import get_csrf_token, validate_csrf_or_abort
@@ -81,6 +84,71 @@ def create_app():
     @app.before_request
     def _csrf_guard():
         validate_csrf_or_abort()
+
+    @app.before_request
+    def _intercept_content_filter_blocked():
+        """
+        When content policy blocks a domain, Unbound returns the LAN IP.
+        The browser then connects here with Host: <blocked-domain>. Catch that
+        and redirect to the block page so the user can authenticate or stay blocked.
+        """
+        # Logged-in admin sessions pass straight through
+        if session.get("user_id"):
+            return None
+
+        # Portal, static assets, auth, and setup routes are always reachable
+        if request.path.startswith(
+            ("/portal", "/static", "/login", "/logout", "/setup")
+        ):
+            return None
+
+        # Extract bare hostname from the Host header (strip port)
+        raw_host = request.headers.get("Host") or ""
+        host = raw_host.split(":")[0].strip().lower()
+        if not host:
+            return None
+
+        # Direct IP access (e.g. http://192.168.1.1/) — not a DNS redirect
+        try:
+            ipaddress.ip_address(host)
+            return None
+        except ValueError:
+            pass
+
+        # Our own device hostname — not a DNS redirect
+        try:
+            own = {"localhost", socket.gethostname().lower(), socket.getfqdn().lower()}
+            if host in own:
+                return None
+        except Exception:
+            pass
+
+        try:
+            from .database import get_db
+            from .services.content_policy import (
+                has_active_captive_session,
+                has_active_content_policy,
+                is_blocked_domain,
+            )
+
+            conn = get_db()
+            if not has_active_content_policy(conn):
+                return None
+            if has_active_captive_session(conn, request.remote_addr or ""):
+                return None
+            if not is_blocked_domain(conn, host):
+                return None
+        except Exception:
+            return None
+
+        query = urlencode(
+            {
+                "policy": "content",
+                "domain": host,
+                "url": request.url,
+            }
+        )
+        return redirect(f"/portal/?{query}", code=302)
 
     @app.before_request
     def _request_timing_start():
