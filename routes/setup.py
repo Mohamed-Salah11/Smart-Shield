@@ -221,6 +221,22 @@ def api_step1_save():
 # Step 2 — LAN IP configuration
 # ---------------------------------------------------------------------------
 
+@setup_bp.route("/api/step2/bsd-detect", methods=["GET"])
+def api_step2_bsd_detect():
+    """Read current BSD state for both WAN and LAN interfaces assigned in step 1."""
+    conn = get_db()
+    from app.services.network_service import read_interface_config_from_bsd
+    wan_row = conn.execute("SELECT assigned_port FROM wan_config WHERE id=1").fetchone()
+    lan_row = conn.execute("SELECT assigned_port FROM lan_config WHERE id=1").fetchone()
+    wan_iface = ((wan_row["assigned_port"] or "").strip()) if wan_row else ""
+    lan_iface = ((lan_row["assigned_port"] or "").strip()) if lan_row else ""
+    return jsonify({
+        "ok": True,
+        "wan": read_interface_config_from_bsd(wan_iface) if wan_iface else {},
+        "lan": read_interface_config_from_bsd(lan_iface) if lan_iface else {},
+    })
+
+
 @setup_bp.route("/step2", methods=["GET"])
 def step2():
     guard = _wizard_guard()

@@ -128,11 +128,14 @@ def create_app():
             from .services.content_policy import (
                 has_active_captive_session,
                 has_active_content_policy,
+                is_admin_bypass_session,
                 is_blocked_domain,
             )
 
             conn = get_db()
             if not has_active_content_policy(conn):
+                return None
+            if is_admin_bypass_session(conn, request.remote_addr or ""):
                 return None
             if has_active_captive_session(conn, request.remote_addr or ""):
                 return None

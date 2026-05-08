@@ -12,6 +12,7 @@ GET  /portal/success       → shown after successful auth
 GET  /portal/logout        → end session and remove from PF table
 """
 
+import json
 import sys
 from urllib.parse import urlparse
 from flask import (
@@ -120,15 +121,26 @@ def auth():
                 **context,
             )
 
+        # Load portal whitelist once for both auth paths
+        _cp_row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        _cp_settings = json.loads(_cp_row["value_json"]) if _cp_row else {}
+        _whitelist = {u.strip().lower() for u in (_cp_settings.get("whitelist_users") or [])}
+        is_whitelisted = username.strip().lower() in _whitelist
+
         # Try RADIUS first; fall back to local user table
         radius_result = authenticate_radius(conn, username, password)
         if radius_result.get("ok"):
-            result = authenticate_session(conn, mac, ip, username=username)
+            result = authenticate_session(
+                conn, mac, ip, username=username,
+                is_superuser=is_whitelisted,
+            )
         else:
             # Local user check — use correct column names from the users table
             from werkzeug.security import check_password_hash as _chk
             row = conn.execute(
-                "SELECT password FROM users WHERE username=? AND (status IS NULL OR status='active')",
+                "SELECT password, is_superuser FROM users WHERE username=? AND (status IS NULL OR status='active')",
                 (username,),
             ).fetchone()
             if not row or not _chk(row["password"], password):
@@ -137,7 +149,8 @@ def auth():
                     error="Invalid username or password.",
                     **context,
                 )
-            result = authenticate_session(conn, mac, ip, username=username)
+            is_superuser = bool(row["is_superuser"]) or is_whitelisted
+            result = authenticate_session(conn, mac, ip, username=username, is_superuser=is_superuser)
 
     if not result.get("ok"):
         # Decide which template to return to (block page or generic login page)

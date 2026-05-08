@@ -460,7 +460,10 @@ def generate_pf_conf(conn) -> str:
 
     """)
 
-    base_tables = "table <authenticated_clients> persist\n\n"
+    base_tables = (
+        "table <authenticated_clients> persist\n"
+        "table <admin_bypass_clients> persist\n\n"
+    )
 
     options = textwrap.dedent("""\
         set block-policy drop
@@ -506,6 +509,9 @@ def generate_pf_conf(conn) -> str:
     # Default policy
     block all
     pass out quick keep state
+
+    # Admin accounts bypass all content policy filtering
+    pass in quick from <admin_bypass_clients> to any keep state
 
     """)
         + cp_anchor_line

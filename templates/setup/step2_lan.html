@@ -56,6 +56,19 @@
 
     <div id="alert" class="alert"></div>
 
+    <!-- Auto-detect from live BSD -->
+    <div id="bsd-detect-bar" style="display:flex;align-items:center;gap:12px;background:#1a2a1a;
+         border:1px solid #2e7d32;border-radius:6px;padding:10px 14px;margin-bottom:20px;">
+      <span style="font-size:.85rem;color:#81c784;flex:1;">
+        <strong>Tip:</strong> Auto-detect reads the current IP and type directly from FreeBSD.
+      </span>
+      <button type="button" onclick="detectFromBsd()"
+              style="padding:6px 14px;background:#2e7d32;color:#fff;border:none;
+                     border-radius:5px;font-size:.85rem;cursor:pointer;">
+        ↻ Auto-detect from BSD
+      </button>
+    </div>
+
     <div class="section-title">LAN Interface</div>
     <div class="form-group">
       <label for="lan_ip">LAN IP Address / Subnet (CIDR) <span style="color:#ef5350">*</span></label>
@@ -137,6 +150,35 @@ function showAlert(msg, type) {
   el.className = `alert alert-${type}`;
   el.textContent = msg;
   el.style.display = 'block';
+}
+
+async function detectFromBsd() {
+  try {
+    const r = await fetch('/setup/api/step2/bsd-detect', {
+      headers: { 'X-CSRF-Token': CSRF_TOKEN }, credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (!d.ok) return;
+
+    // Pre-fill LAN
+    const lan = d.lan || {};
+    const lanIp = lan.ipv4_address || lan.live_ip || '';
+    if (lanIp) document.getElementById('lan_ip').value = lanIp;
+
+    // Pre-fill WAN
+    const wan = d.wan || {};
+    const wanType = wan.ipv4_config_type || 'dhcp';
+    const wanTypeEl = document.getElementById('wan_type');
+    if (wanTypeEl) { wanTypeEl.value = wanType; toggleWanFields(); }
+    if (wanType === 'static') {
+      const wanIp = wan.ipv4_address || wan.live_ip || '';
+      if (wanIp) document.getElementById('wan_ip').value = wanIp;
+      if (wan.gateway) document.getElementById('wan_gw').value = wan.gateway;
+    }
+
+    const bar = document.getElementById('bsd-detect-bar');
+    if (bar) bar.style.borderColor = '#4fc3f7';
+  } catch(e) { console.warn('BSD detect failed:', e); }
 }
 </script>
 </body>

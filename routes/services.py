@@ -1321,6 +1321,7 @@ def api_cp_save_settings():
     allowed_keys = {
         "enabled", "lan_interface", "portal_ip", "portal_port",
         "http_redirect_port", "allow_dns", "radius_server", "radius_secret",
+        "whitelist_users",
     }
     settings = {k: v for k, v in data.items() if k in allowed_keys}
 
