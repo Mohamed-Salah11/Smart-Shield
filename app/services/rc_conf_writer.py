@@ -61,10 +61,11 @@ def generate_rc_conf_block(conn) -> str:
     """
     lines = []
 
-    # ── PF (always enabled on a firewall appliance) ──────────────────────────
+    # ── PF + IP forwarding (always enabled on a firewall appliance) ─────────
     lines += [
         'pf_enable="YES"',
         'pflog_enable="YES"',
+        'gateway_enable="YES"',   # IPv4 packet forwarding — required for router/NAT operation
     ]
 
     # ── WAN interface ────────────────────────────────────────────────────────
@@ -308,6 +309,10 @@ def apply_rc_conf(conn) -> dict:
     try:
         with open(_RC_CONF_LOCAL, "w") as fh:
             fh.write(new_content)
+        # Activate IP forwarding immediately so LAN clients can route without a reboot
+        if _on_freebsd():
+            from app.services.network_service import run_command
+            run_command(["sysctl", "net.inet.ip.forwarding=1"], check=False)
         return {
             "ok": True,
             "message": f"Network config written to {_RC_CONF_LOCAL}",

@@ -74,11 +74,13 @@ def _now_ts() -> int:
 # ---------------------------------------------------------------------------
 
 def authenticate_session(
-    conn, mac: str, ip: str, username: str = "", duration_minutes: int = 60
+    conn, mac: str, ip: str, username: str = "",
+    duration_minutes: int = 60, is_superuser: bool = False
 ) -> dict:
     """
     Create a new authenticated captive portal session.
     Adds the client IP to the PF authenticated table if on FreeBSD.
+    Admin (superuser) sessions are also added to admin_bypass_clients to skip content policy.
     """
     mac   = (mac or "").strip().lower()
     ip    = (ip or "").strip()
@@ -94,16 +96,17 @@ def authenticate_session(
     conn.execute(
         """
         INSERT INTO captive_sessions
-            (mac_address, ip_address, username, expires_at)
-        VALUES (?, ?, ?, ?)
+            (mac_address, ip_address, username, is_superuser, expires_at)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(mac_address) DO UPDATE SET
             ip_address=excluded.ip_address,
             username=excluded.username,
+            is_superuser=excluded.is_superuser,
             expires_at=excluded.expires_at,
             logged_out=0,
             created_at=CURRENT_TIMESTAMP
         """,
-        (mac, ip, uname, expires_at),
+        (mac, ip, uname, int(is_superuser), expires_at),
     )
     conn.commit()
 
@@ -127,14 +130,22 @@ def authenticate_session(
             conn.commit()
             return {"ok": False, "message": str(exc)}
 
+        # Admin accounts also bypass content policy at PF level
+        if is_superuser:
+            try:
+                run_privileged("pf.table_add", table="admin_bypass_clients", ip=ip)
+            except Exception:
+                pass
+
     return {"ok": True, "message": f"Session created for {ip} ({uname or mac})."}
 
 
 def logout_session(conn, session_id: int) -> dict:
-    rows = _rows(conn, "SELECT ip_address FROM captive_sessions WHERE id=?", (session_id,))
+    rows = _rows(conn, "SELECT ip_address, is_superuser FROM captive_sessions WHERE id=?", (session_id,))
     if not rows:
         return {"ok": False, "message": "Session not found."}
     ip = rows[0]["ip_address"]
+    was_superuser = bool(rows[0]["is_superuser"])
     conn.execute(
         "UPDATE captive_sessions SET logged_out=1 WHERE id=?", (session_id,)
     )
@@ -142,11 +153,15 @@ def logout_session(conn, session_id: int) -> dict:
 
     if sys.platform.startswith("freebsd"):
         try:
-            from app.services.network_service import run_command
             from app.services.priv_helper import run_privileged
             run_privileged("pf.table_delete", table="authenticated_clients", ip=ip)
         except Exception:
             pass
+        if was_superuser:
+            try:
+                run_privileged("pf.table_delete", table="admin_bypass_clients", ip=ip)
+            except Exception:
+                pass
 
     return {"ok": True, "message": f"Session {session_id} logged out."}
 

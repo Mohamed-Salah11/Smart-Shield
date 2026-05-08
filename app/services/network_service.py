@@ -518,6 +518,66 @@ def get_interface_state(iface_name: str) -> dict:
     }
 
 
+def read_interface_config_from_bsd(iface_name: str) -> dict:
+    """
+    Read the current configuration of one interface from the live FreeBSD system.
+    Combines:
+      - sysrc -n ifconfig_<iface>   → determines type (dhcp / static / none)
+      - ifconfig <iface>             → live assigned IP (even for DHCP)
+      - sysrc -n defaultrouter       → current default gateway
+    Returns dict with keys: iface, ipv4_config_type, ipv4_address, gateway, live_ip
+    Non-FreeBSD: returns the dict with empty values (safe for dev environments).
+    """
+    result: dict = {
+        "iface":            iface_name,
+        "ipv4_config_type": "none",
+        "ipv4_address":     "",
+        "gateway":          "",
+        "live_ip":          "",
+    }
+    if not sys.platform.startswith("freebsd") or not iface_name:
+        return result
+
+    try:
+        from app.services.priv_helper import run_privileged
+        rc_key = "ifconfig_" + re.sub(r"[^A-Za-z0-9_]", "_", iface_name)
+        r = run_privileged("sysrc.get", key=rc_key)
+        rc_val = (r.stdout or "").strip().upper()
+        if rc_val == "DHCP":
+            result["ipv4_config_type"] = "dhcp"
+        elif "INET" in rc_val or rc_val.startswith("STATIC"):
+            result["ipv4_config_type"] = "static"
+        elif rc_val in ("UP", "", "NO"):
+            result["ipv4_config_type"] = "none"
+        else:
+            # non-empty, non-DHCP → treat as static
+            result["ipv4_config_type"] = "static"
+    except Exception:
+        pass
+
+    # Read live IP from ifconfig (works regardless of DHCP vs static)
+    try:
+        state = get_interface_state(iface_name)
+        live = state.get("cidr") or state.get("inet") or ""
+        result["live_ip"] = live
+        if result["ipv4_config_type"] == "static" and live:
+            result["ipv4_address"] = live
+    except Exception:
+        pass
+
+    # Read gateway from rc.conf
+    try:
+        r = run_privileged("sysrc.get", key="defaultrouter")
+        gw = (r.stdout or "").strip()
+        if gw and gw.upper() not in ("NO", ""):
+            result["gateway"] = gw
+    except Exception:
+        pass
+
+    return result
+
+
+
 # ---------------------------------------------------------------------------
 # Phase 3 — Interface assignment with live apply + rollback
 # ---------------------------------------------------------------------------

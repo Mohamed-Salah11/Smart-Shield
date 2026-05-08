@@ -1636,6 +1636,7 @@ ON static_leases(mac_address)
         mac_address  TEXT    NOT NULL UNIQUE,
         ip_address   TEXT    NOT NULL,
         username     TEXT    DEFAULT '',
+        is_superuser INTEGER DEFAULT 0,
         expires_at   INTEGER NOT NULL,
         logged_out   INTEGER DEFAULT 0,
         bytes_in     INTEGER DEFAULT 0,
@@ -1643,6 +1644,12 @@ ON static_leases(mac_address)
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    try:
+        cursor.execute(
+            "ALTER TABLE captive_sessions ADD COLUMN is_superuser INTEGER DEFAULT 0"
+        )
+    except Exception:
+        pass  # column already exists
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_captive_sessions_expires "
         "ON captive_sessions(expires_at, logged_out)"

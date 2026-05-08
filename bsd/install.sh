@@ -49,6 +49,18 @@ if [ "${OS}" != "FreeBSD" ]; then
     fatal "This script is for FreeBSD only (detected: ${OS})."
 fi
 
+# ─── Deployment mode ─────────────────────────────────────────────────────────
+printf "\n${BOLD}━━━ Deployment Mode ━━━${NC}\n"
+printf "  ${GREEN}live${NC}  — Apply real PF rules, interface config, and service control\n"
+printf "  ${YELLOW}dry${NC}   — Safe mode: writes config files but does NOT touch PF/network\n"
+printf "${YELLOW}[?]${NC} Enable LIVE network apply now? [y/N]: "
+read -r _LIVE_ANS
+case "${_LIVE_ANS}" in
+    [Yy]|[Yy][Ee][Ss]) DEPLOY_LIVE=1; info "Live mode selected." ;;
+    *)                  DEPLOY_LIVE=0; info "Dry-run mode selected — safe for initial testing." ;;
+esac
+DRY_RUN_VAL=$([ "${DEPLOY_LIVE}" -eq 1 ] && echo 0 || echo 1)
+
 section "1. Package Installation"
 
 info "Updating pkg repository..."
@@ -112,6 +124,14 @@ install -d -m 0755 /usr/local/etc/unbound 2>/dev/null && info "Created: /usr/loc
 install -d -m 0755 /usr/local/etc/openvpn    2>/dev/null && info "Created: /usr/local/etc/openvpn" || true
 install -d -m 0700 /usr/local/etc/openvpn/keys 2>/dev/null && info "Created: /usr/local/etc/openvpn/keys (mode 700)" || true
 install -d -m 0755 /var/log/openvpn           2>/dev/null && info "Created: /var/log/openvpn" || true
+install -d -m 0755 /var/run/openvpn           2>/dev/null && info "Created: /var/run/openvpn" || true
+
+# L2TP (mpd5)
+install -d -m 0755 /usr/local/etc/mpd5 2>/dev/null && info "Created: /usr/local/etc/mpd5" || true
+install -d -m 0755 /var/run/mpd5       2>/dev/null && info "Created: /var/run/mpd5" || true
+
+# Unbound query log (required by SIEM collector)
+install -d -m 0755 /var/log/unbound    2>/dev/null && info "Created: /var/log/unbound" || true
 
 # Suricata
 install -d -m 0755 /usr/local/etc/suricata       2>/dev/null && info "Created: /usr/local/etc/suricata" || true
@@ -128,6 +148,20 @@ install -d -m 0755 /var/run/nginx        2>/dev/null && info "Created: /var/run/
 install -d -m 0755 /usr/local/etc/mrtg             2>/dev/null && info "Created: /usr/local/etc/mrtg" || true
 install -d -m 0755 /var/db/smart-shield/mrtg       2>/dev/null && info "Created: /var/db/smart-shield/mrtg" || true
 
+# ── Required runtime files ───────────────────────────────────────────────────
+# dhcpd refuses to start if dhcpd.leases doesn't exist as a file
+if [ ! -f /var/db/dhcpd/dhcpd.leases ]; then
+    touch /var/db/dhcpd/dhcpd.leases
+    chmod 0644 /var/db/dhcpd/dhcpd.leases
+    info "Created: /var/db/dhcpd/dhcpd.leases"
+fi
+
+# Minimal PF ruleset — wizard overwrites with generated rules; without this PF can't load
+if [ ! -f /etc/pf.conf ]; then
+    printf '# Smart Shield bootstrap — wizard replaces this\nset skip on lo0\npass all\n' > /etc/pf.conf
+    info "Created: /etc/pf.conf (minimal bootstrap — wizard will replace)"
+fi
+
 section "3. Environment Configuration"
 
 ENV_FILE="${ETC_DIR}/smart-shield.env"
@@ -143,7 +177,7 @@ if [ ! -f "${ENV_FILE}" ]; then
             sed -i '' "s|replace-with-long-random-secret|${SECRET}|" "${ENV_FILE}"
         fi
         # Set FreeBSD production paths
-        cat >> "${ENV_FILE}" << 'EOF'
+        cat >> "${ENV_FILE}" << 'ENVEOF'
 
 # ── FreeBSD production paths (appended by install.sh) ──
 SMARTSHIELD_DB_PATH=/var/db/smart-shield/data.db
@@ -151,9 +185,9 @@ SMARTSHIELD_CONFIG_PATH=/usr/local/etc/smart-shield/config.json
 SMARTSHIELD_UPLOAD_DIR=/var/db/smart-shield/uploads/profile_pictures
 SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smart-shield/audit.log
 FLASK_DEBUG=0
-SMARTSHIELD_ENABLE_NETWORK_APPLY=0
-SMARTSHIELD_NETWORK_DRY_RUN=0
-EOF
+ENVEOF
+        printf 'SMARTSHIELD_ENABLE_NETWORK_APPLY=%s\n' "${DEPLOY_LIVE}" >> "${ENV_FILE}"
+        printf 'SMARTSHIELD_NETWORK_DRY_RUN=%s\n'      "${DRY_RUN_VAL}" >> "${ENV_FILE}"
         chmod 0600 "${ENV_FILE}"
         info "Created: ${ENV_FILE} (SECRET_KEY set automatically, mode 0600)"
         info "Admin account will be created on first run via the setup wizard."
@@ -167,8 +201,8 @@ SMARTSHIELD_DB_PATH=/var/db/smart-shield/data.db
 SMARTSHIELD_CONFIG_PATH=/usr/local/etc/smart-shield/config.json
 SMARTSHIELD_UPLOAD_DIR=/var/db/smart-shield/uploads/profile_pictures
 SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smart-shield/audit.log
-SMARTSHIELD_ENABLE_NETWORK_APPLY=0
-SMARTSHIELD_NETWORK_DRY_RUN=0
+SMARTSHIELD_ENABLE_NETWORK_APPLY=${DEPLOY_LIVE}
+SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
@@ -205,6 +239,15 @@ else
     info "Config already exists or example missing — skipping."
 fi
 
+# Pre-generate master encryption key (avoids auto-generate delay on first request)
+MASTER_KEY_FILE="${ETC_DIR}/master.key"
+if [ ! -f "${MASTER_KEY_FILE}" ]; then
+    python3 -c "import os,base64; open('${MASTER_KEY_FILE}','wb').write(base64.b64encode(os.urandom(32))+b'\n')" \
+        2>/dev/null || warn "Could not pre-generate master.key — will auto-generate on first app start."
+    chmod 0600 "${MASTER_KEY_FILE}" 2>/dev/null || true
+    info "Generated: ${MASTER_KEY_FILE} (mode 0600)"
+fi
+
 section "4. Python Virtual Environment"
 
 # cryptography requires Rust to build from source — install rust before pip
@@ -224,7 +267,7 @@ fi
 
 info "Upgrading pip + installing requirements..."
 "${VENV}/bin/pip" install --upgrade pip -q
-"${VENV}/bin/pip" install -r "${APP_ROOT}/requirements.txt" -q
+"${VENV}/bin/pip" install -r "${APP_ROOT}/requirements.txt"
 info "Python dependencies installed."
 
 section "5. Service + CLI Tools"
@@ -251,12 +294,12 @@ for TOOL in smartshieldctl smartshield-cli; do
     fi
 done
 
-# MRTG probe script
+# MRTG probe script — install to /usr/local/sbin for cron use
 MRTG_PROBE_SRC="${APP_ROOT}/bsd/mrtg-probe.sh"
-MRTG_PROBE_DEST="${APP_ROOT}/bsd/mrtg-probe.sh"
+MRTG_PROBE_DEST="/usr/local/sbin/mrtg-probe.sh"
 if [ -f "${MRTG_PROBE_SRC}" ]; then
-    chmod 0555 "${MRTG_PROBE_SRC}"
-    info "MRTG probe script ready: ${MRTG_PROBE_DEST}"
+    install -m 0555 "${MRTG_PROBE_SRC}" "${MRTG_PROBE_DEST}"
+    info "Installed MRTG probe: ${MRTG_PROBE_DEST}"
 else
     warn "mrtg-probe.sh not found at ${MRTG_PROBE_SRC}"
 fi
@@ -322,6 +365,25 @@ info "smart_shield_enable=YES written to rc.conf"
 sysrc unbound_enable=YES
 info "unbound_enable=YES written to rc.conf"
 
+# PF packet filter — must be enabled for firewall and NAT to work
+sysrc pf_enable=YES
+sysrc pflog_enable=YES
+info "pf_enable + pflog_enable written to rc.conf"
+
+# IP forwarding — required so LAN clients can reach the internet through this box
+sysrc gateway_enable=YES
+info "gateway_enable=YES written to rc.conf"
+sysctl net.inet.ip.forwarding=1 >/dev/null
+info "IP forwarding activated immediately (net.inet.ip.forwarding=1)"
+
+# DHCP server
+sysrc isc_dhcpd_enable=YES
+info "isc_dhcpd_enable=YES written to rc.conf"
+
+# SNMP daemon (bsnmpd) — used by MRTG for bandwidth graphs
+sysrc bsnmpd_enable=YES
+info "bsnmpd_enable=YES written to rc.conf"
+
 section "7. Preflight Verification"
 
 info "Running Python preflight check..."
@@ -354,26 +416,33 @@ else:
 PYEOF
 
 section "Done"
-printf "\n${BOLD}Smart Shield installation complete.${NC}\n\n"
+
+if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+    MODE_LINE="${GREEN}LIVE${NC} — PF rules and network changes apply immediately"
+else
+    MODE_LINE="${YELLOW}DRY-RUN${NC} — config files written; no live PF/network changes"
+    MODE_LINE="${MODE_LINE}\n         Edit ${ENV_FILE} and set SMARTSHIELD_NETWORK_DRY_RUN=0 for live operation"
+fi
+
+printf "\n${BOLD}Smart Shield installation complete.${NC}\n"
+printf "  Mode: "; printf "${MODE_LINE}\n\n"
+
 cat << EOF
 Next steps:
-  1. Edit ${ENV_FILE}
-       — Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 when ready for live network changes
-       — Set ABUSECH_AUTH_KEY=<your-key>  (get it at https://abuse.ch/)
-         Leave ABUSECH_DRY_RUN=1 until you want live threat intel lookups.
-         Store the key here (mode 0600) or in your secret manager — never in Git.
-
-  2. Start the service:
+  1. Start the service:
        service smart_shield start
        service smart_shield status
 
-  3. Open the web UI and complete the setup wizard:
+  2. Open the web UI and complete the setup wizard:
        http://<LAN-IP>:5000
-       (You will be redirected to the setup wizard on first visit — create your
-        admin account in step 3 of the wizard.)
+       (You will be redirected to the setup wizard — create your admin account in step 3.)
 
-  4. Check the Preflight page in the web UI:
+  3. Check the Preflight page in the web UI:
        System → Preflight Check
+
+  4. Set your Abuse.ch key in ${ENV_FILE}:
+       ABUSECH_AUTH_KEY=<your-key>   (get it at https://abuse.ch/)
+       Leave ABUSECH_DRY_RUN=1 until you want live threat intel lookups.
 
   5. (Optional) Configure nginx as TLS reverse proxy:
        See bsd/FREEBSD_DEPLOYMENT.md Step 9

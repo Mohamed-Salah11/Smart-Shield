@@ -304,14 +304,16 @@ def reload_all_services(conn) -> dict:
     except Exception as exc:
         results.append({"service": "strongswan", "ok": False, "message": str(exc)})
 
-    # L2TP (mpd5)
+    # L2TP (mpd5) — only apply when explicitly enabled
     try:
-        from app.services.l2tp_writer import write_l2tp_conf
-        l2tp_result = write_l2tp_conf(conn)
-        results.append({"service": "l2tp", "ok": l2tp_result["ok"], "message": l2tp_result["message"]})
-        if l2tp_result["ok"]:
-            r = service_action("mpd5", "restart")
-            results.append({"service": "l2tp-restart", "ok": r["ok"], "message": r["message"]})
+        _l2tp_row = conn.execute("SELECT enabled FROM l2tp_config WHERE id=1").fetchone()
+        if _l2tp_row and _l2tp_row["enabled"]:
+            from app.services.l2tp_writer import write_l2tp_conf
+            l2tp_result = write_l2tp_conf(conn)
+            results.append({"service": "l2tp", "ok": l2tp_result["ok"], "message": l2tp_result["message"]})
+            if l2tp_result["ok"]:
+                r = service_action("mpd5", "restart")
+                results.append({"service": "l2tp-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "l2tp", "ok": False, "message": str(exc)})
 
