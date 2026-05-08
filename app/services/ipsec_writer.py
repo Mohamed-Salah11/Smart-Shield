@@ -358,16 +358,17 @@ def apply_ipsec(conn) -> dict:
     if not result["ok"] or not sys.platform.startswith("freebsd"):
         return result
     try:
-        from app.services.network_service import run_command
+        from app.services.priv_helper import run_privileged
         from app.services.service_manager import sysrc_set
         sysrc_set("strongswan_enable", "YES")
-        # Try 'ipsec reload' first; fall back to full restart
-        r = run_command(["ipsec", "reload"], check=False)
-        if r.returncode != 0:
-            r = run_command(["service", "strongswan", "restart"], check=False)
+        r = run_privileged("ipsec.reload")
         ok = r.returncode == 0
-        return {"ok": ok,
-                "message": result["message"] + " | ipsec reload: " + (r.stdout or r.stderr or "").strip()}
+        msg = (r.stdout or r.stderr or "").strip()
+        if not ok:
+            r2 = run_privileged("service.action", service_name="strongswan", action="restart")
+            ok = r2.returncode == 0
+            msg = (r2.stdout or r2.stderr or "").strip()
+        return {"ok": ok, "message": result["message"] + " | reload: " + msg}
     except Exception as exc:
         return {"ok": False, "message": f"Config written but reload failed: {exc}"}
 
@@ -377,8 +378,8 @@ def get_ipsec_status() -> dict:
     if not sys.platform.startswith("freebsd"):
         return {"running": False, "tunnels": [], "message": "Not on FreeBSD"}
     try:
-        from app.services.network_service import run_command
-        r = run_command(["ipsec", "statusall"], check=False)
+        from app.services.priv_helper import run_privileged
+        r = run_privileged("ipsec.statusall")
         output = (r.stdout or "").strip()
         tunnels = []
         for line in output.splitlines():

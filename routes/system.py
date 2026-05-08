@@ -376,6 +376,9 @@ def admin_access():
     cursor = conn.cursor()
     
     if request.method == "POST":
+        _addrs = request.form.getlist('pass_list_address[]')
+        _cidrs = request.form.getlist('pass_list_cidr[]')
+        _pass_list = json.dumps([f"{a.strip()}/{c}" for a, c in zip(_addrs, _cidrs) if a.strip()])
         cursor.execute("""
             UPDATE advanced_admin_access SET
                 protocol = ?,
@@ -400,6 +403,7 @@ def admin_access():
                 threshold = ?,
                 blocktime = ?,
                 detection_time = ?,
+                pass_list = ?,
                 serial_terminal = ?,
                 serial_speed = ?,
                 primary_console = ?,
@@ -428,6 +432,7 @@ def admin_access():
             request.form.get('threshold', 30),
             request.form.get('blocktime', 120),
             request.form.get('detection_time', 1800),
+            _pass_list,
             1 if request.form.get('serial_terminal') else 0,
             request.form.get('serial_speed', '115200'),
             request.form.get('primary_console', 'video'),
@@ -937,6 +942,43 @@ def api_acme_request():
     return jsonify(result)
 
 
+@system_bp.route("/api/certificates/<int:cert_id>", methods=["GET"])
+@login_required
+def api_get_cert(cert_id):
+    from app.services.cert_manager import get_cert_pem, list_certs
+    conn = get_db()
+    rows = list_certs(conn)
+    row  = next((r for r in rows if r.get("id") == cert_id), None)
+    if not row:
+        return jsonify({"ok": False, "message": "Not found"}), 404
+    pem = get_cert_pem(conn, cert_id)
+    return jsonify({"ok": True, "cert": {**row, "pem": pem}})
+
+
+@system_bp.route("/api/certificates/<int:cert_id>", methods=["DELETE"])
+@login_required
+def api_delete_cert(cert_id):
+    from app.services.cert_manager import delete_cert
+    conn   = get_db()
+    result = delete_cert(conn, cert_id)
+    log_event(category="system", action="cert_deleted",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"cert_id": cert_id, "ok": result["ok"]})
+    return jsonify(result)
+
+
+@system_bp.route("/api/certificates/ca/<int:ca_id>", methods=["DELETE"])
+@login_required
+def api_delete_ca(ca_id):
+    from app.services.cert_manager import delete_ca
+    conn   = get_db()
+    result = delete_ca(conn, ca_id)
+    log_event(category="system", action="ca_deleted",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"ca_id": ca_id, "ok": result["ok"]})
+    return jsonify(result)
+
+
 # ----------------------------
 # HIGH AVAILABILITY
 # ----------------------------
@@ -944,9 +986,53 @@ def api_acme_request():
 @system_bp.route("/high-availability", methods=["GET", "POST"])
 @login_required
 def high_availability():
+    import json as _json
+    conn = get_db()
     if request.method == "POST":
+        from app.secret_store import encrypt_secret
+        raw_pw = request.form.get("remote_password", "").strip()
+        pw_enc = encrypt_secret(raw_pw) if raw_pw else ""
+        sync_options = _json.dumps(request.form.getlist("sync_options"))
+        conn.execute("""
+            INSERT INTO ha_settings (id, ss_sync_enabled, sync_interface, filter_host_id,
+                peer_ip, xmlrpc_ip, remote_username, remote_password_enc,
+                sync_admin, sync_options, updated_at)
+            VALUES (1,?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+                ss_sync_enabled=excluded.ss_sync_enabled,
+                sync_interface=excluded.sync_interface,
+                filter_host_id=excluded.filter_host_id,
+                peer_ip=excluded.peer_ip,
+                xmlrpc_ip=excluded.xmlrpc_ip,
+                remote_username=excluded.remote_username,
+                remote_password_enc=CASE WHEN excluded.remote_password_enc != ''
+                    THEN excluded.remote_password_enc ELSE ha_settings.remote_password_enc END,
+                sync_admin=excluded.sync_admin,
+                sync_options=excluded.sync_options,
+                updated_at=excluded.updated_at
+        """, (
+            1 if request.form.get("SS-Sync_enabled") else 0,
+            request.form.get("sync_interface", "WAN"),
+            request.form.get("filter_host_id", ""),
+            request.form.get("SS-Sync_peer_ip", ""),
+            request.form.get("sync_config_ip", ""),
+            request.form.get("remote_username", ""),
+            pw_enc,
+            1 if request.form.get("sync_admin") else 0,
+            sync_options,
+        ))
+        conn.commit()
+        log_event(category="system", action="ha_settings_saved",
+                  username=session.get("username"), remote_addr=request.remote_addr)
         return redirect(url_for("system.high_availability"))
-    return render_template("high_availability.html")
+
+    row = conn.execute("SELECT * FROM ha_settings WHERE id=1").fetchone()
+    ha  = dict(row) if row else {}
+    try:
+        ha["sync_options_list"] = _json.loads(ha.get("sync_options") or "[]")
+    except Exception:
+        ha["sync_options_list"] = []
+    return render_template("high_availability.html", ha=ha)
 
 
 # ----------------------------
@@ -994,6 +1080,59 @@ def setup_wizard_step(step):
     if step in range(2, 11):
         return render_template(f"setup_wizard_step{step}.html")
     return "Invalid wizard step", 404
+
+
+@system_bp.route("/api/setup-wizard/general", methods=["POST"])
+@login_required
+def api_setup_wizard_general():
+    import os as _os
+    data = request.get_json(force=True) or {}
+    cfg  = _load_general_config()
+    cfg["hostname"]   = (data.get("hostname") or cfg.get("hostname", "SmartShield")).strip()
+    cfg["domain"]     = (data.get("domain")   or cfg.get("domain",   "home.arpa")).strip()
+    dns1 = (data.get("primary_dns")   or "").strip()
+    dns2 = (data.get("secondary_dns") or "").strip()
+    cfg["dns_servers"]  = [d for d in [dns1, dns2] if d]
+    cfg["dns_override"] = bool(data.get("override_dns", True))
+    config_file = _general_config_path()
+    _os.makedirs(_os.path.dirname(_os.path.abspath(config_file)), exist_ok=True)
+    with open(config_file, "w", encoding="utf-8") as fh:
+        json.dump(cfg, fh, indent=4)
+    return jsonify({"ok": True, "message": "General settings saved."})
+
+
+@system_bp.route("/api/setup-wizard/time", methods=["POST"])
+@login_required
+def api_setup_wizard_time():
+    import os as _os
+    data = request.get_json(force=True) or {}
+    conn = get_db()
+
+    cfg = _load_general_config()
+    cfg["timezone"] = (data.get("timezone") or "Etc/UTC").strip()
+    config_file = _general_config_path()
+    _os.makedirs(_os.path.dirname(_os.path.abspath(config_file)), exist_ok=True)
+    with open(config_file, "w", encoding="utf-8") as fh:
+        json.dump(cfg, fh, indent=4)
+
+    ntp_row = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='ntp_settings'"
+    ).fetchone()
+    ntp_cfg = json.loads(ntp_row["value_json"]) if ntp_row else {}
+    ntp_server = (data.get("ntp_server") or "").strip()
+    if ntp_server:
+        servers = ntp_cfg.get("servers", [])
+        if ntp_server not in servers:
+            servers = [ntp_server] + [s for s in servers if s]
+        ntp_cfg["servers"] = servers[:4]
+    ntp_cfg.setdefault("enabled", True)
+    conn.execute(
+        "INSERT INTO service_state (key_name, value_json, updated_at) VALUES ('ntp_settings',?,CURRENT_TIMESTAMP)"
+        " ON CONFLICT(key_name) DO UPDATE SET value_json=excluded.value_json, updated_at=CURRENT_TIMESTAMP",
+        (json.dumps(ntp_cfg),)
+    )
+    conn.commit()
+    return jsonify({"ok": True, "message": "Time settings saved."})
 
 
 # ----------------------------

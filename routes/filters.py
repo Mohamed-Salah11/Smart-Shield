@@ -192,6 +192,13 @@ def dns_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
+        # Activate the PF redirect rule so blocked domains reach the block page
+        try:
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
+        except Exception as exc:
+            result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="dns_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -271,6 +278,13 @@ def web_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
+        # Activate the PF redirect rule so blocked domains reach the block page
+        try:
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
+        except Exception as exc:
+            result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="web_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -388,6 +402,13 @@ def app_apply():
                 result["message"] = result.get("message", "") + " | PF: " + pf_result.get("message", "")
         except Exception as exc:
             result["pf_warning"] = str(exc)
+        # Activate the PF redirect rule so blocked domains reach the block page
+        try:
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
+        except Exception as exc:
+            result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="app_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,

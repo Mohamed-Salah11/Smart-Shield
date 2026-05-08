@@ -285,6 +285,125 @@ def _build_shaper_queues(conn, wan_iface: str, lan_iface: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 4b. Virtual IP rules
+# ---------------------------------------------------------------------------
+
+def _build_virtual_ip_rules(conn) -> str:
+    """
+    Read virtual_ips_configs and emit:
+    - CARP pass rule when any CARP VIPs are configured
+    - VIRTUAL_IPS macro listing all VIP addresses (for use in filter rules)
+    - Comment lines documenting each VIP
+    """
+    try:
+        rows = _rows(
+            conn,
+            "SELECT type, interface, address, prefix FROM virtual_ips_configs ORDER BY id",
+        )
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Virtual IPs ──"]
+    has_carp = False
+    vip_addrs = []
+
+    for vip in rows:
+        vtype  = (vip.get("type") or "").strip().lower()
+        addr   = (vip.get("address") or "").strip()
+        prefix = vip.get("prefix") or 32
+        iface  = (vip.get("interface") or "").strip()
+        if not addr:
+            continue
+        vip_addrs.append(addr)
+        if vtype == "carp":
+            has_carp = True
+        lines.append(f"# {vtype.title()} VIP: {addr}/{prefix} on {iface}")
+
+    if has_carp:
+        lines.append("pass quick proto carp keep state")
+    if vip_addrs:
+        lines.append(f'VIRTUAL_IPS = "{{ {" ".join(vip_addrs)} }}"')
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 4c. Dummynet limiter comment block (pipes applied in reload_pf_rules)
+# ---------------------------------------------------------------------------
+
+def _build_dummynet_pipes(conn) -> str:
+    """
+    Emit a comment block documenting the dummynet pipes that will be created
+    by _run_dnctl_setup() before pfctl loads this conf.  The pipe IDs (1-based,
+    ordered by limiters_configs.id) can be referenced in future match rules via
+    dnpipe N.
+    """
+    try:
+        rows = _rows(
+            conn,
+            "SELECT id, name, bandwidth, bandwidth_unit FROM limiters_configs "
+            "WHERE enable_disable=1 ORDER BY id",
+        )
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Dummynet Limiter Pipes ──"]
+    for i, row in enumerate(rows, start=1):
+        bw      = row.get("bandwidth") or 0
+        bw_unit = (row.get("bandwidth_unit") or "Mbit/s").rstrip("/s").lower()
+        name    = (row.get("name") or f"limiter_{i}").strip()
+        lines.append(f"# Pipe {i}: {name}  ({bw}{bw_unit})")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _run_dnctl_setup(conn) -> None:
+    """
+    Create dummynet pipes from limiters_configs via dnctl before applying
+    PF rules.  Pipe IDs are 1-based, ordered by row id.
+    No-op on non-FreeBSD or when no limiters are configured.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        rows = _rows(
+            conn,
+            "SELECT bandwidth, bandwidth_unit, delay_ms, queue_length "
+            "FROM limiters_configs WHERE enable_disable=1 ORDER BY id",
+        )
+    except Exception:
+        return
+    if not rows:
+        return
+
+    try:
+        run_command(["/sbin/dnctl", "-q", "flush"], check=False)
+    except Exception:
+        pass
+
+    for i, row in enumerate(rows, start=1):
+        bw      = row.get("bandwidth") or 0
+        bw_unit = (row.get("bandwidth_unit") or "Mbit/s").rstrip("/s")
+        delay   = row.get("delay_ms") or 0
+        qlimit  = row.get("queue_length") or 50
+        cmd = ["/sbin/dnctl", "pipe", str(i), "config",
+               "bw", f"{bw}{bw_unit}",
+               "queue", str(qlimit)]
+        if delay:
+            cmd += ["delay", str(delay)]
+        try:
+            run_command(cmd, check=False)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # 5. Application filter PF rules
 # ---------------------------------------------------------------------------
 
@@ -401,6 +520,8 @@ def generate_pf_conf(conn) -> str:
         macros
         + base_tables
         + _build_alias_tables(conn)
+        + _build_virtual_ip_rules(conn)
+        + _build_dummynet_pipes(conn)
         + options
         + scrub
         + _build_shaper_queues(conn, wan_iface, lan_iface)
@@ -563,6 +684,12 @@ def reload_pf_rules(conn) -> dict:
             fh.write(conf_text)
     except OSError as exc:
         return {"ok": False, "message": f"Failed to write {_PF_CONF_PATH}: {exc}", "conf": conf_text}
+
+    # Step 3b — apply dummynet limiter pipes before PF loads
+    try:
+        _run_dnctl_setup(conn)
+    except Exception:
+        pass
 
     # Step 4 — reload PF
     try:

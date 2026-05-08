@@ -421,6 +421,35 @@ ON interface_assignments(interface_type)
     )
     """)
 
+    # LOGIN BRUTE-FORCE FAILURE TRACKING
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS login_failures (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        remote_addr TEXT    NOT NULL,
+        failed_at   REAL    NOT NULL
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_failures_ip_time ON login_failures(remote_addr, failed_at)"
+    )
+
+    # HIGH AVAILABILITY SETTINGS
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ha_settings (
+        id                  INTEGER PRIMARY KEY DEFAULT 1,
+        ss_sync_enabled     INTEGER DEFAULT 1,
+        sync_interface      TEXT    DEFAULT 'WAN',
+        filter_host_id      TEXT    DEFAULT '',
+        peer_ip             TEXT    DEFAULT '',
+        xmlrpc_ip           TEXT    DEFAULT '',
+        remote_username     TEXT    DEFAULT '',
+        remote_password_enc TEXT    DEFAULT '',
+        sync_admin          INTEGER DEFAULT 0,
+        sync_options        TEXT    DEFAULT '[]',
+        updated_at          TEXT    DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # ADVANCED FIREWALL & NAT TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_firewall_nat (
@@ -1009,11 +1038,19 @@ ON interface_assignments(interface_type)
         interface TEXT,
         protocol TEXT,
         source TEXT,
+        source_port TEXT,
         destination TEXT,
+        dest_port TEXT,
         description TEXT,
         rule_order INTEGER DEFAULT 0
     )
     """)
+    # Migrate existing LAN tables that predate source_port/dest_port columns
+    for col in ("source_port", "dest_port"):
+        try:
+            cursor.execute(f"ALTER TABLE firewall_rules_lan ADD COLUMN {col} TEXT")
+        except Exception:
+            pass  # column already exists
 
     # Firewall Aliases
     cursor.execute("""
@@ -1039,6 +1076,23 @@ ON interface_assignments(interface_type)
         queue_limit INTEGER,
         tbr_size INTEGER,
         description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Traffic Shaper Queue Assignments (match rules that send traffic to queues)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS traffic_shaper_queues (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled INTEGER DEFAULT 1,
+        queue_name TEXT NOT NULL,
+        ack_queue TEXT DEFAULT '',
+        protocol TEXT DEFAULT 'any',
+        source TEXT DEFAULT 'any',
+        source_port TEXT DEFAULT '',
+        destination TEXT DEFAULT 'any',
+        dest_port TEXT DEFAULT '',
+        description TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)

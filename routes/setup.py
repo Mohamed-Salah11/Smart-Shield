@@ -430,6 +430,17 @@ def api_step4_apply():
     except Exception as exc:
         results.append({"step": "services", "ok": False, "details": str(exc)})
 
+    try:
+        from app.services.mrtg_writer import apply_mrtg
+        mrtg_result = apply_mrtg(conn)
+        results.append({
+            "step": "mrtg",
+            "ok": mrtg_result.get("ok", False),
+            "details": mrtg_result.get("message", ""),
+        })
+    except Exception as exc:
+        results.append({"step": "mrtg", "ok": False, "details": str(exc)})
+
     overall_ok = all(r.get("ok", False) for r in results)
     if overall_ok:
         _mark_setup_complete(conn)

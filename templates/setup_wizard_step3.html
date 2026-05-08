@@ -3,7 +3,10 @@
 {% block main %}
 
 <div class="container">
-<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 3</h1><p class="ss-page-desc">Time server configuration</p></div></div>
+<div class="ss-page-header"><div><h1 class="ss-page-title">Setup Assistant — Step 3</h1><p class="ss-page-desc">General information configuration</p></div></div>
+
+<div id="wiz-toast" class="alert d-none" role="alert"
+     style="position:fixed;top:70px;right:20px;z-index:9999;min-width:320px;"></div>
 
 <!-- Progress -->
 <div class="mb-4">
@@ -16,7 +19,6 @@
 </div>
 </div>
 
-<form method="post" action="#">
 <!-- Content Card -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div><div><div class="ss-card-title">General Information</div></div></div>
@@ -79,14 +81,49 @@
 </svg>
 Back
 </a>
-<a href="{{ url_for('system.setup_wizard_step', step=4) }}" class="btn btn-primary">
+<button type="button" class="btn btn-primary" onclick="saveAndContinue()">
 Continue
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="ms-1" viewBox="0 0 16 16">
 <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
 </svg>
-</a>
+</button>
 </div>
-</form>
 </div>
+
+<script>
+function showWizToast(msg, ok) {
+  const t = document.getElementById('wiz-toast');
+  t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+  t.textContent = msg;
+  t.classList.remove('d-none');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('d-none'), 5000);
+}
+
+async function saveAndContinue() {
+  const payload = {
+    hostname:      document.querySelector('[name="hostname"]').value.trim(),
+    domain:        document.querySelector('[name="domain"]').value.trim(),
+    primary_dns:   document.querySelector('[name="primary_dns"]').value.trim(),
+    secondary_dns: document.querySelector('[name="secondary_dns"]').value.trim(),
+    override_dns:  document.getElementById('override_dns').checked,
+  };
+  try {
+    const r = await fetch('/system/api/setup-wizard/general', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      window.location.href = "{{ url_for('system.setup_wizard_step', step=4) }}";
+    } else {
+      showWizToast('Error: ' + (d.message || 'Unknown error'), false);
+    }
+  } catch(e) {
+    showWizToast('Network error: ' + e.message, false);
+  }
+}
+</script>
 
 {% endblock %}

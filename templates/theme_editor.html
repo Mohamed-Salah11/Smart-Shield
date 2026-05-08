@@ -67,6 +67,7 @@
       <p style="margin:0;font-size:.8rem;color:var(--muted);">Customize every color in the interface. Changes are applied live.</p>
     </div>
     <div style="display:flex;gap:8px;">
+      <a href="{{ url_for('system.dashboard') }}" class="btn btn-sm btn-outline-secondary">← Dashboard</a>
       <button class="btn btn-sm btn-outline-secondary" onclick="resetToBase()">Reset</button>
       <button class="btn btn-sm btn-primary" onclick="applyAndSave()">Save &amp; Apply</button>
     </div>

@@ -56,7 +56,8 @@
 .lm-cat[data-cat="system"].active    { background: #f59e0b; border-color: #f59e0b; }
 .lm-cat[data-cat="security"].active  { background: #ef4444; border-color: #ef4444; }
 .lm-cat[data-cat="browsing"].active  { background: #64748b; border-color: #64748b; }
-.lm-cat[data-cat="ids"].active       { background: #8b5cf6; border-color: #8b5cf6; }
+.lm-cat[data-cat="ids"].active        { background: #8b5cf6; border-color: #8b5cf6; }
+.lm-cat[data-cat="connection"].active { background: #0ea5e9; border-color: #0ea5e9; }
 
 /* Right controls */
 .lm-controls { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
@@ -130,7 +131,8 @@
 .lm-row.cat-system   { border-left: 2px solid #f59e0b; }
 .lm-row.cat-security { border-left: 2px solid #ef4444; background: rgba(239,68,68,.04); }
 .lm-row.cat-browsing { border-left: 2px solid #334155; }
-.lm-row.cat-ids      { border-left: 2px solid #8b5cf6; background: rgba(139,92,246,.04); }
+.lm-row.cat-ids        { border-left: 2px solid #8b5cf6; background: rgba(139,92,246,.04); }
+.lm-row.cat-connection { border-left: 2px solid #0ea5e9; }
 
 /* Columns */
 .lm-ts   { color: #475569; font-size: .75rem; padding-right: 8px; white-space: nowrap; }
@@ -142,7 +144,8 @@
 .cat-col-system   { color: #f59e0b; }
 .cat-col-security { color: #ef4444; }
 .cat-col-browsing { color: #64748b; }
-.cat-col-ids      { color: #8b5cf6; }
+.cat-col-ids        { color: #8b5cf6; }
+.cat-col-connection { color: #0ea5e9; }
 .cat-col-default  { color: #94a3b8; }
 
 .lm-action { color: #e2e8f0; font-weight: 600; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -195,6 +198,33 @@
 }
 .lm-viewport.paused .lm-pause-overlay { display: block; }
 
+/* ── Action quick-filter row ── */
+.lm-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 6px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-bottom: none;
+  align-items: center;
+}
+.lm-act {
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: .68rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--muted);
+  transition: background .12s, color .12s, border-color .12s;
+  user-select: none;
+}
+.lm-act:hover  { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.lm-act.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
 /* ── Light mode overrides ── */
 :root:not([data-theme="dark"]) .lm-viewport  { background: #0f172a; }
 :root:not([data-theme="dark"]) .lm-scroll::-webkit-scrollbar-track { background: #0f172a; }
@@ -235,6 +265,7 @@
       <span class="lm-cat" data-cat="security">Security</span>
       <span class="lm-cat" data-cat="browsing">Browsing</span>
       <span class="lm-cat" data-cat="ids">IDS/IPS</span>
+      <span class="lm-cat" data-cat="connection">Connections</span>
     </div>
 
     <div class="lm-controls">
@@ -242,6 +273,17 @@
       <span class="lm-live-label" id="liveLabel">Live</span>
       <span class="text-muted" style="font-size:.75rem;" id="lastPoll"></span>
     </div>
+  </div>
+
+  <!-- Action quick-filter row -->
+  <div class="lm-actions" id="actionFilters">
+    <span style="font-size:.68rem;color:var(--muted);font-weight:600;padding-right:4px;">Action:</span>
+    <span class="lm-act active" data-actions="">All Actions</span>
+    <span class="lm-act" data-actions="page_view">Pages Visited</span>
+    <span class="lm-act" data-actions="api_change|pf_reload|dhcp_apply|dns_apply|firewall_apply|mrtg_apply|captive_portal_apply|apply_all_policies|ids_config_save|ids_toggle|dns_filter_apply|web_filter_apply|app_filter_apply">Config Changes</span>
+    <span class="lm-act" data-actions="login_success|login_failed|logout|captive_portal_logout">Auth Events</span>
+    <span class="lm-act" data-actions="ids_alert|brute_force_detected|ids_flood_detected">Alerts</span>
+    <span class="lm-act" data-actions="dhcp_lease_assigned|dns_query|pf_new_conn">LAN Activity</span>
   </div>
 
   <!-- Stats bar -->
@@ -270,6 +312,11 @@
       <div class="lm-stat-dot" style="background:#8b5cf6;"></div>
       <span class="lm-stat-val" id="sc-ids">—</span>
       <span class="lm-stat-lbl">IDS</span>
+    </div>
+    <div class="lm-stat-item">
+      <div class="lm-stat-dot" style="background:#0ea5e9;"></div>
+      <span class="lm-stat-val" id="sc-connection">—</span>
+      <span class="lm-stat-lbl">Connections</span>
     </div>
     <div class="lm-stat-item" style="margin-left:auto;">
       <span class="lm-stat-val" id="sc-total">—</span>
@@ -307,6 +354,7 @@ const MAX_ROWS  = 1000;       // DOM row limit to prevent memory bloat
 let latestTs     = "";        // ISO timestamp of newest fetched event
 let allRows      = [];        // full buffer (newest first)
 let activeFilter = "";        // category filter "" = all
+let actionFilter = new Set(); // action filter — empty = show all actions
 let searchText   = "";        // live search string
 let pollTimer    = null;
 let pollInterval = 5000;
@@ -331,14 +379,17 @@ const fmtTs = ts => (ts||'').replace('T',' ').slice(0,19);
 const catClass = c => ({
   session:'cat-col-session', system:'cat-col-system',
   security:'cat-col-security', browsing:'cat-col-browsing',
-  ids:'cat-col-ids',
+  ids:'cat-col-ids', connection:'cat-col-connection',
 }[c] || 'cat-col-default');
 
 const rowClass = c => ({
   session:'cat-session', system:'cat-system',
   security:'cat-security', browsing:'cat-browsing',
-  ids:'cat-ids',
+  ids:'cat-ids', connection:'cat-connection',
 }[c] || '');
+
+const actionMatch = e =>
+  actionFilter.size === 0 || actionFilter.has(e.action || '');
 
 const detailSummary = e => {
   const d = e.details || {};
@@ -388,6 +439,7 @@ function makeRow(e, isNew) {
 function renderVisible() {
   const visible = allRows.filter(e => {
     if (activeFilter && e.category !== activeFilter) return false;
+    if (!actionMatch(e)) return false;
     if (searchText) {
       const hay = [e.action,e.username,e.remote_addr,e.category,
                    JSON.stringify(e.details||{})].join(' ').toLowerCase();
@@ -426,6 +478,7 @@ function prependEvents(events) {
   // Rebuild DOM only when not doing a full reload
   const matches = events.filter(e => {
     if (activeFilter && e.category !== activeFilter) return false;
+    if (!actionMatch(e)) return false;
     if (searchText) {
       const hay = [e.action,e.username,e.remote_addr,e.category,
                    JSON.stringify(e.details||{})].join(' ').toLowerCase();
@@ -490,7 +543,8 @@ async function pollStats() {
     document.getElementById('sc-system').textContent   = (body.system   || 0).toLocaleString();
     document.getElementById('sc-security').textContent = (body.security || 0).toLocaleString();
     document.getElementById('sc-browsing').textContent = (body.browsing || 0).toLocaleString();
-    document.getElementById('sc-ids').textContent      = (body.ids      || 0).toLocaleString();
+    document.getElementById('sc-ids').textContent        = (body.ids        || 0).toLocaleString();
+    document.getElementById('sc-connection').textContent = (body.connection || 0).toLocaleString();
     document.getElementById('sc-total').textContent    = (body._total   || 0).toLocaleString();
   } catch(_) {}
 }
@@ -520,6 +574,22 @@ document.querySelectorAll('.lm-cat').forEach(btn => {
     activeFilter = btn.dataset.cat;
     // Full re-render from buffer
     latestTs = '';           // reset so next poll fetches everything for this filter
+    allRows  = [];
+    scroll.innerHTML = '';
+    scroll.appendChild(empty);
+    empty.style.display = '';
+    poll();
+  });
+});
+
+/* ── Action filter ── */
+document.querySelectorAll('.lm-act').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.lm-act').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const raw = btn.dataset.actions || '';
+    actionFilter = raw ? new Set(raw.split('|')) : new Set();
+    latestTs = '';
     allRows  = [];
     scroll.innerHTML = '';
     scroll.appendChild(empty);

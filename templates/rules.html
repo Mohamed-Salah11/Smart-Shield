@@ -92,7 +92,9 @@
                                 <th>Disabled</th>
                                 <th>Protocol</th>
                                 <th>Source</th>
+                                <th>Src Port</th>
                                 <th>Destination</th>
+                                <th>Dst Port</th>
                                 <th>Description</th>
                                 <th>Actions</th>
                             </tr>
@@ -156,6 +158,16 @@
             <div class="modal-body">
                 <form id="floatingRuleForm">
                     <div class="mb-3 row">
+                        <label for="floating_action" class="col-sm-3 col-form-label fw-semibold">Action</label>
+                        <div class="col-sm-9">
+                            <select id="floating_action" class="form-select">
+                                <option value="pass">Pass</option>
+                                <option value="block">Block</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Disabled</label>
                         <div class="col-sm-9">
                             <div class="form-check">
@@ -185,15 +197,51 @@
                         </div>
                     </div>
                     <div class="mb-3 row">
-                        <label for="floating_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <label for="floating_source" class="col-sm-3 col-form-label fw-semibold">Source</label>
                         <div class="col-sm-9">
-                            <input type="text" id="floating_description" class="form-control" placeholder="Enter rule description">
+                            <input type="text" id="floating_source" class="form-control" placeholder="any">
                         </div>
                     </div>
                     <div class="mb-3 row">
-                        <label for="floating_redirect_ip" class="col-sm-3 col-form-label fw-semibold">Redirect IP</label>
+                        <label for="floating_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="floating_redirect_ip" class="form-control" placeholder="e.g., 192.168.1.100">
+                            <input type="text" id="floating_source_port" class="form-control" placeholder="any or 80">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_destination" class="col-sm-3 col-form-label fw-semibold">Destination</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_destination" class="form-control" placeholder="any">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_dest_port" class="form-control" placeholder="any or 443">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_gateway" class="col-sm-3 col-form-label fw-semibold">Gateway</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_gateway" class="form-control" placeholder="leave blank for default">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_queue" class="col-sm-3 col-form-label fw-semibold">Queue</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_queue" class="form-control" placeholder="leave blank for none">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_schedule" class="col-sm-3 col-form-label fw-semibold">Schedule</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_schedule" class="form-control" placeholder="leave blank for always">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="floating_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="floating_description" class="form-control" placeholder="Enter rule description">
                         </div>
                     </div>
                 </form>
@@ -247,6 +295,30 @@
                         </div>
                     </div>
                     <div class="mb-3 row">
+                        <label for="wan_source" class="col-sm-3 col-form-label fw-semibold">Source</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="wan_source" class="form-control" placeholder="any">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="wan_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="wan_source_port" class="form-control" placeholder="any or 80">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="wan_destination" class="col-sm-3 col-form-label fw-semibold">Destination</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="wan_destination" class="form-control" placeholder="any">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="wan_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="wan_dest_port" class="form-control" placeholder="any or 443">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
                         <label for="rule_desc" class="col-sm-3 col-form-label fw-semibold">Description</label>
                         <div class="col-sm-9">
                             <input type="text" id="rule_desc" class="form-control" placeholder="Enter rule description">
@@ -273,6 +345,25 @@
             <div class="modal-body">
                 <form id="lanRuleForm">
                     <div class="mb-3 row">
+                        <label for="lan_action" class="col-sm-3 col-form-label fw-semibold">Action</label>
+                        <div class="col-sm-9">
+                            <select id="lan_action" class="form-select">
+                                <option value="pass">Pass</option>
+                                <option value="block">Block</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label class="col-sm-3 col-form-label fw-semibold">Disabled</label>
+                        <div class="col-sm-9">
+                            <div class="form-check">
+                                <input type="checkbox" id="lan_disabled" class="form-check-input">
+                                <label class="form-check-label" for="lan_disabled">Disable this rule</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
                         <label for="lan_interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
                         <div class="col-sm-9">
                             <select id="lan_interface" class="form-select">
@@ -289,6 +380,30 @@
                                 <option value="udp">UDP</option>
                                 <option value="icmp">ICMP</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_source" class="col-sm-3 col-form-label fw-semibold">Source</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="lan_source" class="form-control" placeholder="any">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="lan_source_port" class="form-control" placeholder="any or 80">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_destination" class="col-sm-3 col-form-label fw-semibold">Destination</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="lan_destination" class="form-control" placeholder="any">
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="lan_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="lan_dest_port" class="form-control" placeholder="any or 443">
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -392,16 +507,17 @@
     if (floatingRuleSaveBtn) {
         floatingRuleSaveBtn.addEventListener('click', async () => {
             const ruleData = {
+                action: document.getElementById('floating_action').value,
                 disabled: document.getElementById('floating_disabled').checked ? 1 : 0,
                 interface: document.getElementById('floating_interface').value,
                 protocol: document.getElementById('floating_protocol').value,
-                source: 'any',
-                source_port: '',
-                destination: 'any',
-                dest_port: '',
-                gateway: '',
-                queue: '',
-                schedule: '',
+                source: document.getElementById('floating_source').value || 'any',
+                source_port: document.getElementById('floating_source_port').value || '',
+                destination: document.getElementById('floating_destination').value || 'any',
+                dest_port: document.getElementById('floating_dest_port').value || '',
+                gateway: document.getElementById('floating_gateway').value || '',
+                queue: document.getElementById('floating_queue').value || '',
+                schedule: document.getElementById('floating_schedule').value || '',
                 description: document.getElementById('floating_description').value || 'New floating rule',
                 position: floatingAddPosition
             };
@@ -410,9 +526,16 @@
 
             if (result) {
                 bootstrap.Modal.getInstance(floatingModal).hide();
+                document.getElementById('floating_action').value = 'pass';
                 document.getElementById('floating_disabled').checked = false;
+                document.getElementById('floating_source').value = '';
+                document.getElementById('floating_source_port').value = '';
+                document.getElementById('floating_destination').value = '';
+                document.getElementById('floating_dest_port').value = '';
+                document.getElementById('floating_gateway').value = '';
+                document.getElementById('floating_queue').value = '';
+                document.getElementById('floating_schedule').value = '';
                 document.getElementById('floating_description').value = '';
-                document.getElementById('floating_redirect_ip').value = '';
                 alert('Rule saved successfully!');
                 loadFloatingRules();
             }
@@ -441,8 +564,10 @@
                 action: document.getElementById('wan_rule_action').value,
                 disabled: document.getElementById('wan_rule_disabled').checked ? 1 : 0,
                 protocol: document.getElementById('wan_rule_protocol').value,
-                source: 'any',
-                destination: 'any',
+                source: document.getElementById('wan_source').value || 'any',
+                source_port: document.getElementById('wan_source_port').value || '',
+                destination: document.getElementById('wan_destination').value || 'any',
+                dest_port: document.getElementById('wan_dest_port').value || '',
                 description: document.getElementById('rule_desc').value || 'New WAN rule',
                 position: wanAddPosition
             };
@@ -451,7 +576,12 @@
             if (result) {
                 alert('WAN Rule saved successfully!');
                 bootstrap.Modal.getInstance(wanModal).hide();
+                document.getElementById('wan_rule_action').value = 'pass';
                 document.getElementById('wan_rule_disabled').checked = false;
+                document.getElementById('wan_source').value = '';
+                document.getElementById('wan_source_port').value = '';
+                document.getElementById('wan_destination').value = '';
+                document.getElementById('wan_dest_port').value = '';
                 document.getElementById('rule_desc').value = '';
                 loadWanRules();
             }
@@ -477,11 +607,14 @@
     if (lanRuleSaveBtn) {
         lanRuleSaveBtn.addEventListener('click', async () => {
             const ruleData = {
-                disabled: 0,
+                action: document.getElementById('lan_action').value,
+                disabled: document.getElementById('lan_disabled').checked ? 1 : 0,
                 interface: document.getElementById('lan_interface').value,
                 protocol: document.getElementById('lan_protocol').value,
-                source: 'any',
-                destination: 'any',
+                source: document.getElementById('lan_source').value || 'any',
+                source_port: document.getElementById('lan_source_port').value || '',
+                destination: document.getElementById('lan_destination').value || 'any',
+                dest_port: document.getElementById('lan_dest_port').value || '',
                 description: document.getElementById('lan_description').value || 'New LAN rule',
                 position: lanAddPosition
             };
@@ -490,6 +623,12 @@
             if (result) {
                 alert('LAN Rule saved successfully!');
                 bootstrap.Modal.getInstance(lanModal).hide();
+                document.getElementById('lan_action').value = 'pass';
+                document.getElementById('lan_disabled').checked = false;
+                document.getElementById('lan_source').value = '';
+                document.getElementById('lan_source_port').value = '';
+                document.getElementById('lan_destination').value = '';
+                document.getElementById('lan_dest_port').value = '';
                 document.getElementById('lan_description').value = '';
                 loadLanRules();
             }
@@ -551,7 +690,9 @@
                         <td>${rule.disabled ? 'Yes' : 'No'}</td>
                         <td>${rule.protocol || 'any'}</td>
                         <td>${rule.source || 'any'}</td>
+                        <td>${rule.source_port || '*'}</td>
                         <td>${rule.destination || 'any'}</td>
+                        <td>${rule.dest_port || '*'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary" onclick="moveRule('wan', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
@@ -635,35 +776,45 @@
             if (type === 'floating') {
                 const modal = document.getElementById('floatingModal');
                 document.getElementById('floatingModalLabel').textContent = 'Edit Floating Rule';
-                document.getElementById('floating_disabled').checked   = !!rule.disabled;
-                document.getElementById('floating_interface').value    = rule.interface  || '';
-                document.getElementById('floating_protocol').value     = rule.protocol   || 'any';
-                document.getElementById('floating_description').value  = rule.description || '';
+                document.getElementById('floating_action').value         = rule.action      || 'pass';
+                document.getElementById('floating_disabled').checked     = !!rule.disabled;
+                document.getElementById('floating_interface').value      = rule.interface   || '';
+                document.getElementById('floating_protocol').value       = rule.protocol    || 'any';
+                document.getElementById('floating_source').value         = rule.source      || '';
+                document.getElementById('floating_source_port').value    = rule.source_port || '';
+                document.getElementById('floating_destination').value    = rule.destination || '';
+                document.getElementById('floating_dest_port').value      = rule.dest_port   || '';
+                document.getElementById('floating_gateway').value        = rule.gateway     || '';
+                document.getElementById('floating_queue').value          = rule.queue       || '';
+                document.getElementById('floating_schedule').value       = rule.schedule    || '';
+                document.getElementById('floating_description').value    = rule.description || '';
                 new bootstrap.Modal(modal).show();
 
             } else if (type === 'wan') {
                 const modal = document.getElementById('wanModal');
-                const titleEl = modal.querySelector('.modal-title');
-                if (titleEl) titleEl.textContent = 'Edit WAN Rule';
-                const actionEl = document.getElementById('wan_rule_action');
-                if (actionEl) actionEl.value  = rule.action   || 'pass';
-                document.getElementById('wan_rule_disabled').checked  = !!rule.disabled;
-                const protoEl = document.getElementById('wan_rule_protocol');
-                if (protoEl) protoEl.value = rule.protocol || 'any';
-                const descEl  = document.getElementById('rule_desc');
-                if (descEl)   descEl.value  = rule.description || '';
+                modal.querySelector('.modal-title').textContent = 'Edit WAN Rule';
+                document.getElementById('wan_rule_action').value    = rule.action      || 'pass';
+                document.getElementById('wan_rule_disabled').checked = !!rule.disabled;
+                document.getElementById('wan_rule_protocol').value  = rule.protocol    || 'any';
+                document.getElementById('wan_source').value         = rule.source      || '';
+                document.getElementById('wan_source_port').value    = rule.source_port || '';
+                document.getElementById('wan_destination').value    = rule.destination || '';
+                document.getElementById('wan_dest_port').value      = rule.dest_port   || '';
+                document.getElementById('rule_desc').value          = rule.description || '';
                 new bootstrap.Modal(modal).show();
 
             } else if (type === 'lan') {
                 const modal = document.getElementById('lanModal');
-                const titleEl = modal.querySelector('.modal-title');
-                if (titleEl) titleEl.textContent = 'Edit LAN Rule';
-                const ifaceEl = document.getElementById('lan_interface');
-                if (ifaceEl) ifaceEl.value = rule.interface  || '';
-                const protoEl = document.getElementById('lan_protocol');
-                if (protoEl) protoEl.value = rule.protocol   || 'any';
-                const descEl  = document.getElementById('lan_description');
-                if (descEl)   descEl.value  = rule.description || '';
+                modal.querySelector('.modal-title').textContent = 'Edit LAN Rule';
+                document.getElementById('lan_action').value         = rule.action      || 'pass';
+                document.getElementById('lan_disabled').checked     = !!rule.disabled;
+                document.getElementById('lan_interface').value      = rule.interface   || '';
+                document.getElementById('lan_protocol').value       = rule.protocol    || 'any';
+                document.getElementById('lan_source').value         = rule.source      || '';
+                document.getElementById('lan_source_port').value    = rule.source_port || '';
+                document.getElementById('lan_destination').value    = rule.destination || '';
+                document.getElementById('lan_dest_port').value      = rule.dest_port   || '';
+                document.getElementById('lan_description').value    = rule.description || '';
                 new bootstrap.Modal(modal).show();
             }
         } catch (e) {

@@ -54,17 +54,16 @@ section "1. Package Installation"
 info "Updating pkg repository..."
 pkg update -q
 
-REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nginx"
+REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nano mrtg nginx"
 info "Installing required packages: ${REQUIRED_PKGS}"
 # shellcheck disable=SC2086
 pkg install -y ${REQUIRED_PKGS}
 
-# suricata-update: package name varies by Python version
+# Python sqlite3 extension (required for the app database)
 PYTHON_VER=$(python3 -c "import sys; print('%d%d' % sys.version_info[:2])" 2>/dev/null || echo "311")
-SURICATA_UPDATE_PKG="py${PYTHON_VER}-suricata-update"
-pkg install -y "${SURICATA_UPDATE_PKG}" 2>/dev/null \
-    || pkg install -y py311-suricata-update \
-    || fatal "suricata-update package not found — cannot continue."
+pkg install -y "py${PYTHON_VER}-sqlite3" 2>/dev/null \
+    || pkg install -y py311-sqlite3 \
+    || warn "py${PYTHON_VER}-sqlite3 not found — sqlite3 module may already be bundled."
 
 section "2. Directory Creation"
 
@@ -125,6 +124,10 @@ install -d -m 0755 /usr/local/etc/nginx  2>/dev/null && info "Created: /usr/loca
 install -d -m 0755 /var/log/nginx        2>/dev/null && info "Created: /var/log/nginx" || true
 install -d -m 0755 /var/run/nginx        2>/dev/null && info "Created: /var/run/nginx" || true
 
+# MRTG
+install -d -m 0755 /usr/local/etc/mrtg             2>/dev/null && info "Created: /usr/local/etc/mrtg" || true
+install -d -m 0755 /var/db/smart-shield/mrtg       2>/dev/null && info "Created: /var/db/smart-shield/mrtg" || true
+
 section "3. Environment Configuration"
 
 ENV_FILE="${ETC_DIR}/smart-shield.env"
@@ -178,12 +181,19 @@ else
     chmod 0600 "${ENV_FILE}"
 fi
 
-# Warn (non-fatal) when ABUSECH_AUTH_KEY is not yet configured
+# Prompt for ABUSECH_AUTH_KEY if not already set in the env file
 if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
-    warn "ABUSECH_AUTH_KEY is not set in ${ENV_FILE}."
-    warn "Abuse.ch threat intelligence (URLhaus / MalwareBazaar / ThreatFox) will"
-    warn "be unavailable until you add:  ABUSECH_AUTH_KEY=<your-key>"
-    warn "Get your key at: https://abuse.ch/"
+    printf "\n${BOLD}━━━ Abuse.ch Threat Intelligence ━━━${NC}\n"
+    printf "Abuse.ch provides URLhaus / MalwareBazaar / ThreatFox threat feeds.\n"
+    printf "Get your free API key at: https://abuse.ch/\n"
+    printf "${YELLOW}[?]${NC} Enter your ABUSECH_AUTH_KEY (press Enter to skip): "
+    read -r ABUSE_KEY
+    if [ -n "${ABUSE_KEY}" ]; then
+        sed -i '' "s|^ABUSECH_AUTH_KEY=.*|ABUSECH_AUTH_KEY=${ABUSE_KEY}|" "${ENV_FILE}"
+        info "Abuse.ch Auth Key saved to ${ENV_FILE}"
+    else
+        warn "ABUSECH_AUTH_KEY not set — threat intel features disabled until you add it to ${ENV_FILE}"
+    fi
 fi
 
 CONFIG_FILE="${ETC_DIR}/config.json"
@@ -240,6 +250,23 @@ for TOOL in smartshieldctl smartshield-cli; do
         warn "Tool not found: ${SRC}"
     fi
 done
+
+# MRTG probe script
+MRTG_PROBE_SRC="${APP_ROOT}/bsd/mrtg-probe.sh"
+MRTG_PROBE_DEST="${APP_ROOT}/bsd/mrtg-probe.sh"
+if [ -f "${MRTG_PROBE_SRC}" ]; then
+    chmod 0555 "${MRTG_PROBE_SRC}"
+    info "MRTG probe script ready: ${MRTG_PROBE_DEST}"
+else
+    warn "mrtg-probe.sh not found at ${MRTG_PROBE_SRC}"
+fi
+
+# MRTG cron job (every 5 minutes)
+CRON_FILE="/etc/cron.d/smart-shield-mrtg"
+CRON_LINE="*/5 * * * * root /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
+printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
+chmod 0644 "${CRON_FILE}"
+info "MRTG cron job installed: ${CRON_FILE}"
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
 section "5a. sudo / Sudoers (optional fallback)"
