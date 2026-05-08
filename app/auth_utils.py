@@ -65,6 +65,9 @@ def login_required(view_func):
     def wrapped_view(*args, **kwargs):
         user_id = session.get("user_id")
         if not user_id:
+            if _is_api_path(request.path):
+                from flask import jsonify
+                return jsonify({"ok": False, "message": "Session expired. Please refresh and log in."}), 401
             return redirect(url_for("auth.login"))
 
         profile = _load_user_profile(user_id)

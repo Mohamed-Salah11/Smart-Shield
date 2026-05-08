@@ -139,6 +139,43 @@ def create_app():
             if is_admin_bypass_session(conn, request.remote_addr or ""):
                 return None
             if has_active_captive_session(conn, request.remote_addr or ""):
+                if is_blocked_domain(conn, host):
+                    # Authenticated user whose browser is still hitting the LAN IP via a
+                    # stale DNS cache entry (Unbound redirect TTL is now 5 s).
+                    # Show a bridge page that auto-retries after 8 s; by then DNS has expired
+                    # and PF will route the query to the upstream resolver → real IP.
+                    orig_url = request.url
+                    safe_host = host.replace("'", "").replace('"', "")
+                    safe_url  = orig_url.replace("'", "%27").replace('"', "%22")
+                    bridge = (
+                        '<!DOCTYPE html><html><head><meta charset="utf-8">'
+                        f'<meta http-equiv="refresh" content="8; url={safe_url}">'
+                        '<title>Access Granted — Smart Shield</title>'
+                        '<style>'
+                        '*{box-sizing:border-box;margin:0;padding:0}'
+                        'body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,sans-serif;'
+                        'display:flex;align-items:center;justify-content:center;height:100vh}'
+                        '.box{text-align:center;max-width:400px;padding:40px 32px;background:#1e293b;'
+                        'border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5)}'
+                        'h2{color:#4ade80;font-size:1.2rem;margin-bottom:10px}'
+                        'p{color:#94a3b8;font-size:.88rem;margin:8px 0 20px;line-height:1.55}'
+                        'a.btn{display:inline-block;padding:10px 24px;background:#1e3a5f;color:#fff;'
+                        'border-radius:6px;font-size:.9rem;font-weight:700;text-decoration:none}'
+                        'a.btn:hover{background:#2d5a8f}'
+                        '.sub{font-size:.74rem;color:#475569;margin-top:14px}'
+                        '</style></head><body><div class="box">'
+                        '<h2>&#x2714; Access Granted</h2>'
+                        f'<p>You are authenticated. Loading <strong>{safe_host}</strong>…<br>'
+                        'Redirecting automatically in a moment.</p>'
+                        f'<a href="{safe_url}" class="btn">Open {safe_host}</a>'
+                        '<div class="sub">If the site doesn&rsquo;t load, open a new browser tab '
+                        'and navigate there directly.</div>'
+                        '</div></body></html>'
+                    )
+                    from flask import make_response as _mkr
+                    resp = _mkr(bridge, 200)
+                    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+                    return resp
                 return None
             if not is_blocked_domain(conn, host):
                 return None

@@ -156,6 +156,29 @@
     line-height: 1.5;
   }
 
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.1rem; }
+  .tab-btn {
+    flex: 1; padding: .55rem .5rem; background: none; border: none;
+    font-size: .82rem; font-weight: 600; color: #6b7280;
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn.active { color: #1e3a5f; border-color: #1e3a5f; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .btn-open-full {
+    display: block; margin-top: .9rem; text-align: center;
+    font-size: .75rem; color: #6b7280; text-decoration: underline;
+  }
+  .btn-open-full:hover { color: #1e3a5f; }
+
+  input[type=text].voucher-input {
+    text-transform: uppercase; letter-spacing: .2em; font-size: 1rem;
+    text-align: center; font-family: monospace;
+  }
+
   /* ── Footer ── */
   .footer {
     text-align: center;
@@ -226,27 +249,71 @@
 
     <div class="divider">Sign in to access</div>
 
-    <form method="POST" action="/portal/auth">
-      <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}">
-      <input type="hidden" name="auth_type"     value="credentials">
-      <input type="hidden" name="back_template" value="block">
-      <input type="hidden" name="domain"        value="{{ domain|default('') }}">
-      <input type="hidden" name="orig_url"      value="{{ orig_url|default('') }}">
+    <!-- Tab buttons -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-cred-btn" onclick="switchTab('cred')">
+        🔑 Username &amp; Password
+      </button>
+      <button class="tab-btn" id="tab-voucher-btn" onclick="switchTab('voucher')">
+        🎟 Voucher Code
+      </button>
+    </div>
 
-      <label for="username">Smart Shield Username</label>
-      <input type="text" id="username" name="username"
-             autocomplete="username" required placeholder="your username">
+    <!-- Tab 1: Credentials -->
+    <div class="tab-panel active" id="tab-cred">
+      <form method="POST" action="/portal/auth">
+        <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}">
+        <input type="hidden" name="auth_type"     value="credentials">
+        <input type="hidden" name="back_template" value="block">
+        <input type="hidden" name="policy"        value="content">
+        <input type="hidden" name="domain"        value="{{ domain|default('') }}">
+        <input type="hidden" name="orig_url"      value="{{ orig_url|default('') }}">
 
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password"
-             autocomplete="current-password" required placeholder="••••••••">
+        <label for="username">Smart Shield Username</label>
+        <input type="text" id="username" name="username"
+               autocomplete="username" required placeholder="your username">
 
-      <button type="submit" class="btn-primary">Sign In &amp; Access Site</button>
-    </form>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password"
+               autocomplete="current-password" required placeholder="••••••••">
 
-    <p class="hint">Only users with a Smart Shield account can bypass this block.<br>
-    Contact your network administrator if you need access.</p>
+        <button type="submit" class="btn-primary">Sign In &amp; Access Site</button>
+      </form>
+    </div>
+
+    <!-- Tab 2: Voucher -->
+    <div class="tab-panel" id="tab-voucher">
+      <form method="POST" action="/portal/auth">
+        <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}">
+        <input type="hidden" name="auth_type"     value="voucher">
+        <input type="hidden" name="back_template" value="block">
+        <input type="hidden" name="policy"        value="content">
+        <input type="hidden" name="domain"        value="{{ domain|default('') }}">
+        <input type="hidden" name="orig_url"      value="{{ orig_url|default('') }}">
+
+        <label for="voucher_code">Voucher Code</label>
+        <input type="text" id="voucher_code" name="voucher_code"
+               class="voucher-input" maxlength="8" autocomplete="off"
+               placeholder="AB12CD34"
+               oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+
+        <button type="submit" class="btn-primary">Redeem &amp; Access Site</button>
+      </form>
+      <p class="hint">Enter the 8-character code provided by your administrator.</p>
+    </div>
+
+    <a href="/portal/?policy=content&amp;domain={{ domain|urlencode }}&amp;url={{ orig_url|urlencode }}"
+       class="btn-open-full">Open full login page ↗</a>
   </div>
+
+  <script>
+  function switchTab(t) {
+    ['cred','voucher'].forEach(function(id) {
+      document.getElementById('tab-'+id).classList.toggle('active', id===t);
+      document.getElementById('tab-'+id+'-btn').classList.toggle('active', id===t);
+    });
+  }
+  </script>
   {% endif %}
 
   <div class="footer">Protected by Smart Shield &middot; Content Police Filter</div>

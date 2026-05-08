@@ -175,13 +175,16 @@ def auth():
     session["content_filter_authenticated"] = True
     session["portal_ip"] = ip
 
-    if context["policy"] == "content":
-        return render_template("portal/success.html", **context)
-
-    # If came from block page, go back to block success view
     back_template = request.form.get("back_template", "login")
+
     if back_template == "block":
+        # User came via the DNS-redirect block page (direct navigation, not a popup).
+        # Render block.html authenticated view — it has auto-redirect JS + Continue button.
         return render_template("portal/block.html", authenticated=True, **context)
+
+    if context["policy"] == "content":
+        # Popup/interstitial flow — success.html uses window.opener to navigate the parent tab.
+        return render_template("portal/success.html", **context)
 
     return redirect(_safe_redirect_target(orig_url))
 

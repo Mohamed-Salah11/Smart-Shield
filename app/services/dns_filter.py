@@ -69,14 +69,16 @@ def generate_dns_filter_zones(conn) -> list:
         fqdn = domain + "."
         if action == "block":
             if block_ip:
-                # Redirect to Smart Shield so the block/login page is served
+                # Redirect to Smart Shield so the block/login page is served.
+                # TTL=5 s so the browser DNS cache expires quickly after the user
+                # authenticates and PF switches them to the upstream resolver.
                 lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
             else:
                 lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
         elif action == "redirect" and redirect_ip:
             lines.append(f'    local-zone: "{fqdn}" redirect')
-            lines.append(f'    local-data: "{fqdn} A {redirect_ip}"')
+            lines.append(f'    local-data: "{fqdn} 5 A {redirect_ip}"')
         elif action == "allow":
             lines.append(f'    local-zone: "{fqdn}" transparent')
     return lines

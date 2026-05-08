@@ -334,17 +334,69 @@ def _handle_https_redirect(raw_conn: socket.socket, ctx: ssl.SSLContext,
                 if line.lower().startswith("host:"):
                     host = line.split(":", 1)[1].strip().split(":")[0]
                     break
-            location = f"http://{portal_ip}:{portal_port}/portal/block"
+
+            portal_url = f"http://{portal_ip}:{portal_port}/portal/block"
             if host:
-                location += f"?domain={host}"
-            response = (
-                f"HTTP/1.1 302 Found\r\n"
-                f"Location: {location}\r\n"
-                f"Content-Length: 0\r\n"
-                f"Connection: close\r\n\r\n"
+                portal_url += f"?domain={host}"
+
+            display_host = host or "this site"
+            body = (
+                "<!DOCTYPE html><html><head>"
+                "<meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                f"<title>Blocked — Smart Shield</title>"
+                "<style>"
+                "*{box-sizing:border-box;margin:0;padding:0}"
+                "body{background:linear-gradient(135deg,#0f172a,#1e3a5f);min-height:100vh;"
+                "display:flex;align-items:center;justify-content:center;"
+                "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:1rem}"
+                ".card{background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);"
+                "width:100%;max-width:420px;overflow:hidden;text-align:center}"
+                ".hdr{background:#1e3a5f;color:#fff;padding:1.4rem 2rem}"
+                ".hdr .ic{font-size:2rem;display:block;margin-bottom:.3rem}"
+                ".hdr h1{font-size:1.15rem;font-weight:700;letter-spacing:.02em}"
+                ".hdr p{font-size:.78rem;opacity:.7;margin-top:.2rem}"
+                ".body{padding:1.5rem 2rem 1.75rem}"
+                ".notice{background:#fef2f2;border-left:4px solid #dc2626;"
+                "padding:.9rem 1.2rem;border-radius:0 6px 6px 0;text-align:left;margin-bottom:1.25rem}"
+                ".notice strong{color:#991b1b;font-size:.88rem}"
+                ".notice code{background:#fee2e2;border-radius:3px;padding:1px 5px;"
+                "font-size:.85rem;color:#7f1d1d;word-break:break-all}"
+                ".notice p{font-size:.8rem;color:#b91c1c;margin-top:.3rem;line-height:1.4}"
+                ".btn{display:block;width:100%;padding:.75rem;background:#1e3a5f;color:#fff;"
+                "border-radius:6px;font-size:.95rem;font-weight:700;text-decoration:none;"
+                "transition:background .2s;margin-bottom:.65rem}"
+                ".btn:hover{background:#2d5a8f}"
+                ".btn-v{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}"
+                ".btn-v:hover{background:#dcfce7}"
+                ".hint{font-size:.72rem;color:#9ca3af;margin-top:.5rem;line-height:1.5}"
+                ".ftr{font-size:.72rem;color:#9ca3af;padding:.7rem;border-top:1px solid #f1f5f9}"
+                "</style></head><body><div class='card'>"
+                "<div class='hdr'><span class='ic'>🛡️</span>"
+                "<h1>Smart Shield — Content Police</h1>"
+                "<p>Network access control &amp; content filtering</p></div>"
+                "<div class='body'>"
+                "<div class='notice'>"
+                f"<strong>🚫 Site blocked: <code>{display_host}</code></strong>"
+                "<p>This domain is restricted by the content policy.<br>"
+                "Sign in below to bypass filtering for your device.</p>"
+                "</div>"
+                f"<a href='{portal_url}' class='btn'>🔐 Proceed to Login</a>"
+                f"<a href='{portal_url}' class='btn btn-v'>🎟 Use a Voucher Code</a>"
+                "<p class='hint'>Your session will allow access for the duration of your visit.</p>"
+                "</div>"
+                "<div class='ftr'>Protected by Smart Shield &middot; Content Police Filter</div>"
+                "</div></body></html>"
             )
+            body_bytes = body.encode("utf-8")
+            response = (
+                f"HTTP/1.1 200 OK\r\n"
+                f"Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body_bytes)}\r\n"
+                f"Connection: close\r\n\r\n"
+            ).encode() + body_bytes
             try:
-                tls.sendall(response.encode())
+                tls.sendall(response)
             except Exception:
                 pass
     except Exception:
@@ -426,6 +478,10 @@ def generate_pf_anchor(conn) -> str:
         except Exception:
             lan_iface = "em1"
 
+    # Upstream DNS for authenticated clients — bypasses Unbound's block redirects
+    # so after auth, blocked domains resolve to their real IPs.
+    upstream_dns = (settings.get("upstream_dns") or "8.8.8.8").strip()
+
     lines = [
     "# ============================================================",
     "# Smart Shield - Captive Portal / Content Filter PF anchor",
@@ -433,9 +489,14 @@ def generate_pf_anchor(conn) -> str:
     "# DO NOT EDIT MANUALLY",
     "# ============================================================",
     "",
-    "# Translation rules first",
+    "# Translation rules (unauthenticated clients → portal)",
     f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port {http_port} -> {portal_ip} port {portal_port}",
     f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port 443 -> {portal_ip} port {_CP_HTTPS_PORT}",
+    "",
+    "# DNS bypass for authenticated clients — route to upstream resolver instead of",
+    "# Unbound so that previously blocked domains return their real IPs after login.",
+    f"rdr on {lan_iface} proto udp from <authenticated_clients> to any port 53 -> {upstream_dns} port 53",
+    f"rdr on {lan_iface} proto tcp from <authenticated_clients> to any port 53 -> {upstream_dns} port 53",
     "",
     "# Filter rules",
     f"pass in quick on {lan_iface} from <authenticated_clients> to any keep state",

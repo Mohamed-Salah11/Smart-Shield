@@ -97,3 +97,34 @@ def api_save_settings():
         details={"key_set": bool(raw_key)},
     )
     return jsonify({"ok": True, "has_key": bool(raw_key)})
+
+
+# ---------------------------------------------------------------------------
+# Approve / reject a pending agent action
+# ---------------------------------------------------------------------------
+
+@chatbot_bp.route("/api/approve_action", methods=["POST"])
+@login_required
+def api_approve_action():
+    data     = request.get_json(force=True) or {}
+    action   = data.get("action")
+    approved = bool(data.get("approved", False))
+
+    if not action or not isinstance(action, dict):
+        return jsonify({"ok": False, "message": "Invalid action payload."}), 400
+
+    if not approved:
+        return jsonify({"ok": True, "reply": "Action cancelled."})
+
+    from app.services.chatbot_service import execute_approved_action
+    conn   = get_db()
+    result = execute_approved_action(conn, action, session.get("username", ""))
+
+    log_event(
+        category="system",
+        action="chatbot_action_executed",
+        username=session.get("username"),
+        remote_addr=request.remote_addr,
+        details={"tool": action.get("tool"), "args": action.get("args"), "ok": result.get("ok")},
+    )
+    return jsonify(result)
