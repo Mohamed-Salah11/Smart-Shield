@@ -121,12 +121,63 @@ def add_web_filter_rule(
     return cur.lastrowid
 
 
+def update_web_filter_rule(
+    conn,
+    rule_id: int,
+    url_pattern: str,
+    action: str = "block",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    domain = _extract_domain(url_pattern)
+    if not domain:
+        raise ValueError("Could not extract a domain from the supplied URL/pattern.")
+    if action not in ("block", "allow"):
+        raise ValueError("Action must be 'block' or 'allow'.")
+    conn.execute(
+        """
+        UPDATE filter_web_rules
+           SET url_pattern=?, action=?, category=?, description=?
+         WHERE id=?
+        """,
+        (domain, action, category, description, rule_id),
+    )
+    conn.commit()
+
+
+def hot_apply_web_rule(conn, rule_id: int) -> None:
+    """Instantly inject or remove a single web filter DNS rule via unbound-control."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        row = conn.execute(
+            "SELECT url_pattern, action, enabled FROM filter_web_rules WHERE id=?",
+            (rule_id,),
+        ).fetchone()
+        if not row:
+            return
+        domain = row["url_pattern"]
+        if row["enabled"]:
+            zone_type = "transparent" if row["action"] == "allow" else "always_refuse"
+            run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+        else:
+            try:
+                run_privileged("unbound.local_zone_remove", domain=domain)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def toggle_web_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_web_rules SET enabled = ? WHERE id = ?",
         (1 if enabled else 0, rule_id),
     )
     conn.commit()
+    hot_apply_web_rule(conn, rule_id)
 
 
 def delete_web_filter_rule(conn, rule_id: int) -> None:

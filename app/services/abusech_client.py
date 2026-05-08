@@ -50,8 +50,21 @@ def _get_auth_key() -> str:
     )
 
 
-def is_dry_run() -> bool:
-    """Return True when ABUSECH_DRY_RUN is unset or any value except '0'."""
+def is_dry_run(conn=None) -> bool:
+    """Return True when live API calls should be suppressed.
+
+    Checks the DB column first (GUI-controlled), falls back to the env var
+    (set by install.sh or overridden manually).
+    """
+    if conn is not None:
+        try:
+            row = conn.execute(
+                "SELECT abusech_dry_run FROM ids_threat_feeds WHERE id=1"
+            ).fetchone()
+            if row is not None:
+                return bool(row["abusech_dry_run"])
+        except Exception:
+            pass
     return os.getenv("ABUSECH_DRY_RUN", "1") != "0"
 
 

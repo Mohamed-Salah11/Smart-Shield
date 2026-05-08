@@ -41,7 +41,11 @@ def _client_mac(ip: str) -> str:
     return ""
 
 def _safe_redirect_target(url: str) -> str:
-    """Only redirect to relative URLs or the same Smart Shield host."""
+    """Redirect to the original URL after captive portal login.
+    Allows relative URLs, same-host URLs, and any external http/https URL
+    (external redirects are the normal captive portal post-auth behaviour).
+    Rejects non-http schemes (javascript:, data:, etc.) as a safety measure.
+    """
     url = (url or "").strip()
     if not url:
         return url_for("portal.success")
@@ -52,8 +56,8 @@ def _safe_redirect_target(url: str) -> str:
     if not parsed.netloc:
         return url
 
-    # Allow only same host.
-    if parsed.netloc == request.host:
+    # Allow any absolute http or https URL (covers external sites after captive portal auth).
+    if parsed.scheme in ("http", "https"):
         return url
 
     return url_for("portal.success")

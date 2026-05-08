@@ -1302,12 +1302,22 @@ def api_wol_delete_host(host_id):
 @services_bp.route("/api/captive-portal/settings", methods=["GET"])
 @login_required
 def api_cp_get_settings():
-    """Return current captive portal settings."""
+    """Return current captive portal settings, falling back to auto-detected defaults."""
     conn  = get_db()
     row   = conn.execute(
         "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
     ).fetchone()
-    settings = json.loads(row["value_json"]) if row else {}
+    stored = json.loads(row["value_json"]) if row else {}
+    from app.services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
+    defaults = {
+        "portal_ip":          _default_portal_ip(conn),
+        "portal_port":        _CP_REDIRECT_PORT,
+        "http_redirect_port": 80,
+        "lan_interface":      "em1",
+        "allow_dns":          True,
+        "enabled":            False,
+    }
+    settings = {**defaults, **stored}
     return jsonify({"ok": True, "settings": settings})
 
 
@@ -1418,6 +1428,36 @@ def api_cp_list_vouchers():
         " FROM captive_vouchers ORDER BY created_at DESC LIMIT 200"
     )]
     return jsonify({"ok": True, "vouchers": vouchers})
+
+
+@services_bp.route("/api/captive-portal/vouchers/<int:voucher_id>", methods=["DELETE"])
+@api_permission_required("api.network.edit")
+def api_cp_delete_voucher(voucher_id):
+    conn = get_db()
+    row = conn.execute("SELECT id FROM captive_vouchers WHERE id=?", (voucher_id,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "message": "Voucher not found."}), 404
+    conn.execute("DELETE FROM captive_vouchers WHERE id=?", (voucher_id,))
+    conn.commit()
+    log_event(category="system", action="captive_portal_voucher_delete",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"voucher_id": voucher_id})
+    return jsonify({"ok": True, "message": "Voucher deleted."})
+
+
+@services_bp.route("/api/captive-portal/vouchers/<int:voucher_id>/disabled", methods=["PATCH"])
+@api_permission_required("api.network.edit")
+def api_cp_toggle_voucher_disabled(voucher_id):
+    data = request.get_json(force=True) or {}
+    disabled = bool(data.get("disabled", True))
+    conn = get_db()
+    from app.services.captive_portal import disable_voucher
+    result = disable_voucher(conn, voucher_id, disabled)
+    if result.get("ok"):
+        log_event(category="system", action="captive_portal_voucher_disable",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"voucher_id": voucher_id, "disabled": disabled})
+    return jsonify(result)
 
 
 @services_bp.route("/api/captive-portal/apply", methods=["POST"])

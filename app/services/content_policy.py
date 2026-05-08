@@ -167,27 +167,16 @@ def is_admin_bypass_session(conn, ip: str, now: int | None = None) -> bool:
 
 def get_block_page_ip(conn) -> str:
     """
-    Return the LAN IP to use as the DNS redirect target for blocked domains.
-    Tries lan_config first, then captive_portal_settings as fallback.
-    Returns '' if neither source has a usable IP (caller falls back to NXDOMAIN).
+    Return the LAN IP for Unbound local-data A records (block page redirect target).
+    Always uses the LAN interface IP from lan_config — never localhost or a URL.
+    Returns '' if LAN IP is not configured (Unbound falls back to NXDOMAIN).
     """
     try:
         row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
-        ip = ((row["ipv4_address"] if row else "") or "").split("/")[0].strip()
-        if ip:
+        raw = ((row["ipv4_address"] if row else "") or "").strip()
+        ip = raw.split("/")[0].strip()  # strip CIDR prefix, e.g. "192.168.1.1/24" → "192.168.1.1"
+        if ip and not ip.startswith("127."):
             return ip
-    except Exception:
-        pass
-    try:
-        import json as _json
-        row = conn.execute(
-            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
-        ).fetchone()
-        if row:
-            settings = _json.loads(row["value_json"])
-            ip = (settings.get("portal_ip") or "").strip()
-            if ip and ip != "127.0.0.1":
-                return ip
     except Exception:
         pass
     return ""

@@ -114,12 +114,72 @@ def add_dns_filter_rule(
     return cur.lastrowid
 
 
+def update_dns_filter_rule(
+    conn,
+    rule_id: int,
+    domain: str,
+    action: str = "block",
+    redirect_ip: str = "",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    domain = _sanitize_domain(domain)
+    if not domain:
+        raise ValueError("Domain must not be empty.")
+    if action not in ("block", "allow"):
+        raise ValueError("Action must be 'block' or 'allow'.")
+    conn.execute(
+        """
+        UPDATE filter_dns_rules
+           SET domain=?, action=?, redirect_ip=?, category=?, description=?
+         WHERE id=?
+        """,
+        (domain, action, redirect_ip, category, description, rule_id),
+    )
+    conn.commit()
+
+
+def hot_apply_dns_rule(conn, rule_id: int) -> None:
+    """Instantly inject or remove a single DNS rule via unbound-control (no service restart)."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        row = conn.execute(
+            "SELECT domain, action, redirect_ip, enabled FROM filter_dns_rules WHERE id=?",
+            (rule_id,),
+        ).fetchone()
+        if not row:
+            return
+        domain = row["domain"]
+        if row["enabled"]:
+            if row["action"] == "redirect" and row["redirect_ip"]:
+                run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
+                run_privileged("unbound.local_data_a", domain=domain, ip=row["redirect_ip"])
+            else:
+                zone_type = "transparent" if row["action"] == "allow" else "always_refuse"
+                run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+        else:
+            try:
+                run_privileged("unbound.local_zone_remove", domain=domain)
+            except Exception:
+                pass
+            try:
+                run_privileged("unbound.local_data_remove", domain=domain)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def toggle_dns_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_dns_rules SET enabled = ? WHERE id = ?",
         (1 if enabled else 0, rule_id),
     )
     conn.commit()
+    hot_apply_dns_rule(conn, rule_id)
 
 
 def delete_dns_filter_rule(conn, rule_id: int) -> None:

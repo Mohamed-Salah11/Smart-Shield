@@ -233,11 +233,32 @@ def generate_voucher(
     }
 
 
+def disable_voucher(conn, voucher_id: int, disabled: bool) -> dict:
+    row = conn.execute(
+        "SELECT id FROM captive_vouchers WHERE id=?", (voucher_id,)
+    ).fetchone()
+    if not row:
+        return {"ok": False, "message": "Voucher not found."}
+    conn.execute(
+        "UPDATE captive_vouchers SET disabled=? WHERE id=?",
+        (1 if disabled else 0, voucher_id),
+    )
+    conn.commit()
+    return {"ok": True, "disabled": disabled}
+
+
 def redeem_voucher(conn, code: str, mac: str, ip: str) -> dict:
     code = (code or "").strip().upper()
+    # First check if the voucher exists at all (redeemed or not, disabled or not)
+    all_rows = _rows(conn, "SELECT * FROM captive_vouchers WHERE code=?", (code,))
+    if not all_rows:
+        return {"ok": False, "message": "Voucher not found or already used."}
+    voucher_candidate = all_rows[0]
+    if voucher_candidate.get("disabled"):
+        return {"ok": False, "message": "Voucher is disabled."}
     rows = _rows(
         conn,
-        "SELECT * FROM captive_vouchers WHERE code=? AND redeemed=0",
+        "SELECT * FROM captive_vouchers WHERE code=? AND redeemed=0 AND disabled=0",
         (code,),
     )
     if not rows:
