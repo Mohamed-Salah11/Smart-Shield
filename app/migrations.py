@@ -196,6 +196,24 @@ def _migration_v6(conn):
     conn.execute("INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)")
 
 
+def _migration_v7(conn):
+    """Phase 7: add disabled flag to captive_vouchers for temporary suspension."""
+    try:
+        conn.execute("ALTER TABLE captive_vouchers ADD COLUMN disabled INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists on fresh installs
+
+
+def _migration_v8(conn):
+    """Phase 8: add abusech_dry_run flag to ids_threat_feeds for GUI control."""
+    try:
+        conn.execute(
+            "ALTER TABLE ids_threat_feeds ADD COLUMN abusech_dry_run INTEGER DEFAULT 1"
+        )
+    except Exception:
+        pass  # column already exists on fresh installs
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -204,6 +222,8 @@ MIGRATIONS = [
     (4, _migration_v4),
     (5, _migration_v5),
     (6, _migration_v6),
+    (7, _migration_v7),
+    (8, _migration_v8),
 ]
 
 

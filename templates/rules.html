@@ -205,7 +205,10 @@
                     <div class="mb-3 row">
                         <label for="floating_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="floating_source_port" class="form-control" placeholder="any or 80">
+                            <div class="input-group">
+                                <input type="text" id="floating_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'floating_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -217,7 +220,10 @@
                     <div class="mb-3 row">
                         <label for="floating_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="floating_dest_port" class="form-control" placeholder="any or 443">
+                            <div class="input-group">
+                                <input type="text" id="floating_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'floating_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -303,7 +309,10 @@
                     <div class="mb-3 row">
                         <label for="wan_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="wan_source_port" class="form-control" placeholder="any or 80">
+                            <div class="input-group">
+                                <input type="text" id="wan_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'wan_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -315,7 +324,10 @@
                     <div class="mb-3 row">
                         <label for="wan_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="wan_dest_port" class="form-control" placeholder="any or 443">
+                            <div class="input-group">
+                                <input type="text" id="wan_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'wan_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -391,7 +403,10 @@
                     <div class="mb-3 row">
                         <label for="lan_source_port" class="col-sm-3 col-form-label fw-semibold">Source Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="lan_source_port" class="form-control" placeholder="any or 80">
+                            <div class="input-group">
+                                <input type="text" id="lan_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'lan_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -403,7 +418,10 @@
                     <div class="mb-3 row">
                         <label for="lan_dest_port" class="col-sm-3 col-form-label fw-semibold">Dest Port</label>
                         <div class="col-sm-9">
-                            <input type="text" id="lan_dest_port" class="form-control" placeholder="any or 443">
+                            <div class="input-group">
+                                <input type="text" id="lan_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'lan_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -422,7 +440,72 @@
     </div>
 </div>
 
+<style>
+.port-picker-dropdown {
+  position: absolute; z-index: 9999;
+  background: var(--panel, #fff); border: 1px solid var(--border-color, #ccc);
+  border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.25);
+  min-width: 220px; max-height: 320px; overflow-y: auto; padding: 6px 0;
+}
+.port-picker-cat  { font-size:.67rem; font-weight:700; text-transform:uppercase;
+                    letter-spacing:.07em; color:var(--muted,#888);
+                    padding:7px 12px 3px; pointer-events:none; }
+.port-picker-item { padding:5px 14px; cursor:pointer; font-size:.83rem;
+                    display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.port-picker-item:hover { background:var(--border-color-soft,#f0f0f0); }
+.port-picker-num  { font-family:monospace; font-weight:700; color:var(--text-color,#222); }
+.port-picker-name { color:var(--muted,#888); font-size:.78rem; }
+</style>
+
 <script>
+    // ── Known Ports quick-select ────────────────────────────────────────────
+    const KNOWN_PORTS = {
+      "Web":         [["80","HTTP"],["443","HTTPS"],["8080","HTTP-alt"],["8443","HTTPS-alt"]],
+      "Remote":      [["22","SSH"],["23","Telnet"],["3389","RDP"],["5900","VNC"]],
+      "Email":       [["25","SMTP"],["587","SMTP-TLS"],["110","POP3"],["995","POP3S"],["143","IMAP"],["993","IMAPS"]],
+      "DNS/Network": [["53","DNS"],["67","DHCP-srv"],["68","DHCP-cli"],["123","NTP"],["161","SNMP"]],
+      "Database":    [["3306","MySQL"],["5432","PostgreSQL"],["27017","MongoDB"],["6379","Redis"],["1433","MSSQL"]],
+      "File/VoIP":   [["21","FTP"],["990","FTPS"],["69","TFTP"],["554","RTSP"],["5060","SIP"]],
+      "VPN":         [["1194","OpenVPN"],["500","IKE"],["4500","IKE-NAT"],["1701","L2TP"]],
+    };
+
+    let _pickerActive = null;
+
+    function showPortPicker(btn, fieldId) {
+      if (_pickerActive) { _pickerActive.remove(); _pickerActive = null; }
+      const dropdown = document.createElement('div');
+      dropdown.className = 'port-picker-dropdown';
+      Object.entries(KNOWN_PORTS).forEach(([cat, ports]) => {
+        const hdr = document.createElement('div');
+        hdr.className = 'port-picker-cat';
+        hdr.textContent = cat;
+        dropdown.appendChild(hdr);
+        ports.forEach(([num, name]) => {
+          const item = document.createElement('div');
+          item.className = 'port-picker-item';
+          item.innerHTML = `<span class="port-picker-num">${num}</span><span class="port-picker-name">${name}</span>`;
+          item.addEventListener('click', () => {
+            document.getElementById(fieldId).value = num;
+            dropdown.remove(); _pickerActive = null;
+          });
+          dropdown.appendChild(item);
+        });
+      });
+      const rect = btn.getBoundingClientRect();
+      dropdown.style.top  = (rect.bottom + window.scrollY + 2) + 'px';
+      dropdown.style.left = (rect.left  + window.scrollX) + 'px';
+      document.body.appendChild(dropdown);
+      _pickerActive = dropdown;
+      setTimeout(() => {
+        document.addEventListener('click', function _close(e) {
+          if (!dropdown.contains(e.target) && e.target !== btn) {
+            dropdown.remove(); _pickerActive = null;
+            document.removeEventListener('click', _close);
+          }
+        });
+      }, 0);
+    }
+
     // --- TAB SWITCHING FUNCTION ---
     function openTab(evt, tabName) {
         evt.preventDefault();

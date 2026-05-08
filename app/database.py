@@ -1413,6 +1413,7 @@ ON static_leases(mac_address)
     CREATE TABLE IF NOT EXISTS ids_threat_feeds (
         id               INTEGER PRIMARY KEY CHECK (id = 1),
         abusech_auth_key TEXT    DEFAULT '',
+        abusech_dry_run  INTEGER DEFAULT 1,
         updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1420,6 +1421,40 @@ ON static_leases(mac_address)
     cursor.execute(
         "INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)"
     )
+
+    # Seed abuse.ch key + dry-run flag from env into DB if install.sh set it and DB has no key yet
+    _env_abusech_key  = os.environ.get("ABUSECH_AUTH_KEY",  "").strip()
+    _env_dry_run_flag = 0 if os.environ.get("ABUSECH_DRY_RUN", "1").strip() == "0" else 1
+    if _env_abusech_key:
+        _existing_key = cursor.execute(
+            "SELECT abusech_auth_key FROM ids_threat_feeds WHERE id=1"
+        ).fetchone()
+        if not (_existing_key and _existing_key["abusech_auth_key"]):
+            try:
+                from app.secret_store import encrypt_secret
+                cursor.execute(
+                    "UPDATE ids_threat_feeds SET abusech_auth_key=?, abusech_dry_run=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+                    (encrypt_secret(_env_abusech_key), _env_dry_run_flag),
+                )
+            except Exception:
+                pass  # secret_store may be unavailable during early migration — skip
+
+    # Seed Groq API key from env into service_state if install.sh set it and DB has no entry yet
+    _env_groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if _env_groq_key:
+        _existing_groq = cursor.execute(
+            "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
+        ).fetchone()
+        if not _existing_groq:
+            try:
+                import json as _json2
+                from app.secret_store import encrypt_secret as _enc2
+                cursor.execute(
+                    "INSERT OR IGNORE INTO service_state (key_name, value_json) VALUES (?, ?)",
+                    ("chatbot_settings", _json2.dumps({"groq_api_key": _enc2(_env_groq_key)})),
+                )
+            except Exception:
+                pass
 
     # ── Routing: Gateways ─────────────────────────────────────────────────────
     cursor.execute("""
@@ -1663,6 +1698,7 @@ ON static_leases(mac_address)
         duration_minutes  INTEGER NOT NULL DEFAULT 60,
         bandwidth_kbps    INTEGER DEFAULT 0,
         redeemed          INTEGER DEFAULT 0,
+        disabled          INTEGER DEFAULT 0,
         redeemed_at       TIMESTAMP,
         created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )

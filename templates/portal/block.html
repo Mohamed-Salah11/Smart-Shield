@@ -193,6 +193,15 @@
     {% endif %}
     <p class="hint">Your session is active. Access will remain open until you log out or close your browser.</p>
   </div>
+  {% if orig_url %}
+  <script>
+  setTimeout(function() { window.location.href = {{ orig_url | tojson }}; }, 1000);
+  </script>
+  {% elif domain %}
+  <script>
+  setTimeout(function() { window.location.href = "http://" + {{ domain | tojson }}; }, 1000);
+  </script>
+  {% endif %}
 
   {% else %}
   <!-- ── Blocked view ── -->

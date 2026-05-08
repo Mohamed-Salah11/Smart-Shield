@@ -1,4 +1,5 @@
 import ipaddress
+import json
 import os
 import socket
 import time
@@ -144,14 +145,59 @@ def create_app():
         except Exception:
             return None
 
-        query = urlencode(
-            {
-                "policy": "content",
-                "domain": host,
-                "url": request.url,
-            }
-        )
-        return redirect(f"/portal/?{query}", code=302)
+        query = urlencode({"policy": "content", "domain": host, "url": request.url})
+        # Build absolute URL so the popup reaches Flask directly, regardless of PF state
+        try:
+            import json as _json
+            from app.services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
+            _cp_row = conn.execute(
+                "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+            ).fetchone()
+            _cp_cfg = _json.loads(_cp_row["value_json"]) if _cp_row else {}
+            _portal_ip   = (_cp_cfg.get("portal_ip") or _default_portal_ip(conn)).strip()
+            _portal_port = int(_cp_cfg.get("portal_port") or _CP_REDIRECT_PORT)
+            portal_url = f"http://{_portal_ip}:{_portal_port}/portal/?{query}"
+        except Exception:
+            portal_url = f"/portal/?{query}"
+        interstitial = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Access Blocked — Smart Shield</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{background:#1a1d23;color:#e0e0e0;font-family:'Segoe UI',sans-serif;
+     display:flex;align-items:center;justify-content:center;height:100vh;}}
+.box{{text-align:center;max-width:440px;padding:44px 36px;background:#23262d;
+      border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.5);}}
+h2{{color:#ef5350;font-size:1.3rem;margin-bottom:10px;}}
+p{{color:#9e9e9e;font-size:.9rem;margin:10px 0 28px;line-height:1.55;}}
+strong{{color:#e0e0e0;}}
+.btn{{padding:11px 28px;background:#4fc3f7;color:#1a1d23;border:none;
+      border-radius:7px;font-size:1rem;font-weight:700;cursor:pointer;}}
+.btn:hover{{background:#81d4fa;}}
+.hint{{font-size:.75rem;color:#555;margin-top:14px;}}
+</style></head><body><div class="box">
+<h2>&#x1F6AB; Access Blocked</h2>
+<p>The domain <strong>{host}</strong> is restricted by content policy.<br>
+Log in to bypass filtering for your device.</p>
+<button class="btn" id="btn" onclick="openPortal()">Open Login</button>
+<div class="hint" id="hint">Login will open in a new tab.</div>
+</div>
+<script>
+var _url={json.dumps(portal_url)};
+var _win=null;
+function openPortal(){{
+  _win=window.open(_url,'ss_portal_login');
+  document.getElementById('hint').textContent='Waiting for login…';
+  document.getElementById('btn').textContent='Waiting…';
+  var t=setInterval(function(){{
+    try{{if(_win&&_win.closed){{clearInterval(t);location.reload();}}}}catch(e){{}}
+  }},800);
+}}
+window.addEventListener('load',openPortal);
+</script></body></html>"""
+        from flask import make_response
+        resp = make_response(interstitial, 200)
+        resp.headers["Content-Type"] = "text/html; charset=utf-8"
+        return resp
 
     @app.before_request
     def _request_timing_start():
@@ -257,6 +303,7 @@ def create_app():
     from routes.ids import ids_bp
     from routes.filters import filters_bp
     from routes.portal import portal_bp
+    from routes.chatbot import chatbot_bp
 
     app.register_blueprint(setup_bp)
     app.register_blueprint(auth_bp)
@@ -273,5 +320,6 @@ def create_app():
     app.register_blueprint(ids_bp)
     app.register_blueprint(filters_bp)
     app.register_blueprint(portal_bp)
+    app.register_blueprint(chatbot_bp)
 
     return app

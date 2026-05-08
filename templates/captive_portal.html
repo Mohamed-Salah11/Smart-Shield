@@ -143,13 +143,15 @@
               <th style="padding:10px 14px;">Code</th>
               <th>Duration</th>
               <th>Bandwidth</th>
+              <th>Status</th>
               <th>Redeemed</th>
               <th>Redeemed At</th>
               <th>Created</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="vouchers-tbody">
-            <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading vouchers…</td></tr>
+            <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Loading vouchers…</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,6 +165,9 @@
         <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
         <div><div class="ss-card-title">Portal Configuration</div></div>
         <div class="ss-card-actions">
+          <button type="button" class="btn btn-sm btn-warning me-1" onclick="reloadFirewall()">
+            <i class="fa-solid fa-fire me-1"></i>Reload Firewall
+          </button>
           <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()">
             <i class="fa-solid fa-check me-1"></i>Save Settings
           </button>
@@ -456,22 +461,62 @@ async function loadVouchers() {
     const vouchers = d.vouchers || [];
     const tbody = document.getElementById('vouchers-tbody');
     if (!vouchers.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No vouchers generated yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">No vouchers generated yet</td></tr>';
       return;
     }
-    tbody.innerHTML = vouchers.map(v => `
-      <tr>
+    tbody.innerHTML = vouchers.map(v => {
+      const isDisabled = !!v.disabled;
+      const statusBadge = isDisabled
+        ? '<span class="badge bg-danger">Disabled</span>'
+        : (v.redeemed ? '<span class="badge bg-secondary">Used</span>' : '<span class="badge bg-success">Active</span>');
+      const disableBtn = v.redeemed ? '' : `
+        <button class="btn btn-sm ${isDisabled ? 'btn-outline-success' : 'btn-outline-warning'} me-1"
+          onclick="toggleVoucherDisabled(${v.id}, ${isDisabled})"
+          title="${isDisabled ? 'Enable voucher' : 'Disable voucher'}">
+          <i class="fa-solid ${isDisabled ? 'fa-circle-check' : 'fa-ban'}"></i>
+        </button>`;
+      return `<tr style="${isDisabled ? 'opacity:.55;' : ''}">
         <td style="padding:8px 14px;font-family:monospace;font-weight:700;letter-spacing:.05em;">${esc(v.code)}</td>
         <td>${esc(v.duration_minutes)} min</td>
         <td>${v.bandwidth_kbps ? esc(v.bandwidth_kbps) + ' kbps' : 'Unlimited'}</td>
+        <td>${statusBadge}</td>
         <td>${v.redeemed ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
         <td>${esc(v.redeemed_at ? fmtTs(v.redeemed_at) : '—')}</td>
         <td style="color:var(--muted);font-size:.78rem;">${esc(v.created_at||'—')}</td>
-      </tr>`).join('');
+        <td style="white-space:nowrap;">${disableBtn}<button class="btn btn-sm btn-outline-danger" onclick="revokeVoucher(${v.id})">
+          <i class="fa-solid fa-trash"></i>
+        </button></td>
+      </tr>`;
+    }).join('');
   } catch(e) {
     document.getElementById('vouchers-tbody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Error loading vouchers</td></tr>';
+      '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Error loading vouchers</td></tr>';
   }
+}
+
+async function toggleVoucherDisabled(id, currentlyDisabled) {
+  const d = await apiFetch(`/services/api/captive-portal/vouchers/${id}/disabled`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ disabled: !currentlyDisabled }),
+  });
+  showToast(d.ok ? (d.disabled ? 'Voucher disabled.' : 'Voucher enabled.') : 'Error: ' + d.message, d.ok);
+  if (d.ok) loadVouchers();
+}
+
+async function revokeVoucher(id) {
+  if (!confirm('Delete this voucher permanently?')) return;
+  const d = await apiFetch('/services/api/captive-portal/vouchers/' + id, { method: 'DELETE' });
+  showToast(d.ok ? 'Voucher deleted.' : 'Error: ' + d.message, d.ok);
+  if (d.ok) loadVouchers();
+}
+
+async function reloadFirewall() {
+  showToast('Reloading firewall rules…', true);
+  try {
+    const d = await apiFetch('/status/filter-reload/apply', { method: 'POST' });
+    showToast(d.ok ? 'Firewall reloaded successfully.' : 'Error: ' + (d.message || 'Unknown error'), d.ok);
+  } catch(e) { showToast('Network error: ' + e.message, false); }
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
@@ -541,6 +586,8 @@ window.addEventListener('DOMContentLoaded', () => {
   showTab('sessions');
   loadStatus();
   loadSessions();
+  // Auto-refresh sessions every 30 seconds
+  setInterval(loadSessions, 30000);
 });
 </script>
 {% endblock %}

@@ -249,6 +249,38 @@ def add_app_from_signature(conn, sig_key: str, action: str = "block") -> int:
     )
 
 
+def update_app_filter_rule(
+    conn,
+    rule_id: int,
+    app_name: str,
+    action: str = "block",
+    block_dns: bool = True,
+    block_ports: bool = False,
+    ports: str = "",
+    protocol: str = "tcp+udp",
+    domains: str = "",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    if not app_name.strip():
+        raise ValueError("Application name must not be empty.")
+    conn.execute(
+        """
+        UPDATE filter_app_rules
+           SET app_name=?, action=?, block_dns=?, block_ports=?,
+               ports=?, protocol=?, domains=?, category=?, description=?
+         WHERE id=?
+        """,
+        (
+            app_name.strip(), action,
+            1 if block_dns else 0, 1 if block_ports else 0,
+            ports, protocol, domains, category, description,
+            rule_id,
+        ),
+    )
+    conn.commit()
+
+
 def toggle_app_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_app_rules SET enabled = ? WHERE id = ?",
@@ -351,22 +383,32 @@ def generate_app_filter_pf_rules(conn) -> str:
 def apply_app_filter(conn) -> dict:
     """Regenerate unbound.conf (DNS blocking) and pf.conf (port blocking), then reload both."""
     results = []
+    ok = True
+
     try:
         from app.services.dns_writer import write_unbound_conf
         dns_result = write_unbound_conf(conn)
         results.append(f"DNS: {dns_result['message']}")
-        if sys.platform.startswith("freebsd") and dns_result["ok"]:
+        if not dns_result["ok"]:
+            ok = False
+        elif sys.platform.startswith("freebsd"):
             from app.services.service_manager import service_action
             r = service_action("unbound", "reload")
             results.append(f"Unbound reload: {r['message']}")
+            if not r["ok"]:
+                ok = False
     except Exception as exc:
         results.append(f"DNS apply error: {exc}")
+        ok = False
 
     try:
         from app.services.pf_generator import reload_pf_rules
         pf_result = reload_pf_rules(conn)
         results.append(f"PF: {pf_result['message']}")
+        if not pf_result["ok"]:
+            ok = False
     except Exception as exc:
         results.append(f"PF apply error: {exc}")
+        ok = False
 
-    return {"ok": True, "message": " | ".join(results)}
+    return {"ok": ok, "message": " | ".join(results)}

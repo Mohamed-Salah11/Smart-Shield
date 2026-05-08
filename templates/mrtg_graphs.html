@@ -7,12 +7,18 @@
       <h1 class="ss-page-title">Traffic History</h1>
       <p class="ss-page-desc">MRTG bandwidth graphs — daily, weekly, monthly, yearly views</p>
     </div>
-    <form method="post" action="/status/mrtg/apply" style="display:inline;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-outline-primary btn-sm">
-        <i class="fa-solid fa-rotate me-1"></i>Regenerate Config
+    <div class="d-flex gap-2 align-items-center">
+      <form method="post" action="/status/mrtg/apply" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="fa-solid fa-rotate me-1"></i>Regenerate Config
+        </button>
+      </form>
+      <button class="btn btn-outline-secondary btn-sm" id="btn-mrtg-reinit" onclick="reinitMrtg()">
+        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Reinitialize MRTG
       </button>
-    </form>
+      <span id="mrtg-reinit-msg" style="font-size:.82rem;color:var(--muted);"></span>
+    </div>
   </div>
 
   <!-- Period tabs -->
@@ -79,6 +85,20 @@
 <script>
 const interfaces = {{ iface_names | tojson }};
 let currentPeriod = 'day';
+
+async function reinitMrtg() {
+  const btn = document.getElementById('btn-mrtg-reinit');
+  const msg = document.getElementById('mrtg-reinit-msg');
+  btn.disabled = true;
+  msg.textContent = 'Running…';
+  try {
+    const r = await fetch('/status/api/mrtg/reinitialize', { method: 'POST' });
+    const d = await r.json();
+    msg.textContent = d.ok ? 'Done — reloading page…' : 'Error: ' + (d.message || 'failed');
+    if (d.ok) setTimeout(() => location.reload(), 1200);
+  } catch(e) { msg.textContent = 'Network error'; }
+  btn.disabled = false;
+}
 
 function switchPeriod(evt, period) {
   evt.preventDefault();

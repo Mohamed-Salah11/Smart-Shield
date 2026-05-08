@@ -336,16 +336,8 @@
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">
-                        <i class="fa-solid fa-eye fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Overview
-                    </a></li>
-                    <li><a href="{{ url_for('ids.ids_index', tab='config') }}">
-                        <i class="fa-solid fa-gear fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Configuration
-                    </a></li>
-                    <li><a href="{{ url_for('ids.ids_index', tab='rules') }}">
-                        <i class="fa-solid fa-triangle-exclamation fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Detection Rules
+                        <i class="fa-solid fa-shield-virus fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        IDS / IPS
                     </a></li>
                 </ul>
             </details>
@@ -381,10 +373,6 @@
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
-                    <li><a href="{{ url_for('status.status_home') }}">
-                        <i class="fa-solid fa-circle-info fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Overview
-                    </a></li>
                     <li><a href="{{ url_for('status.carp_failover') }}">
                         <i class="fa-solid fa-arrows-rotate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
                         Failover Status
@@ -416,10 +404,6 @@
                     <li><a href="{{ url_for('status.system_logs') }}">
                         <i class="fa-solid fa-terminal fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
                         Live Events
-                    </a></li>
-                    <li><a href="{{ url_for('status.system_logs', tab='sessions') }}">
-                        <i class="fa-solid fa-user-clock fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Auth Events
                     </a></li>
                 </ul>
             </details>
@@ -609,5 +593,144 @@
     });
 })();
 </script>
+
+{% if session.get("user_id") %}
+<!-- ── SmartShield AI Chatbot ─────────────────────────────────────────────── -->
+<style>
+#ss-chat-fab{position:fixed;bottom:24px;right:24px;z-index:8888;width:52px;height:52px;
+  border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;
+  justify-content:center;font-size:1.25rem;cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,0,0,.35);transition:transform .2s;border:none;}
+#ss-chat-fab:hover{transform:scale(1.1);}
+#ss-chat-panel{position:fixed;bottom:84px;right:24px;z-index:8889;width:390px;
+  height:530px;border-radius:14px;background:var(--panel);
+  border:1px solid var(--border-color);box-shadow:0 8px 36px rgba(0,0,0,.32);
+  display:flex;flex-direction:column;overflow:hidden;}
+#ss-chat-panel.d-none{display:none!important;}
+#ss-chat-header{padding:12px 14px;background:var(--primary);color:#fff;
+  display:flex;justify-content:space-between;align-items:center;
+  font-weight:700;font-size:.88rem;gap:8px;flex-shrink:0;}
+#ss-chat-header .hdr-btns button{background:none;border:none;color:#fff;
+  cursor:pointer;padding:3px 7px;font-size:.88rem;opacity:.8;border-radius:4px;}
+#ss-chat-header .hdr-btns button:hover{opacity:1;background:rgba(255,255,255,.15);}
+#ss-chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;
+  flex-direction:column;gap:10px;font-size:.84rem;}
+.ss-cm{max-width:90%;padding:9px 13px;border-radius:10px;line-height:1.55;word-break:break-word;}
+.ss-cm.u{align-self:flex-end;background:var(--primary);color:#fff;border-radius:10px 10px 2px 10px;}
+.ss-cm.b{align-self:flex-start;background:var(--border-color-soft,#efefef);
+  color:var(--text-color);border-radius:10px 10px 10px 2px;}
+.ss-cm.s{align-self:center;font-size:.74rem;color:var(--muted);font-style:italic;}
+.ss-thinking{align-self:flex-start;color:var(--muted);font-size:.79rem;font-style:italic;padding:4px 2px;}
+#ss-chat-footer{padding:10px;border-top:1px solid var(--border-color);
+  display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+#ss-chat-input{flex:1;border:1px solid var(--border-color);border-radius:8px;
+  padding:8px 10px;font-size:.83rem;background:var(--bg);color:var(--text-color);
+  resize:none;line-height:1.4;font-family:inherit;}
+#ss-chat-input:focus{outline:none;border-color:var(--primary);}
+#ss-chat-send{width:38px;height:38px;border-radius:8px;background:var(--primary);
+  color:#fff;border:none;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:.95rem;flex-shrink:0;}
+#ss-chat-send:disabled{opacity:.5;cursor:not-allowed;}
+</style>
+
+<button id="ss-chat-fab" onclick="ssChatToggle()" title="SmartShield AI">
+  <i class="fa-solid fa-robot"></i>
+</button>
+
+<div id="ss-chat-panel" class="d-none">
+  <div id="ss-chat-header">
+    <span><i class="fa-solid fa-robot me-1"></i> SmartShield AI</span>
+    <div class="hdr-btns">
+      <button onclick="ssChatClear()" title="New conversation"><i class="fa-solid fa-rotate"></i></button>
+      <button onclick="ssChatToggle()" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+  <div id="ss-chat-messages"></div>
+  <div id="ss-chat-footer">
+    <textarea id="ss-chat-input" rows="2"
+      placeholder="Ask about firewall rules, logs, threats, security…"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ssChatSend();}"></textarea>
+    <button id="ss-chat-send" onclick="ssChatSend()">
+      <i class="fa-solid fa-paper-plane"></i>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  let _open = false;
+  let _msgs = [];   // message history in OpenAI format
+
+  function _addMsg(text, cls) {
+    const el = document.createElement('div');
+    el.className = 'ss-cm ' + cls;
+    // Render basic markdown-like newlines
+    el.innerHTML = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                       .replace(/\n/g,'<br>');
+    const box = document.getElementById('ss-chat-messages');
+    box.appendChild(el);
+    el.scrollIntoView({behavior:'smooth', block:'end'});
+    return el;
+  }
+
+  window.ssChatToggle = function() {
+    _open = !_open;
+    document.getElementById('ss-chat-panel').classList.toggle('d-none', !_open);
+    if (_open && _msgs.length === 0) {
+      _addMsg("Hi! I'm SmartShield AI. Ask me about your firewall rules, logs, active threats, connected devices, or any security question.", 'b');
+    }
+    if (_open) document.getElementById('ss-chat-input').focus();
+  };
+
+  window.ssChatClear = function() {
+    _msgs = [];
+    document.getElementById('ss-chat-messages').innerHTML = '';
+    _addMsg("Conversation cleared. How can I help?", 'b');
+  };
+
+  window.ssChatSend = async function() {
+    const inp  = document.getElementById('ss-chat-input');
+    const text = (inp.value || '').trim();
+    if (!text) return;
+    inp.value = '';
+
+    _addMsg(text, 'u');
+    _msgs.push({role:'user', content: text});
+
+    const box = document.getElementById('ss-chat-messages');
+    const thinking = document.createElement('div');
+    thinking.className = 'ss-thinking';
+    thinking.textContent = 'SmartShield AI is thinking…';
+    box.appendChild(thinking);
+    thinking.scrollIntoView({behavior:'smooth', block:'end'});
+
+    const sendBtn = document.getElementById('ss-chat-send');
+    sendBtn.disabled = true;
+
+    try {
+      const res  = await fetch('/chatbot/api/chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({messages: _msgs}),
+      });
+      const data = await res.json();
+      thinking.remove();
+      if (data.ok) {
+        _msgs = data.messages;
+        _addMsg(data.reply, 'b');
+      } else {
+        _addMsg('⚠ ' + (data.message || 'Unknown error'), 's');
+      }
+    } catch(e) {
+      thinking.remove();
+      _addMsg('Network error: ' + e.message, 's');
+    } finally {
+      sendBtn.disabled = false;
+      inp.focus();
+    }
+  };
+})();
+</script>
+{% endif %}
 </body>
 </html>

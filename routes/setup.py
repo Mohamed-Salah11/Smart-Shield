@@ -339,6 +339,14 @@ def api_step2_save():
         (lan_port,),
     )
     conn.commit()
+
+    # Auto-configure a DHCP pool from the saved LAN CIDR so devices get IPs on first boot
+    try:
+        from app.services.dhcp_writer import auto_configure_pool
+        auto_configure_pool(conn, "LAN")
+    except Exception:
+        pass  # Non-fatal — admin can configure DHCP manually via the services page
+
     return jsonify({"ok": True, "message": "Network configuration saved."})
 
 
@@ -457,7 +465,9 @@ def api_step4_apply():
     except Exception as exc:
         results.append({"step": "mrtg", "ok": False, "details": str(exc)})
 
-    overall_ok = all(r.get("ok", False) for r in results)
+    # Only require the three network steps; MRTG is optional and must not block completion
+    _REQUIRED = {"rc_conf", "interfaces", "services"}
+    overall_ok = all(r.get("ok", False) for r in results if r.get("step") in _REQUIRED)
     if overall_ok:
         _mark_setup_complete(conn)
 

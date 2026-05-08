@@ -432,14 +432,21 @@
           </div>
         </div>
 
-        <!-- Dry-run note -->
-        <div class="mb-4 row">
-          <div class="col-sm-9 offset-sm-3">
-            <div class="alert alert-secondary py-2 px-3 mb-0" style="font-size:.8rem;">
-              <i class="fa-solid fa-flask me-1"></i>
-              <strong>Dry-run mode is active by default.</strong>
-              Lookups are logged but no blocking actions are taken until
-              <code>ABUSECH_DRY_RUN=0</code> is set in your environment.
+        <!-- Live API toggle -->
+        <div class="mb-4 row align-items-center">
+          <label class="col-sm-3 col-form-label fw-semibold" for="feedsLiveToggle">
+            Live API Calls
+          </label>
+          <div class="col-sm-9">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="feedsLiveToggle">
+              <label class="form-check-label" for="feedsLiveToggle" id="feedsLiveLabel">
+                Dry-run (logging only)
+              </label>
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+              When enabled, lookups reach abuse.ch live. When disabled, calls are logged but not sent.
+              Automatically enabled when you save an Auth-Key.
             </div>
           </div>
         </div>
@@ -686,6 +693,39 @@ function _setFeedsStatus(hasKey) {
   }
 }
 
+function _setDryRunUI(dryRun) {
+  const toggle = document.getElementById('feedsLiveToggle');
+  const label  = document.getElementById('feedsLiveLabel');
+  if (!toggle) return;
+  toggle.checked = !dryRun;  // checked = live mode (dry_run=0)
+  if (label) label.textContent = dryRun ? 'Dry-run (logging only)' : 'Live (calls go to abuse.ch)';
+}
+
+// Load current dry_run state on page load
+(async function() {
+  try {
+    const r = await apiFetch('{{ url_for("ids.ids_feeds_get") }}').then(r => r.json());
+    if (r.ok && r.dry_run !== undefined) _setDryRunUI(r.dry_run);
+  } catch(_) {}
+})();
+
+const feedsLiveToggle = document.getElementById('feedsLiveToggle');
+if (feedsLiveToggle) {
+  feedsLiveToggle.addEventListener('change', async function() {
+    const dryRun = this.checked ? 0 : 1;
+    const res = await apiFetch('{{ url_for("ids.ids_feeds_save") }}', {
+      method: 'POST',
+      body: JSON.stringify({dry_run: dryRun}),
+    }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
+    if (res.ok) {
+      _setDryRunUI(res.dry_run);
+    } else {
+      this.checked = !this.checked;  // revert on error
+      alert('Error updating setting: ' + (res.message || 'Unknown error'));
+    }
+  });
+}
+
 const btnSaveFeeds = document.getElementById('btnSaveFeeds');
 if (btnSaveFeeds) {
   btnSaveFeeds.addEventListener('click', async function() {
@@ -701,6 +741,7 @@ if (btnSaveFeeds) {
       document.getElementById('feedsAuthKey').value = '';
       document.getElementById('feedsAuthKey').placeholder = 'Key already stored — paste new key to replace';
       _setFeedsStatus(true);
+      if (res.dry_run !== undefined) _setDryRunUI(res.dry_run);
     } else {
       alert('Error saving key: ' + (res.message || 'Unknown error'));
     }
@@ -776,6 +817,7 @@ if (btnClearFeeds) {
       document.getElementById('feedsAuthKey').value = '';
       document.getElementById('feedsAuthKey').placeholder = 'Paste your Auth-Key here';
       _setFeedsStatus(false);
+      _setDryRunUI(true);  // clearing the key resets to dry-run
       this.remove();
     } else {
       alert('Error clearing key: ' + (res.message || 'Unknown error'));

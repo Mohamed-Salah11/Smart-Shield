@@ -172,6 +172,27 @@ def _val_sysrc_value(v: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+def _val_unbound_domain(v: str) -> str:
+    """Validate a DNS domain name for use with unbound-control; returns with trailing dot."""
+    v = str(v).strip().lower()
+    bare = v.rstrip(".")
+    if not bare or not re.match(r"^[a-z0-9]([a-z0-9\-_\.]{0,251}[a-z0-9])?$", bare):
+        raise ValueError(f"Invalid domain: {v!r}")
+    return bare + "."
+
+
+def _val_zone_type(v: str) -> str:
+    """Validate an unbound local-zone type."""
+    _SAFE = {
+        "always_refuse", "always_nxdomain", "always_noerror",
+        "static", "redirect", "transparent", "nodefault",
+    }
+    v = str(v).strip().lower()
+    if v not in _SAFE:
+        raise ValueError(f"Unknown zone type: {v!r}")
+    return v
+
+
 # Action allowlist
 # ---------------------------------------------------------------------------
 # Each entry describes one privileged action.
@@ -278,6 +299,28 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "description": "Reload unbound-control.",
         "cmd": ["/usr/local/sbin/unbound-control", "reload"],
         "params": {},
+    },
+    # Unbound hot-update actions (no service restart — ~50ms per call)
+    "unbound.local_zone": {
+        "description": "Hot-add a local-zone override (block/redirect a domain instantly).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_zone", "{domain}", "{zone_type}"],
+        "params": {"domain": _val_unbound_domain, "zone_type": _val_zone_type},
+    },
+    "unbound.local_zone_remove": {
+        "description": "Remove a local-zone override (unblock a domain instantly).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_zone_remove", "{domain}"],
+        "params": {"domain": _val_unbound_domain},
+    },
+    "unbound.local_data_a": {
+        "description": "Hot-add a local A record (for redirect-to-IP action).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_data",
+                "{domain}", "IN", "A", "{ip}"],
+        "params": {"domain": _val_unbound_domain, "ip": _val_ip},
+    },
+    "unbound.local_data_remove": {
+        "description": "Remove a local data record (clears a redirect A record).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_data_remove", "{domain}"],
+        "params": {"domain": _val_unbound_domain},
     },
     "ipsec.reload": {
         "description": "Hot-reload strongSwan IKE daemon configuration.",

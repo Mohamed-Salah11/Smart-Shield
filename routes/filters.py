@@ -46,6 +46,7 @@ from app.services.app_filter import (
     delete_app_filter_rule,
     get_app_filter_rules,
     toggle_app_filter_rule,
+    update_app_filter_rule,
 )
 from app.services.dns_filter import (
     add_dns_filter_rule,
@@ -53,6 +54,7 @@ from app.services.dns_filter import (
     delete_dns_filter_rule,
     get_dns_filter_rules,
     toggle_dns_filter_rule,
+    update_dns_filter_rule,
 )
 from app.services.web_filter import (
     WEB_CATEGORIES,
@@ -61,6 +63,7 @@ from app.services.web_filter import (
     delete_web_filter_rule,
     get_web_filter_rules,
     toggle_web_filter_rule,
+    update_web_filter_rule,
 )
 
 filters_bp = Blueprint("filters", __name__, url_prefix="/filters")
@@ -163,6 +166,31 @@ def dns_toggle(rule_id):
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
+@filters_bp.route("/dns/<int:rule_id>/edit", methods=["PUT"])
+@login_required
+def dns_edit(rule_id):
+    data = request.get_json(force=True) or {}
+    domain = (data.get("domain") or "").strip()
+    action = (data.get("action") or "block").lower()
+    redirect_ip = (data.get("redirect_ip") or "").strip()
+    category = (data.get("category") or "custom").strip()
+    description = (data.get("description") or "").strip()
+    if not domain:
+        return jsonify({"ok": False, "message": "Domain is required."}), 400
+    try:
+        conn = get_db()
+        update_dns_filter_rule(conn, rule_id, domain, action, redirect_ip, category, description)
+        rule = dict(conn.execute("SELECT * FROM filter_dns_rules WHERE id=?", (rule_id,)).fetchone())
+        log_event(category="system", action="dns_filter_edit",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"id": rule_id, "domain": domain})
+        return jsonify({"ok": True, "message": "Rule updated.", "rule": rule})
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
 @filters_bp.route("/dns/<int:rule_id>/delete", methods=["POST"])
 @login_required
 def dns_delete(rule_id):
@@ -181,7 +209,6 @@ def dns_delete(rule_id):
 def dns_apply():
     conn = get_db()
     result = apply_dns_filter(conn)
-    # Regenerate and reload Unbound so the new zones take effect immediately
     if result.get("ok"):
         try:
             from app.services.dns_writer import apply_unbound
@@ -192,13 +219,13 @@ def dns_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
-        # Activate the PF redirect rule so blocked domains reach the block page
-        try:
-            from app.services.captive_portal import apply_captive_portal
-            cp_result = apply_captive_portal(conn)
-            result["captive_portal"] = cp_result.get("message", "")
-        except Exception as exc:
-            result["captive_portal_warning"] = str(exc)
+    # Always apply captive portal PF anchor — independent of Unbound reload status
+    try:
+        from app.services.captive_portal import apply_captive_portal
+        cp_result = apply_captive_portal(conn)
+        result["captive_portal"] = cp_result.get("message", "")
+    except Exception as exc:
+        result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="dns_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -250,6 +277,30 @@ def web_toggle(rule_id):
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
+@filters_bp.route("/web/<int:rule_id>/edit", methods=["PUT"])
+@login_required
+def web_edit(rule_id):
+    data = request.get_json(force=True) or {}
+    url_pattern = (data.get("url_pattern") or "").strip()
+    action = (data.get("action") or "block").lower()
+    category = (data.get("category") or "custom").strip()
+    description = (data.get("description") or "").strip()
+    if not url_pattern:
+        return jsonify({"ok": False, "message": "URL/domain is required."}), 400
+    try:
+        conn = get_db()
+        update_web_filter_rule(conn, rule_id, url_pattern, action, category, description)
+        rule = dict(conn.execute("SELECT * FROM filter_web_rules WHERE id=?", (rule_id,)).fetchone())
+        log_event(category="system", action="web_filter_edit",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"id": rule_id, "url_pattern": url_pattern})
+        return jsonify({"ok": True, "message": "Rule updated.", "rule": rule})
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
 @filters_bp.route("/web/<int:rule_id>/delete", methods=["POST"])
 @login_required
 def web_delete(rule_id):
@@ -278,13 +329,13 @@ def web_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
-        # Activate the PF redirect rule so blocked domains reach the block page
-        try:
-            from app.services.captive_portal import apply_captive_portal
-            cp_result = apply_captive_portal(conn)
-            result["captive_portal"] = cp_result.get("message", "")
-        except Exception as exc:
-            result["captive_portal_warning"] = str(exc)
+    # Always apply captive portal PF anchor — independent of Unbound reload status
+    try:
+        from app.services.captive_portal import apply_captive_portal
+        cp_result = apply_captive_portal(conn)
+        result["captive_portal"] = cp_result.get("message", "")
+    except Exception as exc:
+        result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="web_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,
@@ -324,7 +375,24 @@ def app_add():
             username=session.get("username"), remote_addr=request.remote_addr,
             details={"app_name": app_name, "id": row_id},
         )
-        return jsonify({"ok": True, "message": f"Application filter added for '{app_name}'.", "id": row_id})
+        block_dns_val = bool(data.get("block_dns", True))
+        block_ports_val = bool(data.get("block_ports", False))
+        ports_val = (data.get("ports") or "").strip()
+        return jsonify({
+            "ok": True,
+            "message": f"Application filter added for '{app_name}'.",
+            "id": row_id,
+            "rule": {
+                "id": row_id,
+                "app_name": app_name,
+                "action": (data.get("action") or "block").lower(),
+                "category": (data.get("category") or "custom").strip(),
+                "block_dns": 1 if block_dns_val else 0,
+                "block_ports": 1 if block_ports_val else 0,
+                "ports": ports_val,
+                "enabled": 1,
+            },
+        })
     except ValueError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
     except Exception as exc:
@@ -367,6 +435,38 @@ def app_toggle(rule_id):
     return jsonify({"ok": True, "message": f"Rule {'enabled' if enabled else 'disabled'}."})
 
 
+@filters_bp.route("/app/<int:rule_id>/edit", methods=["PUT"])
+@login_required
+def app_edit(rule_id):
+    data = request.get_json(force=True) or {}
+    app_name = (data.get("app_name") or "").strip()
+    if not app_name:
+        return jsonify({"ok": False, "message": "Application name is required."}), 400
+    try:
+        conn = get_db()
+        update_app_filter_rule(
+            conn, rule_id,
+            app_name=app_name,
+            action=(data.get("action") or "block").lower(),
+            block_dns=bool(data.get("block_dns", True)),
+            block_ports=bool(data.get("block_ports", False)),
+            ports=(data.get("ports") or "").strip(),
+            protocol=(data.get("protocol") or "tcp+udp"),
+            domains=(data.get("domains") or "").strip(),
+            category=(data.get("category") or "custom").strip(),
+            description=(data.get("description") or "").strip(),
+        )
+        rule = dict(conn.execute("SELECT * FROM filter_app_rules WHERE id=?", (rule_id,)).fetchone())
+        log_event(category="system", action="app_filter_edit",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"id": rule_id, "app_name": app_name})
+        return jsonify({"ok": True, "message": "Rule updated.", "rule": rule})
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
 @filters_bp.route("/app/<int:rule_id>/delete", methods=["POST"])
 @login_required
 def app_delete(rule_id):
@@ -384,31 +484,15 @@ def app_delete(rule_id):
 @login_required
 def app_apply():
     conn = get_db()
+    # apply_app_filter() handles Unbound + PF internally and returns proper ok status
     result = apply_app_filter(conn)
-    # App filter touches both Unbound (DNS zones) and PF rules — reload both
-    if result.get("ok"):
-        try:
-            from app.services.dns_writer import apply_unbound
-            unbound_result = apply_unbound(conn)
-            result["unbound"] = unbound_result.get("message", "")
-        except Exception as exc:
-            result["unbound_warning"] = str(exc)
-        try:
-            from app.services.pf_generator import reload_pf_rules
-            pf_result = reload_pf_rules(conn)
-            result["pf"] = pf_result.get("message", "")
-            if not pf_result.get("ok"):
-                result["ok"] = False
-                result["message"] = result.get("message", "") + " | PF: " + pf_result.get("message", "")
-        except Exception as exc:
-            result["pf_warning"] = str(exc)
-        # Activate the PF redirect rule so blocked domains reach the block page
-        try:
-            from app.services.captive_portal import apply_captive_portal
-            cp_result = apply_captive_portal(conn)
-            result["captive_portal"] = cp_result.get("message", "")
-        except Exception as exc:
-            result["captive_portal_warning"] = str(exc)
+    # Always apply captive portal PF anchor — independent of filter apply status
+    try:
+        from app.services.captive_portal import apply_captive_portal
+        cp_result = apply_captive_portal(conn)
+        result["captive_portal"] = cp_result.get("message", "")
+    except Exception as exc:
+        result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="app_filter_apply",
         username=session.get("username"), remote_addr=request.remote_addr,

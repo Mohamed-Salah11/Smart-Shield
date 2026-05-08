@@ -176,18 +176,10 @@ if [ ! -f "${ENV_FILE}" ]; then
             sed -i '' "s|replace-this-with-a-long-random-secret|${SECRET}|" "${ENV_FILE}"
             sed -i '' "s|replace-with-long-random-secret|${SECRET}|" "${ENV_FILE}"
         fi
-        # Set FreeBSD production paths
-        cat >> "${ENV_FILE}" << 'ENVEOF'
-
-# ── FreeBSD production paths (appended by install.sh) ──
-SMARTSHIELD_DB_PATH=/var/db/smart-shield/data.db
-SMARTSHIELD_CONFIG_PATH=/usr/local/etc/smart-shield/config.json
-SMARTSHIELD_UPLOAD_DIR=/var/db/smart-shield/uploads/profile_pictures
-SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smart-shield/audit.log
-FLASK_DEBUG=0
-ENVEOF
-        printf 'SMARTSHIELD_ENABLE_NETWORK_APPLY=%s\n' "${DEPLOY_LIVE}" >> "${ENV_FILE}"
-        printf 'SMARTSHIELD_NETWORK_DRY_RUN=%s\n'      "${DRY_RUN_VAL}" >> "${ENV_FILE}"
+        # Update deployment-mode flags (.env.example already has all paths; only update dynamic values)
+        sed -i '' "s|^SMARTSHIELD_ENABLE_NETWORK_APPLY=.*|SMARTSHIELD_ENABLE_NETWORK_APPLY=${DEPLOY_LIVE}|" "${ENV_FILE}"
+        sed -i '' "s|^SMARTSHIELD_NETWORK_DRY_RUN=.*|SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}|"          "${ENV_FILE}"
+        info "Deployment flags set: ENABLE_NETWORK_APPLY=${DEPLOY_LIVE}  DRY_RUN=${DRY_RUN_VAL}"
         chmod 0600 "${ENV_FILE}"
         info "Created: ${ENV_FILE} (SECRET_KEY set automatically, mode 0600)"
         info "Admin account will be created on first run via the setup wizard."
@@ -206,6 +198,8 @@ SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
+# SmartShield AI chatbot — get a free key at https://console.groq.com
+GROQ_API_KEY=
 EOF
         chmod 0600 "${ENV_FILE}"
         info "Admin account will be created on first run via the setup wizard."
@@ -224,9 +218,26 @@ if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
     read -r ABUSE_KEY
     if [ -n "${ABUSE_KEY}" ]; then
         sed -i '' "s|^ABUSECH_AUTH_KEY=.*|ABUSECH_AUTH_KEY=${ABUSE_KEY}|" "${ENV_FILE}"
-        info "Abuse.ch Auth Key saved to ${ENV_FILE}"
+        sed -i '' "s|^ABUSECH_DRY_RUN=.*|ABUSECH_DRY_RUN=0|"              "${ENV_FILE}"
+        info "Abuse.ch Auth Key saved and live API calls enabled (dry-run disabled)."
     else
         warn "ABUSECH_AUTH_KEY not set — threat intel features disabled until you add it to ${ENV_FILE}"
+    fi
+fi
+
+# Prompt for GROQ_API_KEY (SmartShield AI chatbot)
+if ! grep -q "^GROQ_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
+    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Groq) ━━━${NC}\n"
+    printf "SmartShield includes an AI security assistant powered by Groq LLM.\n"
+    printf "It can analyse logs, explain rules, and answer firewall questions.\n"
+    printf "Get a FREE API key at: https://console.groq.com\n"
+    printf "${YELLOW}[?]${NC} Enter your GROQ_API_KEY (press Enter to skip): "
+    read -r GROQ_KEY
+    if [ -n "${GROQ_KEY}" ]; then
+        sed -i '' "s|^GROQ_API_KEY=.*|GROQ_API_KEY=${GROQ_KEY}|" "${ENV_FILE}"
+        info "Groq API key saved — SmartShield AI chatbot is enabled."
+    else
+        warn "GROQ_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
     fi
 fi
 
@@ -383,6 +394,45 @@ info "isc_dhcpd_enable=YES written to rc.conf"
 # SNMP daemon (bsnmpd) — used by MRTG for bandwidth graphs
 sysrc bsnmpd_enable=YES
 info "bsnmpd_enable=YES written to rc.conf"
+
+section "6b. Live Network Activation"
+
+# Allow caller to override via env vars; defaults target a typical lab setup
+LAN_IFACE="${LAN_IFACE:-em1}"
+LAN_IP="${LAN_IP:-192.168.1.1}"
+LAN_MASK="${LAN_MASK:-255.255.255.0}"
+
+# ── LAN interface ─────────────────────────────────────────────────────────────
+sysrc "ifconfig_${LAN_IFACE}=inet ${LAN_IP} netmask ${LAN_MASK}"
+info "ifconfig_${LAN_IFACE} written to rc.conf (${LAN_IP}/${LAN_MASK})"
+
+if ifconfig "${LAN_IFACE}" 2>/dev/null | grep -q "flags="; then
+    ifconfig "${LAN_IFACE}" inet "${LAN_IP}" netmask "${LAN_MASK}" up 2>/dev/null \
+        && info "Assigned ${LAN_IP}/${LAN_MASK} to ${LAN_IFACE}" \
+        || warn "ifconfig assign failed — interface may not be present; rc.conf updated"
+    service netif restart "${LAN_IFACE}" 2>/dev/null \
+        && info "netif restarted for ${LAN_IFACE}" || true
+else
+    warn "${LAN_IFACE} not present — IP assignment skipped (rc.conf updated for next boot)"
+fi
+
+# ── PF ────────────────────────────────────────────────────────────────────────
+if pfctl -s info 2>/dev/null | grep -q "^Status: Enabled"; then
+    pfctl -f /etc/pf.conf 2>/dev/null \
+        && info "PF rules reloaded from /etc/pf.conf" \
+        || warn "PF reload failed — check /etc/pf.conf syntax"
+else
+    pfctl -f /etc/pf.conf 2>/dev/null && pfctl -e 2>/dev/null \
+        && info "PF loaded and enabled" \
+        || warn "PF enable failed — check /etc/pf.conf"
+fi
+
+# ── pflog ─────────────────────────────────────────────────────────────────────
+if service pflog status 2>/dev/null | grep -q running; then
+    info "pflog already running"
+else
+    service pflog start 2>/dev/null && info "pflog started" || warn "pflog start failed"
+fi
 
 section "7. Preflight Verification"
 

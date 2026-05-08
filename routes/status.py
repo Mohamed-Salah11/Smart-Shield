@@ -727,3 +727,16 @@ def mrtg_image(filename):
         abort(400)
     mrtg_dir = "/var/db/smart-shield/mrtg"
     return send_from_directory(mrtg_dir, filename)
+
+
+@status_bp.route("/api/mrtg/reinitialize", methods=["POST"])
+@login_required
+def mrtg_reinitialize():
+    """Re-run apply_mrtg() to regenerate MRTG config and prime graph files."""
+    conn = get_db()
+    try:
+        from app.services.mrtg_writer import apply_mrtg
+        result = apply_mrtg(conn)
+        return jsonify({"ok": result.get("ok", False), "message": result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)})

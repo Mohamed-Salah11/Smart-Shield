@@ -18,7 +18,7 @@ import sys
 
 _MRTG_CONF_PATH  = "/usr/local/etc/mrtg/mrtg.cfg"
 _MRTG_WORK_DIR   = "/var/db/smart-shield/mrtg"
-_PROBE_SCRIPT    = "/usr/local/share/smart-shield/bsd/mrtg-probe.sh"
+_PROBE_SCRIPT    = "/usr/local/sbin/mrtg-probe.sh"
 _MRTG_LOCK_FILE  = "/var/run/smart-shield/mrtg.lock"
 
 
@@ -143,15 +143,15 @@ def apply_mrtg(conn) -> dict:
     except Exception as exc:
         return {"ok": False, "message": f"Cannot write {_MRTG_CONF_PATH}: {exc}"}
 
-    # Prime the RRD / log files with an initial run so graphs appear quickly
+    # Run MRTG twice:
+    #   Pass 1: creates .log RRD files (exits non-zero because files are new — that is normal)
+    #   Pass 2: reads the .log files and generates initial PNG graph images
     try:
         import subprocess
-        result = subprocess.run(
-            ["/usr/local/bin/mrtg", _MRTG_CONF_PATH,
-             "--lock-file", _MRTG_LOCK_FILE, "--log-level", "0"],
-            capture_output=True, text=True, timeout=30
-        )
-        # MRTG exits non-zero on first run (no log files yet) — that is normal
+        _cmd = ["/usr/local/bin/mrtg", _MRTG_CONF_PATH,
+                "--lock-file", _MRTG_LOCK_FILE, "--log-level", "0"]
+        for _ in range(2):
+            subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
     except FileNotFoundError:
         return {"ok": False, "message": "mrtg binary not found — is net-mgmt/mrtg installed?"}
     except Exception as exc:
