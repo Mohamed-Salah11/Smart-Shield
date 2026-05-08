@@ -20,6 +20,8 @@ apply_dns_filter(conn)                       -> dict        # {"ok", "message"}
 import re
 import sys
 
+from app.services.content_policy import get_block_page_ip
+
 
 def _rows(conn, sql, params=()):
     cur = conn.cursor()
@@ -39,15 +41,6 @@ def _sanitize_domain(raw: str) -> str:
 # Unbound config line generator (consumed by dns_writer.py)
 # ---------------------------------------------------------------------------
 
-def _block_page_ip(conn) -> str:
-    """Return the Smart Shield LAN IP (without prefix) to use as the DNS redirect target."""
-    try:
-        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
-        addr = (row["ipv4_address"] if row else "") or ""
-        return addr.split("/")[0].strip()
-    except Exception:
-        return ""
-
 
 def generate_dns_filter_zones(conn) -> list:
     """
@@ -58,7 +51,7 @@ def generate_dns_filter_zones(conn) -> list:
     /portal/block page instead of getting a raw NXDOMAIN.  Falls back to
     always_nxdomain when no LAN IP is configured.
     """
-    block_ip = _block_page_ip(conn)
+    block_ip = get_block_page_ip(conn)
 
     rules = _rows(conn, """
         SELECT domain, action, redirect_ip

@@ -3,14 +3,22 @@
 {% block main %}
 <div class="container">
 
+  <div id="ovpn-toast" class="alert d-none" role="alert"
+       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:320px;"></div>
+
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">OpenVPN Servers</h1>
       <p class="ss-page-desc">Configure OpenVPN server instances</p>
     </div>
-    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#openvpnAddServerModal">
-      <i class="fa-solid fa-plus me-1"></i>Add Server
-    </button>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-success" onclick="applyOpenvpn()">
+        <i class="fa-solid fa-play me-1"></i>Apply &amp; Restart
+      </button>
+      <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#openvpnAddServerModal">
+        <i class="fa-solid fa-plus me-1"></i>Add Server
+      </button>
+    </div>
   </div>
 
   <ul class="nav nav-tabs mb-4">
@@ -993,6 +1001,11 @@
 				<td class="${statusClass}">${server.server_mode} / ${server.device_mode}</td>
 				<td class="${statusClass}">${server.description || '-'}</td>
 				<td>
+					<a href="/vpn/api/openvpn/generate-config/${server.id}"
+					   download="openvpn-server-${server.id}.conf"
+					   class="btn btn-sm btn-outline-secondary" title="Download .conf">
+						<i class="fas fa-download"></i>
+					</a>
 					<button class="btn btn-sm btn-primary" onclick="editServer(${server.id})" title="Edit">
 						<i class="fas fa-edit"></i>
 					</button>
@@ -1058,6 +1071,27 @@
 				console.error('Error:', error);
 				alert('Error deleting server');
 			});
+	}
+
+	function showToast(msg, ok) {
+		const t = document.getElementById('ovpn-toast');
+		t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+		t.textContent = msg;
+		t.classList.remove('d-none');
+		clearTimeout(t._timer);
+		t._timer = setTimeout(() => t.classList.add('d-none'), 5000);
+	}
+
+	async function applyOpenvpn() {
+		try {
+			const r = await fetch('/vpn/api/openvpn/apply', { method: 'POST' });
+			const d = await r.json();
+			const ok = d.ok ?? (d.status === 'success');
+			showToast(ok ? 'OpenVPN restarted successfully.' : 'Error: ' + (d.message || d.error || 'Unknown error'), ok);
+			loadOpenVPNServers();
+		} catch(e) {
+			showToast('Network error: ' + e.message, false);
+		}
 	}
 </script>
 </div>

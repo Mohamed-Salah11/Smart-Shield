@@ -649,57 +649,6 @@ small {
 }
 .dropdown-divider { border-color: var(--border-color); margin: 4px 0; }
 
-/* ========================================
-   DARK MODE TOGGLE SWITCH
-======================================== */
-.dark-mode-toggle { position: relative; }
-.dark-mode-input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-}
-.dark-mode-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 52px;
-  height: 28px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 50px;
-  padding: 4px 7px;
-  cursor: pointer;
-  position: relative;
-  transition: background .3s ease;
-}
-.dark-mode-label i {
-  font-size: 12px;
-  z-index: 1;
-  transition: opacity .3s ease;
-}
-.dark-mode-label .fa-sun  { color: #ffd43b; }
-.dark-mode-label .fa-moon { color: #f8f9fa; opacity: .5; }
-.dark-mode-ball {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background: #fff;
-  border-radius: 50%;
-  top: 3px;
-  left: 3px;
-  transition: transform .3s ease, box-shadow .3s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,.2);
-}
-.dark-mode-input:checked + .dark-mode-label {
-  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-}
-.dark-mode-input:checked + .dark-mode-label .fa-sun  { opacity: .4; }
-.dark-mode-input:checked + .dark-mode-label .fa-moon { opacity: 1; color: #ffd43b; }
-.dark-mode-input:checked + .dark-mode-label .dark-mode-ball {
-  transform: translateX(24px);
-  background: #1e293b;
-  box-shadow: 0 0 8px rgba(255,212,59,.35);
-}
 
 /* ========================================
    APP SHELL + SIDEBAR

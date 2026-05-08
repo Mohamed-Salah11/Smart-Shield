@@ -656,3 +656,74 @@ def api_health_system():
     """Return memory and CPU load averages."""
     from app.services.health_monitor import check_memory_cpu
     return jsonify({"ok": True, **check_memory_cpu()})
+
+
+# ══════════════════════════════════════════════════
+# MRTG TRAFFIC HISTORY GRAPHS
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/mrtg")
+@login_required
+def mrtg_graphs():
+    """MRTG historical bandwidth graphs page."""
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    wan_row = conn.execute("SELECT assigned_port, description FROM wan_config LIMIT 1").fetchone()
+    lan_row = conn.execute("SELECT assigned_port, description FROM lan_config LIMIT 1").fetchone()
+
+    interfaces = []
+    seen = set()
+    for row, label in [(wan_row, "WAN"), (lan_row, "LAN")]:
+        if not row:
+            continue
+        name = (row["assigned_port"] or "").strip()
+        if name and name not in seen:
+            seen.add(name)
+            interfaces.append({
+                "name": name,
+                "label": label,
+                "description": (row["description"] or "").strip(),
+            })
+
+    iface_names = [i["name"] for i in interfaces]
+    return render_template(
+        "mrtg_graphs.html",
+        interfaces=interfaces,
+        iface_names=iface_names,
+        on_freebsd=sys.platform.startswith("freebsd"),
+    )
+
+
+@status_bp.route("/mrtg/apply", methods=["POST"])
+@login_required
+def mrtg_apply():
+    """Regenerate mrtg.cfg and do a first run to initialise log files."""
+    from app.database import get_db
+    from app.services.mrtg_writer import apply_mrtg
+    from app.audit_log import log_event
+    conn   = get_db()
+    result = apply_mrtg(conn)
+    log_event(
+        category="system", action="mrtg_apply",
+        username=request.values.get("username"),
+        remote_addr=request.remote_addr,
+        details={"ok": result["ok"], "message": result.get("message", "")},
+    )
+    from flask import flash, redirect, url_for
+    if result.get("ok"):
+        flash("MRTG configuration regenerated successfully.", "success")
+    else:
+        flash(f"MRTG error: {result.get('message', 'Unknown error')}", "danger")
+    return redirect(url_for("status.mrtg_graphs"))
+
+
+@status_bp.route("/mrtg/image/<path:filename>")
+@login_required
+def mrtg_image(filename):
+    """Serve MRTG-generated PNG graph files from the MRTG work directory."""
+    from flask import send_from_directory, abort
+    if ".." in filename or filename.startswith("/"):
+        abort(400)
+    mrtg_dir = "/var/db/smart-shield/mrtg"
+    return send_from_directory(mrtg_dir, filename)

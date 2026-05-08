@@ -315,15 +315,15 @@ def reload_all_services(conn) -> dict:
     except Exception as exc:
         results.append({"service": "l2tp", "ok": False, "message": str(exc)})
 
-    # NTP
+    # NTP — only apply when explicitly enabled
     try:
-        from app.services.ntp_writer import apply_ntp
-        ntp_result = apply_ntp(conn)
-        results.append({
-           "service": "ntpd",
-             "ok": ntp_result["ok"],
-             "message": ntp_result["message"],
-        })
+        import json as _j
+        _row = conn.execute("SELECT value_json FROM service_state WHERE key_name='ntp_settings'").fetchone()
+        _ntp = _j.loads(_row["value_json"]) if _row else {}
+        if _ntp.get("enabled", True):
+            from app.services.ntp_writer import apply_ntp
+            ntp_result = apply_ntp(conn)
+            results.append({"service": "ntpd", "ok": ntp_result["ok"], "message": ntp_result["message"]})
     except Exception as exc:
         results.append({"service": "ntpd", "ok": False, "message": str(exc)})
 
@@ -340,35 +340,51 @@ def reload_all_services(conn) -> dict:
     except Exception as exc:
         results.append({"service": "suricata", "ok": False, "message": str(exc)})
 
-    # DDNS (ddclient)
+    # DDNS (ddclient) — only apply when at least one active client is configured
     try:
-        from app.services.ddns_writer import apply_ddns
-        ddns_result = apply_ddns(conn)
-        results.append({"service": "ddns", "ok": ddns_result["ok"], "message": ddns_result["message"]})
+        import json as _j
+        _row = conn.execute("SELECT value_json FROM service_state WHERE key_name='dynamic_dns_clients'").fetchone()
+        _clients = _j.loads(_row["value_json"]) if _row else []
+        if any(not c.get("disabled") for c in _clients):
+            from app.services.ddns_writer import apply_ddns
+            ddns_result = apply_ddns(conn)
+            results.append({"service": "ddns", "ok": ddns_result["ok"], "message": ddns_result["message"]})
     except Exception as exc:
         results.append({"service": "ddns", "ok": False, "message": str(exc)})
 
-    # SNMP (bsnmpd)
+    # SNMP (bsnmpd) — only apply when explicitly enabled
     try:
-        from app.services.snmp_writer import apply_snmp
-        snmp_result = apply_snmp(conn)
-        results.append({"service": "bsnmpd", "ok": snmp_result["ok"], "message": snmp_result["message"]})
+        import json as _j
+        _row = conn.execute("SELECT value_json FROM service_state WHERE key_name='snmp_settings'").fetchone()
+        _snmp = _j.loads(_row["value_json"]) if _row else {}
+        if _snmp.get("enabled"):
+            from app.services.snmp_writer import apply_snmp
+            snmp_result = apply_snmp(conn)
+            results.append({"service": "bsnmpd", "ok": snmp_result["ok"], "message": snmp_result["message"]})
     except Exception as exc:
         results.append({"service": "bsnmpd", "ok": False, "message": str(exc)})
 
-    # UPnP (miniupnpd)
+    # UPnP (miniupnpd) — only apply when explicitly enabled
     try:
-        from app.services.upnp_writer import apply_upnp
-        upnp_result = apply_upnp(conn)
-        results.append({"service": "miniupnpd", "ok": upnp_result["ok"], "message": upnp_result["message"]})
+        import json as _j
+        _row = conn.execute("SELECT value_json FROM service_state WHERE key_name='upnp_settings'").fetchone()
+        _upnp = _j.loads(_row["value_json"]) if _row else {}
+        if _upnp.get("enabled"):
+            from app.services.upnp_writer import apply_upnp
+            upnp_result = apply_upnp(conn)
+            results.append({"service": "miniupnpd", "ok": upnp_result["ok"], "message": upnp_result["message"]})
     except Exception as exc:
         results.append({"service": "miniupnpd", "ok": False, "message": str(exc)})
 
-    # IGMP proxy
+    # IGMP proxy — only apply when explicitly enabled
     try:
-        from app.services.igmp_writer import apply_igmp
-        igmp_result = apply_igmp(conn)
-        results.append({"service": "igmpproxy", "ok": igmp_result["ok"], "message": igmp_result["message"]})
+        import json as _j
+        _row = conn.execute("SELECT value_json FROM service_state WHERE key_name='igmp_settings'").fetchone()
+        _igmp = _j.loads(_row["value_json"]) if _row else {}
+        if _igmp.get("enabled"):
+            from app.services.igmp_writer import apply_igmp
+            igmp_result = apply_igmp(conn)
+            results.append({"service": "igmpproxy", "ok": igmp_result["ok"], "message": igmp_result["message"]})
     except Exception as exc:
         results.append({"service": "igmpproxy", "ok": False, "message": str(exc)})
 

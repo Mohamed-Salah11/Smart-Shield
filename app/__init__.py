@@ -232,6 +232,13 @@ def create_app():
 
     init_db()
 
+    # Start SIEM background collectors (FreeBSD only; silent no-op on dev)
+    try:
+        from app.services.siem_collector import start_siem_collectors
+        start_siem_collectors()
+    except Exception:
+        pass
+
     from routes.setup import setup_bp
     from routes.auth import auth_bp
     from routes.users import users_bp

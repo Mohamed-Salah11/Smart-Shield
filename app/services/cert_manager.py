@@ -518,6 +518,38 @@ def generate_crl(conn, ca_id: int) -> dict:
         return {"ok": False, "pem": "", "message": f"CRL generation failed: {exc}"}
 
 
+def delete_cert(conn, cert_id: int) -> dict:
+    """Delete a server or client certificate. Refuses to delete CA entries."""
+    try:
+        row = conn.execute(
+            "SELECT id, cert_type FROM certificates WHERE id=?", (cert_id,)
+        ).fetchone()
+        if not row:
+            return {"ok": False, "message": "Certificate not found."}
+        if row["cert_type"] == "ca":
+            return {"ok": False, "message": "Use delete_ca() to remove a CA."}
+        conn.execute("DELETE FROM certificates WHERE id=?", (cert_id,))
+        conn.commit()
+        return {"ok": True, "message": "Certificate deleted."}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+def delete_ca(conn, ca_id: int) -> dict:
+    """Delete a CA only if no active (non-revoked) certs depend on it."""
+    try:
+        dependents = conn.execute(
+            "SELECT COUNT(*) FROM certificates WHERE ca_id=? AND revoked=0", (ca_id,)
+        ).fetchone()[0]
+        if dependents:
+            return {"ok": False, "message": f"Cannot delete: {dependents} active certificate(s) depend on this CA."}
+        conn.execute("DELETE FROM certificates WHERE id=?", (ca_id,))
+        conn.commit()
+        return {"ok": True, "message": "CA deleted."}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
 # ---------------------------------------------------------------------------
 # OCSP stapling
 # ---------------------------------------------------------------------------

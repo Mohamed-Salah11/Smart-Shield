@@ -279,6 +279,16 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "cmd": ["/usr/local/sbin/unbound-control", "reload"],
         "params": {},
     },
+    "ipsec.reload": {
+        "description": "Hot-reload strongSwan IKE daemon configuration.",
+        "cmd": ["/usr/local/sbin/ipsec", "reload"],
+        "params": {},
+    },
+    "ipsec.statusall": {
+        "description": "Show all active IPsec tunnels and SAs.",
+        "cmd": ["/usr/local/sbin/ipsec", "statusall"],
+        "params": {},
+    },
     "pfctl.check": {
         "description": "Validate a PF config file without applying it.",
         "cmd": ["/sbin/pfctl", "-n", "-f", "{config_path}"],

@@ -175,46 +175,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
-        const pageTab = '{{ tab|lower }}';
-        let type = 'Host(s)';
-        if (pageTab === 'ports') type = 'Port(s)';
-        else if (pageTab === 'urls') type = 'URL (IPs)';
-
-        const aliasData = {
-          name: name,
-          type: type,
-          values: valuesArray,
-          description: description
-        };
-
-        try {
-          const response = await fetch('/firewall/api/aliases', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(aliasData)
-          });
-
-          const result = await response.json();
-          if (result.success) {
-            alert('Alias imported successfully!');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
-            modal.hide();
-            // Clear form
-            document.getElementById('impName').value = '';
-            document.getElementById('impDesc').value = '';
-            document.getElementById('impAliases').value = '';
-            // Reload aliases
-            loadAliases();
-          } else {
-            alert('Error importing alias: ' + result.error);
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Could not connect to the backend server.');
-        }
-      });
-    }
-  });
 </script>
 <!-- Add/Edit Alias Modal -->
 <div class="modal fade" id="aliasModal" tabindex="-1" aria-labelledby="aliasModalLabel" aria-hidden="true">

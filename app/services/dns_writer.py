@@ -120,6 +120,10 @@ def generate_unbound_conf(conn) -> str:
     if lan_subnet:
         lines.append(f"    access-control: {lan_subnet} allow")
 
+    # SIEM DNS query logging (off by default — admin must enable)
+    siem_dns = _load_service_state(conn, "siem_settings")
+    dns_query_logging = bool(siem_dns.get("dns_query_logging", False))
+
     lines += [
         "",
         "    hide-identity: yes",
@@ -142,6 +146,14 @@ def generate_unbound_conf(conn) -> str:
         "    private-address: 10.0.0.0/8",
         "",
     ]
+
+    if dns_query_logging:
+        lines += [
+            "    # SIEM DNS query logging",
+            "    log-queries: yes",
+            '    logfile: "/var/log/unbound/query.log"',
+            "",
+        ]
 
     # Static host overrides
     host_overrides = resolver.get("host_overrides") or []

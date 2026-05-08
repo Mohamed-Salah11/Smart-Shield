@@ -29,7 +29,10 @@ apply_captive_portal(conn)                                       -> dict
 
 import os
 import secrets
+import ssl
+import socket
 import sys
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -39,6 +42,12 @@ _CP_ANCHOR_PATH   = "/etc/pf.captive_portal.conf"
 _CP_ANCHOR_NAME   = "captive_portal"
 _CP_REDIRECT_IP   = "127.0.0.1"
 _CP_REDIRECT_PORT = 5000  # matches gunicorn bind port in rc.d/smart_shield
+_CP_HTTPS_PORT    = 5443  # HTTPS redirect listener for port-443 interception
+_CP_CERT_PATH     = "/etc/smart_shield_block.crt"
+_CP_KEY_PATH      = "/etc/smart_shield_block.key"
+
+# Guard so the HTTPS redirect thread is only started once per process
+_https_thread_started = threading.Event()
 def _default_portal_ip(conn) -> str:
     try:
         import ipaddress
@@ -234,6 +243,122 @@ def redeem_voucher(conn, code: str, mac: str, ip: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Self-signed cert + HTTPS redirect server
+# ---------------------------------------------------------------------------
+
+def generate_self_signed_cert(cert_path: str, key_path: str, ip: str) -> None:
+    """Generate a self-signed TLS certificate for the block-page HTTPS listener."""
+    import datetime as _dt
+    import ipaddress as _ipmod
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Smart Shield Block Page")])
+    san: list = [x509.DNSName("smartshield.local")]
+    try:
+        san.append(x509.IPAddress(_ipmod.IPv4Address(ip)))
+    except Exception:
+        pass
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(_dt.datetime.utcnow())
+        .not_valid_after(_dt.datetime.utcnow() + _dt.timedelta(days=3650))
+        .add_extension(x509.SubjectAlternativeName(san), critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    with open(cert_path, "wb") as fh:
+        fh.write(cert.public_bytes(serialization.Encoding.PEM))
+    with open(key_path, "wb") as fh:
+        fh.write(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption(),
+        ))
+
+
+def _handle_https_redirect(raw_conn: socket.socket, ctx: ssl.SSLContext,
+                           portal_ip: str, portal_port: int) -> None:
+    try:
+        with ctx.wrap_socket(raw_conn, server_side=True) as tls:
+            data = b""
+            try:
+                data = tls.recv(4096)
+            except Exception:
+                pass
+            host = ""
+            for line in data.decode("utf-8", "replace").splitlines():
+                if line.lower().startswith("host:"):
+                    host = line.split(":", 1)[1].strip().split(":")[0]
+                    break
+            location = f"http://{portal_ip}:{portal_port}/portal/block"
+            if host:
+                location += f"?domain={host}"
+            response = (
+                f"HTTP/1.1 302 Found\r\n"
+                f"Location: {location}\r\n"
+                f"Content-Length: 0\r\n"
+                f"Connection: close\r\n\r\n"
+            )
+            try:
+                tls.sendall(response.encode())
+            except Exception:
+                pass
+    except Exception:
+        pass
+    finally:
+        try:
+            raw_conn.close()
+        except Exception:
+            pass
+
+
+def _https_redirect_worker(portal_ip: str, portal_port: int,
+                           cert_path: str, key_path: str) -> None:
+    try:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(cert_path, key_path)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+            srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            srv.bind(("0.0.0.0", _CP_HTTPS_PORT))
+            srv.listen(32)
+            while True:
+                try:
+                    conn, _ = srv.accept()
+                    threading.Thread(
+                        target=_handle_https_redirect,
+                        args=(conn, ctx, portal_ip, portal_port),
+                        daemon=True,
+                    ).start()
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+
+def start_https_redirect_server(portal_ip: str, portal_port: int,
+                                cert_path: str, key_path: str) -> None:
+    """Start the HTTPS→HTTP redirect listener if not already running."""
+    if _https_thread_started.is_set():
+        return
+    _https_thread_started.set()
+    t = threading.Thread(
+        target=_https_redirect_worker,
+        args=(portal_ip, portal_port, cert_path, key_path),
+        daemon=True,
+        name="https-block-redirect",
+    )
+    t.start()
+
+
+# ---------------------------------------------------------------------------
 # PF anchor generation
 # ---------------------------------------------------------------------------
 
@@ -274,10 +399,12 @@ def generate_pf_anchor(conn) -> str:
     "",
     "# Translation rules first",
     f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port {http_port} -> {portal_ip} port {portal_port}",
+    f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port 443 -> {portal_ip} port {_CP_HTTPS_PORT}",
     "",
     "# Filter rules",
     f"pass in quick on {lan_iface} from <authenticated_clients> to any keep state",
     f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {portal_port} keep state",
+    f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {_CP_HTTPS_PORT} keep state",
    ]
 
     if dns_allow:
@@ -302,6 +429,23 @@ def apply_captive_portal(conn) -> dict:
         "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
     ).fetchone()
     settings = json.loads(rows["value_json"]) if rows else {}
+
+    portal_ip   = (settings.get("portal_ip") or _default_portal_ip(conn)).strip()
+    portal_port = settings.get("portal_port") or _CP_REDIRECT_PORT
+
+    # Generate self-signed cert for HTTPS redirect listener if it doesn't exist
+    try:
+        if not (os.path.exists(_CP_CERT_PATH) and os.path.exists(_CP_KEY_PATH)):
+            generate_self_signed_cert(_CP_CERT_PATH, _CP_KEY_PATH, portal_ip)
+    except Exception:
+        pass
+
+    # Start HTTPS redirect server (no-op if already running)
+    try:
+        if os.path.exists(_CP_CERT_PATH) and os.path.exists(_CP_KEY_PATH):
+            start_https_redirect_server(portal_ip, portal_port, _CP_CERT_PATH, _CP_KEY_PATH)
+    except Exception:
+        pass
 
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — captive portal anchor generated but not applied.",

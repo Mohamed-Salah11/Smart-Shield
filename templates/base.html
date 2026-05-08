@@ -58,18 +58,6 @@
 
         <!-- Right controls -->
         <ul class="navbar-nav ms-auto">
-            <!-- Dark Mode Toggle -->
-            <li class="nav-item d-flex align-items-center me-3">
-                <div class="dark-mode-toggle">
-                    <input type="checkbox" id="darkModeSwitch" class="dark-mode-input">
-                    <label for="darkModeSwitch" class="dark-mode-label">
-                        <i class="fa-solid fa-sun"></i>
-                        <i class="fa-solid fa-moon"></i>
-                        <span class="dark-mode-ball"></span>
-                    </label>
-                </div>
-            </li>
-
             <!-- User dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#"
@@ -417,6 +405,10 @@
                         <i class="fa-solid fa-wave-square fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
                         Bandwidth Monitor
                     </a></li>
+                    <li><a href="{{ url_for('status.mrtg_graphs') }}">
+                        <i class="fa-solid fa-chart-area fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        Traffic History
+                    </a></li>
                     <li><a href="{{ url_for('status.dhcp_leases') }}">
                         <i class="fa-solid fa-list fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
                         Active Leases
@@ -588,18 +580,9 @@
     })();
 })();
 
-// ── Dark Mode ──
+// ── Theme loader ──
 (function() {
-    const darkModeSwitch = document.getElementById('darkModeSwitch');
     const html = document.documentElement;
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-        html.setAttribute('data-theme', 'dark');
-        if (darkModeSwitch) darkModeSwitch.checked = true;
-    }
-
     try {
         const userTheme = localStorage.getItem('userTheme');
         if (userTheme) {
@@ -610,26 +593,6 @@
             });
         }
     } catch(e) {}
-
-    if (darkModeSwitch) {
-        darkModeSwitch.addEventListener('change', function() {
-            if (this.checked) {
-                html.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                html.removeAttribute('data-theme');
-                localStorage.setItem('theme', 'light');
-            }
-            try {
-                const ut = localStorage.getItem('userTheme');
-                if (ut) {
-                    const t = JSON.parse(ut);
-                    t['data-theme'] = this.checked ? 'dark' : 'light';
-                    localStorage.setItem('userTheme', JSON.stringify(t));
-                }
-            } catch(e) {}
-        });
-    }
 })();
 
 // ── Display Advanced toggle (global) ──

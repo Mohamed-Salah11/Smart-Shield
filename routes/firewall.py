@@ -40,7 +40,7 @@ def get_floating_rules():
         db = get_db()
         cursor = db.cursor()
         cursor.execute("""
-            SELECT id, disabled, interface, protocol, source, source_port, 
+            SELECT id, action, disabled, interface, protocol, source, source_port,
                    destination, dest_port, gateway, queue, schedule, description
             FROM firewall_rules_floating
             ORDER BY rule_order
@@ -72,11 +72,12 @@ def add_floating_rule():
             new_order = cursor.fetchone()[0]
         
         cursor.execute("""
-            INSERT INTO firewall_rules_floating 
-            (disabled, interface, protocol, source, source_port, destination, 
+            INSERT INTO firewall_rules_floating
+            (action, disabled, interface, protocol, source, source_port, destination,
              dest_port, gateway, queue, schedule, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
+            data.get('action', 'pass'),
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
             data.get('protocol', 'any'),
@@ -150,7 +151,7 @@ def get_floating_rule(rule_id):
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "SELECT id, disabled, interface, protocol, source, source_port, "
+            "SELECT id, action, disabled, interface, protocol, source, source_port, "
             "destination, dest_port, gateway, queue, schedule, description "
             "FROM firewall_rules_floating WHERE id=?", (rule_id,)
         )
@@ -172,11 +173,12 @@ def update_floating_rule(rule_id):
         cursor = db.cursor()
         
         cursor.execute("""
-            UPDATE firewall_rules_floating 
-            SET disabled=?, interface=?, protocol=?, source=?, source_port=?, 
+            UPDATE firewall_rules_floating
+            SET action=?, disabled=?, interface=?, protocol=?, source=?, source_port=?,
                 destination=?, dest_port=?, gateway=?, queue=?, schedule=?, description=?
             WHERE id=?
         """, (
+            data.get('action', 'pass'),
             data.get('disabled', 0),
             data.get('interface'),
             data.get('protocol'),
@@ -250,15 +252,17 @@ def add_wan_rule():
             new_order = cursor.fetchone()[0]
         
         cursor.execute("""
-            INSERT INTO firewall_rules_wan 
-            (action, disabled, protocol, source, destination, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO firewall_rules_wan
+            (action, disabled, protocol, source, source_port, destination, dest_port, description, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('action', 'pass'),
             data.get('disabled', 0),
             data.get('protocol', 'any'),
             data.get('source', 'any'),
+            data.get('source_port', ''),
             data.get('destination', 'any'),
+            data.get('dest_port', ''),
             data.get('description', ''),
             new_order
         ))
@@ -337,15 +341,18 @@ def update_wan_rule(rule_id):
         cursor = db.cursor()
         
         cursor.execute("""
-            UPDATE firewall_rules_wan 
-            SET action=?, disabled=?, protocol=?, source=?, destination=?, description=?
+            UPDATE firewall_rules_wan
+            SET action=?, disabled=?, protocol=?, source=?, source_port=?,
+                destination=?, dest_port=?, description=?
             WHERE id=?
         """, (
             data.get('action'),
             data.get('disabled'),
             data.get('protocol'),
             data.get('source'),
+            data.get('source_port'),
             data.get('destination'),
+            data.get('dest_port'),
             data.get('description'),
             rule_id
         ))
@@ -379,7 +386,8 @@ def get_lan_rules():
         db = get_db()
         cursor = db.cursor()
         cursor.execute("""
-            SELECT id, disabled, interface, protocol, source, destination, description
+            SELECT id, action, disabled, interface, protocol, source, source_port,
+                   destination, dest_port, description
             FROM firewall_rules_lan
             ORDER BY rule_order
         """)
@@ -408,15 +416,19 @@ def add_lan_rule():
             new_order = cursor.fetchone()[0]
         
         cursor.execute("""
-            INSERT INTO firewall_rules_lan 
-            (disabled, interface, protocol, source, destination, description, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO firewall_rules_lan
+            (action, disabled, interface, protocol, source, source_port,
+             destination, dest_port, description, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
+            data.get('action', 'pass'),
             data.get('disabled', 0),
             data.get('interface', 'LAN'),
             data.get('protocol', 'any'),
             data.get('source', 'any'),
+            data.get('source_port', ''),
             data.get('destination', 'any'),
+            data.get('dest_port', ''),
             data.get('description', ''),
             new_order
         ))
@@ -475,7 +487,8 @@ def get_lan_rule(rule_id):
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "SELECT id, action, disabled, protocol, source, destination, description "
+            "SELECT id, action, disabled, interface, protocol, source, source_port, "
+            "destination, dest_port, description "
             "FROM firewall_rules_lan WHERE id=?", (rule_id,)
         )
         row = cursor.fetchone()
@@ -496,15 +509,19 @@ def update_lan_rule(rule_id):
         cursor = db.cursor()
         
         cursor.execute("""
-            UPDATE firewall_rules_lan 
-            SET disabled=?, interface=?, protocol=?, source=?, destination=?, description=?
+            UPDATE firewall_rules_lan
+            SET action=?, disabled=?, interface=?, protocol=?, source=?, source_port=?,
+                destination=?, dest_port=?, description=?
             WHERE id=?
         """, (
+            data.get('action', 'pass'),
             data.get('disabled'),
             data.get('interface'),
             data.get('protocol'),
             data.get('source'),
+            data.get('source_port'),
             data.get('destination'),
+            data.get('dest_port'),
             data.get('description'),
             rule_id
         ))
