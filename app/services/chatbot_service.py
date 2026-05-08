@@ -30,6 +30,14 @@ Guidelines:
 - For external security questions (CVEs, best practices) use search_web.
 - Keep answers concise and actionable. Use bullet points for lists.
 - If a tool fails or returns an error, tell the user and suggest what to check manually.
+
+Agent capabilities (require user approval):
+- You can block or unblock domains via the DNS filter using block_domain / unblock_domain.
+- You can add firewall block rules using add_firewall_block_rule.
+- When a user asks you to block/allow something, call the appropriate tool directly — the
+  system will pause and show the user an approval card before any change is applied.
+- Do NOT ask the user "shall I proceed?" in text — just call the tool and let the approval
+  UI handle the confirmation.
 """
 
 # ---------------------------------------------------------------------------
@@ -204,7 +212,104 @@ TOOLS = [
             },
         },
     },
+    # ── Write / action tools (require user confirmation) ──────────────────
+    {
+        "type": "function",
+        "function": {
+            "name": "block_domain",
+            "description": (
+                "Block a domain via the DNS content filter. "
+                "Use this when the user asks to block a website or domain. "
+                "This requires user confirmation before it is applied."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain to block (e.g. facebook.com). Do not include 'https://' or paths.",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Category label for the rule (e.g. social-media, gaming, adult). Default: custom.",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Short reason for the block (shown in the filter list).",
+                    },
+                },
+                "required": ["domain"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "unblock_domain",
+            "description": (
+                "Remove a DNS block rule for a domain, restoring access. "
+                "Use when the user asks to unblock or allow a previously blocked domain. "
+                "Requires user confirmation."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain to unblock (e.g. facebook.com).",
+                    },
+                },
+                "required": ["domain"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_firewall_block_rule",
+            "description": (
+                "Add a floating firewall rule to block traffic by IP, network, or port. "
+                "Use this when the user asks to block an IP address, subnet, or specific port. "
+                "Requires user confirmation before it is applied."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Human-readable label for this rule (required).",
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source IP or network to block (e.g. 192.168.1.50 or any). Default: any.",
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination IP or network (e.g. 1.2.3.4 or any). Default: any.",
+                    },
+                    "protocol": {
+                        "type": "string",
+                        "enum": ["any", "tcp", "udp", "icmp", "tcp/udp"],
+                        "description": "Protocol. Default: any.",
+                    },
+                    "dest_port": {
+                        "type": "string",
+                        "description": "Destination port or range to block (e.g. 80 or 80:443). Leave empty for all ports.",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": ["in", "out", "any"],
+                        "description": "Traffic direction. Default: any.",
+                    },
+                },
+                "required": ["description"],
+            },
+        },
+    },
 ]
+
+# Tools that mutate system state — intercepted for user confirmation
+_WRITE_TOOLS = {"block_domain", "unblock_domain", "add_firewall_block_rule"}
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +476,119 @@ def _tool_search_web(query: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Pending-action helpers
+# ---------------------------------------------------------------------------
+
+def _describe_pending_action(tool: str, args: dict) -> tuple:
+    """Return (summary, detail) strings for a pending write action."""
+    if tool == "block_domain":
+        domain = args.get("domain", "unknown")
+        cat    = args.get("category", "custom")
+        return (
+            f"Block {domain} in DNS filter",
+            f"Add {domain} to the DNS block list (category: {cat}). "
+            f"All DNS queries for {domain} and its subdomains will return NXDOMAIN.",
+        )
+    if tool == "unblock_domain":
+        domain = args.get("domain", "unknown")
+        return (
+            f"Unblock {domain} from DNS filter",
+            f"Remove the DNS block rule for {domain}, restoring normal access.",
+        )
+    if tool == "add_firewall_block_rule":
+        desc  = args.get("description", "Block rule")
+        src   = args.get("source", "any")
+        dst   = args.get("destination", "any")
+        port  = args.get("dest_port", "")
+        proto = args.get("protocol", "any")
+        port_str = f":{port}" if port else ""
+        return (
+            f"Add firewall block rule: {desc}",
+            f"Create a floating BLOCK rule — {proto.upper()} {src} → {dst}{port_str}. Description: {desc}",
+        )
+    return (f"Execute: {tool}", f"Arguments: {json.dumps(args)}")
+
+
+def execute_approved_action(conn, action: dict, username: str) -> dict:
+    """Execute a write action that has been approved by the user."""
+    tool = action.get("tool", "")
+    args = action.get("args", {})
+
+    try:
+        if tool == "block_domain":
+            domain      = args.get("domain", "").strip()
+            category    = args.get("category", "custom")
+            description = args.get("description", "Blocked via SmartShield AI")
+            if not domain:
+                return {"ok": False, "reply": "Domain name is required."}
+            from app.services.dns_filter import add_dns_filter_rule, apply_dns_filter
+            add_dns_filter_rule(conn, domain, action="block", category=category, description=description)
+            result = apply_dns_filter(conn)
+            if result["ok"]:
+                reply = (
+                    f"**{domain}** has been added to the DNS block list and the filter has been applied. "
+                    f"All DNS queries for {domain} and its subdomains are now blocked."
+                )
+            else:
+                reply = f"Rule saved but DNS reload failed: {result['message']}. Restart Unbound to apply."
+            return {"ok": True, "reply": reply}
+
+        if tool == "unblock_domain":
+            domain = args.get("domain", "").strip()
+            if not domain:
+                return {"ok": False, "reply": "Domain name is required."}
+            from app.services.dns_filter import get_dns_filter_rules, delete_dns_filter_rule, apply_dns_filter
+            rules   = get_dns_filter_rules(conn)
+            matched = [r for r in rules if r["domain"].lower() == domain.lower()]
+            if not matched:
+                return {"ok": True, "reply": f"No DNS block rule found for **{domain}** — it may already be unblocked."}
+            for r in matched:
+                delete_dns_filter_rule(conn, r["id"])
+            result = apply_dns_filter(conn)
+            suffix = "" if result["ok"] else f" (DNS reload failed: {result['message']})"
+            return {"ok": True, "reply": f"DNS block rule for **{domain}** has been removed.{suffix}"}
+
+        if tool == "add_firewall_block_rule":
+            description = args.get("description", "AI-generated block rule")
+            source      = args.get("source", "any")
+            destination = args.get("destination", "any")
+            protocol    = args.get("protocol", "any")
+            dest_port   = args.get("dest_port", "")
+            direction   = args.get("direction", "any")
+
+            cursor = conn.cursor()
+            cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_floating")
+            new_order = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO firewall_rules_floating
+                    (action, disabled, interface, protocol, source, source_port,
+                     destination, dest_port, gateway, queue, schedule, description, rule_order)
+                VALUES (?, 0, ?, ?, ?, '', ?, ?, '', '', '', ?, ?)
+                """,
+                ("block", direction, protocol, source, destination, dest_port, description, new_order),
+            )
+            conn.commit()
+            try:
+                from app.services.firewall_writer import write_pf_rules
+                write_pf_rules(conn)
+            except Exception:
+                pass
+            return {
+                "ok": True,
+                "reply": (
+                    f"Firewall block rule **{description}** has been added "
+                    f"({source} → {destination}, {protocol.upper()}). Changes have been applied."
+                ),
+            }
+
+        return {"ok": False, "reply": f"Unknown action type: {tool}"}
+
+    except Exception as exc:
+        return {"ok": False, "reply": f"Failed to execute action: {exc}"}
+
+
+# ---------------------------------------------------------------------------
 # Agentic chat loop
 # ---------------------------------------------------------------------------
 
@@ -415,6 +633,31 @@ def process_chat(conn, messages: list, username: str) -> dict:
 
         if choice.finish_reason == "tool_calls":
             tool_calls = choice.message.tool_calls or []
+
+            # Check if any call is a write action requiring confirmation
+            write_tc = next((tc for tc in tool_calls if tc.function.name in _WRITE_TOOLS), None)
+            if write_tc:
+                try:
+                    tool_args = json.loads(write_tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    tool_args = {}
+                summary, detail = _describe_pending_action(write_tc.function.name, tool_args)
+                agent_text = choice.message.content or (
+                    f"I can {summary.lower()}. Please review the details below and approve or cancel."
+                )
+                messages = messages + [{"role": "assistant", "content": agent_text}]
+                return {
+                    "ok": True,
+                    "reply": agent_text,
+                    "messages": messages,
+                    "pending_action": {
+                        "tool": write_tc.function.name,
+                        "args": tool_args,
+                        "summary": summary,
+                        "detail": detail,
+                    },
+                }
+
             # Build the assistant message dict for history
             asst_msg = {
                 "role": "assistant",

@@ -631,6 +631,19 @@
   color:#fff;border:none;cursor:pointer;display:flex;align-items:center;
   justify-content:center;font-size:.95rem;flex-shrink:0;}
 #ss-chat-send:disabled{opacity:.5;cursor:not-allowed;}
+/* ── Pending-action approval card ── */
+.ss-action-card{align-self:stretch;border:1px solid var(--primary);border-radius:10px;
+  padding:12px 14px;background:var(--bg);font-size:.82rem;}
+.ss-action-summary{font-weight:700;margin-bottom:5px;color:var(--primary);font-size:.84rem;}
+.ss-action-detail{color:var(--muted);margin-bottom:10px;font-size:.78rem;line-height:1.5;}
+.ss-action-btns{display:flex;gap:8px;}
+.ss-action-approve{background:#22c55e;color:#fff;border:none;border-radius:6px;
+  padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;}
+.ss-action-approve:hover{background:#16a34a;}
+.ss-action-cancel{background:#ef4444;color:#fff;border:none;border-radius:6px;
+  padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;}
+.ss-action-cancel:hover{background:#dc2626;}
+.ss-action-status{font-size:.78rem;color:var(--muted);font-style:italic;}
 </style>
 
 <button id="ss-chat-fab" onclick="ssChatToggle()" title="SmartShield AI">
@@ -661,17 +674,67 @@
   let _open = false;
   let _msgs = [];   // message history in OpenAI format
 
+  function _esc(t) {
+    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
   function _addMsg(text, cls) {
     const el = document.createElement('div');
     el.className = 'ss-cm ' + cls;
-    // Render basic markdown-like newlines
-    el.innerHTML = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                       .replace(/\n/g,'<br>');
+    el.innerHTML = _esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     const box = document.getElementById('ss-chat-messages');
     box.appendChild(el);
     el.scrollIntoView({behavior:'smooth', block:'end'});
     return el;
   }
+
+  function _addActionCard(action) {
+    const card = document.createElement('div');
+    card.className = 'ss-action-card';
+    card.dataset.action = JSON.stringify(action);
+    card.innerHTML =
+      '<div class="ss-action-summary"><i class="fa-solid fa-shield-halved"></i> ' + _esc(action.summary) + '</div>' +
+      '<div class="ss-action-detail">' + _esc(action.detail) + '</div>' +
+      '<div class="ss-action-btns">' +
+        '<button class="ss-action-approve" onclick="ssChatApprove(this)"><i class="fa-solid fa-check"></i> Approve</button>' +
+        '<button class="ss-action-cancel"  onclick="ssChatCancel(this)"><i class="fa-solid fa-xmark"></i> Cancel</button>' +
+      '</div>';
+    const box = document.getElementById('ss-chat-messages');
+    box.appendChild(card);
+    card.scrollIntoView({behavior:'smooth', block:'end'});
+  }
+
+  window.ssChatApprove = async function(btn) {
+    const card   = btn.closest('.ss-action-card');
+    const action = JSON.parse(card.dataset.action);
+    card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status">Applying…</span>';
+    try {
+      const res = await fetch('/chatbot/api/approve_action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: action, approved: true}),
+      });
+      let data;
+      try { data = await res.json(); }
+      catch(_) { data = {ok: false, reply: 'Server returned a non-JSON response (status ' + res.status + ').'}; }
+      card.remove();
+      if (data.ok) {
+        _msgs.push({role: 'assistant', content: data.reply});
+        _addMsg(data.reply, 'b');
+      } else {
+        _addMsg('⚠ ' + (data.reply || data.message || 'Action failed.'), 's');
+      }
+    } catch(e) {
+      card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status" style="color:#ef4444">Error: ' + _esc(e.message) + '</span>';
+    }
+  };
+
+  window.ssChatCancel = function(btn) {
+    const card = btn.closest('.ss-action-card');
+    card.remove();
+    _addMsg('Action cancelled.', 's');
+    _msgs.push({role: 'user', content: 'I changed my mind — please cancel that action.'});
+  };
 
   window.ssChatToggle = function() {
     _open = !_open;
@@ -708,22 +771,37 @@
     sendBtn.disabled = true;
 
     try {
-      const res  = await fetch('/chatbot/api/chat', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
+      const res = await fetch('/chatbot/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({messages: _msgs}),
       });
-      const data = await res.json();
       thinking.remove();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch(_) {
+        if (res.status === 401 || res.redirected) {
+          _addMsg('⚠ Session expired. Please refresh the page and log in again.', 's');
+        } else {
+          _addMsg('⚠ Server error (HTTP ' + res.status + '). Please try again.', 's');
+        }
+        return;
+      }
+
       if (data.ok) {
         _msgs = data.messages;
         _addMsg(data.reply, 'b');
+        if (data.pending_action) {
+          _addActionCard(data.pending_action);
+        }
       } else {
         _addMsg('⚠ ' + (data.message || 'Unknown error'), 's');
       }
     } catch(e) {
       thinking.remove();
-      _addMsg('Network error: ' + e.message, 's');
+      _addMsg('⚠ Could not reach the server. Check your connection and try again.', 's');
     } finally {
       sendBtn.disabled = false;
       inp.focus();
