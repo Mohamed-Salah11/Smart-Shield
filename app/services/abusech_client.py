@@ -56,6 +56,12 @@ def is_dry_run(conn=None) -> bool:
     Checks the DB column first (GUI-controlled), falls back to the env var
     (set by install.sh or overridden manually).
     """
+    if conn is None:
+        try:
+            from app.database import get_db
+            conn = get_db()
+        except Exception:
+            pass
     if conn is not None:
         try:
             row = conn.execute(

@@ -1439,19 +1439,19 @@ ON static_leases(mac_address)
             except Exception:
                 pass  # secret_store may be unavailable during early migration — skip
 
-    # Seed Groq API key from env into service_state if install.sh set it and DB has no entry yet
-    _env_groq_key = os.environ.get("GROQ_API_KEY", "").strip()
-    if _env_groq_key:
-        _existing_groq = cursor.execute(
+    # Seed Anthropic API key from env into service_state if install.sh set it and DB has no entry yet
+    _env_anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if _env_anthropic_key:
+        _existing_chatbot = cursor.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
-        if not _existing_groq:
+        if not _existing_chatbot:
             try:
                 import json as _json2
                 from app.secret_store import encrypt_secret as _enc2
                 cursor.execute(
                     "INSERT OR IGNORE INTO service_state (key_name, value_json) VALUES (?, ?)",
-                    ("chatbot_settings", _json2.dumps({"groq_api_key": _enc2(_env_groq_key)})),
+                    ("chatbot_settings", _json2.dumps({"anthropic_api_key": _enc2(_env_anthropic_key)})),
                 )
             except Exception:
                 pass

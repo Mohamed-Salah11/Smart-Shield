@@ -198,8 +198,8 @@ SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
-# SmartShield AI chatbot — get a free key at https://console.groq.com
-GROQ_API_KEY=
+# SmartShield AI chatbot — get a key at https://console.anthropic.com
+ANTHROPIC_API_KEY=
 EOF
         chmod 0600 "${ENV_FILE}"
         info "Admin account will be created on first run via the setup wizard."
@@ -225,19 +225,19 @@ if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
     fi
 fi
 
-# Prompt for GROQ_API_KEY (SmartShield AI chatbot)
-if ! grep -q "^GROQ_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
-    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Groq) ━━━${NC}\n"
-    printf "SmartShield includes an AI security assistant powered by Groq LLM.\n"
+# Prompt for ANTHROPIC_API_KEY (SmartShield AI chatbot)
+if ! grep -q "^ANTHROPIC_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
+    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Claude) ━━━${NC}\n"
+    printf "SmartShield includes an AI security assistant powered by Claude (Anthropic).\n"
     printf "It can analyse logs, explain rules, and answer firewall questions.\n"
-    printf "Get a FREE API key at: https://console.groq.com\n"
-    printf "${YELLOW}[?]${NC} Enter your GROQ_API_KEY (press Enter to skip): "
-    read -r GROQ_KEY
-    if [ -n "${GROQ_KEY}" ]; then
-        sed -i '' "s|^GROQ_API_KEY=.*|GROQ_API_KEY=${GROQ_KEY}|" "${ENV_FILE}"
-        info "Groq API key saved — SmartShield AI chatbot is enabled."
+    printf "Get an API key at: https://console.anthropic.com\n"
+    printf "${YELLOW}[?]${NC} Enter your ANTHROPIC_API_KEY (press Enter to skip): "
+    read -r ANTHROPIC_KEY
+    if [ -n "${ANTHROPIC_KEY}" ]; then
+        sed -i '' "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_KEY}|" "${ENV_FILE}"
+        info "Anthropic API key saved — SmartShield AI chatbot is enabled."
     else
-        warn "GROQ_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
+        warn "ANTHROPIC_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
     fi
 fi
 
@@ -321,6 +321,157 @@ CRON_LINE="*/5 * * * * root /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --l
 printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
 chmod 0644 "${CRON_FILE}"
 info "MRTG cron job installed: ${CRON_FILE}"
+
+# Bootstrap MRTG: write initial config and run two passes to create .log files + first PNGs.
+# The web UI "Regenerate Config" will update this later with wizard-configured interface names.
+MRTG_CONF="/usr/local/etc/mrtg/mrtg.cfg"
+MRTG_LOCK="/var/run/smart-shield/mrtg.lock"
+MRTG_BIN="/usr/local/bin/mrtg"
+
+if [ ! -f "${MRTG_CONF}" ]; then
+    cat > "${MRTG_CONF}" << 'MRTGEOF'
+# Smart Shield MRTG Configuration (bootstrap defaults — regenerate via web UI after wizard)
+WorkDir: /var/db/smart-shield/mrtg
+Refresh: 300
+Interval: 5
+Language: English
+Options[_]: growright, bits
+
+Target[em0]: `/usr/local/sbin/mrtg-probe.sh em0`
+MaxBytes[em0]: 125000000
+Title[em0]: WAN Traffic — em0
+PageTop[em0]: <h1>WAN — em0</h1>
+Options[em0]: bits, growright, noinfo
+
+Target[em1]: `/usr/local/sbin/mrtg-probe.sh em1`
+MaxBytes[em1]: 125000000
+Title[em1]: LAN Traffic — em1
+PageTop[em1]: <h1>LAN — em1</h1>
+Options[em1]: bits, growright, noinfo
+MRTGEOF
+    info "Bootstrap MRTG config written: ${MRTG_CONF}"
+fi
+
+if [ -x "${MRTG_BIN}" ]; then
+    # Pass 1: creates .log RRD files (non-zero exit on new files is expected)
+    "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
+    # Pass 2: reads .log files and generates initial PNG graph images
+    "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
+    info "MRTG initialised — initial graphs generated in /var/db/smart-shield/mrtg"
+else
+    warn "MRTG binary not found at ${MRTG_BIN} — ensure net-mgmt/mrtg is installed"
+fi
+
+# ── Nginx TLS reverse proxy ────────────────────────────────────────────────────
+section "Nginx TLS & Reverse Proxy"
+
+# SSL directory (mode 0700 — private key must not be world-readable)
+SSL_DIR="/usr/local/etc/smart-shield/ssl"
+install -d -m 0700 "${SSL_DIR}" 2>/dev/null || true
+
+# Generate a self-signed certificate if none exists yet.
+# Replace with a CA-signed or ACME cert in production.
+SSL_CERT="${SSL_DIR}/cert.pem"
+SSL_KEY="${SSL_DIR}/key.pem"
+if [ ! -f "${SSL_CERT}" ] || [ ! -f "${SSL_KEY}" ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        openssl req -x509 -newkey rsa:4096 -nodes -days 3650 \
+            -keyout "${SSL_KEY}" \
+            -out    "${SSL_CERT}" \
+            -subj   "/CN=smart-shield.local" \
+            2>/dev/null
+        chmod 0600 "${SSL_KEY}"
+        chmod 0644 "${SSL_CERT}"
+        info "Self-signed TLS certificate generated (valid 10 years): ${SSL_CERT}"
+    else
+        warn "openssl not found — TLS certificate not generated. Place cert.pem / key.pem in ${SSL_DIR}"
+    fi
+else
+    info "TLS certificate already exists — skipping generation."
+fi
+
+# Write a complete nginx.conf (replaces the default pkg stub).
+# server_name _ = catch-all (works for any IP or hostname on this appliance).
+# proxy_read_timeout 300s to accommodate Claude API agentic loops.
+cat > /usr/local/etc/nginx/nginx.conf << 'NGINXEOF'
+user www;
+worker_processes auto;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /usr/local/etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile          on;
+    keepalive_timeout 65;
+    server_tokens     off;
+
+    access_log /var/log/nginx/access.log;
+    error_log  /var/log/nginx/error.log warn;
+
+    # ── HTTP → HTTPS redirect ─────────────────────────────────────────────────
+    server {
+        listen      80;
+        listen      [::]:80;
+        server_name _;
+        return 301  https://$host$request_uri;
+    }
+
+    # ── HTTPS — Smart Shield dashboard ───────────────────────────────────────
+    server {
+        listen      443 ssl;
+        listen      [::]:443 ssl;
+        server_name _;
+
+        ssl_certificate     /usr/local/etc/smart-shield/ssl/cert.pem;
+        ssl_certificate_key /usr/local/etc/smart-shield/ssl/key.pem;
+
+        ssl_protocols             TLSv1.2 TLSv1.3;
+        ssl_ciphers               ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache         shared:SSL:10m;
+        ssl_session_timeout       1d;
+        ssl_session_tickets       off;
+
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Frame-Options           DENY                                           always;
+        add_header X-Content-Type-Options    nosniff                                        always;
+        add_header X-XSS-Protection          "1; mode=block"                                always;
+        add_header Referrer-Policy           "strict-origin-when-cross-origin"              always;
+
+        client_max_body_size 260m;
+
+        location / {
+            proxy_pass         http://127.0.0.1:5000;
+            proxy_http_version 1.1;
+
+            proxy_set_header   Host              $host;
+            proxy_set_header   X-Real-IP         $remote_addr;
+            proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+
+            proxy_connect_timeout  90s;
+            proxy_read_timeout    300s;
+            proxy_send_timeout     90s;
+        }
+    }
+}
+NGINXEOF
+info "Nginx configuration written to /usr/local/etc/nginx/nginx.conf"
+
+# Enable and start nginx
+sysrc nginx_enable=YES
+info "nginx_enable=YES written to rc.conf"
+if nginx -t 2>/dev/null; then
+    service nginx restart 2>/dev/null || service nginx start 2>/dev/null || true
+    info "Nginx started — dashboard now available over HTTPS."
+else
+    warn "Nginx config test failed — check /usr/local/etc/nginx/nginx.conf. Start manually: service nginx start"
+fi
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
 section "5a. sudo / Sudoers (optional fallback)"

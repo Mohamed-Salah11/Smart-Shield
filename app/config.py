@@ -76,8 +76,8 @@ class Config:
     # If blank, a key is auto-generated on first use and persisted to disk.
     MASTER_KEY: str = os.getenv("SMARTSHIELD_MASTER_KEY", "")
 
-    # --------------------------------------------------------- AI Chatbot (Groq)
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    # ------------------------------------------------------ AI Chatbot (Claude)
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
     # ------------------------------------------------------ Upload constraints
     MAX_CONTENT_LENGTH: int = 2 * 1024 * 1024  # 2 MB max upload size

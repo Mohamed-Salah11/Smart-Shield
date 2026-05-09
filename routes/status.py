@@ -170,12 +170,22 @@ def api_interface_stats():
             r = run_command(["netstat", "-ibn"], check=False)
             for line in (r.stdout or "").splitlines():
                 parts = line.split()
-                if len(parts) >= 8 and not line.startswith("Name"):
+                # Filter to link-layer rows only (<Link#N>) to avoid duplicate
+                # entries per interface (netstat outputs one row per address family).
+                # FreeBSD netstat -ibn columns:
+                #   Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+                #   [0]  [1] [2]     [3]     [4]   [5]   [6]    [7]   [8]   [9]   [10]
+                if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2]):
                     try:
                         stats.append({
-                            "name": parts[0], "mtu": parts[1],
-                            "rx_pkts": int(parts[4]), "rx_errs": int(parts[5]),
-                            "tx_pkts": int(parts[6]), "tx_errs": int(parts[7]),
+                            "name":     parts[0],
+                            "mtu":      parts[1],
+                            "rx_pkts":  int(parts[4]),
+                            "rx_errs":  int(parts[5]),
+                            "rx_bytes": int(parts[6]),
+                            "tx_pkts":  int(parts[7]),
+                            "tx_errs":  int(parts[8]),
+                            "tx_bytes": int(parts[9]),
                         })
                     except (ValueError, IndexError):
                         pass

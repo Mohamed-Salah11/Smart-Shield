@@ -3,9 +3,9 @@ routes/chatbot.py
 -----------------
 SmartShield AI chatbot endpoints.
 
-  POST /chatbot/api/chat        — agentic chat (requires GROQ_API_KEY)
-  GET  /chatbot/api/settings    — check whether Groq key is configured
-  POST /chatbot/api/settings    — save / clear the Groq API key (encrypted in DB)
+  POST /chatbot/api/chat        — agentic chat (requires ANTHROPIC_API_KEY)
+  GET  /chatbot/api/settings    — check whether Anthropic key is configured
+  POST /chatbot/api/settings    — save / clear the Anthropic API key (encrypted in DB)
 """
 
 import json
@@ -51,20 +51,20 @@ def api_chat():
 # ---------------------------------------------------------------------------
 
 def _load_raw_key(conn) -> str:
-    """Return the decrypted Groq key or empty string."""
+    """Return the decrypted Anthropic key or empty string."""
     try:
         row = conn.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
         if row:
             settings = json.loads(row["value_json"])
-            encrypted = settings.get("groq_api_key", "")
+            encrypted = settings.get("anthropic_api_key", "")
             if encrypted:
                 from app.secret_store import decrypt_secret
                 return decrypt_secret(encrypted)
     except Exception:
         pass
-    return os.environ.get("GROQ_API_KEY", "")
+    return os.environ.get("ANTHROPIC_API_KEY", "")
 
 
 @chatbot_bp.route("/api/settings", methods=["GET"])
@@ -79,13 +79,13 @@ def api_get_settings():
 @login_required
 def api_save_settings():
     data    = request.get_json(force=True) or {}
-    raw_key = (data.get("groq_api_key") or "").strip()
+    raw_key = (data.get("anthropic_api_key") or "").strip()
 
     from app.secret_store import encrypt_secret
     conn = get_db()
     conn.execute(
         "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES (?, ?)",
-        ("chatbot_settings", json.dumps({"groq_api_key": encrypt_secret(raw_key) if raw_key else ""})),
+        ("chatbot_settings", json.dumps({"anthropic_api_key": encrypt_secret(raw_key) if raw_key else ""})),
     )
     conn.commit()
 

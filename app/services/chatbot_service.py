@@ -1,7 +1,7 @@
 """
 chatbot_service.py
 ------------------
-SmartShield AI agent powered by Groq LLM with tool-use.
+SmartShield AI agent powered by Claude (Anthropic) with tool-use.
 
 The agent can query live system data (firewall rules, logs, service health,
 DHCP leases, IDS alerts, content policy, VPN status) and search the web for
@@ -41,269 +41,233 @@ Agent capabilities (require user approval):
 """
 
 # ---------------------------------------------------------------------------
-# Groq key resolution (DB-first → env fallback)
+# Anthropic key resolution (DB-first → env fallback)
 # ---------------------------------------------------------------------------
 
-def _load_groq_key(conn) -> str:
-    """Read Groq API key from service_state (encrypted) then fall back to env var."""
+def _load_anthropic_key(conn) -> str:
+    """Read Anthropic API key from service_state (encrypted) then fall back to env var."""
     try:
         row = conn.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
         if row:
             settings = json.loads(row["value_json"])
-            encrypted = settings.get("groq_api_key", "")
+            encrypted = settings.get("anthropic_api_key", "")
             if encrypted:
                 from app.secret_store import decrypt_secret
                 return decrypt_secret(encrypted)
     except Exception:
         pass
-    return os.environ.get("GROQ_API_KEY", "")
+    return os.environ.get("ANTHROPIC_API_KEY", "")
 
 
 # ---------------------------------------------------------------------------
-# Tool definitions (OpenAI/Groq function-calling format)
+# Tool definitions (Anthropic format)
 # ---------------------------------------------------------------------------
 
 TOOLS = [
     {
-        "type": "function",
-        "function": {
-            "name": "get_system_health",
-            "description": (
-                "Get the current running status of all Smart Shield services "
-                "(PF firewall, DHCP, Unbound/DNS, OpenVPN, IPSec, IDS/Suricata, etc.) "
-                "and basic system resource usage."
-            ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
+        "name": "get_system_health",
+        "description": (
+            "Get the current running status of all Smart Shield services "
+            "(PF firewall, DHCP, Unbound/DNS, OpenVPN, IPSec, IDS/Suricata, etc.) "
+            "and basic system resource usage."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_audit_logs",
-            "description": (
-                "Search and retrieve Smart Shield audit logs. Use this to analyse "
-                "login attempts, configuration changes, firewall events, and security incidents."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Filter by category: session, system, security, browsing, ids (optional)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Max entries to return (1–200). Default 50.",
-                    },
-                    "search": {
-                        "type": "string",
-                        "description": "Text search within log messages or details.",
-                    },
+        "name": "get_audit_logs",
+        "description": (
+            "Search and retrieve Smart Shield audit logs. Use this to analyse "
+            "login attempts, configuration changes, firewall events, and security incidents."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "description": "Filter by category: session, system, security, browsing, ids (optional)",
                 },
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_firewall_rules",
-            "description": (
-                "Get the active firewall rules from Smart Shield. "
-                "Returns the rule set requested: floating (global), wan, lan, or all."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "rule_type": {
-                        "type": "string",
-                        "enum": ["floating", "wan", "lan", "all"],
-                        "description": "Which rule set to retrieve.",
-                    }
+                "limit": {
+                    "type": "integer",
+                    "description": "Max entries to return (1–200). Default 50.",
                 },
-                "required": ["rule_type"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_network_config",
-            "description": (
-                "Get the current network configuration: LAN IP/subnet, WAN type and IP, "
-                "interface port assignments, and DHCP pool settings."
-            ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_dhcp_leases",
-            "description": (
-                "Get the current active DHCP leases — shows all devices that have received "
-                "IP addresses from this Smart Shield appliance."
-            ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_ids_alerts",
-            "description": (
-                "Get recent IDS/IPS (Suricata) intrusion detection alerts. "
-                "Use this to analyse active threats and security incidents."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": "integer",
-                        "description": "Max alerts to return (1–100). Default 20.",
-                    }
+                "search": {
+                    "type": "string",
+                    "description": "Text search within log messages or details.",
                 },
-                "required": [],
             },
+            "required": [],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_content_policy",
-            "description": (
-                "Get the current content policy rules: DNS filter rules (blocked/allowed domains), "
-                "web filter rules, and application filter rules."
-            ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_vpn_status",
-            "description": (
-                "Get the current VPN configuration and connection status for "
-                "OpenVPN servers/clients, IPSec tunnels, and L2TP."
-            ),
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_web",
-            "description": (
-                "Search the internet for firewall configuration guides, security advisories, "
-                "CVE information, or best practices. Use when the user asks about external "
-                "security topics not specific to this appliance."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query focused on network security, firewalls, or FreeBSD topics.",
-                    }
-                },
-                "required": ["query"],
+        "name": "get_firewall_rules",
+        "description": (
+            "Get the active firewall rules from Smart Shield. "
+            "Returns the rule set requested: floating (global), wan, lan, or all."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rule_type": {
+                    "type": "string",
+                    "enum": ["floating", "wan", "lan", "all"],
+                    "description": "Which rule set to retrieve.",
+                }
             },
+            "required": ["rule_type"],
+        },
+    },
+    {
+        "name": "get_network_config",
+        "description": (
+            "Get the current network configuration: LAN IP/subnet, WAN type and IP, "
+            "interface port assignments, and DHCP pool settings."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_dhcp_leases",
+        "description": (
+            "Get the current active DHCP leases — shows all devices that have received "
+            "IP addresses from this Smart Shield appliance."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_ids_alerts",
+        "description": (
+            "Get recent IDS/IPS (Suricata) intrusion detection alerts. "
+            "Use this to analyse active threats and security incidents."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max alerts to return (1–100). Default 20.",
+                }
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_content_policy",
+        "description": (
+            "Get the current content policy rules: DNS filter rules (blocked/allowed domains), "
+            "web filter rules, and application filter rules."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_vpn_status",
+        "description": (
+            "Get the current VPN configuration and connection status for "
+            "OpenVPN servers/clients, IPSec tunnels, and L2TP."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "search_web",
+        "description": (
+            "Search the internet for firewall configuration guides, security advisories, "
+            "CVE information, or best practices. Use when the user asks about external "
+            "security topics not specific to this appliance."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query focused on network security, firewalls, or FreeBSD topics.",
+                }
+            },
+            "required": ["query"],
         },
     },
     # ── Write / action tools (require user confirmation) ──────────────────
     {
-        "type": "function",
-        "function": {
-            "name": "block_domain",
-            "description": (
-                "Block a domain via the DNS content filter. "
-                "Use this when the user asks to block a website or domain. "
-                "This requires user confirmation before it is applied."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "domain": {
-                        "type": "string",
-                        "description": "Domain to block (e.g. facebook.com). Do not include 'https://' or paths.",
-                    },
-                    "category": {
-                        "type": "string",
-                        "description": "Category label for the rule (e.g. social-media, gaming, adult). Default: custom.",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Short reason for the block (shown in the filter list).",
-                    },
+        "name": "block_domain",
+        "description": (
+            "Block a domain via the DNS content filter. "
+            "Use this when the user asks to block a website or domain. "
+            "This requires user confirmation before it is applied."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to block (e.g. facebook.com). Do not include 'https://' or paths.",
                 },
-                "required": ["domain"],
+                "category": {
+                    "type": "string",
+                    "description": "Category label for the rule (e.g. social-media, gaming, adult). Default: custom.",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Short reason for the block (shown in the filter list).",
+                },
             },
+            "required": ["domain"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "unblock_domain",
-            "description": (
-                "Remove a DNS block rule for a domain, restoring access. "
-                "Use when the user asks to unblock or allow a previously blocked domain. "
-                "Requires user confirmation."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "domain": {
-                        "type": "string",
-                        "description": "Domain to unblock (e.g. facebook.com).",
-                    },
+        "name": "unblock_domain",
+        "description": (
+            "Remove a DNS block rule for a domain, restoring access. "
+            "Use when the user asks to unblock or allow a previously blocked domain. "
+            "Requires user confirmation."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to unblock (e.g. facebook.com).",
                 },
-                "required": ["domain"],
             },
+            "required": ["domain"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "add_firewall_block_rule",
-            "description": (
-                "Add a floating firewall rule to block traffic by IP, network, or port. "
-                "Use this when the user asks to block an IP address, subnet, or specific port. "
-                "Requires user confirmation before it is applied."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "description": {
-                        "type": "string",
-                        "description": "Human-readable label for this rule (required).",
-                    },
-                    "source": {
-                        "type": "string",
-                        "description": "Source IP or network to block (e.g. 192.168.1.50 or any). Default: any.",
-                    },
-                    "destination": {
-                        "type": "string",
-                        "description": "Destination IP or network (e.g. 1.2.3.4 or any). Default: any.",
-                    },
-                    "protocol": {
-                        "type": "string",
-                        "enum": ["any", "tcp", "udp", "icmp", "tcp/udp"],
-                        "description": "Protocol. Default: any.",
-                    },
-                    "dest_port": {
-                        "type": "string",
-                        "description": "Destination port or range to block (e.g. 80 or 80:443). Leave empty for all ports.",
-                    },
-                    "direction": {
-                        "type": "string",
-                        "enum": ["in", "out", "any"],
-                        "description": "Traffic direction. Default: any.",
-                    },
+        "name": "add_firewall_block_rule",
+        "description": (
+            "Add a floating firewall rule to block traffic by IP, network, or port. "
+            "Use this when the user asks to block an IP address, subnet, or specific port. "
+            "Requires user confirmation before it is applied."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable label for this rule (required).",
                 },
-                "required": ["description"],
+                "source": {
+                    "type": "string",
+                    "description": "Source IP or network to block (e.g. 192.168.1.50 or any). Default: any.",
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "Destination IP or network (e.g. 1.2.3.4 or any). Default: any.",
+                },
+                "protocol": {
+                    "type": "string",
+                    "enum": ["any", "tcp", "udp", "icmp", "tcp/udp"],
+                    "description": "Protocol. Default: any.",
+                },
+                "dest_port": {
+                    "type": "string",
+                    "description": "Destination port or range to block (e.g. 80 or 80:443). Leave empty for all ports.",
+                },
+                "direction": {
+                    "type": "string",
+                    "enum": ["in", "out", "any"],
+                    "description": "Traffic direction. Default: any.",
+                },
             },
+            "required": ["description"],
         },
     },
 ]
@@ -596,100 +560,86 @@ def process_chat(conn, messages: list, username: str) -> dict:
     """
     Run the SmartShield AI agent loop.
 
-    Accepts `messages` in OpenAI format ([{"role": "user"/"assistant"/"tool", "content": ...}]).
+    Accepts `messages` in Anthropic format ([{"role": "user"/"assistant", "content": ...}]).
     Returns {"ok": True, "reply": str, "messages": updated_list} or {"ok": False, "message": str}.
     """
-    api_key = _load_groq_key(conn)
+    api_key = _load_anthropic_key(conn)
     if not api_key:
-        return {"ok": False, "message": "GROQ_API_KEY not configured. Add it via Admin → Settings → SmartShield AI."}
+        return {"ok": False, "message": "ANTHROPIC_API_KEY not configured. Add it via Admin → Settings → SmartShield AI."}
 
     try:
-        from groq import Groq
+        import anthropic
     except ImportError:
-        return {"ok": False, "message": "Groq SDK not installed. Run: pip install groq"}
+        return {"ok": False, "message": "Anthropic SDK not installed. Run: pip install anthropic"}
 
-    client = Groq(api_key=api_key)
-    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    client = anthropic.Anthropic(api_key=api_key)
 
     max_iterations = 8  # prevent infinite loops
     for _ in range(max_iterations):
         try:
-            resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+            resp = client.messages.create(
+                model="claude-opus-4-6",
                 max_tokens=4096,
+                system=SYSTEM_PROMPT,
                 tools=TOOLS,
-                tool_choice="auto",
-                messages=full_messages,
+                messages=messages,
             )
         except Exception as exc:
-            return {"ok": False, "message": f"Groq API error: {exc}"}
+            return {"ok": False, "message": f"Claude API error: {exc}"}
 
-        choice = resp.choices[0]
-
-        if choice.finish_reason == "stop":
-            reply = choice.message.content or ""
+        if resp.stop_reason == "end_turn":
+            reply = next((b.text for b in resp.content if b.type == "text"), "")
             messages = messages + [{"role": "assistant", "content": reply}]
             return {"ok": True, "reply": reply, "messages": messages}
 
-        if choice.finish_reason == "tool_calls":
-            tool_calls = choice.message.tool_calls or []
+        if resp.stop_reason == "tool_use":
+            tool_use_blocks = [b for b in resp.content if b.type == "tool_use"]
 
             # Check if any call is a write action requiring confirmation
-            write_tc = next((tc for tc in tool_calls if tc.function.name in _WRITE_TOOLS), None)
+            write_tc = next((b for b in tool_use_blocks if b.name in _WRITE_TOOLS), None)
             if write_tc:
-                try:
-                    tool_args = json.loads(write_tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    tool_args = {}
-                summary, detail = _describe_pending_action(write_tc.function.name, tool_args)
-                agent_text = choice.message.content or (
-                    f"I can {summary.lower()}. Please review the details below and approve or cancel."
+                summary, detail = _describe_pending_action(write_tc.name, write_tc.input)
+                agent_text = next(
+                    (b.text for b in resp.content if b.type == "text"),
+                    f"I can {summary.lower()}. Please review the details below and approve or cancel.",
                 )
+                # Store only text (no tool_use block) to avoid an unmatched tool_use on the next turn
                 messages = messages + [{"role": "assistant", "content": agent_text}]
                 return {
                     "ok": True,
                     "reply": agent_text,
                     "messages": messages,
                     "pending_action": {
-                        "tool": write_tc.function.name,
-                        "args": tool_args,
+                        "tool": write_tc.name,
+                        "args": write_tc.input,
                         "summary": summary,
                         "detail": detail,
                     },
                 }
 
-            # Build the assistant message dict for history
-            asst_msg = {
-                "role": "assistant",
-                "content": choice.message.content or "",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                    }
-                    for tc in tool_calls
-                ],
-            }
-            full_messages.append(asst_msg)
+            # Build the assistant message with content blocks for history
+            asst_content = []
+            for b in resp.content:
+                if b.type == "text":
+                    asst_content.append({"type": "text", "text": b.text})
+                elif b.type == "tool_use":
+                    asst_content.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+            asst_msg = {"role": "assistant", "content": asst_content}
             messages = messages + [asst_msg]
 
-            for tc in tool_calls:
-                try:
-                    tool_args = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    tool_args = {}
-                result = _execute_tool(conn, tc.function.name, tool_args)
-                tool_msg = {
-                    "role": "tool",
-                    "tool_call_id": tc.id,
+            # Execute read tools and collect results
+            tool_results = []
+            for b in tool_use_blocks:
+                result = _execute_tool(conn, b.name, b.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": b.id,
                     "content": json.dumps(result, default=str),
-                }
-                full_messages.append(tool_msg)
-                messages = messages + [tool_msg]
+                })
+            messages = messages + [{"role": "user", "content": tool_results}]
             continue
 
-        # Unexpected finish reason
+        # Unexpected stop reason
         break
 
     return {"ok": False, "message": "Agent loop ended without a final response. Please try again."}
