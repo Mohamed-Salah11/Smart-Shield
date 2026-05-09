@@ -27,7 +27,11 @@ _TIMEOUT = 10  # seconds
 
 
 def _get_auth_key() -> str:
-    """Return the abuse.ch Auth-Key, checking env then the database."""
+    """Return the abuse.ch Auth-Key if configured, else empty string.
+
+    URLhaus and MalwareBazaar don't require auth; ThreatFox recommends it.
+    Callers that need auth can check for an empty return value themselves.
+    """
     key = os.getenv("ABUSECH_AUTH_KEY", "").strip()
     if key:
         return key
@@ -44,10 +48,7 @@ def _get_auth_key() -> str:
                 return key
     except Exception:
         pass
-    raise RuntimeError(
-        "ABUSECH_AUTH_KEY is required for abuse.ch API access. "
-        "Set it in your .env file or add it via IDS → Threat Feeds in the web UI."
-    )
+    return ""
 
 
 def is_dry_run(conn=None) -> bool:
@@ -75,7 +76,8 @@ def is_dry_run(conn=None) -> bool:
 
 
 def _auth_headers() -> dict:
-    return {"Auth-Key": _get_auth_key()}
+    key = _get_auth_key()
+    return {"Auth-Key": key} if key else {}
 
 
 def _post_form(url: str, data: dict) -> dict:
@@ -140,7 +142,8 @@ def malwarebazaar_lookup_hash(file_hash: str) -> dict:
     if is_dry_run():
         log_info("abusech.malwarebazaar", "dry-run: skipping hash lookup", {"hash": file_hash})
         return {"query_status": "dry_run"}
-    return _post_json_req(f"{_MWBAZAAR_BASE}/", {"query": "get_info", "hash": file_hash})
+    # MalwareBazaar API v1 expects form-encoded data, not JSON
+    return _post_form(f"{_MWBAZAAR_BASE}/", {"query": "get_info", "hash": file_hash})
 
 
 def malwarebazaar_recent(selector: str = "time", limit: int = 100) -> dict:
@@ -148,9 +151,10 @@ def malwarebazaar_recent(selector: str = "time", limit: int = 100) -> dict:
     if is_dry_run():
         log_info("abusech.malwarebazaar", "dry-run: skipping recent samples fetch", {"limit": limit})
         return {"query_status": "dry_run", "data": []}
-    return _post_json_req(
+    # MalwareBazaar API v1 expects form-encoded data, not JSON
+    return _post_form(
         f"{_MWBAZAAR_BASE}/",
-        {"query": "get_recent", "selector": selector, "limit": limit},
+        {"query": "get_recent", "selector": selector, "limit": str(limit)},
     )
 
 

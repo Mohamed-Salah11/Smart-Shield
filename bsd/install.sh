@@ -82,6 +82,18 @@ pkg install -y "py${PYTHON_VER}-sqlite3" 2>/dev/null \
     || pkg install -y py311-sqlite3 \
     || warn "py${PYTHON_VER}-sqlite3 not found — sqlite3 module may already be bundled."
 
+# suricata-update is a separate Python tool not bundled with the suricata pkg
+info "Installing suricata-update..."
+pkg install -y "py${PYTHON_VER}-suricata-update" 2>/dev/null \
+    || pip install --break-system-packages suricata-update 2>/dev/null \
+    || warn "suricata-update could not be installed via pkg/pip — install manually if needed"
+
+# Initialise the source index so 'Update Rules' works on first use
+if command -v suricata-update >/dev/null 2>&1; then
+    suricata-update update-sources --no-merge 2>/dev/null || true
+    info "suricata-update source index initialised"
+fi
+
 section "2. Directory Creation"
 
 # Smart Shield runtime directories

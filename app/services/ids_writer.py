@@ -408,12 +408,14 @@ def update_rules(conn) -> dict:
     errors  = []
 
     for rs in rulesets:
-        url = (rs.get("url") or "").strip()
+        url  = (rs.get("url") or "").strip()
         name = rs.get("name", "")
-        if not url:
-            continue
         try:
-            result = run_command(["suricata-update", "add-source", name, url], check=False)
+            if url:
+                result = run_command(["suricata-update", "add-source", name, url], check=False)
+            else:
+                # Built-in indexed source (e.g. "et/open") — enable via the index
+                result = run_command(["suricata-update", "enable-source", name], check=False)
             updated.append({"name": name, "ok": result.returncode == 0})
         except FreeBSDNetworkError as exc:
             errors.append(f"{name}: {exc}")

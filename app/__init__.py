@@ -140,6 +140,28 @@ def create_app():
             )
 
             conn = get_db()
+
+            # ── Captive portal mode ───────────────────────────────────────────────
+            # When captive portal is enabled, every HTTP request that arrives here
+            # with a non-local Host header was PF-redirected from an unauthenticated
+            # client on port 80.  Send them to the portal login page.  This also
+            # covers OS captive-portal probes (Firefox detectportal, Chrome 204,
+            # Apple CNA) so browsers show a "Sign in to network" popup automatically.
+            import json as _cp_json
+            from .services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
+            _cp_row = conn.execute(
+                "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+            ).fetchone()
+            if _cp_row:
+                _cp_cfg = _cp_json.loads(_cp_row["value_json"])
+                if _cp_cfg.get("enabled", False):
+                    if not has_active_captive_session(conn, request.remote_addr or ""):
+                        _portal_ip   = (_cp_cfg.get("portal_ip") or _default_portal_ip(conn)).strip()
+                        _portal_port = int(_cp_cfg.get("portal_port") or _CP_REDIRECT_PORT)
+                        _query = urlencode({"url": request.url})
+                        return redirect(f"http://{_portal_ip}:{_portal_port}/portal/?{_query}")
+                    # Client is authenticated — fall through to content-policy check
+
             if not has_active_content_policy(conn):
                 return None
             if is_admin_bypass_session(conn, request.remote_addr or ""):
