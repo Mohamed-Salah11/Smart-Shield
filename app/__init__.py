@@ -77,6 +77,12 @@ def create_app():
 
     app.config.from_object(get_config())
 
+    # Trust one proxy hop (nginx) so request.remote_addr reflects the real
+    # client IP instead of 127.0.0.1, keeping captive-portal checks and
+    # audit logs correct.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError(
             "SECRET_KEY is not set. Create a .env file (see .env.example) and set SECRET_KEY."
@@ -140,17 +146,17 @@ def create_app():
                 return None
             if has_active_captive_session(conn, request.remote_addr or ""):
                 if is_blocked_domain(conn, host):
-                    # Authenticated user whose browser is still hitting the LAN IP via a
-                    # stale DNS cache entry (Unbound redirect TTL is now 5 s).
-                    # Show a bridge page that auto-retries after 8 s; by then DNS has expired
-                    # and PF will route the query to the upstream resolver → real IP.
+                    # Authenticated user hitting a DNS-blocked domain.
+                    # Try a one-shot redirect after 3 s (lets the 5 s Unbound TTL expire).
+                    # sessionStorage prevents an auto-retry loop on repeated visits —
+                    # if DNS still returns LAN IP the user gets a manual "Open" button.
                     orig_url = request.url
                     safe_host = host.replace("'", "").replace('"', "")
                     safe_url  = orig_url.replace("'", "%27").replace('"', "%22")
+                    ss_key    = f"ss_bridge_{safe_host}"
                     bridge = (
                         '<!DOCTYPE html><html><head><meta charset="utf-8">'
-                        f'<meta http-equiv="refresh" content="8; url={safe_url}">'
-                        '<title>Access Granted — Smart Shield</title>'
+                        '<title>Connecting — Smart Shield</title>'
                         '<style>'
                         '*{box-sizing:border-box;margin:0;padding:0}'
                         'body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,sans-serif;'
@@ -164,13 +170,18 @@ def create_app():
                         'a.btn:hover{background:#2d5a8f}'
                         '.sub{font-size:.74rem;color:#475569;margin-top:14px}'
                         '</style></head><body><div class="box">'
-                        '<h2>&#x2714; Access Granted</h2>'
-                        f'<p>You are authenticated. Loading <strong>{safe_host}</strong>…<br>'
-                        'Redirecting automatically in a moment.</p>'
+                        '<h2>&#x2714; Session Active</h2>'
+                        f'<p>Your device is authenticated. Loading <strong>{safe_host}</strong>…</p>'
                         f'<a href="{safe_url}" class="btn">Open {safe_host}</a>'
-                        '<div class="sub">If the site doesn&rsquo;t load, open a new browser tab '
-                        'and navigate there directly.</div>'
-                        '</div></body></html>'
+                        '<div class="sub">If the site doesn&rsquo;t load, it may be restricted '
+                        'by content policy for your account.</div>'
+                        '</div>'
+                        '<script>'
+                        f'if(!sessionStorage.getItem("{ss_key}"){{'
+                        f'sessionStorage.setItem("{ss_key}","1");'
+                        f'setTimeout(function(){{window.location.href="{safe_url}";}},3000);}}'
+                        '</script>'
+                        '</body></html>'
                     )
                     from flask import make_response as _mkr
                     resp = _mkr(bridge, 200)
@@ -183,7 +194,8 @@ def create_app():
             return None
 
         query = urlencode({"policy": "content", "domain": host, "url": request.url})
-        # Build absolute URL so the popup reaches Flask directly, regardless of PF state
+        # Redirect directly to the captive portal (standard hotel/airport WiFi pattern).
+        # This avoids the popup-opener approach and works reliably across browsers.
         try:
             import json as _json
             from app.services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
@@ -196,45 +208,9 @@ def create_app():
             portal_url = f"http://{_portal_ip}:{_portal_port}/portal/?{query}"
         except Exception:
             portal_url = f"/portal/?{query}"
-        interstitial = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Access Blocked — Smart Shield</title>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0;}}
-body{{background:#1a1d23;color:#e0e0e0;font-family:'Segoe UI',sans-serif;
-     display:flex;align-items:center;justify-content:center;height:100vh;}}
-.box{{text-align:center;max-width:440px;padding:44px 36px;background:#23262d;
-      border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.5);}}
-h2{{color:#ef5350;font-size:1.3rem;margin-bottom:10px;}}
-p{{color:#9e9e9e;font-size:.9rem;margin:10px 0 28px;line-height:1.55;}}
-strong{{color:#e0e0e0;}}
-.btn{{padding:11px 28px;background:#4fc3f7;color:#1a1d23;border:none;
-      border-radius:7px;font-size:1rem;font-weight:700;cursor:pointer;}}
-.btn:hover{{background:#81d4fa;}}
-.hint{{font-size:.75rem;color:#555;margin-top:14px;}}
-</style></head><body><div class="box">
-<h2>&#x1F6AB; Access Blocked</h2>
-<p>The domain <strong>{host}</strong> is restricted by content policy.<br>
-Log in to bypass filtering for your device.</p>
-<button class="btn" id="btn" onclick="openPortal()">Open Login</button>
-<div class="hint" id="hint">Login will open in a new tab.</div>
-</div>
-<script>
-var _url={json.dumps(portal_url)};
-var _win=null;
-function openPortal(){{
-  _win=window.open(_url,'ss_portal_login');
-  document.getElementById('hint').textContent='Waiting for login…';
-  document.getElementById('btn').textContent='Waiting…';
-  var t=setInterval(function(){{
-    try{{if(_win&&_win.closed){{clearInterval(t);location.reload();}}}}catch(e){{}}
-  }},800);
-}}
-window.addEventListener('load',openPortal);
-</script></body></html>"""
-        from flask import make_response
-        resp = make_response(interstitial, 200)
-        resp.headers["Content-Type"] = "text/html; charset=utf-8"
-        return resp
+
+        from flask import redirect as _redir
+        return _redir(portal_url)
 
     @app.before_request
     def _request_timing_start():

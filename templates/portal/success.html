@@ -65,15 +65,15 @@
       Returning to your page…
     </div>
     <script>
-    // Navigate the opener tab to the original URL (or reload if no URL available), then close this tab
+    var _target = {{ orig_url | tojson }};
     if (window.opener && !window.opener.closed) {
-      var _target = {{ orig_url | tojson }};
-      if (_target) {
-        window.opener.location.href = _target;
-      } else {
-        window.opener.location.reload();
-      }
+      // Popup case: navigate the opener tab then close this popup.
+      if (_target) { window.opener.location.href = _target; }
+      else { window.opener.location.reload(); }
       setTimeout(function() { window.close(); }, 600);
+    } else if (_target) {
+      // Direct-navigation case: redirect this tab to the original URL after 1.5 s.
+      setTimeout(function() { window.location.href = _target; }, 1500);
     }
     </script>
     {% else %}

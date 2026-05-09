@@ -178,14 +178,13 @@ def auth():
     back_template = request.form.get("back_template", "login")
 
     if back_template == "block":
-        # User came via the DNS-redirect block page (direct navigation, not a popup).
+        # User came via the DNS-redirect block page (direct navigation).
         # Render block.html authenticated view — it has auto-redirect JS + Continue button.
         return render_template("portal/block.html", authenticated=True, **context)
 
-    if context["policy"] == "content":
-        # Popup/interstitial flow — success.html uses window.opener to navigate the parent tab.
-        return render_template("portal/success.html", **context)
-
+    # Redirect to the original URL the user was trying to visit.
+    # The interstitial was replaced with a direct portal redirect, so
+    # window.opener popup logic is no longer needed here.
     return redirect(_safe_redirect_target(orig_url))
 
 
