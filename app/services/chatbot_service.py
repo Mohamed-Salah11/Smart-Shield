@@ -578,7 +578,7 @@ def process_chat(conn, messages: list, username: str) -> dict:
     for _ in range(max_iterations):
         try:
             resp = client.messages.create(
-                model="claude-opus-4-6",
+                model="claude-sonnet-4-6",
                 max_tokens=4096,
                 system=SYSTEM_PROMPT,
                 tools=TOOLS,
