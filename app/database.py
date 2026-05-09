@@ -1409,17 +1409,27 @@ ON static_leases(mac_address)
     )
     """)
 
+    # Seed default built-in suricata-update sources for new installs.
+    # Blank URL = use "suricata-update enable-source <name>" (indexed source).
+    cursor.executemany(
+        "INSERT OR IGNORE INTO ids_rulesets (name, enabled, url, description) VALUES (?, 1, ?, ?)",
+        [
+            ("et/open", "", "Emerging Threats Open Rules (free, no registration required)"),
+            ("oisf/trafficid", "", "OISF Traffic ID rules (free, protocol identification)"),
+        ],
+    )
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ids_threat_feeds (
         id               INTEGER PRIMARY KEY CHECK (id = 1),
         abusech_auth_key TEXT    DEFAULT '',
-        abusech_dry_run  INTEGER DEFAULT 1,
+        abusech_dry_run  INTEGER DEFAULT 0,
         updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     cursor.execute(
-        "INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)"
+        "INSERT OR IGNORE INTO ids_threat_feeds (id, abusech_dry_run) VALUES (1, 0)"
     )
 
     # Seed abuse.ch key + dry-run flag from env into DB if install.sh set it and DB has no key yet

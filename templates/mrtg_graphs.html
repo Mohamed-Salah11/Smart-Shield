@@ -66,7 +66,7 @@
       <!-- Graph image — src is swapped by switchPeriod() -->
       <img
         id="img-{{ iface.name }}"
-        src="/status/mrtg/image/{{ iface.name }}-day.png?{{ now_ts }}"
+        src="/status/mrtg/image/{{ iface.name }}.png?{{ now_ts }}"
         alt="{{ iface.label }} daily traffic graph"
         style="max-width:100%;border-radius:6px;"
         onerror="this.style.display='none'; document.getElementById('nodata-{{ iface.name }}').style.display='block';"
@@ -116,7 +116,8 @@ function switchPeriod(evt, period) {
     if (!img) return;
     img.style.display = '';
     if (nodata) nodata.style.display = 'none';
-    img.src = '/status/mrtg/image/' + name + '-' + period + '.png?' + Date.now();
+    const sfx = {day: '', week: '-w', month: '-m', year: '-y'};
+    img.src = '/status/mrtg/image/' + name + (sfx[period] || '') + '.png?' + Date.now();
   });
 }
 </script>

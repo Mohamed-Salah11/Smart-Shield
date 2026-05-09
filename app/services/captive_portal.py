@@ -489,9 +489,13 @@ def generate_pf_anchor(conn) -> str:
     "# DO NOT EDIT MANUALLY",
     "# ============================================================",
     "",
-    "# Translation rules (unauthenticated clients → portal)",
+    "# Soft captive portal: redirect HTTP only — all other traffic passes normally.",
+    "# HTTPS interception and block-all are intentionally omitted so that",
+    "# unauthenticated clients retain full internet access; only port-80 browsing",
+    "# is redirected to the login page. Content-policy DNS blocking is independent.",
+    "",
+    "# Translation rules (unauthenticated HTTP → portal login)",
     f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port {http_port} -> {portal_ip} port {portal_port}",
-    f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port 443 -> {portal_ip} port {_CP_HTTPS_PORT}",
     "",
     "# DNS bypass for authenticated clients — route to upstream resolver instead of",
     "# Unbound so that previously blocked domains return their real IPs after login.",
@@ -501,7 +505,6 @@ def generate_pf_anchor(conn) -> str:
     "# Filter rules",
     f"pass in quick on {lan_iface} from <authenticated_clients> to any keep state",
     f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {portal_port} keep state",
-    f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {_CP_HTTPS_PORT} keep state",
    ]
 
     if dns_allow:
@@ -512,8 +515,8 @@ def generate_pf_anchor(conn) -> str:
 
     lines += [
     "",
-    "# Block everything else from unauthenticated clients before the generic LAN pass rule",
-    f"block in quick on {lan_iface} from !<authenticated_clients> to any",
+    "# Allow all other traffic — content policy and firewall rules handle blocking.",
+    f"pass in on {lan_iface} from !<authenticated_clients> to any keep state",
     ]
     return "\n".join(lines) + "\n"
 
@@ -545,19 +548,8 @@ def apply_captive_portal(conn) -> dict:
     portal_ip   = (settings.get("portal_ip") or _default_portal_ip(conn)).strip()
     portal_port = settings.get("portal_port") or _CP_REDIRECT_PORT
 
-    # Generate self-signed cert for HTTPS redirect listener if it doesn't exist
-    try:
-        if not (os.path.exists(_CP_CERT_PATH) and os.path.exists(_CP_KEY_PATH)):
-            generate_self_signed_cert(_CP_CERT_PATH, _CP_KEY_PATH, portal_ip)
-    except Exception:
-        pass
-
-    # Start HTTPS redirect server (no-op if already running)
-    try:
-        if os.path.exists(_CP_CERT_PATH) and os.path.exists(_CP_KEY_PATH):
-            start_https_redirect_server(portal_ip, portal_port, _CP_CERT_PATH, _CP_KEY_PATH)
-    except Exception:
-        pass
+    # HTTPS interception is disabled (soft captive portal mode — see generate_pf_anchor).
+    # The HTTPS redirect server is no longer started.
 
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — captive portal anchor generated but not applied.",

@@ -175,7 +175,7 @@ def api_interface_stats():
                 # FreeBSD netstat -ibn columns:
                 #   Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
                 #   [0]  [1] [2]     [3]     [4]   [5]   [6]    [7]   [8]   [9]   [10]
-                if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2]):
+                if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2], re.IGNORECASE):
                     try:
                         stats.append({
                             "name":     parts[0],
