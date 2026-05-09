@@ -254,9 +254,11 @@ def create_app():
 
     @app.context_processor
     def _csrf_context():
+        from app.services.runtime_mode import mode_badge
         return {
             "csrf_token": get_csrf_token,
             "profile_picture_url": profile_picture_url,
+            "runtime_mode_badge": mode_badge(),
         }
 
     @app.after_request

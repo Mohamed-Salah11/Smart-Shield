@@ -37,6 +37,39 @@ _STARTED = threading.Event()   # prevent double-start in dev reloader
 
 
 # ---------------------------------------------------------------------------
+# Offset persistence helpers
+# ---------------------------------------------------------------------------
+
+def _load_offset(key: str, default: int = 0) -> int:
+    """Read a persisted byte offset from the siem_state table."""
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT value FROM siem_state WHERE key=?", (key,)
+        ).fetchone()
+        if row:
+            return int(row["value"])
+    except Exception:
+        pass
+    return default
+
+
+def _save_offset(key: str, value: int):
+    """Write a byte offset to the siem_state table. Silent on failure."""
+    try:
+        from app.database import get_db
+        db = get_db()
+        db.execute(
+            "INSERT INTO siem_state (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)"
+            " ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP",
+            (key, str(value)),
+        )
+        db.commit()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
@@ -100,7 +133,10 @@ def _collect_ids_alerts(state: dict):
     if not os.path.exists(_EVE_JSON_PATH):
         return
 
-    lines, state["ids_offset"] = _tail_file(_EVE_JSON_PATH, state.get("ids_offset", 0))
+    prev_offset = state.get("ids_offset", 0)
+    lines, state["ids_offset"] = _tail_file(_EVE_JSON_PATH, prev_offset)
+    if state["ids_offset"] != prev_offset:
+        _save_offset("ids_offset", state["ids_offset"])
 
     for line in lines:
         try:
@@ -226,7 +262,10 @@ def _collect_dns_queries(state: dict):
     if not os.path.exists(_UNBOUND_QUERY_LOG):
         return
 
-    lines, state["dns_offset"] = _tail_file(_UNBOUND_QUERY_LOG, state.get("dns_offset", 0))
+    prev_offset = state.get("dns_offset", 0)
+    lines, state["dns_offset"] = _tail_file(_UNBOUND_QUERY_LOG, prev_offset)
+    if state["dns_offset"] != prev_offset:
+        _save_offset("dns_offset", state["dns_offset"])
 
     # Load blocked domains once per cycle for fast lookup
     blocked: set = state.get("blocked_domains", set())
@@ -427,8 +466,8 @@ def start_siem_collectors():
     _STARTED.set()
 
     shared_state: dict = {
-        "ids_offset":  0,
-        "dns_offset":  0,
+        "ids_offset":  _load_offset("ids_offset", 0),
+        "dns_offset":  _load_offset("dns_offset", 0),
         "dhcp_seen":   set(),
         "pf_seen":     set(),
         "alerted":     {},

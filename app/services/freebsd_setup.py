@@ -364,15 +364,70 @@ def check_tools() -> List[dict]:
 # preflight_check — combines dirs + tools into one report
 # ---------------------------------------------------------------------------
 
+def _check_disk_space(path: str = "/var", min_mb: int = 500) -> dict:
+    """Return disk space info for *path*. Warns when free space < min_mb."""
+    try:
+        stat = shutil.disk_usage(path)
+        free_mb = stat.free // (1024 * 1024)
+        ok = free_mb >= min_mb
+        return {
+            "path":    path,
+            "free_mb": free_mb,
+            "ok":      ok,
+            "warning": "" if ok else f"Only {free_mb} MB free on {path} (minimum {min_mb} MB recommended).",
+        }
+    except Exception as exc:
+        return {"path": path, "free_mb": -1, "ok": True, "warning": f"Could not check disk space: {exc}"}
+
+
+def _check_freebsd_version(min_major: int = 13) -> dict:
+    """Check that the FreeBSD major version meets the minimum requirement."""
+    if not _ON_FREEBSD:
+        return {"version": "n/a", "ok": True, "warning": ""}
+    try:
+        import subprocess
+        r = subprocess.run(["uname", "-r"], capture_output=True, text=True, timeout=5)
+        version_str = r.stdout.strip()  # e.g. "13.2-RELEASE-p4"
+        major = int(version_str.split(".")[0])
+        ok = major >= min_major
+        return {
+            "version": version_str,
+            "major":   major,
+            "ok":      ok,
+            "warning": "" if ok else f"FreeBSD {version_str} is older than {min_major}.x — upgrade recommended.",
+        }
+    except Exception as exc:
+        return {"version": "unknown", "ok": True, "warning": f"Could not determine FreeBSD version: {exc}"}
+
+
+def _check_pfctl_usable() -> dict:
+    """Verify pfctl can query PF status without error."""
+    if not _ON_FREEBSD:
+        return {"ok": True, "warning": ""}
+    try:
+        import subprocess
+        r = subprocess.run(["pfctl", "-s", "info"], capture_output=True, text=True, timeout=5)
+        ok = r.returncode == 0
+        return {
+            "ok":      ok,
+            "warning": "" if ok else f"pfctl -s info failed (rc={r.returncode}): {(r.stderr or '').strip()}",
+        }
+    except Exception as exc:
+        return {"ok": False, "warning": f"pfctl check failed: {exc}"}
+
+
 def preflight_check() -> dict:
     """
     Return a full preflight report.  Suitable for a /system/preflight UI page.
 
     {
-      "dirs":   [{"path", "ok", "created", "error"}, ...],
-      "tools":  [{"name", "pkg", "present", "optional", "description"}, ...],
-      "missing_required": [...tool names...],
-      "overall_ok": bool,
+      "dirs":              [{"path", "ok", "created", "error"}, ...],
+      "tools":             [{"name", "pkg", "present", "optional", "description"}, ...],
+      "missing_required":  [...tool names...],
+      "dir_errors":        [...paths...],
+      "warnings":          [...warning strings...],
+      "system_info":       {"freebsd_version", "disk_var", "pfctl_ok"},
+      "overall_ok":        bool,
     }
     """
     dirs   = ensure_dirs()        # also ensures dirs are created
@@ -381,12 +436,31 @@ def preflight_check() -> dict:
     missing_required = [t["name"] for t in tools if not t["present"] and not t["optional"]]
     dir_errors       = [d["path"] for d in dirs if not d["ok"]]
 
+    # Extended system checks
+    disk    = _check_disk_space("/var" if _ON_FREEBSD else ".")
+    ver     = _check_freebsd_version()
+    pf_chk  = _check_pfctl_usable()
+
+    warnings = []
+    if not disk["ok"]:
+        warnings.append(disk["warning"])
+    if not ver["ok"]:
+        warnings.append(ver["warning"])
+    if not pf_chk["ok"]:
+        warnings.append(pf_chk["warning"])
+
     overall_ok = (len(missing_required) == 0 and len(dir_errors) == 0)
 
     return {
-        "dirs":              dirs,
-        "tools":             tools,
-        "missing_required":  missing_required,
-        "dir_errors":        dir_errors,
-        "overall_ok":        overall_ok,
+        "dirs":             dirs,
+        "tools":            tools,
+        "missing_required": missing_required,
+        "dir_errors":       dir_errors,
+        "warnings":         warnings,
+        "system_info": {
+            "freebsd_version": ver.get("version", "n/a"),
+            "disk_var_free_mb": disk.get("free_mb", -1),
+            "pfctl_ok":        pf_chk["ok"],
+        },
+        "overall_ok": overall_ok,
     }

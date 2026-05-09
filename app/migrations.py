@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 10
 
 
 class SchemaVersionError(RuntimeError):
@@ -214,6 +214,37 @@ def _migration_v8(conn):
         pass  # column already exists on fresh installs
 
 
+def _migration_v9(conn):
+    """Phase 9: add missing columns to dhcpv6_pools.
+
+    Migration v4 created dhcpv6_pools without interface_type, enabled,
+    pd_prefix, and pd_prefix_len, but dhcpv6_writer.py reads all four.
+    Fresh installs (database.py) already have these columns; this migration
+    brings existing installs up to the same schema.
+    """
+    for ddl in [
+        "ALTER TABLE dhcpv6_pools ADD COLUMN interface_type TEXT DEFAULT 'LAN'",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN enabled INTEGER DEFAULT 0",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN pd_prefix TEXT DEFAULT ''",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN pd_prefix_len INTEGER DEFAULT 64",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists (fresh install or re-run)
+
+
+def _migration_v10(conn):
+    """Phase 10: siem_state table for SIEM collector offset persistence."""
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS siem_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -224,6 +255,8 @@ MIGRATIONS = [
     (6, _migration_v6),
     (7, _migration_v7),
     (8, _migration_v8),
+    (9, _migration_v9),
+    (10, _migration_v10),
 ]
 
 

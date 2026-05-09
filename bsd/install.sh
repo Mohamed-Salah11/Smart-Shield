@@ -71,10 +71,18 @@ section "1. Package Installation"
 info "Updating pkg repository..."
 pkg update -q
 
-REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nano mrtg nginx"
+REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nano mrtg nginx kea mpd5 miniupnpd igmpproxy ddclient bind-tools tcpdump"
 info "Installing required packages: ${REQUIRED_PKGS}"
 # shellcheck disable=SC2086
 pkg install -y ${REQUIRED_PKGS}
+
+# Verify optional service binaries are available
+info "Verifying service binary availability..."
+for bin in kea-dhcp6 mpd5 miniupnpd igmpproxy ddclient nsupdate; do
+    command -v "$bin" >/dev/null 2>&1 \
+        && info "  OK: $bin ($(command -v "$bin"))" \
+        || warn "  MISSING: $bin — feature depending on this daemon will be unavailable"
+done
 
 # Python sqlite3 extension (required for the app database)
 PYTHON_VER=$(python3 -c "import sys; print('%d%d' % sys.version_info[:2])" 2>/dev/null || echo "311")

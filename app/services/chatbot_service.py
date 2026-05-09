@@ -532,8 +532,8 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
             )
             conn.commit()
             try:
-                from app.services.firewall_writer import write_pf_rules
-                write_pf_rules(conn)
+                from app.services.pf_generator import reload_pf_rules
+                reload_pf_rules(conn)
             except Exception:
                 pass
             return {

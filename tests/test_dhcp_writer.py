@@ -22,6 +22,7 @@ os.environ.setdefault("SMARTSHIELD_MASTER_KEY",
 def conn():
     """Per-test clean in-memory DB with seed data."""
     import secrets, base64
+    _prev = os.environ.get("SMARTSHIELD_DB_PATH")
     os.environ["SMARTSHIELD_DB_PATH"] = (
         f"file:dhcp_{secrets.token_hex(4)}?mode=memory&cache=shared"
     )
@@ -43,6 +44,10 @@ def conn():
     db.commit()
     yield db
     db.close()
+    if _prev is None:
+        os.environ.pop("SMARTSHIELD_DB_PATH", None)
+    else:
+        os.environ["SMARTSHIELD_DB_PATH"] = _prev
 
 
 # ---------------------------------------------------------------------------
