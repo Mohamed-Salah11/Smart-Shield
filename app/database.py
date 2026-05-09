@@ -1323,7 +1323,9 @@ CREATE TABLE IF NOT EXISTS dhcp_pools (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """)
-
+    cursor.execute(
+        "INSERT OR IGNORE INTO dhcp_pools (interface_type, start_ip, end_ip) VALUES ('LAN', '', '')"
+    )
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS static_leases (
@@ -1432,6 +1434,15 @@ ON static_leases(mac_address)
         "INSERT OR IGNORE INTO ids_threat_feeds (id, abusech_dry_run) VALUES (1, 0)"
     )
 
+    # SIEM collector offset persistence
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # Seed abuse.ch key + dry-run flag from env into DB if install.sh set it and DB has no key yet
     _env_abusech_key  = os.environ.get("ABUSECH_AUTH_KEY",  "").strip()
     _env_dry_run_flag = 0 if os.environ.get("ABUSECH_DRY_RUN", "1").strip() == "0" else 1
@@ -1449,9 +1460,9 @@ ON static_leases(mac_address)
             except Exception:
                 pass  # secret_store may be unavailable during early migration — skip
 
-    # Seed Anthropic API key from env into service_state if install.sh set it and DB has no entry yet
-    _env_anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if _env_anthropic_key:
+    # Seed Google API key from env into service_state if install.sh set it and DB has no entry yet
+    _env_google_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    if _env_google_key:
         _existing_chatbot = cursor.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
@@ -1461,7 +1472,7 @@ ON static_leases(mac_address)
                 from app.secret_store import encrypt_secret as _enc2
                 cursor.execute(
                     "INSERT OR IGNORE INTO service_state (key_name, value_json) VALUES (?, ?)",
-                    ("chatbot_settings", _json2.dumps({"anthropic_api_key": _enc2(_env_anthropic_key)})),
+                    ("chatbot_settings", _json2.dumps({"google_api_key": _enc2(_env_google_key)})),
                 )
             except Exception:
                 pass

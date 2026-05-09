@@ -225,7 +225,8 @@ def generate_ipsec_conf(conn) -> str:
                 "    dpdaction=restart",
             ]
 
-        if phase2s:
+        if len(phase2s) == 1:
+            # Single child SA: embed Phase 2 params directly in the Phase 1 conn block.
             p2          = phase2s[0]
             local_net   = _val(p2, "local_network",  "0.0.0.0/0")
             remote_net  = _val(p2, "remote_network", "0.0.0.0/0")
@@ -242,8 +243,39 @@ def generate_ipsec_conf(conn) -> str:
                 f"    esp={esp_str}",
                 f"    lifetime={p2_lifetime}s",
             ]
+            lines.append("")
+        elif phase2s:
+            # Multiple child SAs: base conn defines Phase 1 (auto=add, no subnets),
+            # then one child conn per Phase 2 inherits via also=.
+            # Replace "auto=start" already appended above with "auto=add".
+            for i, ln in enumerate(lines):
+                if ln.strip() == "auto=start":
+                    lines[i] = "    auto=add"
+                    break
+            lines.append("")
 
-        lines.append("")
+            for idx, p2 in enumerate(phase2s, 1):
+                local_net   = _val(p2, "local_network",  "0.0.0.0/0")
+                remote_net  = _val(p2, "remote_network", "0.0.0.0/0")
+                p2_lifetime = p2.get("lifetime") or 3600
+                enc_algs    = _val(p2, "encryption_algorithms", "aes256")
+                hash_algs   = _val(p2, "hash_algorithms", "sha256")
+                pfs_group   = _val(p2, "pfs_key_group", "14")
+                esp_str     = (f"{enc_algs}-{hash_algs}-modp{pfs_group}!"
+                               if pfs_group and pfs_group != "0"
+                               else f"{enc_algs}-{hash_algs}!")
+                lines += [
+                    f"conn {conn_name}_child_{idx}",
+                    f"    also={conn_name}",
+                    f"    leftsubnet={local_net}",
+                    f"    rightsubnet={remote_net}",
+                    f"    esp={esp_str}",
+                    f"    lifetime={p2_lifetime}s",
+                    "    auto=start",
+                    "",
+                ]
+        else:
+            lines.append("")
 
     return "\n".join(lines)
 

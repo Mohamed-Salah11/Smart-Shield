@@ -15,14 +15,17 @@ get_live_leases()           -> list[dict]
 """
 
 import ipaddress
+import os
 import re
 import sys
+import tempfile
 import textwrap
 
 from app.services.network_service import FreeBSDNetworkError
 
-_DHCPD_CONF_PATH  = "/usr/local/etc/dhcpd.conf"
-_DHCPD_LEASE_PATH = "/var/db/dhcpd/dhcpd.leases"
+_DHCPD_CONF_PATH       = "/usr/local/etc/dhcpd.conf"
+_DHCPD_KNOWN_GOOD_PATH = "/usr/local/etc/dhcpd.conf.known_good"
+_DHCPD_LEASE_PATH      = "/var/db/dhcpd/dhcpd.leases"
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +282,77 @@ def generate_dhcpd_conf(conn) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Syntax check + rollback helpers
+# ---------------------------------------------------------------------------
+
+def _validate_dhcpd_conf_syntax(conf: str) -> tuple:
+    """
+    Write conf to a temp file and run ``dhcpd -t -cf <tempfile>``.
+    Returns ``(True, "")`` on success, ``(False, error_output)`` on failure.
+    Skipped on non-FreeBSD or when dhcpd is not installed.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return (True, "skipped-non-freebsd")
+
+    import shutil
+    if not shutil.which("dhcpd"):
+        return (True, "skipped-dhcpd-not-found")
+
+    tmp_path = None
+    try:
+        from app.services.network_service import run_command
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".conf", delete=False, prefix="ss_dhcpd_"
+        ) as f:
+            f.write(conf)
+            tmp_path = f.name
+
+        result = run_command(["dhcpd", "-t", "-cf", tmp_path], check=False)
+        ok  = result.returncode == 0
+        msg = (result.stderr or result.stdout or "").strip()
+        return (ok, msg)
+    except Exception as exc:
+        return (False, str(exc))
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+def _save_known_good_dhcpd() -> bool:
+    """Copy current dhcpd.conf to the known-good backup. Returns True on success."""
+    try:
+        if os.path.exists(_DHCPD_CONF_PATH):
+            with open(_DHCPD_CONF_PATH) as fh:
+                current = fh.read()
+            with open(_DHCPD_KNOWN_GOOD_PATH, "w") as fh:
+                fh.write(current)
+        return True
+    except OSError:
+        return False
+
+
+def _rollback_dhcpd() -> dict:
+    """Restore the known-good dhcpd.conf and restart isc-dhcpd."""
+    if not os.path.exists(_DHCPD_KNOWN_GOOD_PATH):
+        return {"ok": False, "message": "No known-good dhcpd.conf backup found."}
+    try:
+        with open(_DHCPD_KNOWN_GOOD_PATH) as fh:
+            old_conf = fh.read()
+        with open(_DHCPD_CONF_PATH, "w") as fh:
+            fh.write(old_conf)
+        from app.services.service_manager import service_action
+        result = service_action("isc-dhcpd", "restart")
+        if result["ok"]:
+            return {"ok": True, "message": "Rolled back to last known-good dhcpd.conf."}
+        return {"ok": False, "message": f"Rollback file restored but restart failed: {result['message']}"}
+    except OSError as exc:
+        return {"ok": False, "message": f"Rollback failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
 # Write
 # ---------------------------------------------------------------------------
 
@@ -325,22 +399,46 @@ def apply_dhcpd(conn) -> dict:
             "errors": [],
         }
 
-    # 3. Write
+    # 3. Syntax check via dhcpd -t
+    syn_ok, syn_err = _validate_dhcpd_conf_syntax(conf)
+    if not syn_ok:
+        return {
+            "ok": False,
+            "message": f"dhcpd syntax check failed: {syn_err}",
+            "conf": conf,
+            "errors": [syn_err],
+        }
+
+    # 4. Backup current config as known-good
+    _save_known_good_dhcpd()
+
+    # 5. Write new config
     try:
         with open(_DHCPD_CONF_PATH, "w") as fh:
             fh.write(conf)
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf, "errors": []}
 
-    # 4. Enable service in rc.conf so it starts on reboot, then restart it
+    # 6. Enable service in rc.conf so it starts on reboot, then restart it
     from app.services.service_manager import service_action, sysrc_set
     sysrc_set("isc_dhcpd_enable", "YES")
     result = service_action("isc-dhcpd", "restart")
+    if not result["ok"]:
+        rb = _rollback_dhcpd()
+        rb_msg = rb.get("message", "rollback status unknown")
+        return {
+            "ok": False,
+            "message": f"isc-dhcpd restart failed ({result['message']}). {rb_msg}",
+            "conf": conf,
+            "errors": [],
+            "rolled_back": rb["ok"],
+        }
     return {
-        "ok": result["ok"],
+        "ok": True,
         "message": result["message"],
         "conf": conf,
         "errors": [],
+        "rolled_back": False,
     }
 
 

@@ -416,6 +416,7 @@
 
     <!-- Main content -->
     <main class="main-content">
+        {% include "partials/mode_banner.html" ignore missing %}
         {% block content %}{% endblock %}
         {% block main %}{% endblock %}
     </main>

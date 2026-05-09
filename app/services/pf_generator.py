@@ -490,19 +490,15 @@ def generate_pf_conf(conn) -> str:
     _cp_settings = _json.loads(_cp_row["value_json"]) if _cp_row else {}
     _cp_enabled = bool(_cp_settings.get("enabled", False))
 
-    if _cp_enabled:
-        translation_hooks = textwrap.dedent("""\
+    translation_hooks = textwrap.dedent("""\
     # Captive portal translation hook
     rdr-anchor "captive_portal"
 
     """)
-        cp_anchor_line = (
-            "# Captive portal filter hook must run before generic LAN allow.\n"
-            "anchor \"captive_portal\"\n\n"
-        )
-    else:
-        translation_hooks = ""
-        cp_anchor_line = ""
+    cp_anchor_line = (
+        "# Captive portal filter hook must run before generic LAN allow.\n"
+        "anchor \"captive_portal\"\n\n"
+    )
 
     default_policy = (
         textwrap.dedent("""\

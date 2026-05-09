@@ -27,10 +27,10 @@ _TIMEOUT = 10  # seconds
 
 
 def _get_auth_key() -> str:
-    """Return the abuse.ch Auth-Key if configured, else empty string.
+    """Return the abuse.ch Auth-Key if configured.
 
-    URLhaus and MalwareBazaar don't require auth; ThreatFox recommends it.
-    Callers that need auth can check for an empty return value themselves.
+    Raises RuntimeError when no key is available so callers fail fast
+    rather than silently sending unauthenticated requests.
     """
     key = os.getenv("ABUSECH_AUTH_KEY", "").strip()
     if key:
@@ -48,7 +48,7 @@ def _get_auth_key() -> str:
                 return key
     except Exception:
         pass
-    return ""
+    raise RuntimeError("ABUSECH_AUTH_KEY is required for abuse.ch API access")
 
 
 def is_dry_run(conn=None) -> bool:
