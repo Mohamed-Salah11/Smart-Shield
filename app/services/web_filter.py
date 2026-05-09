@@ -180,7 +180,29 @@ def toggle_web_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     hot_apply_web_rule(conn, rule_id)
 
 
+def _hot_remove_domain(domain: str) -> None:
+    """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_zone_remove", domain=domain)
+    except Exception:
+        pass
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_data_remove", domain=domain)
+    except Exception:
+        pass
+
+
 def delete_web_filter_rule(conn, rule_id: int) -> None:
+    row = conn.execute(
+        "SELECT url_pattern FROM filter_web_rules WHERE id=?", (rule_id,)
+    ).fetchone()
+    if row:
+        _hot_remove_domain(row["url_pattern"])
     conn.execute("DELETE FROM filter_web_rules WHERE id = ?", (rule_id,))
     conn.commit()
 

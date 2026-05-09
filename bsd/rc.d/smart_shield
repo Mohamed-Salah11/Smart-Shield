@@ -46,7 +46,7 @@ load_rc_config "${name}"
 : ${smart_shield_python:="/usr/local/share/smart-shield/.venv/bin/python3"}
 : ${smart_shield_gunicorn:="/usr/local/share/smart-shield/.venv/bin/gunicorn"}
 : ${smart_shield_wsgi:="wsgi:app"}
-: ${smart_shield_bind:="0.0.0.0:5000"}
+: ${smart_shield_bind:="192.168.1.1:5000"}
 : ${smart_shield_workers:="2"}
 
 required_files="${smart_shield_gunicorn}"

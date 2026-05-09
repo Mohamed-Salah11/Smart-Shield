@@ -750,9 +750,24 @@ if (btnSaveFeeds) {
 function _showAbusechResult(obj) {
   const box = document.getElementById('abusechResult');
   if (!box) return;
-
   box.classList.remove('d-none');
-  box.textContent = JSON.stringify(obj, null, 2);
+  box.style.color = '';
+
+  if (!obj.ok) {
+    box.style.color = 'var(--danger, #dc2626)';
+    box.textContent = 'Error: ' + (obj.message || 'Unknown error');
+    return;
+  }
+
+  if (obj.dry_run || obj.result?.query_status === 'dry_run') {
+    box.style.color = 'var(--warning, #d97706)';
+    box.textContent =
+      'Dry-run mode is active — no API call was made.\n' +
+      'Toggle "Live" mode in the Threat Feeds settings to run real lookups.';
+    return;
+  }
+
+  box.textContent = JSON.stringify(obj.result ?? obj, null, 2);
 }
 
 const btnAbusechLookup = document.getElementById('btnAbusechLookup');

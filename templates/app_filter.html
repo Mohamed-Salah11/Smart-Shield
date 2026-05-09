@@ -280,6 +280,8 @@
 <div id="toast"></div>
 
 <script>
+const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
 function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
 
@@ -329,8 +331,21 @@ async function applyFilter() {
 async function addFromSig(sigKey, btn) {
   btn.textContent = '…';
   const r = await api('/filters/app/add-signature', { sig_key: sigKey, action: 'block' });
-  if (r.ok) { btn.textContent = 'Added'; btn.classList.add('added'); showToast(r.message, true); }
-  else { btn.textContent = 'Block'; showToast(r.message, false); }
+  if (r.ok) {
+    btn.textContent = 'Added';
+    btn.classList.add('added');
+    showToast(r.message, true);
+    if (r.rule) {
+      const tbody = document.querySelector('.ftbl tbody');
+      const emptyRow = tbody.querySelector('.empty-row');
+      if (emptyRow) emptyRow.remove();
+      tbody.insertAdjacentHTML('afterbegin', _buildRuleRow(r.rule));
+    }
+    scheduleApply();
+  } else {
+    btn.textContent = 'Block';
+    showToast(r.message, false);
+  }
 }
 
 function _buildRuleRow(v) {

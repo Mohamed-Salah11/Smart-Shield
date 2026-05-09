@@ -519,13 +519,28 @@ def generate_pf_anchor(conn) -> str:
 
 
 def apply_captive_portal(conn) -> dict:
-    conf = generate_pf_anchor(conn)
-
     import json
     rows = conn.execute(
         "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
     ).fetchone()
     settings = json.loads(rows["value_json"]) if rows else {}
+
+    # Only apply the block-all PF anchor when captive portal is explicitly enabled.
+    # Default is False so DNS-only content filtering never activates the block-all rule.
+    if not settings.get("enabled", False):
+        if sys.platform.startswith("freebsd"):
+            try:
+                with open(_CP_ANCHOR_PATH, "w") as fh:
+                    fh.write("# captive portal disabled\n")
+                from app.services.priv_helper import run_privileged
+                run_privileged("pf.anchor_reload",
+                               anchor_name=_CP_ANCHOR_NAME,
+                               config_path=_CP_ANCHOR_PATH)
+            except Exception:
+                pass
+        return {"ok": True, "message": "Captive portal disabled — PF anchor cleared."}
+
+    conf = generate_pf_anchor(conn)
 
     portal_ip   = (settings.get("portal_ip") or _default_portal_ip(conn)).strip()
     portal_port = settings.get("portal_port") or _CP_REDIRECT_PORT

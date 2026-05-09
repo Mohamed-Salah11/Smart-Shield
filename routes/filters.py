@@ -418,7 +418,11 @@ def app_add_signature():
             username=session.get("username"), remote_addr=request.remote_addr,
             details={"sig_key": sig_key, "name": sig_name, "id": row_id},
         )
-        return jsonify({"ok": True, "message": f"'{sig_name}' added from signature library.", "id": row_id})
+        rule = dict(conn.execute(
+            "SELECT * FROM filter_app_rules WHERE id=?", (row_id,)
+        ).fetchone())
+        return jsonify({"ok": True, "message": f"'{sig_name}' added from signature library.",
+                        "id": row_id, "rule": rule})
     except ValueError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
     except Exception as exc:
