@@ -216,6 +216,20 @@ def create_app():
     def _request_timing_start():
         g.request_start_time = time.perf_counter()
 
+    @app.before_request
+    def _periodic_expire_sessions():
+        _periodic_expire_sessions._last_ts = getattr(_periodic_expire_sessions, "_last_ts", 0.0)
+        now = time.time()
+        if now - _periodic_expire_sessions._last_ts < 60:
+            return
+        _periodic_expire_sessions._last_ts = now
+        try:
+            from app.services.captive_portal import expire_sessions
+            from app.database import get_db
+            expire_sessions(get_db())
+        except Exception:
+            pass
+
     @app.context_processor
     def _csrf_context():
         return {

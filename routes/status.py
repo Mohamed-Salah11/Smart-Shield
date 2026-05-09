@@ -697,11 +697,13 @@ def mrtg_graphs():
             })
 
     iface_names = [i["name"] for i in interfaces]
+    import time
     return render_template(
         "mrtg_graphs.html",
         interfaces=interfaces,
         iface_names=iface_names,
         on_freebsd=sys.platform.startswith("freebsd"),
+        now_ts=int(time.time()),
     )
 
 
@@ -732,20 +734,24 @@ def mrtg_apply():
 @login_required
 def mrtg_image(filename):
     """Serve MRTG-generated PNG graph files from the MRTG work directory."""
-    from flask import send_from_directory, abort
+    from flask import send_from_directory, abort, make_response
     if ".." in filename or filename.startswith("/"):
         abort(400)
     mrtg_dir = "/var/db/smart-shield/mrtg"
-    return send_from_directory(mrtg_dir, filename)
+    resp = make_response(send_from_directory(mrtg_dir, filename))
+    resp.cache_control.no_store = True
+    resp.cache_control.max_age = 0
+    return resp
 
 
 @status_bp.route("/api/mrtg/reinitialize", methods=["POST"])
 @login_required
 def mrtg_reinitialize():
     """Re-run apply_mrtg() to regenerate MRTG config and prime graph files."""
-    conn = get_db()
     try:
+        from app.database import get_db
         from app.services.mrtg_writer import apply_mrtg
+        conn   = get_db()
         result = apply_mrtg(conn)
         return jsonify({"ok": result.get("ok", False), "message": result.get("message", "")})
     except Exception as exc:

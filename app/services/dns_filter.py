@@ -184,7 +184,28 @@ def toggle_dns_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     hot_apply_dns_rule(conn, rule_id)
 
 
+def _hot_remove_domain(domain: str) -> None:
+    """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_zone_remove", domain=domain)
+    except Exception:
+        pass
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_data_remove", domain=domain)
+    except Exception:
+        pass
+
+
 def delete_dns_filter_rule(conn, rule_id: int) -> None:
+    row = conn.execute(
+        "SELECT domain FROM filter_dns_rules WHERE id=?", (rule_id,)
+    ).fetchone()
+    if row:
+        _hot_remove_domain(row["domain"])
     conn.execute("DELETE FROM filter_dns_rules WHERE id = ?", (rule_id,))
     conn.commit()
 

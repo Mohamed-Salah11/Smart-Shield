@@ -38,6 +38,11 @@ warn()    { printf "${YELLOW}[!]${NC} %s\n" "$*"; }
 fatal()   { printf "${RED}[✗]${NC} %s\n" "$*"; exit 1; }
 section() { printf "\n${BOLD}━━━ %s ━━━${NC}\n" "$*"; }
 
+# ─── LAN defaults (overridable by setting env vars before running this script) ─
+LAN_IFACE="${LAN_IFACE:-em1}"
+LAN_IP="${LAN_IP:-192.168.1.1}"
+LAN_MASK="${LAN_MASK:-255.255.255.0}"
+
 # ─── Root check ──────────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
     fatal "This script must be run as root.  Try: sudo sh $0"
@@ -148,6 +153,14 @@ install -d -m 0755 /var/run/nginx        2>/dev/null && info "Created: /var/run/
 install -d -m 0755 /usr/local/etc/mrtg             2>/dev/null && info "Created: /usr/local/etc/mrtg" || true
 install -d -m 0755 /var/db/smart-shield/mrtg       2>/dev/null && info "Created: /var/db/smart-shield/mrtg" || true
 
+# Log rotation (newsyslog)
+_NEWSYSLOG_SRC="$(dirname "$0")/etc/newsyslog.d/smart-shield.conf"
+if [ -f "${_NEWSYSLOG_SRC}" ]; then
+    install -d -m 0755 /usr/local/etc/newsyslog.d 2>/dev/null || true
+    install -m 0644 "${_NEWSYSLOG_SRC}" /usr/local/etc/newsyslog.d/smart-shield.conf
+    info "Log rotation config installed → /usr/local/etc/newsyslog.d/smart-shield.conf"
+fi
+
 # ── Required runtime files ───────────────────────────────────────────────────
 # dhcpd refuses to start if dhcpd.leases doesn't exist as a file
 if [ ! -f /var/db/dhcpd/dhcpd.leases ]; then
@@ -198,8 +211,8 @@ SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
-# SmartShield AI chatbot — get a key at https://console.anthropic.com
-ANTHROPIC_API_KEY=
+# SmartShield AI chatbot — get a free key at https://aistudio.google.com
+GOOGLE_API_KEY=
 EOF
         chmod 0600 "${ENV_FILE}"
         info "Admin account will be created on first run via the setup wizard."
@@ -225,19 +238,19 @@ if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
     fi
 fi
 
-# Prompt for ANTHROPIC_API_KEY (SmartShield AI chatbot)
-if ! grep -q "^ANTHROPIC_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
-    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Claude) ━━━${NC}\n"
-    printf "SmartShield includes an AI security assistant powered by Claude (Anthropic).\n"
+# Prompt for GOOGLE_API_KEY (SmartShield AI chatbot — Gemini)
+if ! grep -q "^GOOGLE_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
+    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Gemini) ━━━${NC}\n"
+    printf "SmartShield includes an AI security assistant powered by Google Gemini.\n"
     printf "It can analyse logs, explain rules, and answer firewall questions.\n"
-    printf "Get an API key at: https://console.anthropic.com\n"
-    printf "${YELLOW}[?]${NC} Enter your ANTHROPIC_API_KEY (press Enter to skip): "
-    read -r ANTHROPIC_KEY
-    if [ -n "${ANTHROPIC_KEY}" ]; then
-        sed -i '' "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${ANTHROPIC_KEY}|" "${ENV_FILE}"
-        info "Anthropic API key saved — SmartShield AI chatbot is enabled."
+    printf "Get a free API key at: https://aistudio.google.com\n"
+    printf "${YELLOW}[?]${NC} Enter your GOOGLE_API_KEY (press Enter to skip): "
+    read -r GOOGLE_KEY
+    if [ -n "${GOOGLE_KEY}" ]; then
+        sed -i '' "s|^GOOGLE_API_KEY=.*|GOOGLE_API_KEY=${GOOGLE_KEY}|" "${ENV_FILE}"
+        info "Google API key saved — SmartShield AI chatbot is enabled."
     else
-        warn "ANTHROPIC_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
+        warn "GOOGLE_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
     fi
 fi
 
@@ -363,7 +376,7 @@ else
 fi
 
 # ── Nginx TLS reverse proxy ────────────────────────────────────────────────────
-section "Nginx TLS & Reverse Proxy"
+section "5a. Nginx TLS & Reverse Proxy"
 
 # SSL directory (mode 0700 — private key must not be world-readable)
 SSL_DIR="/usr/local/etc/smart-shield/ssl"
@@ -392,7 +405,7 @@ fi
 
 # Write a complete nginx.conf (replaces the default pkg stub).
 # server_name _ = catch-all (works for any IP or hostname on this appliance).
-# proxy_read_timeout 300s to accommodate Claude API agentic loops.
+# proxy_read_timeout 300s to accommodate Gemini API agentic loops.
 cat > /usr/local/etc/nginx/nginx.conf << 'NGINXEOF'
 user www;
 worker_processes auto;
@@ -463,6 +476,16 @@ http {
 NGINXEOF
 info "Nginx configuration written to /usr/local/etc/nginx/nginx.conf"
 
+# Restrict nginx listeners and gunicorn proxy_pass to the LAN interface IP.
+# The heredoc above uses single-quotes so $LAN_IP is substituted here via sed.
+sed -i '' "s|listen      80;|listen      ${LAN_IP}:80;|"    /usr/local/etc/nginx/nginx.conf
+sed -i '' '/listen      \[::\]:80;/d'                        /usr/local/etc/nginx/nginx.conf
+sed -i '' "s|listen      443 ssl;|listen      ${LAN_IP}:443 ssl;|" /usr/local/etc/nginx/nginx.conf
+sed -i '' '/listen      \[::\]:443 ssl;/d'                   /usr/local/etc/nginx/nginx.conf
+sed -i '' "s|proxy_pass         http://127\.0\.0\.1:5000;|proxy_pass         http://${LAN_IP}:5000;|" \
+    /usr/local/etc/nginx/nginx.conf
+info "nginx bound to LAN interface only (${LAN_IP}:443)"
+
 # Enable and start nginx
 sysrc nginx_enable=YES
 info "nginx_enable=YES written to rc.conf"
@@ -474,7 +497,7 @@ else
 fi
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
-section "5a. sudo / Sudoers (optional fallback)"
+section "5b. sudo / Sudoers (optional fallback)"
 
 # Ensure sudo is installed
 if ! command -v sudo >/dev/null 2>&1; then
@@ -548,23 +571,26 @@ info "bsnmpd_enable=YES written to rc.conf"
 
 section "6b. Live Network Activation"
 
-# Allow caller to override via env vars; defaults target a typical lab setup
-LAN_IFACE="${LAN_IFACE:-em1}"
-LAN_IP="${LAN_IP:-192.168.1.1}"
-LAN_MASK="${LAN_MASK:-255.255.255.0}"
-
 # ── LAN interface ─────────────────────────────────────────────────────────────
 sysrc "ifconfig_${LAN_IFACE}=inet ${LAN_IP} netmask ${LAN_MASK}"
 info "ifconfig_${LAN_IFACE} written to rc.conf (${LAN_IP}/${LAN_MASK})"
 
-if ifconfig "${LAN_IFACE}" 2>/dev/null | grep -q "flags="; then
-    ifconfig "${LAN_IFACE}" inet "${LAN_IP}" netmask "${LAN_MASK}" up 2>/dev/null \
-        && info "Assigned ${LAN_IP}/${LAN_MASK} to ${LAN_IFACE}" \
-        || warn "ifconfig assign failed — interface may not be present; rc.conf updated"
-    service netif restart "${LAN_IFACE}" 2>/dev/null \
-        && info "netif restarted for ${LAN_IFACE}" || true
+# Bind gunicorn to the LAN IP so the app only listens on the management interface.
+sysrc "smart_shield_bind=${LAN_IP}:5000"
+info "smart_shield_bind=${LAN_IP}:5000 written to rc.conf"
+
+if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+    if ifconfig "${LAN_IFACE}" 2>/dev/null | grep -q "flags="; then
+        ifconfig "${LAN_IFACE}" inet "${LAN_IP}" netmask "${LAN_MASK}" up 2>/dev/null \
+            && info "Assigned ${LAN_IP}/${LAN_MASK} to ${LAN_IFACE}" \
+            || warn "ifconfig assign failed — interface may not be present; rc.conf updated"
+        service netif restart "${LAN_IFACE}" 2>/dev/null \
+            && info "netif restarted for ${LAN_IFACE}" || true
+    else
+        warn "${LAN_IFACE} not present — IP assignment skipped (rc.conf updated for next boot)"
+    fi
 else
-    warn "${LAN_IFACE} not present — IP assignment skipped (rc.conf updated for next boot)"
+    info "Dry-run: LAN IP written to rc.conf only; run in LIVE mode to apply ifconfig immediately."
 fi
 
 # ── PF ────────────────────────────────────────────────────────────────────────
@@ -634,9 +660,10 @@ Next steps:
        service smart_shield start
        service smart_shield status
 
-  2. Open the web UI and complete the setup wizard:
-       http://<LAN-IP>:5000
-       (You will be redirected to the setup wizard — create your admin account in step 3.)
+  2. Open the web UI (HTTPS, LAN only) and complete the setup wizard:
+       https://${LAN_IP}
+       (Accept the self-signed certificate warning — replace with a CA cert for production.)
+       You will be redirected to the setup wizard; create your admin account in step 3.
 
   3. Check the Preflight page in the web UI:
        System → Preflight Check
@@ -644,8 +671,5 @@ Next steps:
   4. Set your Abuse.ch key in ${ENV_FILE}:
        ABUSECH_AUTH_KEY=<your-key>   (get it at https://abuse.ch/)
        Leave ABUSECH_DRY_RUN=1 until you want live threat intel lookups.
-
-  5. (Optional) Configure nginx as TLS reverse proxy:
-       See bsd/FREEBSD_DEPLOYMENT.md Step 9
 
 EOF
