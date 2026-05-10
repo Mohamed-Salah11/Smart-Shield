@@ -375,6 +375,20 @@ def _snapshot_component_definitions():
             }
         )
 
+    # Additional critical files always included on FreeBSD
+    if sys.platform.startswith("freebsd"):
+        _extra_files = [
+            ("/usr/local/etc/ipsec.secrets",                 "ipsec_secrets",    "IPsec Secrets"),
+            ("/usr/local/etc/suricata/rules/local.rules",    "suricata_local_rules", "Suricata Local Rules"),
+        ]
+        for path, name, label in _extra_files:
+            definitions.append({"name": name, "kind": "file",
+                                 "path": _normalize_abs(path), "label": label})
+
+        # OpenVPN key directory (certs exported by export_pki_to_disk)
+        definitions.append({"name": "openvpn_keys", "kind": "directory",
+                             "path": "/usr/local/etc/openvpn/keys", "label": "OpenVPN Keys"})
+
     return definitions
 
 
@@ -527,11 +541,22 @@ def _build_full_snapshot_payload(mask_passwords=False):
         total_bytes += byte_count
         total_masked_files += masked_count
 
+    try:
+        from app.migrations import CURRENT_SCHEMA_VERSION
+        schema_ver = CURRENT_SCHEMA_VERSION
+    except Exception:
+        schema_ver = 0
+
     return {
         "snapshot_format": SNAPSHOT_PAYLOAD_FORMAT,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "scope": "full_system_snapshot",
         "password_masked": bool(mask_passwords),
+        "version_metadata": {
+            "app_version": "F27",
+            "schema_version": schema_ver,
+            "backup_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        },
         "device": {
             "hostname": config.get("hostname") or "Smart Shield",
             "timezone": config.get("timezone") or "Etc/UTC",
@@ -663,6 +688,21 @@ def _decode_snapshot_envelope(raw_backup_bytes, password):
         raise BackupFormatError("Unsupported backup snapshot format.")
     if not isinstance(payload_obj.get("components"), dict):
         raise BackupFormatError("Backup snapshot components are missing.")
+
+    # Schema-version compatibility check — warn but don't block if backup is older
+    version_meta = payload_obj.get("version_metadata") or {}
+    backup_schema = version_meta.get("schema_version", 0)
+    if backup_schema:
+        try:
+            from app.migrations import CURRENT_SCHEMA_VERSION
+            if isinstance(backup_schema, int) and backup_schema > CURRENT_SCHEMA_VERSION:
+                raise BackupFormatError(
+                    f"Backup was created with schema v{backup_schema} but this "
+                    f"installation is at v{CURRENT_SCHEMA_VERSION}. "
+                    f"Upgrade the application before restoring."
+                )
+        except ImportError:
+            pass
 
     return payload_obj, encrypted
 
