@@ -76,8 +76,13 @@ class Config:
     # If blank, a key is auto-generated on first use and persisted to disk.
     MASTER_KEY: str = os.getenv("SMARTSHIELD_MASTER_KEY", "")
 
-    # ------------------------------------------------------ AI Chatbot (Claude)
+    # ------------------------------------------------------ AI Chatbot (Google Gemini)
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    # Legacy — kept for potential future provider switching; not used by active chatbot.
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+
+    # ---------------------------------------------- Threat intelligence (abuse.ch)
+    ABUSECH_AUTH_KEY: str = os.getenv("ABUSECH_AUTH_KEY", "")
 
     # ------------------------------------------------------ Upload constraints
     MAX_CONTENT_LENGTH: int = 2 * 1024 * 1024  # 2 MB max upload size

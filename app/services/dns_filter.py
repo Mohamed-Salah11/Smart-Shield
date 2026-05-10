@@ -128,8 +128,10 @@ def update_dns_filter_rule(
     domain = _sanitize_domain(domain)
     if not domain:
         raise ValueError("Domain must not be empty.")
-    if action not in ("block", "allow"):
-        raise ValueError("Action must be 'block' or 'allow'.")
+    if action not in ("block", "allow", "redirect"):
+        raise ValueError("Action must be 'block', 'allow', or 'redirect'.")
+    if action == "redirect" and not redirect_ip:
+        raise ValueError("redirect_ip is required when action is 'redirect'.")
     conn.execute(
         """
         UPDATE filter_dns_rules

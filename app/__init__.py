@@ -332,6 +332,13 @@ def create_app():
 
     init_db()
 
+    # Emit startup warnings for missing optional keys (chatbot, threat intel, master key).
+    try:
+        from app.services.runtime_mode import startup_warnings
+        startup_warnings()
+    except Exception:
+        pass
+
     # Start SIEM background collectors (FreeBSD only; silent no-op on dev)
     try:
         from app.services.siem_collector import start_siem_collectors

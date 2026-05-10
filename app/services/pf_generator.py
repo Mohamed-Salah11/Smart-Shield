@@ -404,6 +404,122 @@ def _run_dnctl_setup(conn) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 4d. Hardening rules (anti-spoof, bogons, private-net block, ICMP, admin UI)
+# ---------------------------------------------------------------------------
+
+# Standard bogon / unroutable prefixes that should never appear as WAN sources.
+_BOGON_PREFIXES = [
+    "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8",
+    "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24",
+    "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24",
+    "224.0.0.0/3", "240.0.0.0/4",
+]
+
+# RFC-1918 private address blocks.
+_PRIVATE_NET_PREFIXES = [
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+]
+
+# ICMPv6 types always needed for neighbor discovery (must never be blocked).
+_ND_ICMPV6_TYPES = "133 134 135 136 137"
+
+# Default admin GUI port if not configured in the DB.
+_DEFAULT_ADMIN_PORT = 5000
+
+
+def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
+    """
+    Emit sane default firewall hardening rules:
+      - Bogon table (unroutable addresses) and block rule on WAN (configurable)
+      - Private-net block on WAN (configurable)
+      - anti-spoof rules on WAN and LAN
+      - Sane ICMP pass rules
+      - ICMPv6 Neighbor Discovery always-pass rules
+      - Admin GUI protection rule (always pass from LAN)
+    """
+    # Read hardening settings; fall back to safe defaults if table/columns missing.
+    block_bogons       = True
+    block_private_nets = True
+    admin_port         = _DEFAULT_ADMIN_PORT
+
+    try:
+        row = conn.execute(
+            "SELECT block_bogons, block_private_nets FROM advanced_firewall_nat LIMIT 1"
+        ).fetchone()
+        if row:
+            block_bogons       = bool(row[0]) if row[0] is not None else True
+            block_private_nets = bool(row[1]) if row[1] is not None else True
+    except Exception:
+        pass
+
+    try:
+        arow = conn.execute(
+            "SELECT tcp_port FROM advanced_admin_access LIMIT 1"
+        ).fetchone()
+        if arow and arow[0]:
+            admin_port = int(arow[0])
+    except Exception:
+        pass
+
+    lines = ["# ── Firewall Hardening ──"]
+
+    # Bogon table
+    if block_bogons:
+        bogon_list = " ".join(_BOGON_PREFIXES)
+        lines.append(f"table <bogons> const {{ {bogon_list} }}")
+
+    # Private nets table
+    if block_private_nets:
+        priv_list = " ".join(_PRIVATE_NET_PREFIXES)
+        lines.append(f"table <private_nets> const {{ {priv_list} }}")
+
+    lines.append("")
+
+    # anti-spoof — prevents spoofed source packets from the wrong interface
+    lines.append(f"antispoof quick for {wan_iface}")
+    lines.append(f"antispoof quick for {lan_iface}")
+    lines.append("")
+
+    # Block bogon sources arriving on WAN
+    if block_bogons:
+        lines.append(f"block in quick on {wan_iface} from <bogons> to any")
+
+    # Block private-net sources arriving on WAN (prevent RFC-1918 spoofing from internet)
+    if block_private_nets:
+        lines.append(f"block in quick on {wan_iface} from <private_nets> to any")
+
+    if block_bogons or block_private_nets:
+        lines.append("")
+
+    # Sane ICMP pass rules (types safe to pass; covers ping + path MTU discovery)
+    lines.append("# ICMP: allow essential types, drop the rest")
+    lines.append(
+        "pass in  quick proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+    )
+    lines.append(
+        "pass out quick proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+    )
+    lines.append("")
+
+    # ICMPv6 — Neighbor Discovery types must always be allowed
+    lines.append("# ICMPv6: Neighbor Discovery (must not be blocked)")
+    lines.append(
+        f"pass quick proto icmp6 icmp6-type {{ {_ND_ICMPV6_TYPES} }} keep state"
+    )
+    lines.append("")
+
+    # Admin GUI protection — always allow from LAN so admins can't be locked out
+    lines.append(f"# Admin GUI: always reachable from LAN on port {admin_port}")
+    lines.append(
+        f"pass in quick on {lan_iface} proto tcp "
+        f"from any to any port {admin_port} keep state"
+    )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # 5. Application filter PF rules
 # ---------------------------------------------------------------------------
 
@@ -526,6 +642,7 @@ def generate_pf_conf(conn) -> str:
         + _build_dummynet_pipes(conn)
         + options
         + scrub
+        + _build_hardening_rules(conn, wan_iface, lan_iface)
         + _build_shaper_queues(conn, wan_iface, lan_iface)
         + default_nat
         + _build_nat_rules(conn, wan_iface)

@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 10
+CURRENT_SCHEMA_VERSION = 12
 
 
 class SchemaVersionError(RuntimeError):
@@ -245,6 +245,55 @@ def _migration_v10(conn):
     """)
 
 
+def _migration_v11(conn):
+    """Phase 11: Fix certificates table column name mismatches.
+
+    Migration v3 created the certificates table with:
+      - key_pem_enc   (fresh installs use private_key_enc)
+      - serial_number (fresh installs use serial)
+      - chain_pem     (not in fresh schema; left in place as harmless extra column)
+      - no revoked_at (fresh installs include revoked_at TIMESTAMP)
+
+    This migration renames the mismatched columns and adds revoked_at so that
+    upgraded databases have the same schema as fresh installs.
+    """
+    info = conn.execute("PRAGMA table_info(certificates)").fetchall()
+    # PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+    cols = {row[1] for row in info}
+
+    if "key_pem_enc" in cols and "private_key_enc" not in cols:
+        conn.execute(
+            "ALTER TABLE certificates RENAME COLUMN key_pem_enc TO private_key_enc"
+        )
+
+    if "serial_number" in cols and "serial" not in cols:
+        conn.execute(
+            "ALTER TABLE certificates RENAME COLUMN serial_number TO serial"
+        )
+
+    if "revoked_at" not in cols:
+        try:
+            conn.execute("ALTER TABLE certificates ADD COLUMN revoked_at TIMESTAMP")
+        except Exception:
+            pass  # already present
+
+
+def _migration_v12(conn):
+    """Phase 12: Add firewall hardening toggle columns to advanced_firewall_nat.
+
+    block_bogons       — block bogon/unroutable addresses arriving on WAN (default ON)
+    block_private_nets — block RFC-1918 private source addresses on WAN (default ON)
+    """
+    for ddl in [
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN block_bogons INTEGER DEFAULT 1",
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN block_private_nets INTEGER DEFAULT 1",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists (fresh install or re-run)
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -257,6 +306,8 @@ MIGRATIONS = [
     (8, _migration_v8),
     (9, _migration_v9),
     (10, _migration_v10),
+    (11, _migration_v11),
+    (12, _migration_v12),
 ]
 
 
