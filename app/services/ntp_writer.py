@@ -166,23 +166,23 @@ def apply_ntp(conn) -> dict:
     conf = generate_ntp_conf(settings)
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — ntpd.conf generated but not written.", "conf": conf}
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — ntpd.conf generated but not written.", "conf": conf}
 
-    try:
-        with open(_NTP_CONF_PATH, "w") as fh:
-            fh.write(conf)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     enabled = bool(settings.get("enabled", True))
-    if enabled:
-        sysrc_set("ntpd_enable", "YES")
-        r = service_action("ntpd", "restart")
-    else:
-        sysrc_set("ntpd_enable", "NO")
-        r = service_action("ntpd", "stop")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        if enabled:
+            sysrc_set("ntpd_enable", "YES")
+            return service_action("ntpd", "restart")
+        else:
+            sysrc_set("ntpd_enable", "NO")
+            return service_action("ntpd", "stop")
+
+    result = apply_with_rollback(_NTP_CONF_PATH, conf, _restart)
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------
@@ -221,3 +221,47 @@ def get_ntp_sync_status() -> dict:
         return {"ok": True, "peers": peers}
     except Exception as exc:
         return {"ok": False, "peers": [], "message": str(exc)}
+
+
+def force_ntp_sync() -> dict:
+    """
+    Force an immediate NTP time synchronisation using ``ntpdate`` or ``ntpd -g``.
+    Useful after a large clock drift or initial setup.
+    Returns ``{"ok": bool, "message": str, "offset_ms": float|None}``.
+    On non-FreeBSD: dry-run.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "Non-FreeBSD — NTP force-sync skipped.", "offset_ms": None}
+
+    import shutil
+    from app.services.network_service import run_command
+
+    # Prefer ntpdate for a one-shot step-correction
+    if shutil.which("ntpdate"):
+        try:
+            r = run_command(["ntpdate", "-u", "pool.ntp.org"], check=False, timeout_seconds=15)
+            ok  = r.returncode == 0
+            out = (r.stdout or r.stderr or "").strip()
+            # Parse offset from ntpdate output: "adjust time server ... offset N.NNNNNN sec"
+            import re as _re
+            m = _re.search(r"offset\s+(-?\d+\.\d+)", out)
+            offset_ms = round(float(m.group(1)) * 1000, 3) if m else None
+            return {
+                "ok":        ok,
+                "message":   "NTP sync completed." if ok else f"ntpdate error: {out}",
+                "offset_ms": offset_ms,
+            }
+        except Exception as exc:
+            return {"ok": False, "message": str(exc), "offset_ms": None}
+
+    # Fallback: kick the running ntpd with -g (step correction allowed once)
+    try:
+        from app.services.service_manager import service_action
+        r = service_action("ntpd", "restart")
+        return {
+            "ok":        r["ok"],
+            "message":   r.get("message", ""),
+            "offset_ms": None,
+        }
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "offset_ms": None}

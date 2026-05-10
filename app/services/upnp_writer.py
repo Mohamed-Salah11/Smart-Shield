@@ -165,26 +165,26 @@ def apply_upnp(conn) -> dict:
         return {"ok": False, "message": "Validation failed: " + " | ".join(errors), "conf": conf}
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — miniupnpd.conf generated but not written.", "conf": conf}
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — miniupnpd.conf generated but not written.", "conf": conf}
 
     os.makedirs(_UPNP_CONF_DIR, exist_ok=True)
     os.makedirs("/var/db/miniupnpd", exist_ok=True)
 
-    try:
-        with open(_UPNP_CONF_PATH, "w") as fh:
-            fh.write(conf)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     enabled = bool(settings.get("enabled", True))
-    if enabled:
-        sysrc_set("miniupnpd_enable", "YES")
-        r = service_action("miniupnpd", "restart")
-    else:
-        sysrc_set("miniupnpd_enable", "NO")
-        r = service_action("miniupnpd", "stop")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        if enabled:
+            sysrc_set("miniupnpd_enable", "YES")
+            return service_action("miniupnpd", "restart")
+        else:
+            sysrc_set("miniupnpd_enable", "NO")
+            return service_action("miniupnpd", "stop")
+
+    result = apply_with_rollback(_UPNP_CONF_PATH, conf, _restart)
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------

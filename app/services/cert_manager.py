@@ -439,6 +439,72 @@ def mask_cert_fields(row: dict) -> dict:
     return safe
 
 
+def get_expiring_certs(conn, warn_days: int = 30) -> dict:
+    """
+    Return an expiry dashboard for all certificates.
+
+    Each entry includes:
+      id, name, cert_type, common_name, not_after, days_remaining, status
+
+    ``status`` is one of: "ok", "expiring_soon", "expired", "revoked", "no_expiry".
+
+    Returns {"certs": list, "expired": int, "expiring_soon": int, "ok": int}.
+    """
+    rows = list_certs(conn)
+    now  = _now()
+    result = []
+
+    for row in rows:
+        entry = {
+            "id":          row.get("id"),
+            "name":        row.get("name"),
+            "cert_type":   row.get("cert_type"),
+            "common_name": row.get("common_name"),
+            "not_after":   row.get("not_after"),
+            "days_remaining": None,
+            "status":      "ok",
+        }
+
+        if row.get("revoked"):
+            entry["status"] = "revoked"
+            result.append(entry)
+            continue
+
+        not_after = row.get("not_after") or ""
+        if not not_after:
+            entry["status"] = "no_expiry"
+            result.append(entry)
+            continue
+
+        try:
+            exp = datetime.datetime.fromisoformat(not_after.replace("Z", "+00:00"))
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=datetime.timezone.utc)
+            days = (exp - now).days
+            entry["days_remaining"] = days
+            if days < 0:
+                entry["status"] = "expired"
+            elif days <= warn_days:
+                entry["status"] = "expiring_soon"
+            else:
+                entry["status"] = "ok"
+        except Exception:
+            entry["status"] = "no_expiry"
+
+        result.append(entry)
+
+    # Sort: expired first, then expiring_soon by days, then ok
+    _order = {"expired": 0, "expiring_soon": 1, "revoked": 2, "ok": 3, "no_expiry": 4}
+    result.sort(key=lambda e: (_order.get(e["status"], 9), e.get("days_remaining") or 9999))
+
+    counts = {
+        "expired":       sum(1 for e in result if e["status"] == "expired"),
+        "expiring_soon": sum(1 for e in result if e["status"] == "expiring_soon"),
+        "ok":            sum(1 for e in result if e["status"] == "ok"),
+    }
+    return {"certs": result, **counts}
+
+
 # ---------------------------------------------------------------------------
 # CRL generation
 # ---------------------------------------------------------------------------

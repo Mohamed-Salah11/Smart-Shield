@@ -50,12 +50,12 @@ def _cfg(conn) -> dict:
 # YAML generator
 # ---------------------------------------------------------------------------
 
-def generate_suricata_yaml(conn) -> str:
+def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
     cfg = _cfg(conn)
     if not cfg:
         cfg = {}
 
-    mode        = cfg.get("mode", "ids")
+    mode        = cfg.get("mode", "ids") if not force_ids_mode else "ids"
     interface   = cfg.get("interface") or "em0"
     home_net    = cfg.get("home_net") or "192.168.0.0/16"
     ext_net     = cfg.get("external_net") or "!$HOME_NET"
@@ -355,6 +355,12 @@ def validate_suricata_yaml(text: str) -> tuple:
 def validate_ips_safety(conn) -> list:
     """
     Additional safety checks required before enabling IPS mode.
+
+    Performs three checks on FreeBSD:
+    1. Interface is selected.
+    2. netmap.ko kernel module is loaded (kldstat -n netmap).
+    3. The NIC driver is in the known-good netmap driver list.
+
     Returns a list of warning/error strings; empty means safe to proceed.
     """
     errors = []
@@ -362,13 +368,48 @@ def validate_ips_safety(conn) -> list:
     interface = (cfg.get("interface") or "").strip()
     if not interface:
         errors.append("IPS mode requires an interface to be selected.")
-    # On FreeBSD, netmap requires the NIC to support it.
-    # We cannot programmatically verify this without trying, so warn the user.
-    errors.append(
-        "IPS mode uses netmap(4) inline capture. Verify your NIC supports netmap "
-        "before enabling IPS (check: kldload netmap). IPS mode will drop traffic on "
-        "misconfiguration."
+        return errors
+
+    if not sys.platform.startswith("freebsd"):
+        errors.append(
+            "IPS mode uses netmap(4) inline capture. Verify your NIC supports netmap "
+            "before enabling IPS (check: kldload netmap). IPS mode will drop traffic on "
+            "misconfiguration."
+        )
+        return errors
+
+    # Check 1: netmap kernel module loaded
+    try:
+        r = run_command(["kldstat", "-n", "netmap"], check=False)
+        if r.returncode != 0:
+            errors.append(
+                "netmap.ko kernel module is not loaded. "
+                "Run 'kldload netmap' or add 'netmap_load=\"YES\"' to /boot/loader.conf."
+            )
+    except FreeBSDNetworkError as exc:
+        errors.append(f"Could not check netmap module: {exc}")
+
+    # Check 2: NIC driver compatibility
+    _NETMAP_SUPPORTED_PREFIXES = (
+        "em", "igb", "ixgbe", "ixl", "re", "vtnet", "vmx", "bnxt", "ix",
     )
+    import re as _re
+    driver = _re.match(r"^([a-z]+)", interface)
+    if driver:
+        drv = driver.group(1)
+        if not any(drv.startswith(p) for p in _NETMAP_SUPPORTED_PREFIXES):
+            errors.append(
+                f"NIC driver '{drv}' may not support netmap(4). "
+                f"Known-good drivers: {', '.join(_NETMAP_SUPPORTED_PREFIXES)}. "
+                "Test carefully — IPS mode will silently drop traffic if netmap fails."
+            )
+
+    if not errors:
+        errors.append(
+            "IPS mode preflight passed. netmap is loaded and the NIC driver looks compatible. "
+            "Monitor traffic after enabling to confirm inline capture is working."
+        )
+
     return errors
 
 
@@ -383,9 +424,10 @@ def write_suricata_config(conn) -> dict:
     os.makedirs(_SURICATA_RUN_DIR, exist_ok=True)
     os.makedirs(_SURICATA_RULES_DIR, exist_ok=True)
 
+    from app.services.config_file_utils import atomic_write, backup_config
     try:
-        with open(_SURICATA_CONF_PATH, "w") as fh:
-            fh.write(conf)
+        backup_config(_SURICATA_CONF_PATH)
+        atomic_write(_SURICATA_CONF_PATH, conf, mode=0o644)
         return {"ok": True, "message": f"Written to {_SURICATA_CONF_PATH}", "conf": conf}
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
@@ -498,7 +540,7 @@ def toggle_ids(conn, enabled: bool) -> dict:
         # Only treat it as a hard error if the interface is also missing.
         hard_errors = [w for w in safety_warnings if "requires" in w.lower()]
         if hard_errors:
-            return {"ok": False, "message": " | ".join(hard_errors)}
+            return {"ok": False, "rolled_back": False, "message": " | ".join(hard_errors)}
 
     # Update DB
     cur = conn.cursor()
@@ -509,18 +551,130 @@ def toggle_ids(conn, enabled: bool) -> dict:
     conn.commit()
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
+        return {"ok": True, "rolled_back": False,
+                "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
 
     if enabled:
+        ips_mode = (mode == "ips")
         conf_text  = generate_suricata_yaml(conn)
         ok, err    = validate_suricata_yaml(conf_text)
         if not ok:
-            return {"ok": False, "message": f"Suricata YAML validation failed: {err}"}
+            return {"ok": False, "rolled_back": False,
+                    "message": f"Suricata YAML validation failed: {err}"}
         write_result = write_suricata_config(conn)
         if not write_result["ok"]:
-            return write_result
+            return {**write_result, "rolled_back": False}
         sysrc_set("suricata_enable", "YES")
-        return service_action(_SERVICE_NAME, "restart")
+        r = service_action(_SERVICE_NAME, "restart")
+        if not r["ok"]:
+            from app.services.config_file_utils import rollback_config
+            rb = rollback_config(_SURICATA_CONF_PATH)
+            # IPS→IDS safe fallback
+            if ips_mode:
+                ids_conf = generate_suricata_yaml(conn, force_ids_mode=True)
+                ok_ids, _ = validate_suricata_yaml(ids_conf)
+                if ok_ids:
+                    try:
+                        from app.services.config_file_utils import atomic_write
+                        atomic_write(_SURICATA_CONF_PATH, ids_conf, mode=0o644)
+                        r2 = service_action(_SERVICE_NAME, "restart")
+                        if r2["ok"]:
+                            return {
+                                **r2,
+                                "rolled_back": False,
+                                "fallback": True,
+                                "message": r2["message"] + " — fell back to IDS (pcap) mode after IPS start failure",
+                            }
+                    except Exception:
+                        pass
+            return {"ok": False, "rolled_back": rb.get("ok", False),
+                    "message": r.get("message", "restart failed"),
+                    "rollback_message": rb.get("message", "")}
+        return {**r, "rolled_back": False}
     else:
         sysrc_set("suricata_enable", "NO")
-        return service_action(_SERVICE_NAME, "stop")
+        r = service_action(_SERVICE_NAME, "stop")
+        return {**r, "rolled_back": False}
+
+
+# ---------------------------------------------------------------------------
+# Block-on-alert: push IDS-detected IPs to PF table
+# ---------------------------------------------------------------------------
+
+def push_blocked_ips_to_pf(conn) -> dict:
+    """
+    Read recent HIGH severity IDS alerts from audit_log,
+    extract source IPs, write to a file, then replace the ss_ids_blocks PF table.
+    Returns {"ok": bool, "count": int, "message": str}.
+    """
+    import ipaddress as _ip
+
+    blocked_ips = set()
+    try:
+        rows = conn.execute(
+            """
+            SELECT details FROM audit_log
+            WHERE category='ids' AND created_at > datetime('now', '-1 hour')
+            LIMIT 1000
+            """
+        ).fetchall()
+        for row in rows:
+            try:
+                d = json.loads(row["details"] if hasattr(row, "keys") else row[0])
+                src = (d.get("src_ip") or "").strip()
+                if src:
+                    _ip.ip_address(src)   # validate
+                    blocked_ips.add(src)
+            except Exception:
+                pass
+    except Exception as exc:
+        return {"ok": False, "count": 0, "message": f"DB query failed: {exc}"}
+
+    _IDS_BLOCK_FILE = "/var/db/smart-shield/ids_blocked_ips.txt"
+
+    try:
+        os.makedirs(os.path.dirname(_IDS_BLOCK_FILE), exist_ok=True)
+        with open(_IDS_BLOCK_FILE, "w") as fh:
+            fh.write("\n".join(sorted(blocked_ips)) + "\n")
+    except Exception as exc:
+        return {"ok": False, "count": 0, "message": f"Could not write IP file: {exc}"}
+
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "count": len(blocked_ips),
+                "message": f"Non-FreeBSD — {len(blocked_ips)} IPs written to file (pfctl not called)"}
+
+    try:
+        from app.services.priv_helper import run_privileged
+        r = run_privileged(
+            "pf.table_replace_file",
+            table="ss_ids_blocks",
+            file_path=_IDS_BLOCK_FILE,
+        )
+        if r.returncode == 0:
+            return {"ok": True, "count": len(blocked_ips),
+                    "message": f"ss_ids_blocks table updated with {len(blocked_ips)} IPs"}
+        return {"ok": False, "count": len(blocked_ips),
+                "message": f"pfctl table_replace failed: {(r.stderr or r.stdout or '').strip()}"}
+    except Exception as exc:
+        return {"ok": False, "count": len(blocked_ips), "message": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Threat table expiration
+# ---------------------------------------------------------------------------
+
+def expire_threat_intel_table(seconds: int = 86400) -> dict:
+    """
+    Remove expired IPs from the ss_threat_intel PF table.
+    Entries older than `seconds` (default 24h) are expired.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "Non-FreeBSD — table expire skipped (dry-run)"}
+    try:
+        from app.services.priv_helper import run_privileged
+        r = run_privileged("pf.table_expire", table="ss_threat_intel", seconds=str(seconds))
+        if r.returncode == 0:
+            return {"ok": True, "message": f"ss_threat_intel: expired entries older than {seconds}s"}
+        return {"ok": False, "message": (r.stderr or r.stdout or "pfctl expire failed").strip()}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}

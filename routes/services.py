@@ -776,6 +776,16 @@ def api_ntp_status():
     return jsonify({"ok": True, **status})
 
 
+@services_bp.route("/api/ntp/force-sync", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_ntp_force_sync():
+    from app.services.ntp_writer import force_ntp_sync
+    result = force_ntp_sync()
+    log_event(category="system", action="ntp_force_sync", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result["ok"]})
+    return jsonify(result)
+
+
 # ---------------------------------------------------------------------------
 # DHCPv6
 # ---------------------------------------------------------------------------
@@ -857,6 +867,27 @@ def api_dhcpv6_status():
     status = get_dhcpv6_status()
     status["leases"] = get_dhcpv6_leases()
     return jsonify({"ok": True, **status})
+
+
+@services_bp.route("/api/dhcpv6/leases", methods=["GET"])
+@login_required
+def api_dhcpv6_leases():
+    from app.services.dhcpv6_writer import get_dhcpv6_leases
+    leases = get_dhcpv6_leases()
+    return jsonify({"ok": True, "leases": leases, "count": len(leases)})
+
+
+@services_bp.route("/api/dhcpv6-ra/apply", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_apply_dhcpv6_and_ra():
+    """Apply DHCPv6 (Kea) and Router Advertisements (rtadvd) together.
+    Ensures M/O flags in RA are consistent with whether Kea pools are enabled."""
+    conn   = get_db()
+    from app.services.dhcpv6_writer import apply_dhcpv6_and_ra
+    result = apply_dhcpv6_and_ra(conn)
+    log_event(category="system", action="dhcpv6_ra_apply", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result["ok"]})
+    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
@@ -975,6 +1006,16 @@ def api_ddns_status():
     return jsonify({"ok": True, **get_ddns_status()})
 
 
+@services_bp.route("/api/ddns/force-update", methods=["POST"])
+@api_permission_required("api.network.edit")
+def api_ddns_force_update():
+    from app.services.ddns_writer import force_ddns_update
+    result = force_ddns_update()
+    log_event(category="system", action="ddns_force_update", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result["ok"]})
+    return jsonify(result)
+
+
 @services_bp.route("/api/ddns/validate", methods=["GET"])
 @login_required
 def api_validate_ddns():
@@ -1032,9 +1073,10 @@ def api_validate_snmp():
     conn = get_db()
     row  = conn.execute("SELECT value_json FROM service_state WHERE key_name='snmp_settings'").fetchone()
     settings = _json.loads(row["value_json"]) if row else {}
-    from app.services.snmp_writer import validate_snmp
-    errors = validate_snmp(settings)
-    return jsonify({"ok": not errors, "errors": errors})
+    from app.services.snmp_writer import validate_snmp, validate_snmp_config
+    errors   = validate_snmp(settings)
+    warnings = validate_snmp_config(conn)
+    return jsonify({"ok": not errors, "errors": errors, "warnings": warnings})
 
 
 @services_bp.route("/api/snmp/preview", methods=["GET"])

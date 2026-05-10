@@ -175,19 +175,18 @@ def apply_ddns(conn) -> dict:
         return {"ok": False, "message": "Validation failed: " + " | ".join(errors), "conf": conf}
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — ddclient.conf generated but not written.", "conf": conf}
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — ddclient.conf generated but not written.", "conf": conf}
 
-    try:
-        with open(_DDCLIENT_CONF, "w") as fh:
-            fh.write(conf)
-        os.chmod(_DDCLIENT_CONF, 0o600)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     sysrc_set("ddclient_enable", "YES")
-    r = service_action("ddclient", "restart")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        return service_action("ddclient", "restart")
+
+    result = apply_with_rollback(_DDCLIENT_CONF, conf, _restart, mode=0o600)
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +202,33 @@ def get_ddns_status() -> dict:
         return {"running": running, "state": state, "message": ""}
     except Exception as exc:
         return {"running": False, "state": "error", "message": str(exc)}
+
+
+def force_ddns_update() -> dict:
+    """
+    Force ddclient to immediately update all DDNS providers (``ddclient -force``).
+    Returns ``{"ok": bool, "message": str, "output": str}``.
+    On non-FreeBSD: dry-run, returns ok=True without running anything.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "Non-FreeBSD — DDNS force-update skipped.", "output": ""}
+
+    import shutil
+    if not shutil.which("ddclient"):
+        return {"ok": False, "message": "ddclient binary not found.", "output": ""}
+
+    try:
+        from app.services.network_service import run_command
+        result = run_command(["ddclient", "-force"], check=False, timeout_seconds=30)
+        ok  = result.returncode == 0
+        out = (result.stdout or result.stderr or "").strip()
+        return {
+            "ok":      ok,
+            "message": "DDNS force-update completed." if ok else f"ddclient exited {result.returncode}.",
+            "output":  out,
+        }
+    except Exception as exc:
+        return {"ok": False, "message": str(exc), "output": ""}
 
 
 # ---------------------------------------------------------------------------

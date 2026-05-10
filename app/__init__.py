@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, g, redirect, request, session
+from flask import Flask, g, redirect, request, session, url_for
 from .database import init_db
 from .config import get_config
 from .security import get_csrf_token, validate_csrf_or_abort
@@ -87,6 +87,18 @@ def create_app():
         raise RuntimeError(
             "SECRET_KEY is not set. Create a .env file (see .env.example) and set SECRET_KEY."
         )
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        # Only add HSTS on HTTPS responses
+        if request.is_secure:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     @app.before_request
     def _csrf_guard():
@@ -235,6 +247,30 @@ def create_app():
         return _redir(portal_url)
 
     @app.before_request
+    def _enforce_session_timeout():
+        """Expire idle sessions after PERMANENT_SESSION_LIFETIME seconds."""
+        if not session.get("user_id"):
+            return
+        idle_limit = app.config.get("PERMANENT_SESSION_LIFETIME", 3600)
+        if isinstance(idle_limit, int):
+            pass
+        else:
+            try:
+                idle_limit = int(idle_limit.total_seconds())
+            except Exception:
+                idle_limit = 3600
+        last_active = session.get("_last_active", 0)
+        now = time.time()
+        if last_active and (now - last_active) > idle_limit:
+            session.clear()
+            if request.path.startswith("/api/") or "/api/" in request.path:
+                from flask import jsonify as _jsonify
+                return _jsonify({"ok": False, "message": "Session expired due to inactivity."}), 401
+            return redirect(url_for("auth.login"))
+        session["_last_active"] = now
+        session.permanent = True
+
+    @app.before_request
     def _request_timing_start():
         g.request_start_time = time.perf_counter()
 
@@ -339,12 +375,43 @@ def create_app():
     except Exception:
         pass
 
+    # Elect a single leader worker before starting background daemon threads.
+    # On FreeBSD with multiple Gunicorn workers, only one process acquires the
+    # exclusive flock; the rest skip collector startup entirely.
+    from app.services.worker_lock import acquire_worker_lock
+    _is_leader = acquire_worker_lock()
+
     # Start SIEM background collectors (FreeBSD only; silent no-op on dev)
-    try:
-        from app.services.siem_collector import start_siem_collectors
-        start_siem_collectors()
-    except Exception:
-        pass
+    if _is_leader:
+        try:
+            from app.services.siem_collector import start_siem_collectors
+            start_siem_collectors()
+        except Exception:
+            pass
+
+    # Start threat-intel feed collector (requires ABUSECH_AUTH_KEY; silent no-op otherwise)
+    if _is_leader:
+        try:
+            from app.services.abusech_client import start_threat_intel_collector
+            start_threat_intel_collector()
+        except Exception:
+            pass
+
+    # Start gateway health monitor (pings gateways every 30s; FreeBSD only)
+    if _is_leader:
+        try:
+            from app.services.gateway_monitor import start_gateway_monitor
+            start_gateway_monitor()
+        except Exception:
+            pass
+
+    # Start schedule enforcer (reloads PF when schedule windows open/close; FreeBSD only)
+    if _is_leader:
+        try:
+            from app.services.schedule_enforcer import start_schedule_enforcer
+            start_schedule_enforcer(app)
+        except Exception:
+            pass
 
     from routes.setup import setup_bp
     from routes.auth import auth_bp

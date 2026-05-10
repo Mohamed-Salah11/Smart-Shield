@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, session, jsonify
 from app.database import get_db
-from app.auth_utils import login_required
+from app.auth_utils import login_required, superuser_required
 from app.audit_log import tail_events, log_event
 import json, os
 import sys
@@ -1043,6 +1043,100 @@ def high_availability():
 @login_required
 def package_manager():
     return render_template("package_manager.html")
+
+
+@system_bp.route("/api/packages", methods=["GET"])
+@login_required
+def api_packages_list():
+    """List installed packages via pkg info. FreeBSD only."""
+    import sys, subprocess
+    if not sys.platform.startswith("freebsd"):
+        return jsonify({"ok": True, "packages": [], "note": "pkg not available on this platform."})
+    try:
+        result = subprocess.run(
+            ["pkg", "info", "--raw=json-compact"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return jsonify({"ok": False, "message": result.stderr.strip() or "pkg info failed."})
+        import json as _j
+        pkgs_raw = _j.loads(result.stdout)
+        packages = [
+            {
+                "name":    name,
+                "version": meta.get("version", ""),
+                "comment": meta.get("comment", ""),
+                "size":    meta.get("flatsize", 0),
+            }
+            for name, meta in pkgs_raw.items()
+        ]
+        packages.sort(key=lambda p: p["name"].lower())
+        return jsonify({"ok": True, "packages": packages, "count": len(packages)})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)})
+
+
+@system_bp.route("/api/packages/search", methods=["GET"])
+@login_required
+def api_packages_search():
+    """Search available packages in the pkg repository."""
+    import sys, subprocess
+    query = (request.args.get("q") or "").strip()
+    if not query:
+        return jsonify({"ok": False, "message": "q parameter required."}), 400
+    if not sys.platform.startswith("freebsd"):
+        return jsonify({"ok": True, "results": [], "note": "pkg not available on this platform."})
+    try:
+        result = subprocess.run(
+            ["pkg", "search", "--raw=json-compact", "--exact", "--", query],
+            capture_output=True, text=True, timeout=30,
+        )
+        import json as _j
+        results = []
+        try:
+            pkgs_raw = _j.loads(result.stdout)
+            results = [
+                {
+                    "name":    name,
+                    "version": meta.get("version", ""),
+                    "comment": meta.get("comment", ""),
+                }
+                for name, meta in pkgs_raw.items()
+            ]
+        except Exception:
+            # Fallback: plain-text search output
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    parts = line.split(None, 1)
+                    results.append({"name": parts[0], "version": "", "comment": parts[1] if len(parts) > 1 else ""})
+        return jsonify({"ok": True, "results": results, "count": len(results)})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)})
+
+
+@system_bp.route("/api/packages/install", methods=["POST"])
+@superuser_required
+def api_packages_install():
+    """Install a package via pkg install. FreeBSD + priv_helper only."""
+    import sys, re
+    if not sys.platform.startswith("freebsd"):
+        return jsonify({"ok": False, "message": "pkg install is only available on FreeBSD."}), 400
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name or not re.match(r'^[A-Za-z0-9._+-]+$', name):
+        return jsonify({"ok": False, "message": "Invalid package name."}), 400
+    try:
+        from app.services.priv_helper import run_privileged
+        result = run_privileged("pkg.install", package_name=name)
+        ok  = result.returncode == 0
+        msg = (result.stdout or result.stderr or "").strip()
+        from app.audit_log import log_event as _log_event
+        _log_event(category="system", action="pkg_install",
+                   username=session.get("username"), remote_addr=request.remote_addr,
+                   details={"package": name, "ok": ok})
+        return jsonify({"ok": ok, "message": msg or ("Installed" if ok else "Install failed")})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)})
 
 
 # ----------------------------

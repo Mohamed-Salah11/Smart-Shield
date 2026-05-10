@@ -477,6 +477,12 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
     args = action.get("args", {})
 
     try:
+        from app.services.apply_state import (
+            record_apply_start, record_apply_result, record_dry_run,
+        )
+        import sys as _sys
+        _dry = not _sys.platform.startswith("freebsd")
+
         if tool == "block_domain":
             domain      = args.get("domain", "").strip()
             category    = args.get("category", "custom")
@@ -485,8 +491,16 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
                 return {"ok": False, "reply": "Domain name is required."}
             from app.services.dns_filter import add_dns_filter_rule, apply_dns_filter
             add_dns_filter_rule(conn, domain, action="block", category=category, description=description)
-            result = apply_dns_filter(conn)
-            if result["ok"]:
+            if _dry:
+                record_dry_run(conn, "dns_filtering", applied_by=username)
+                result = {"ok": True, "message": "dry-run"}
+            else:
+                job_id = record_apply_start(conn, "dns_filtering", applied_by=username,
+                                            notes="chatbot:block_domain")
+                result = apply_dns_filter(conn)
+                record_apply_result(conn, job_id, ok=result.get("ok", False),
+                                    message=result.get("message", ""))
+            if result["ok"] or result.get("message") == "dry-run":
                 reply = (
                     f"**{domain}** has been added to the DNS block list and the filter has been applied. "
                     f"All DNS queries for {domain} and its subdomains are now blocked."
@@ -506,7 +520,15 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
                 return {"ok": True, "reply": f"No DNS block rule found for **{domain}** — it may already be unblocked."}
             for r in matched:
                 delete_dns_filter_rule(conn, r["id"])
-            result = apply_dns_filter(conn)
+            if _dry:
+                record_dry_run(conn, "dns_filtering", applied_by=username)
+                result = {"ok": True, "message": "dry-run"}
+            else:
+                job_id = record_apply_start(conn, "dns_filtering", applied_by=username,
+                                            notes="chatbot:unblock_domain")
+                result = apply_dns_filter(conn)
+                record_apply_result(conn, job_id, ok=result.get("ok", False),
+                                    message=result.get("message", ""))
             suffix = "" if result["ok"] else f" (DNS reload failed: {result['message']})"
             return {"ok": True, "reply": f"DNS block rule for **{domain}** has been removed.{suffix}"}
 
@@ -531,16 +553,27 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
                 ("block", direction, protocol, source, destination, dest_port, description, new_order),
             )
             conn.commit()
-            try:
-                from app.services.pf_generator import reload_pf_rules
-                reload_pf_rules(conn)
-            except Exception:
-                pass
+            if _dry:
+                record_dry_run(conn, "pf_firewall", applied_by=username)
+                pf_ok = True
+            else:
+                job_id = record_apply_start(conn, "pf_firewall", applied_by=username,
+                                            notes="chatbot:add_firewall_block_rule")
+                try:
+                    from app.services.pf_generator import reload_pf_rules
+                    pf_result = reload_pf_rules(conn)
+                    pf_ok = pf_result.get("ok", True)
+                    record_apply_result(conn, job_id, ok=pf_ok,
+                                        message=pf_result.get("message", ""))
+                except Exception as _exc:
+                    record_apply_result(conn, job_id, ok=False, message=str(_exc))
+                    pf_ok = False
             return {
                 "ok": True,
                 "reply": (
                     f"Firewall block rule **{description}** has been added "
-                    f"({source} → {destination}, {protocol.upper()}). Changes have been applied."
+                    f"({source} → {destination}, {protocol.upper()}). "
+                    + ("Changes have been applied." if pf_ok else "Rule saved; PF reload failed — restart manually.")
                 ),
             }
 

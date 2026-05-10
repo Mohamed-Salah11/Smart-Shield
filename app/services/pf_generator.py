@@ -139,6 +139,29 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
             lines.append(f"# {desc}")
         lines.append(f"rdr on {iface} proto {proto} from {src} to {dst} {dst_port}-> {redir_target}")
 
+    # NAT Reflection (hairpin NAT) — LAN clients connecting to WAN IP for port-forwards
+    try:
+        _afn = conn.execute(
+            "SELECT nat_reflection FROM advanced_firewall_nat WHERE id=1"
+        ).fetchone()
+        _nat_reflection = bool(_afn["nat_reflection"]) if _afn and _afn["nat_reflection"] is not None else False
+    except Exception:
+        _nat_reflection = False
+
+    if _nat_reflection:
+        lines.append("# Hairpin NAT: LAN clients connecting to WAN IP for port-forwards")
+        lan_rows_nr = conn.execute(
+            "SELECT assigned_port, ipv4_address FROM lan_config LIMIT 1"
+        ).fetchone()
+        _lan_iface_nr = (lan_rows_nr["assigned_port"] or "em1") if lan_rows_nr else "em1"
+        _lan_net_nr   = (lan_rows_nr["ipv4_address"]  or "192.168.1.0/24") if lan_rows_nr else "192.168.1.0/24"
+        try:
+            import ipaddress as _ipaddress
+            _lan_net_nr = str(_ipaddress.ip_interface(_lan_net_nr).network)
+        except Exception:
+            pass
+        lines.append(f"nat on {_lan_iface_nr} from {_lan_net_nr} to any -> ({_lan_iface_nr})")
+
     # NPt — Network Prefix Translation (IPv6)
     for r in _rows(conn, "SELECT * FROM nat_npt WHERE disabled=0 ORDER BY rule_order, id"):
         iface    = (r.get("interface") or wan_iface).strip() or wan_iface
@@ -159,13 +182,26 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
 # ---------------------------------------------------------------------------
 # 3. Firewall rules  (floating → WAN → LAN)
+#    Rules with a non-empty schedule field are only included when the
+#    schedule is currently active (evaluated by schedule_service).
 # ---------------------------------------------------------------------------
 
 def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
+    from app.services.schedule_service import filter_rules_by_schedule
+
     lines = ["# ── Firewall Rules ──"]
 
+    def _label(rule_id, desc):
+        """Return a PF label string for rule tracking via pfctl -s labels."""
+        safe = (desc or "").replace('"', "'")[:60]
+        return f'label "ss-{rule_id} {safe}"' if safe else f'label "ss-{rule_id}"'
+
     # Floating
-    for r in _rows(conn, "SELECT * FROM firewall_rules_floating WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_floating = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_floating WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_floating):
         iface  = (r.get("interface") or "").strip()
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
@@ -175,12 +211,18 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         action = (r.get("action") or "pass").lower()
         ipart  = f"on {iface} " if iface else ""
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} quick {ipart}{proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} quick {ipart}{proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     # WAN
-    for r in _rows(conn, "SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_wan = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_wan):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
         sport  = _port_line(r.get("source_port"))
@@ -188,12 +230,18 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         dport  = _port_line(r.get("dest_port"))
         action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     # LAN
-    for r in _rows(conn, "SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_lan = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_lan):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
         sport  = _port_line(r.get("source_port"))
@@ -201,9 +249,11 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         dport  = _port_line(r.get("dest_port"))
         action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     lines.append("")
     return "\n".join(lines)
@@ -463,6 +513,11 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
 
     lines = ["# ── Firewall Hardening ──"]
 
+    # IDS block table — populated by push_blocked_ips_to_pf() in ids_writer
+    lines.append("table <ss_ids_blocks> persist")
+    lines.append("block in quick from <ss_ids_blocks>")
+    lines.append("")
+
     # Bogon table
     if block_bogons:
         bogon_list = " ".join(_BOGON_PREFIXES)
@@ -516,6 +571,59 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
     )
     lines.append("")
 
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 4e. Policy-Based Routing (route-to)
+# ---------------------------------------------------------------------------
+
+def _build_policy_routes(conn, wan_iface: str, lan_iface: str) -> str:
+    """
+    Emit PF route-to rules for policy-based routing entries.
+    Queries policy_routes joined with gateways to get the gateway IP and interface.
+    Returns an empty string if the table doesn't exist or has no enabled rows.
+    """
+    try:
+        rows = _rows(
+            conn,
+            """
+            SELECT pr.id, pr.interface_type, pr.source, pr.destination,
+                   pr.description, g.gateway AS gw_ip, g.interface AS gw_iface
+            FROM policy_routes pr
+            LEFT JOIN gateways g ON g.id = pr.gateway_id
+            WHERE pr.enabled=1
+            ORDER BY pr.priority, pr.id
+            """,
+        )
+    except Exception:
+        return ""  # table doesn't exist yet — skip gracefully
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Policy-Based Routing (route-to) ──"]
+    for r in rows:
+        itype    = (r.get("interface_type") or "LAN").upper()
+        iface    = wan_iface if itype == "WAN" else lan_iface
+        src      = _addr(r.get("source"))
+        dst      = _addr(r.get("destination"))
+        gw_ip    = (r.get("gw_ip") or "").strip()
+        gw_iface = (r.get("gw_iface") or wan_iface).strip() or wan_iface
+        desc     = (r.get("description") or "").strip()
+        if not gw_ip:
+            continue  # no gateway resolved — skip
+        if desc:
+            lines.append(f"# {desc}")
+        lines.append(
+            f"pass in quick on {iface} from {src} to {dst} "
+            f"route-to ({gw_iface} {gw_ip}) keep state"
+        )
+
+    if len(lines) == 1:
+        return ""  # only the header was added, nothing useful
+
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -634,6 +742,22 @@ def generate_pf_conf(conn) -> str:
     """)
     )
 
+    # Check if L2TP is configured and add its required firewall rules
+    _l2tp_rules_block = ""
+    try:
+        _l2tp_rows = _rows(conn, "SELECT COUNT(*) as n FROM l2tp_users LIMIT 1")
+        if _l2tp_rows and _l2tp_rows[0].get("n", 0) > 0:
+            from app.services.l2tp_writer import get_l2tp_pf_rules
+            _l2tp_lines = get_l2tp_pf_rules(conn)
+            if _l2tp_lines:
+                _l2tp_rules_block = (
+                    "# ── L2TP/IPsec auto-rules ──\n"
+                    + "\n".join(_l2tp_lines)
+                    + "\n\n"
+                )
+    except Exception:
+        pass
+
     return (
         macros
         + base_tables
@@ -648,6 +772,8 @@ def generate_pf_conf(conn) -> str:
         + _build_nat_rules(conn, wan_iface)
         + translation_hooks
         + default_policy
+        + _build_policy_routes(conn, wan_iface, lan_iface)
+        + _l2tp_rules_block
         + _build_app_filter_rules(conn)
         + _build_firewall_rules(conn, wan_iface, lan_iface)
     )
@@ -830,5 +956,22 @@ def reload_pf_rules(conn) -> dict:
             "message": f"pfctl reload failed ({exc}). {rb_msg}",
             "conf": conf_text,
         }
+
+    # Step 5b — kill all states if configured
+    try:
+        _ks_row = conn.execute(
+            "SELECT kill_states_on_reload FROM advanced_firewall_nat WHERE id=1"
+        ).fetchone()
+        _kill_states = bool(_ks_row["kill_states_on_reload"]) if _ks_row and _ks_row["kill_states_on_reload"] is not None else False
+    except Exception:
+        _kill_states = False
+
+    if _kill_states:
+        import warnings
+        warnings.warn("All PF states flushed (kill_states_on_reload=1)", RuntimeWarning, stacklevel=1)
+        try:
+            run_command(["pfctl", "-k", "0.0.0.0/0"], check=False)
+        except Exception:
+            pass
 
     return {"ok": True, "message": "PF rules reloaded successfully.", "conf": conf_text}

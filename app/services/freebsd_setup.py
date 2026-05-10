@@ -416,6 +416,164 @@ def _check_pfctl_usable() -> dict:
         return {"ok": False, "warning": f"pfctl check failed: {exc}"}
 
 
+def _check_kernel_capability(cap_name: str) -> dict:
+    """
+    Check whether a FreeBSD kernel capability is available.
+
+    Supported cap_name values:
+      dummynet   — IP dummynet traffic shaping (IPFW pipes)
+      carp       — Common Address Redundancy Protocol
+      pfsync     — PF state synchronisation
+      netmap     — netmap fast-path I/O (required for Suricata IPS)
+      ipv6       — IPv6 kernel support
+    """
+    if not _ON_FREEBSD:
+        return {"cap": cap_name, "ok": True, "warning": ""}
+
+    import subprocess
+
+    sysctl_map = {
+        "dummynet": "net.inet.ip.dummynet.count",
+        "carp":     "net.inet.carp.allow",
+        "pfsync":   "net.pfsync.stats",
+        "netmap":   "dev.netmap.version",
+        "ipv6":     "net.inet6.ip6.forwarding",
+    }
+
+    node = sysctl_map.get(cap_name)
+    if not node:
+        return {"cap": cap_name, "ok": False,
+                "warning": f"Unknown capability: {cap_name}"}
+
+    try:
+        r = subprocess.run(["sysctl", "-n", node],
+                           capture_output=True, text=True, timeout=5)
+        ok = r.returncode == 0
+        return {
+            "cap":     cap_name,
+            "ok":      ok,
+            "warning": "" if ok else f"Kernel capability '{cap_name}' unavailable "
+                                     f"(sysctl {node} failed). "
+                                     f"Some features may not work.",
+        }
+    except Exception as exc:
+        return {"cap": cap_name, "ok": False,
+                "warning": f"Could not check capability '{cap_name}': {exc}"}
+
+
+def _check_kernel_capabilities() -> list:
+    """Return capability check results for all relevant FreeBSD kernel options."""
+    caps = ["dummynet", "carp", "pfsync", "netmap", "ipv6"]
+    return [_check_kernel_capability(c) for c in caps]
+
+
+def _check_syntax_validators() -> list:
+    """
+    Verify that installed daemons can validate their own config syntax.
+    Returns a list of {"name", "ok", "warning"} dicts.
+    """
+    if not _ON_FREEBSD:
+        return []
+
+    import subprocess
+
+    validators = []
+
+    # pfctl — core firewall (must always be available)
+    try:
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf",
+                                        delete=False, prefix="ss_pf_chk_") as f:
+            f.write("set block-policy drop\npass all\n")
+            tmp = f.name
+        r = subprocess.run(["pfctl", "-nf", tmp],
+                           capture_output=True, text=True, timeout=5)
+        os.unlink(tmp)
+        validators.append({
+            "name":    "pfctl -nf",
+            "ok":      r.returncode == 0,
+            "warning": "" if r.returncode == 0
+                       else f"pfctl syntax check failed: {(r.stderr or '').strip()}",
+        })
+    except Exception as exc:
+        validators.append({"name": "pfctl -nf", "ok": False,
+                           "warning": f"pfctl validator error: {exc}"})
+
+    # unbound-checkconf
+    try:
+        unbound_conf = "/usr/local/etc/unbound/unbound.conf"
+        if os.path.exists(unbound_conf):
+            r = subprocess.run(["unbound-checkconf", unbound_conf],
+                               capture_output=True, text=True, timeout=5)
+            validators.append({
+                "name":    "unbound-checkconf",
+                "ok":      r.returncode == 0,
+                "warning": "" if r.returncode == 0
+                           else f"unbound config error: {(r.stderr or r.stdout or '').strip()}",
+            })
+        else:
+            validators.append({
+                "name": "unbound-checkconf",
+                "ok":   True,
+                "warning": "unbound.conf not yet generated — will validate on first apply.",
+            })
+    except FileNotFoundError:
+        validators.append({"name": "unbound-checkconf", "ok": False,
+                           "warning": "unbound-checkconf not found — install unbound."})
+    except Exception as exc:
+        validators.append({"name": "unbound-checkconf", "ok": False,
+                           "warning": f"unbound-checkconf error: {exc}"})
+
+    # dhcpd -t (ISC DHCPd)
+    try:
+        dhcpd_conf = "/usr/local/etc/dhcpd.conf"
+        if os.path.exists(dhcpd_conf):
+            r = subprocess.run(["dhcpd", "-t", "-cf", dhcpd_conf],
+                               capture_output=True, text=True, timeout=5)
+            validators.append({
+                "name":    "dhcpd -t",
+                "ok":      r.returncode == 0,
+                "warning": "" if r.returncode == 0
+                           else f"dhcpd config error: {(r.stderr or '').strip()}",
+            })
+        else:
+            validators.append({
+                "name": "dhcpd -t",
+                "ok":   True,
+                "warning": "dhcpd.conf not yet generated — will validate on first apply.",
+            })
+    except FileNotFoundError:
+        validators.append({"name": "dhcpd -t", "ok": True,
+                           "warning": "dhcpd not installed (optional — needed for DHCP server)."})
+    except Exception as exc:
+        validators.append({"name": "dhcpd -t", "ok": False,
+                           "warning": f"dhcpd validator error: {exc}"})
+
+    # suricata -T
+    try:
+        suricata_yaml = "/usr/local/etc/suricata/suricata.yaml"
+        if shutil.which("suricata") and os.path.exists(suricata_yaml):
+            r = subprocess.run(["suricata", "-T", "-c", suricata_yaml],
+                               capture_output=True, text=True, timeout=15)
+            validators.append({
+                "name":    "suricata -T",
+                "ok":      r.returncode == 0,
+                "warning": "" if r.returncode == 0
+                           else f"suricata config error: {(r.stderr or r.stdout or '').strip()[:200]}",
+            })
+        elif shutil.which("suricata"):
+            validators.append({
+                "name": "suricata -T",
+                "ok":   True,
+                "warning": "suricata.yaml not yet generated — will validate on first apply.",
+            })
+    except Exception as exc:
+        validators.append({"name": "suricata -T", "ok": False,
+                           "warning": f"suricata validator error: {exc}"})
+
+    return validators
+
+
 def preflight_check() -> dict:
     """
     Return a full preflight report.  Suitable for a /system/preflight UI page.
@@ -426,20 +584,23 @@ def preflight_check() -> dict:
       "missing_required":  [...tool names...],
       "dir_errors":        [...paths...],
       "warnings":          [...warning strings...],
-      "system_info":       {"freebsd_version", "disk_var", "pfctl_ok"},
+      "kernel_caps":       [{"cap", "ok", "warning"}, ...],
+      "validators":        [{"name", "ok", "warning"}, ...],
+      "system_info":       {"freebsd_version", "disk_var_free_mb", "pfctl_ok"},
       "overall_ok":        bool,
     }
     """
-    dirs   = ensure_dirs()        # also ensures dirs are created
-    tools  = check_tools()
+    dirs  = ensure_dirs()
+    tools = check_tools()
 
     missing_required = [t["name"] for t in tools if not t["present"] and not t["optional"]]
     dir_errors       = [d["path"] for d in dirs if not d["ok"]]
 
-    # Extended system checks
-    disk    = _check_disk_space("/var" if _ON_FREEBSD else ".")
-    ver     = _check_freebsd_version()
-    pf_chk  = _check_pfctl_usable()
+    disk   = _check_disk_space("/var" if _ON_FREEBSD else ".")
+    ver    = _check_freebsd_version()
+    pf_chk = _check_pfctl_usable()
+    kcaps  = _check_kernel_capabilities()
+    valids = _check_syntax_validators()
 
     warnings = []
     if not disk["ok"]:
@@ -448,7 +609,15 @@ def preflight_check() -> dict:
         warnings.append(ver["warning"])
     if not pf_chk["ok"]:
         warnings.append(pf_chk["warning"])
+    for cap in kcaps:
+        if not cap["ok"] and cap["warning"]:
+            warnings.append(cap["warning"])
+    for v in valids:
+        if not v["ok"] and v["warning"]:
+            warnings.append(v["warning"])
 
+    # overall_ok requires required tools present and no dir errors
+    # kernel capability failures are advisory (degrade features, not the whole appliance)
     overall_ok = (len(missing_required) == 0 and len(dir_errors) == 0)
 
     return {
@@ -457,10 +626,12 @@ def preflight_check() -> dict:
         "missing_required": missing_required,
         "dir_errors":       dir_errors,
         "warnings":         warnings,
+        "kernel_caps":      kcaps,
+        "validators":       valids,
         "system_info": {
-            "freebsd_version": ver.get("version", "n/a"),
+            "freebsd_version":  ver.get("version", "n/a"),
             "disk_var_free_mb": disk.get("free_mb", -1),
-            "pfctl_ok":        pf_chk["ok"],
+            "pfctl_ok":         pf_chk["ok"],
         },
         "overall_ok": overall_ok,
     }

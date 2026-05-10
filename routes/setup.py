@@ -110,8 +110,24 @@ def _get_saved_setup_ports(conn):
 
 
 def _wizard_guard():
-    """Redirect away from wizard if it's already done."""
+    """Redirect non-admin users away from wizard if it's already done."""
     if _is_setup_complete():
+        # Admins (superusers) may re-enter the wizard after completion.
+        from flask import session as _session
+        from app.database import get_db as _get_db
+        try:
+            user_id = _session.get("user_id")
+            if user_id:
+                conn = _get_db()
+                row  = conn.execute(
+                    "SELECT is_superuser FROM users WHERE id=?", (user_id,)
+                ).fetchone()
+                if row and row["is_superuser"]:
+                    return None  # Admins can always re-run setup
+        except Exception:
+            pass
+        from flask import flash as _flash
+        _flash("Setup has already been completed.", "info")
         return redirect(url_for("system.dashboard"))
     return None
 

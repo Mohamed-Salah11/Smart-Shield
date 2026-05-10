@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, Response, session
 from app.database import get_db
 from app.auth_utils import login_required
 from app.api_auth import api_permission_required
@@ -6,6 +6,7 @@ from app.secret_store import seal, decrypt_secret
 from app.validators import validate_ip, validate_port, validate_username, collect_errors
 import sqlite3
 from app.secret_store import encrypt_secret
+from app.audit_log import log_event
 
 vpn_bp = Blueprint("vpn", __name__, url_prefix="/vpn")
 
@@ -1985,3 +1986,133 @@ def export_cert_p12(cert_id):
                         headers={"Content-Disposition": f"attachment; filename=cert-{cert_id}.p12"})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/export-pki/<int:server_id>", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def openvpn_export_pki(server_id):
+    """
+    Write CA, server cert, and server key from the cert_manager DB to disk
+    so that apply_openvpn() can reference them from the filesystem.
+
+    Request JSON (all optional — if omitted, the server's own IDs are used):
+      { "ca_id": int, "server_cert_id": int }
+    """
+    try:
+        from app.services.openvpn_writer import export_pki_to_disk
+        conn = get_db()
+        data = request.get_json(silent=True) or {}
+
+        # Resolve defaults from openvpn_servers row
+        row = conn.execute(
+            "SELECT ca_id, server_cert_id FROM openvpn_servers WHERE id=?", (server_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "message": f"OpenVPN server {server_id} not found."}), 404
+
+        ca_id          = data.get("ca_id")          or (row["ca_id"]          if row else None)
+        server_cert_id = data.get("server_cert_id") or (row["server_cert_id"] if row else None)
+
+        result = export_pki_to_disk(conn, server_id, ca_id, server_cert_id)
+        log_event(category="vpn", action="openvpn_export_pki",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"server_id": server_id, "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+# ── Certificate Revocation List (CRL) ──────────────────────────────────────
+
+@vpn_bp.route("/api/certs/<int:ca_id>/crl", methods=["GET"])
+@login_required
+def get_crl_json(ca_id):
+    """
+    Generate (or regenerate) a CRL for the given CA and return it as JSON.
+
+    Response::
+
+        {
+          "ok": true,
+          "revoked_count": <int>,
+          "pem": "<PEM string>"
+        }
+    """
+    try:
+        from app.services.cert_manager import generate_crl
+        conn   = get_db()
+        result = generate_crl(conn, ca_id)
+        if not result["ok"]:
+            return jsonify(result), 404 if "not found" in result.get("message", "") else 500
+
+        # Count revoked certs in the PEM (each entry starts with BEGIN X509 CRL; count lines)
+        revoked_rows = conn.execute(
+            "SELECT COUNT(*) FROM certificates WHERE ca_id=? AND revoked=1",
+            (ca_id,),
+        ).fetchone()
+        revoked_count = revoked_rows[0] if revoked_rows else 0
+
+        return jsonify({"ok": True, "revoked_count": revoked_count, "pem": result["pem"]})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/<int:ca_id>/crl.pem", methods=["GET"])
+@login_required
+def download_crl_pem(ca_id):
+    """
+    Generate a CRL for the given CA and return it as a PEM file download.
+    Content-Type: application/x-pem-file
+    """
+    try:
+        from app.services.cert_manager import generate_crl
+        conn   = get_db()
+        result = generate_crl(conn, ca_id)
+        if not result["ok"]:
+            status = 404 if "not found" in result.get("message", "") else 500
+            return jsonify(result), status
+        return Response(
+            result["pem"],
+            mimetype="application/x-pem-file",
+            headers={"Content-Disposition": f"attachment; filename=ca-{ca_id}.crl.pem"},
+        )
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+# ── OpenVPN client config (.ovpn) export ──────────────────────────────────────
+
+@vpn_bp.route("/api/openvpn/client-export/<int:server_id>/<int:client_cert_id>", methods=["GET"])
+@login_required
+def openvpn_client_export(server_id, client_cert_id):
+    """
+    Generate and download a self-contained .ovpn client config file.
+
+    The file embeds inline <ca>, <cert>, and <key> blocks so no separate
+    PKI files need to be distributed to the end-user.
+
+    URL: GET /vpn/api/openvpn/client-export/<server_id>/<client_cert_id>
+    Response: application/x-openvpn-profile download
+    """
+    try:
+        from app.services.openvpn_writer import generate_client_ovpn
+        conn    = get_db()
+        ovpn    = generate_client_ovpn(conn, server_id, client_cert_id)
+        log_event(
+            category="vpn",
+            action="openvpn_client_export",
+            username=session.get("username"),
+            remote_addr=request.remote_addr,
+            details={"server_id": server_id, "client_cert_id": client_cert_id},
+        )
+        return Response(
+            ovpn,
+            mimetype="application/x-openvpn-profile",
+            headers={
+                "Content-Disposition": f"attachment; filename=client-{client_cert_id}.ovpn"
+            },
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
