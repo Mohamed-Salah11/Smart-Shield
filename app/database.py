@@ -705,6 +705,10 @@ ON interface_assignments(interface_type)
         prefix INTEGER DEFAULT 32,
         expansion INTEGER DEFAULT 0,
         description TEXT DEFAULT '',
+        vhid INTEGER DEFAULT 1,
+        carp_pass TEXT DEFAULT '',
+        advskew INTEGER DEFAULT 0,
+        advbase INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)

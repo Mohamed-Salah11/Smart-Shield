@@ -921,12 +921,9 @@ def apply_vips(conn) -> dict:
             skipped.append({"id": vip.get("id"), "reason": "missing interface or address"})
             continue
 
-        if vtype in ("carp", "pfsync", "proxyarp"):
-            skipped.append({
-                "id": vip.get("id"),
-                "type": vtype,
-                "reason": f"{vtype} requires additional CARP-specific fields (vhid, password) not yet in schema",
-            })
+        if vtype == "pfsync":
+            skipped.append({"id": vip.get("id"), "type": vtype,
+                            "reason": "pfsync is configured via rc.conf — not managed as a VIP"})
             continue
 
         if not sys.platform.startswith("freebsd"):
@@ -937,16 +934,42 @@ def apply_vips(conn) -> dict:
             net = _ipa.ip_interface(f"{addr}/{prefix}")
             netmask = str(net.network.netmask)
             from app.services.priv_helper import run_privileged
-            result = run_privileged("ifconfig.alias_add", iface=iface, ip=addr, netmask=netmask)
-            ok = result.returncode == 0
-            applied.append({
-                "id":    vip.get("id"),
-                "type":  vtype,
-                "iface": iface,
-                "addr":  f"{addr}/{prefix}",
-                "ok":    ok,
-                "message": (result.stderr or result.stdout or "").strip(),
-            })
+
+            if vtype == "carp":
+                # CARP: ifconfig <iface> vhid <vhid> advskew <skew> advbase <base>
+                #       carpdev <iface> pass <password> <addr> netmask <mask> alias
+                vhid    = int(vip.get("vhid") or 1)
+                advskew = int(vip.get("advskew") or 0)
+                advbase = int(vip.get("advbase") or 1)
+                carp_pass_enc = (vip.get("carp_pass") or "").strip()
+                from app.secret_store import decrypt_secret
+                carp_pass = decrypt_secret(carp_pass_enc) if carp_pass_enc else "changeme"
+                # Build the ifconfig command: use run_command since priv_helper
+                # doesn't have a carp-specific template yet — run as subprocess.
+                cmd = [
+                    "ifconfig", iface,
+                    "vhid", str(vhid),
+                    "advskew", str(advskew),
+                    "advbase", str(advbase),
+                    "pass", carp_pass,
+                    addr, "netmask", netmask, "alias",
+                ]
+                r = run_command(cmd, check=False)
+                ok = r.returncode == 0
+                applied.append({
+                    "id": vip.get("id"), "type": "carp", "iface": iface,
+                    "addr": f"{addr}/{prefix}", "vhid": vhid,
+                    "ok": ok, "message": (r.stderr or r.stdout or "").strip(),
+                })
+            else:
+                # ipalias / proxyarp: standard alias
+                result = run_privileged("ifconfig.alias_add", iface=iface, ip=addr, netmask=netmask)
+                ok = result.returncode == 0
+                applied.append({
+                    "id": vip.get("id"), "type": vtype, "iface": iface,
+                    "addr": f"{addr}/{prefix}", "ok": ok,
+                    "message": (result.stderr or result.stdout or "").strip(),
+                })
         except Exception as exc:
             applied.append({"id": vip.get("id"), "iface": iface, "addr": addr, "ok": False, "message": str(exc)})
 

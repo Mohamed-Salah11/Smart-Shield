@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 14
+CURRENT_SCHEMA_VERSION = 15
 
 
 class SchemaVersionError(RuntimeError):
@@ -365,6 +365,26 @@ def _migration_v14(conn):
             pass  # column already exists on fresh installs
 
 
+def _migration_v15(conn):
+    """Phase 15: Add CARP-specific columns to virtual_ips_configs.
+
+    vhid         — CARP virtual host ID (1-255)
+    carp_pass    — CARP password (encrypted)
+    advskew      — CARP advertisement skew (0-254); 0 = master, higher = backup
+    advbase      — CARP advertisement base interval (seconds, default 1)
+    """
+    for ddl in [
+        "ALTER TABLE virtual_ips_configs ADD COLUMN vhid INTEGER DEFAULT 1",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN carp_pass TEXT DEFAULT ''",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN advskew INTEGER DEFAULT 0",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN advbase INTEGER DEFAULT 1",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -381,6 +401,7 @@ MIGRATIONS = [
     (12, _migration_v12),
     (13, _migration_v13),
     (14, _migration_v14),
+    (15, _migration_v15),
 ]
 
 
