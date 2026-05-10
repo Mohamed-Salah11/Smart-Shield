@@ -1,5 +1,6 @@
+from datetime import datetime, timezone
 from functools import wraps
-from flask import session, redirect, url_for, request, render_template
+from flask import session, redirect, url_for, request, render_template, jsonify
 from app.db_utils import db_cursor
 
 
@@ -109,3 +110,48 @@ def superuser_required(view_func):
         return view_func(*args, **kwargs)
 
     return wrapped_view
+
+
+def reauth_required(reason=""):
+    """
+    Decorator that requires a recent reauthentication (within 5 minutes).
+
+    Checks ``session["reauth_time"]``; if missing or stale, returns:
+      JSON {"ok": False, "reauth_required": True, "message": "..."} with 403.
+
+    Usage::
+
+        @reauth_required(reason="factory reset")
+        def my_view():
+            ...
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(*args, **kwargs):
+            reauth_time_str = session.get("reauth_time")
+            if not reauth_time_str:
+                return jsonify({
+                    "ok": False,
+                    "reauth_required": True,
+                    "message": "Please re-authenticate to perform this action.",
+                }), 403
+            try:
+                reauth_dt = datetime.fromisoformat(reauth_time_str)
+                if reauth_dt.tzinfo is None:
+                    reauth_dt = reauth_dt.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - reauth_dt).total_seconds()
+                if age > 300:
+                    return jsonify({
+                        "ok": False,
+                        "reauth_required": True,
+                        "message": "Please re-authenticate to perform this action.",
+                    }), 403
+            except (ValueError, TypeError):
+                return jsonify({
+                    "ok": False,
+                    "reauth_required": True,
+                    "message": "Please re-authenticate to perform this action.",
+                }), 403
+            return view_func(*args, **kwargs)
+        return wrapped_view
+    return decorator

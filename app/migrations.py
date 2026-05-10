@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 12
+CURRENT_SCHEMA_VERSION = 14
 
 
 class SchemaVersionError(RuntimeError):
@@ -294,6 +294,77 @@ def _migration_v12(conn):
             pass  # column already exists (fresh install or re-run)
 
 
+def _migration_v13(conn):
+    """Phase 13: Applied-state tracking tables (Phases 37 and 38).
+
+    config_apply_jobs     — one row per apply operation with full lifecycle state
+    feature_applied_state — one row per feature with current summary state
+
+    These tables power the UI applied-state badges and the config transaction
+    manager rollback decisions.
+    """
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS config_apply_jobs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        feature_key TEXT    NOT NULL,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        config_hash TEXT    DEFAULT '',
+        applied_by  TEXT    DEFAULT 'system',
+        notes       TEXT    DEFAULT '',
+        message     TEXT    DEFAULT '',
+        created_at  REAL    NOT NULL DEFAULT 0,
+        updated_at  REAL    NOT NULL DEFAULT 0
+    )
+    """)
+
+    conn.execute("""
+    CREATE INDEX IF NOT EXISTS idx_cap_jobs_feature_created
+    ON config_apply_jobs(feature_key, created_at DESC)
+    """)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS feature_applied_state (
+        feature_key TEXT PRIMARY KEY,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        message     TEXT    DEFAULT '',
+        last_job_id INTEGER,
+        updated_at  REAL    NOT NULL DEFAULT 0,
+        FOREIGN KEY(last_job_id) REFERENCES config_apply_jobs(id)
+    )
+    """)
+
+
+def _migration_v14(conn):
+    """Phase 14: Policy-based routing table and new columns for advanced_firewall_nat.
+
+    policy_routes       — per-rule entries for PF route-to policy routing
+    nat_reflection      — integer toggle for hairpin NAT on advanced_firewall_nat
+    kill_states_on_reload — integer toggle to flush all PF states after reload
+    """
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS policy_routes (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled          INTEGER DEFAULT 1,
+        priority         INTEGER DEFAULT 100,
+        description      TEXT    DEFAULT '',
+        interface_type   TEXT    DEFAULT 'LAN',
+        source           TEXT    DEFAULT 'any',
+        destination      TEXT    DEFAULT 'any',
+        gateway_id       INTEGER REFERENCES gateways(id),
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    for ddl in [
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN nat_reflection INTEGER DEFAULT 0",
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN kill_states_on_reload INTEGER DEFAULT 0",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -308,6 +379,8 @@ MIGRATIONS = [
     (10, _migration_v10),
     (11, _migration_v11),
     (12, _migration_v12),
+    (13, _migration_v13),
+    (14, _migration_v14),
 ]
 
 

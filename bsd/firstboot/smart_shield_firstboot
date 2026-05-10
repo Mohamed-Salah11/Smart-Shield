@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# smart_shield_firstboot
+# ----------------------
+# First-boot setup script for the Smart Shield appliance.
+# Runs once at boot via /usr/local/etc/rc.d/ or rc.local if a sentinel file
+# is absent, then creates the sentinel so it never runs again.
+#
+# Usage (rc.d integration):
+#   Place this script at /usr/local/libexec/smart_shield_firstboot
+#   and call it from the rc.d service below, OR add to /etc/rc.local:
+#     [ -x /usr/local/libexec/smart_shield_firstboot ] && \
+#         /usr/local/libexec/smart_shield_firstboot
+#
+# What it does:
+#   1. Creates required directories with correct ownership
+#   2. Copies example rc.conf snippets if rc.conf is minimal
+#   3. Sets the hostname from smart-shield config (if configured)
+#   4. Enables PF and IP forwarding in rc.conf
+#   5. Starts Smart Shield service for the first time
+#   6. Writes the sentinel file to prevent re-running
+
+set -e
+
+SENTINEL="/var/db/smart-shield/.firstboot_done"
+SS_DIR="/var/db/smart-shield"
+LOG_DIR="/var/log/smart-shield"
+CONF_DIR="/usr/local/etc/smart-shield"
+RCD="/usr/local/etc/rc.d"
+SVCNAME="smart_shield"
+USER="www"
+
+log() { echo "[firstboot] $*"; logger -t smart_shield_firstboot "$*"; }
+
+# Already ran — exit immediately.
+if [ -f "$SENTINEL" ]; then
+    log "Sentinel found — skipping first-boot setup."
+    exit 0
+fi
+
+log "=== Smart Shield first-boot setup starting ==="
+
+# ── 1. Create required directories ──────────────────────────────────────────
+for DIR in "$SS_DIR" "$LOG_DIR" "$CONF_DIR" \
+           "$SS_DIR/backups" "$SS_DIR/uploads/profile_pictures"; do
+    if [ ! -d "$DIR" ]; then
+        mkdir -p "$DIR"
+        log "Created $DIR"
+    fi
+    chown "$USER":www "$DIR" 2>/dev/null || true
+    chmod 750 "$DIR"
+done
+
+# ── 2. Ensure PF is enabled in /etc/rc.conf ─────────────────────────────────
+if ! grep -q "^pf_enable=" /etc/rc.conf 2>/dev/null; then
+    log "Enabling PF in /etc/rc.conf"
+    sysrc pf_enable="YES"
+fi
+if ! grep -q "^pflog_enable=" /etc/rc.conf 2>/dev/null; then
+    sysrc pflog_enable="YES"
+fi
+
+# ── 3. Enable IP forwarding ──────────────────────────────────────────────────
+if ! grep -q "^gateway_enable=" /etc/rc.conf 2>/dev/null; then
+    log "Enabling IP forwarding in /etc/rc.conf"
+    sysrc gateway_enable="YES"
+fi
+
+# ── 4. Enable Smart Shield rc.d service ─────────────────────────────────────
+if [ -f "$RCD/$SVCNAME" ]; then
+    sysrc ${SVCNAME}_enable="YES" 2>/dev/null || true
+    log "Enabled $SVCNAME in rc.conf"
+fi
+
+# ── 5. Copy default .env if not present ─────────────────────────────────────
+ENV_FILE="/usr/local/etc/smart-shield/.env"
+ENV_EXAMPLE="/usr/local/share/smart-shield/.env.example"
+if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    log "Copied default .env — edit $ENV_FILE to set SECRET_KEY and other settings."
+fi
+
+# ── 6. Generate a random SECRET_KEY if the default placeholder is still set ──
+if [ -f "$ENV_FILE" ]; then
+    if grep -q "CHANGE_ME\|please-change\|replace-this" "$ENV_FILE" 2>/dev/null; then
+        NEW_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || \
+                  openssl rand -hex 32)
+        sed -i '' "s|^SECRET_KEY=.*|SECRET_KEY=${NEW_KEY}|" "$ENV_FILE"
+        log "Generated new SECRET_KEY in $ENV_FILE"
+    fi
+fi
+
+# ── 7. Write sentinel ────────────────────────────────────────────────────────
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$SENTINEL"
+chmod 444 "$SENTINEL"
+
+log "=== Smart Shield first-boot setup complete ==="
+log "Start the service with: service smart_shield start"
+exit 0

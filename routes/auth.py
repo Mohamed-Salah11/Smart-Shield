@@ -1,8 +1,9 @@
 import time
 import json as _json
 import ipaddress as _ip
+from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, request, redirect, url_for, session
+from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import check_password_hash
 from app.database import get_db
 from app.audit_log import log_event
@@ -88,13 +89,31 @@ def login():
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
 
+        # Per-username lockout: 5 failures within 15 minutes triggers lockout.
+        if username and not whitelisted:
+            per_user_count = conn.execute(
+                "SELECT COUNT(*) FROM login_failures WHERE username=? AND failed_at>?",
+                (username, time.time() - 900)
+            ).fetchone()[0]
+            if per_user_count >= 5:
+                log_event(
+                    category="security",
+                    action="login_blocked_user_lockout",
+                    username=username,
+                    remote_addr=remote,
+                    details={"failures": per_user_count},
+                )
+                error = "Too many failed attempts. Please wait 15 minutes before trying again."
+                return render_template("login.html", error=error), 429
+
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cur.fetchone()
 
         if user and check_password_hash(user["password"], password):
-            # Clear failure history on successful login
+            # Clear failure history on successful login (both IP and username based)
             conn.execute("DELETE FROM login_failures WHERE remote_addr=?", (remote,))
+            conn.execute("DELETE FROM login_failures WHERE username=?", (username,))
             conn.commit()
             session["username"]     = user["username"]
             session["user_id"]      = user["id"]
@@ -112,11 +131,11 @@ def login():
             )
             return redirect(url_for("system.dashboard"))
 
-        # Record failure for non-whitelisted IPs
+        # Record failure for non-whitelisted IPs (store both IP and username)
         if not whitelisted:
             conn.execute(
-                "INSERT INTO login_failures (remote_addr, failed_at) VALUES (?,?)",
-                (remote, time.time())
+                "INSERT INTO login_failures (remote_addr, failed_at, username) VALUES (?,?,?)",
+                (remote, time.time(), username or None)
             )
             conn.commit()
         log_event(
@@ -142,3 +161,51 @@ def logout():
     )
     session.clear()
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/reauth", methods=["POST"])
+def reauth():
+    """
+    Reauthentication endpoint for destructive-action gates.
+    POST JSON: {"password": "..."}
+    On success sets session["reauth_time"] and returns {"ok": True}.
+    On failure increments login_failures and returns {"ok": False}.
+    """
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"ok": False, "message": "Not logged in."}), 401
+
+    data     = request.get_json(silent=True) or {}
+    password = (data.get("password") or "").strip()
+    if not password:
+        return jsonify({"ok": False, "message": "Password is required."}), 400
+
+    conn    = get_db()
+    remote  = request.remote_addr or ""
+    row     = conn.execute("SELECT username, password FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "message": "User not found."}), 404
+
+    if check_password_hash(row["password"], password):
+        session["reauth_time"] = datetime.now(timezone.utc).isoformat()
+        log_event(
+            category="security",
+            action="reauth_success",
+            username=row["username"],
+            remote_addr=remote,
+        )
+        return jsonify({"ok": True})
+
+    # Failed reauth — record in login_failures
+    conn.execute(
+        "INSERT INTO login_failures (remote_addr, failed_at, username) VALUES (?,?,?)",
+        (remote, time.time(), row["username"])
+    )
+    conn.commit()
+    log_event(
+        category="security",
+        action="reauth_failed",
+        username=row["username"],
+        remote_addr=remote,
+    )
+    return jsonify({"ok": False, "message": "Incorrect password."}), 403

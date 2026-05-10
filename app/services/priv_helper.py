@@ -193,6 +193,25 @@ def _val_zone_type(v: str) -> str:
     return v
 
 
+def _val_safe_pkg_name(v: str) -> str:
+    """Validate a FreeBSD package name (letters, digits, hyphens, dots, plus, underscore)."""
+    v = str(v).strip()
+    if not v or not re.match(r'^[A-Za-z0-9._+\-]{1,200}$', v):
+        raise ValueError(f"Invalid package name: {v!r}")
+    return v
+
+
+def _val_seconds(v) -> str:
+    """Validate a positive integer number of seconds (for PF table expire)."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        raise ValueError(f"seconds must be a positive integer, got {v!r}")
+    if n <= 0:
+        raise ValueError(f"seconds must be positive, got {n}")
+    return str(n)
+
+
 # Action allowlist
 # ---------------------------------------------------------------------------
 # Each entry describes one privileged action.
@@ -273,6 +292,16 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "netmask", "{netmask}"],
         "params": {"iface": _val_iface_name, "ip": _val_ip, "netmask": _val_ip},
     },
+    "ifconfig.alias_add": {
+        "description": "Add an IP alias (secondary address) to an interface.",
+        "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "netmask", "{netmask}", "alias"],
+        "params": {"iface": _val_iface_name, "ip": _val_ip, "netmask": _val_ip},
+    },
+    "ifconfig.alias_del": {
+        "description": "Remove an IP alias from an interface.",
+        "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "-alias"],
+        "params": {"iface": _val_iface_name, "ip": _val_ip},
+    },
     "ifconfig.up": {
         "description": "Bring an interface up.",
         "cmd": ["/sbin/ifconfig", "{iface}", "up"],
@@ -336,6 +365,31 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "description": "Validate a PF config file without applying it.",
         "cmd": ["/sbin/pfctl", "-n", "-f", "{config_path}"],
         "params": {"config_path": _val_config_path},
+    },
+    "pkg.install": {
+        "description": "Install a package via pkg (non-interactive, auto-yes).",
+        "cmd": ["/usr/sbin/pkg", "install", "-y", "--", "{package_name}"],
+        "params": {"package_name": _val_safe_pkg_name},
+    },
+    "pkg.delete": {
+        "description": "Remove an installed package via pkg.",
+        "cmd": ["/usr/sbin/pkg", "delete", "-y", "--", "{package_name}"],
+        "params": {"package_name": _val_safe_pkg_name},
+    },
+    "pf.table_replace_file": {
+        "description": "Atomically replace all IPs in a PF table from a file.",
+        "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "replace", "-f", "{file_path}"],
+        "params": {"table": _val_table_name, "file_path": _val_config_path},
+    },
+    "kldload": {
+        "description": "Load a kernel module (e.g. netmap).",
+        "cmd": ["/sbin/kldload", "{module}"],
+        "params": {"module": _val_safe_pkg_name},
+    },
+    "pf.table_expire": {
+        "description": "Expire PF table entries older than N seconds.",
+        "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "expire", "{seconds}"],
+        "params": {"table": _val_table_name, "seconds": _val_seconds},
     },
 }
 

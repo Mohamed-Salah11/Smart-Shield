@@ -338,13 +338,15 @@ def write_ipsec_conf(conn) -> dict:
             "secrets": secrets,
         }
 
+    from app.services.config_file_utils import atomic_write, backup_config
     errors = []
-    for path, content in [(_IPSEC_CONF_PATH, conf), (_IPSEC_SECRETS_PATH, secrets)]:
+    for path, content, mode in [
+        (_IPSEC_CONF_PATH,    conf,    0o644),
+        (_IPSEC_SECRETS_PATH, secrets, 0o600),
+    ]:
         try:
-            with open(path, "w") as fh:
-                fh.write(content)
-            if path.endswith("secrets"):
-                os.chmod(path, 0o600)
+            backup_config(path)
+            atomic_write(path, content, mode=mode)
         except OSError as exc:
             errors.append(f"{path}: {exc}")
 
@@ -388,10 +390,11 @@ def apply_ipsec(conn) -> dict:
 
     result = write_ipsec_conf(conn)
     if not result["ok"] or not sys.platform.startswith("freebsd"):
-        return result
+        return {**result, "rolled_back": False}
     try:
         from app.services.priv_helper import run_privileged
         from app.services.service_manager import sysrc_set
+        from app.services.config_file_utils import rollback_config
         sysrc_set("strongswan_enable", "YES")
         r = run_privileged("ipsec.reload")
         ok = r.returncode == 0
@@ -400,9 +403,17 @@ def apply_ipsec(conn) -> dict:
             r2 = run_privileged("service.action", service_name="strongswan", action="restart")
             ok = r2.returncode == 0
             msg = (r2.stdout or r2.stderr or "").strip()
-        return {"ok": ok, "message": result["message"] + " | reload: " + msg}
+        if not ok:
+            rb_conf    = rollback_config(_IPSEC_CONF_PATH)
+            rb_secrets = rollback_config(_IPSEC_SECRETS_PATH)
+            rolled_back = rb_conf.get("ok", False) or rb_secrets.get("ok", False)
+            return {"ok": False, "rolled_back": rolled_back,
+                    "message": result["message"] + " | reload: " + msg}
+        return {"ok": True, "rolled_back": False,
+                "message": result["message"] + " | reload: " + msg}
     except Exception as exc:
-        return {"ok": False, "message": f"Config written but reload failed: {exc}"}
+        return {"ok": False, "rolled_back": False,
+                "message": f"Config written but reload failed: {exc}"}
 
 
 def get_ipsec_status() -> dict:

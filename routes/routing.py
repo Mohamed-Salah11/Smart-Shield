@@ -394,3 +394,56 @@ def api_apply_all_static_routes():
     )
     status = 200 if result.get("ok") else 500
     return jsonify(result), status
+
+
+@routing_bp.route("/api/gateway-health")
+@login_required
+def api_gateway_health():
+    """
+    Return current gateway reachability from the background monitor.
+
+    Response::
+
+        {"ok": true, "gateways": [{"id": 1, "name": "WAN GW", "reachable": true, "ip": "..."}, ...]}
+    """
+    conn = get_db()
+    try:
+        from app.services.gateway_monitor import get_gateway_health
+        health = get_gateway_health()
+    except Exception:
+        health = {}
+
+    rows = _rows(conn, "SELECT id, name, gateway AS ip FROM gateways ORDER BY name")
+    gateways = []
+    for gw in rows:
+        gw_id = gw["id"]
+        reachable = health.get(gw_id)
+        gateways.append({
+            "id":        gw_id,
+            "name":      gw["name"],
+            "ip":        gw.get("ip", ""),
+            "reachable": reachable,  # None = not yet probed
+        })
+    return jsonify({"ok": True, "gateways": gateways})
+
+
+@routing_bp.route("/api/gateway-failover/apply", methods=["POST"])
+@login_required
+def api_gateway_failover_apply():
+    """
+    Probe all gateway-group members and switch the default route to the
+    highest-priority reachable gateway.  No-op on non-FreeBSD.
+    """
+    conn = get_db()
+    try:
+        from app.services.network_service import apply_gateway_failover
+        result = apply_gateway_failover(conn)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+    log_event(
+        category="network", action="gateway_failover_apply",
+        username=None, remote_addr=request.remote_addr,
+        details={"ok": result.get("ok"), "message": result.get("message", "")},
+    )
+    return jsonify(result)

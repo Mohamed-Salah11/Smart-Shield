@@ -36,7 +36,7 @@ except ImportError:
 from app import audit_log as audit_log_module
 from app import database as database_module
 from app.audit_log import log_event
-from app.auth_utils import login_required
+from app.auth_utils import login_required, superuser_required, reauth_required
 from app.uploads import get_upload_dir
 
 diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
@@ -878,6 +878,49 @@ def _restore_full_snapshot(payload):
     return summary
 
 
+def _restart_services_after_restore() -> None:
+    """
+    Restart key services after a config restore so that restored config files
+    take effect.  Best-effort — failures are silently ignored so restore
+    success is not rolled back due to a service restart hiccup.
+    Only runs on FreeBSD; no-op on other platforms.
+    """
+    import sys as _sys
+    if not _sys.platform.startswith("freebsd"):
+        return
+    _SERVICES_TO_RESTART = [
+        "unbound",
+        "isc-dhcpd",
+        "suricata",
+        "openvpn",
+        "strongswan",
+        "mpd5",
+    ]
+    try:
+        from app.services.service_manager import service_action
+        from app.services.priv_helper import run_privileged
+        # Reload PF first (most critical — bad pf.conf causes immediate downtime)
+        try:
+            import os as _os
+            from app.database import get_db
+            from app.services.pf_generator import generate_pf_conf
+            pf_path = "/etc/pf.conf"
+            conf = generate_pf_conf(get_db())
+            with open(pf_path, "w") as fh:
+                fh.write(conf)
+            run_privileged("pf.reload", config_path=pf_path)
+        except Exception:
+            pass
+        # Restart each optional service (skip if not installed)
+        for svc in _SERVICES_TO_RESTART:
+            try:
+                service_action(svc, "restart")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def _backup_page_context():
     config = _load_general_config_file()
     components = _snapshot_component_definitions()
@@ -1148,6 +1191,11 @@ def backup_restore_restore():
 
     flash(" ".join(success_parts), "success")
 
+    # Restart affected services so restored config files take effect on FreeBSD.
+    restart_after = bool(request.form.get("restart_services_after_restore"))
+    if restart_after:
+        _restart_services_after_restore()
+
     if logout_after_restore:
         session.clear()
         return redirect(url_for("auth.login"))
@@ -1222,13 +1270,28 @@ def factory_defaults():
 
 
 @diagnostics_bp.route("/factory-defaults/reset", methods=["POST"])
-@login_required
+@superuser_required
+@reauth_required(reason="factory reset")
 def factory_defaults_reset():
-    """Wipe all firewall rules, NAT, VPN config — keep users."""
-    from flask import current_app
+    """Wipe all firewall rules, NAT, VPN config — keep users. Requires password re-auth."""
+    from werkzeug.security import check_password_hash
     from app.database import get_db
-    conn = get_db()
-    cur  = conn.cursor()
+    data     = request.get_json(silent=True) or {}
+    password = (data.get("confirm_password") or "").strip()
+    if not password:
+        return jsonify({"ok": False, "message": "confirm_password is required."}), 400
+
+    conn    = get_db()
+    user_id = session.get("user_id")
+    row     = conn.execute(
+        "SELECT password FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    if not row or not check_password_hash(row["password"], password):
+        log_event(category="security", action="factory_reset_reauth_failed",
+                  username=session.get("username"), remote_addr=request.remote_addr)
+        return jsonify({"ok": False, "message": "Password confirmation failed."}), 403
+
+    cur = conn.cursor()
     tables_to_clear = [
         "firewall_rules_wan", "firewall_rules_lan", "firewall_rules_floating",
         "firewall_aliases", "firewall_schedules", "nat_pf", "nat_1to1",
@@ -1259,13 +1322,30 @@ def halt_system():
 
 
 @diagnostics_bp.route("/halt-system/execute", methods=["POST"])
-@login_required
+@superuser_required
+@reauth_required(reason="halt/reboot system")
 def halt_system_execute():
     import sys
-    data   = request.get_json(silent=True) or {}
-    action = (data.get("action") or "halt").lower()
+    from werkzeug.security import check_password_hash
+    from app.database import get_db
+    data     = request.get_json(silent=True) or {}
+    action   = (data.get("action") or "halt").lower()
+    password = (data.get("confirm_password") or "").strip()
     if action not in ("halt", "reboot"):
         return jsonify({"ok": False, "message": "Invalid action"}), 400
+    if not password:
+        return jsonify({"ok": False, "message": "confirm_password is required."}), 400
+
+    conn    = get_db()
+    user_id = session.get("user_id")
+    row     = conn.execute(
+        "SELECT password FROM users WHERE id=?", (user_id,)
+    ).fetchone()
+    if not row or not check_password_hash(row["password"], password):
+        log_event(category="security", action=f"system_{action}_reauth_failed",
+                  username=session.get("username"), remote_addr=request.remote_addr)
+        return jsonify({"ok": False, "message": "Password confirmation failed."}), 403
+
     log_event(category="system", action=f"system_{action}",
               username=session.get("username"), remote_addr=request.remote_addr)
     if not sys.platform.startswith("freebsd"):
@@ -1348,6 +1428,24 @@ def packet_capture():
                            on_freebsd=sys.platform.startswith("freebsd"))
 
 
+def _validate_pcap_filter(filter_str: str) -> bool:
+    """
+    Allow only safe BPF filter characters.
+
+    Permits: alphanumeric, spaces, dots, colons, dashes, underscores, slashes.
+    Blocks shell-injection characters: ; & | $ ` ( ) ' " > < newlines etc.
+    An empty filter string is always valid (means "capture everything").
+    """
+    if not filter_str:
+        return True
+    return bool(re.match(r'^[a-zA-Z0-9 .:/_\-]+$', filter_str))
+
+
+def _validate_pcap_iface(iface: str) -> bool:
+    """Allow only safe FreeBSD interface names (alphanumeric, up to 16 chars)."""
+    return bool(re.match(r'^[a-zA-Z][a-zA-Z0-9]{0,15}$', iface))
+
+
 @diagnostics_bp.route("/api/packet-capture", methods=["POST"])
 @login_required
 def api_packet_capture():
@@ -1356,6 +1454,18 @@ def api_packet_capture():
     iface   = (data.get("interface") or "em0").strip()
     count   = min(int(data.get("count") or 50), 200)
     filt    = (data.get("filter") or "").strip()
+
+    # Input validation — prevent shell injection via interface name or BPF filter
+    if not _validate_pcap_iface(iface):
+        return jsonify({"ok": False, "message": "Invalid interface name.", "lines": []}), 400
+    if not _validate_pcap_filter(filt):
+        return jsonify({
+            "ok": False,
+            "message": "Invalid BPF filter: only alphanumeric characters, spaces, "
+                       "dots, colons, dashes, underscores and slashes are allowed.",
+            "lines": [],
+        }), 400
+
     if not sys.platform.startswith("freebsd"):
         return jsonify({"ok": True, "lines": ["Non-FreeBSD host — packet capture not available."]})
     try:

@@ -124,6 +124,53 @@ def generate_snmpd_config(settings: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Security validation (DB-level)
+# ---------------------------------------------------------------------------
+
+def validate_snmp_config(conn) -> list:
+    """
+    Validate SNMP security posture from DB.
+    Returns list of warning strings (empty = no issues).
+    Does NOT block apply — callers should treat these as warnings.
+    """
+    warnings = []
+    row = None
+    try:
+        row = conn.execute("SELECT * FROM snmp_config WHERE id=1").fetchone()
+    except Exception:
+        pass
+
+    if row is not None:
+        row = dict(row)
+        community = (row.get("community") or "public").strip()
+        listen_addr = (row.get("listen_address") or "").strip()
+    else:
+        # Fall back to service_state
+        try:
+            import json as _json
+            srow = conn.execute(
+                "SELECT value_json FROM service_state WHERE key_name='snmp_settings'"
+            ).fetchone()
+            if not srow:
+                return []
+            settings = _json.loads(srow["value_json"])
+            community = (settings.get("community") or "public").strip()
+            listen_addr = (settings.get("listen_address") or "").strip()
+        except Exception:
+            return []
+
+    if community.lower() in {"public", "private", "community", "snmp", "default"}:
+        warnings.append(
+            f"SNMP community string '{community}' is insecure — use a random string."
+        )
+    if listen_addr in {"0.0.0.0", ""}:
+        warnings.append(
+            "SNMP listens on all interfaces — restrict to LAN IP for security."
+        )
+    return warnings
+
+
+# ---------------------------------------------------------------------------
 # Apply
 # ---------------------------------------------------------------------------
 
@@ -140,26 +187,30 @@ def apply_snmp(conn) -> dict:
     if errors:
         return {"ok": False, "message": "Validation failed: " + " | ".join(errors), "conf": conf}
 
+    # Non-blocking security warnings
+    sec_warnings = validate_snmp_config(conn)
+
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — snmpd.config generated but not written.", "conf": conf}
+        result = {"ok": True, "rolled_back": False,
+                  "message": "Non-FreeBSD — snmpd.config generated but not written.", "conf": conf}
+        result["warnings"] = sec_warnings
+        return result
 
-    import os
-    try:
-        with open(_SNMPD_CONF_PATH, "w") as fh:
-            fh.write(conf)
-        os.chmod(_SNMPD_CONF_PATH, 0o600)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     enabled = bool(settings.get("enabled", True))
-    if enabled:
-        sysrc_set("bsnmpd_enable", "YES")
-        r = service_action("bsnmpd", "restart")
-    else:
-        sysrc_set("bsnmpd_enable", "NO")
-        r = service_action("bsnmpd", "stop")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        if enabled:
+            sysrc_set("bsnmpd_enable", "YES")
+            return service_action("bsnmpd", "restart")
+        else:
+            sysrc_set("bsnmpd_enable", "NO")
+            return service_action("bsnmpd", "stop")
+
+    result = apply_with_rollback(_SNMPD_CONF_PATH, conf, _restart, mode=0o600)
+    result["warnings"] = sec_warnings
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------

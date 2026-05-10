@@ -803,3 +803,160 @@ def apply_interface_config(conn) -> dict:
         "message": "; ".join(r["message"] for r in results) if results else "Nothing to apply",
         "details": results,
     }
+
+
+# ---------------------------------------------------------------------------
+# Virtual IPs live apply (Phase 11)
+# ---------------------------------------------------------------------------
+
+def check_gateway_reachability(gateway_ip: str, count: int = 3) -> bool:
+    """
+    Ping *gateway_ip* ``count`` times and return True if at least one reply arrives.
+    Uses ``/sbin/ping -c <count> -q -W 1 <ip>`` on FreeBSD.
+    Returns True on non-FreeBSD (dev mode — assume all reachable).
+    """
+    if not sys.platform.startswith("freebsd"):
+        return True
+    try:
+        result = run_command(
+            ["/sbin/ping", "-c", str(count), "-q", "-W", "1", gateway_ip],
+            check=False, timeout_seconds=count + 2,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def apply_gateway_failover(conn) -> dict:
+    """
+    Phase 8: Multi-WAN gateway failover.
+
+    Iterates gateway groups ordered by priority, pings each member gateway,
+    and activates the highest-priority reachable gateway as the default route.
+
+    Returns {"ok": bool, "active_gateway": str|None, "message": str, "details": list}.
+    """
+    try:
+        cur = conn.execute("""
+            SELECT g.name, g.gateway, g.interface, gg.priority, gg.group_name
+            FROM gateway_group_members gg
+            JOIN gateways g ON gg.gateway_id = g.id
+            WHERE g.disabled = 0
+            ORDER BY gg.group_name, gg.priority ASC
+        """)
+        members = [dict(r) for r in cur.fetchall()]
+    except Exception as exc:
+        return {"ok": False, "active_gateway": None, "message": f"DB error: {exc}", "details": []}
+
+    if not members:
+        return {"ok": True, "active_gateway": None, "message": "No gateway groups configured.", "details": []}
+
+    details = []
+    active  = None
+
+    for m in members:
+        gw_ip    = (m.get("gateway") or "").strip()
+        gw_name  = m.get("name", gw_ip)
+        reachable = check_gateway_reachability(gw_ip)
+        details.append({"gateway": gw_ip, "name": gw_name, "reachable": reachable})
+        if reachable and active is None:
+            active = gw_ip
+
+    if not sys.platform.startswith("freebsd"):
+        return {
+            "ok": True,
+            "active_gateway": active,
+            "message": f"Non-FreeBSD — failover calculated: {active or 'none reachable'}",
+            "details": details,
+        }
+
+    if active is None:
+        return {"ok": False, "active_gateway": None, "message": "All gateways unreachable.", "details": details}
+
+    try:
+        run_command(["/sbin/route", "-n", "delete", "default"], check=False)
+        r = run_command(["/sbin/route", "-n", "add", "default", active], check=False)
+        ok = r.returncode == 0
+        return {
+            "ok":            ok,
+            "active_gateway": active,
+            "message":       f"Default route set to {active}." if ok else f"route add failed: {(r.stderr or r.stdout or '').strip()}",
+            "details":       details,
+        }
+    except Exception as exc:
+        return {"ok": False, "active_gateway": active, "message": str(exc), "details": details}
+
+
+def apply_vips(conn) -> dict:
+    """
+    Apply all virtual IP entries from ``virtual_ips_configs`` to live interfaces.
+
+    - type='ipalias': adds the address as an IP alias on the interface using
+      ``ifconfig <iface> inet <ip> netmask <mask> alias``.
+    - type='carp' and other types: logged as unsupported until CARP-specific
+      fields (vhid, password) are added to the schema.
+
+    On non-FreeBSD: config-only mode (no commands run).
+    Returns {"ok": bool, "applied": list, "skipped": list, "message": str}.
+    """
+    import ipaddress as _ipa
+
+    rows = []
+    try:
+        cur = conn.execute("SELECT * FROM virtual_ips_configs ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+    except Exception as exc:
+        return {"ok": False, "applied": [], "skipped": [], "message": f"DB error: {exc}"}
+
+    applied = []
+    skipped = []
+
+    for vip in rows:
+        vtype  = (vip.get("type") or "ipalias").lower()
+        iface  = (vip.get("interface") or "").strip()
+        addr   = (vip.get("address") or "").strip()
+        prefix = int(vip.get("prefix") or 32)
+
+        if not iface or not addr:
+            skipped.append({"id": vip.get("id"), "reason": "missing interface or address"})
+            continue
+
+        if vtype in ("carp", "pfsync", "proxyarp"):
+            skipped.append({
+                "id": vip.get("id"),
+                "type": vtype,
+                "reason": f"{vtype} requires additional CARP-specific fields (vhid, password) not yet in schema",
+            })
+            continue
+
+        if not sys.platform.startswith("freebsd"):
+            applied.append({"id": vip.get("id"), "type": vtype, "iface": iface, "addr": addr, "dry_run": True})
+            continue
+
+        try:
+            net = _ipa.ip_interface(f"{addr}/{prefix}")
+            netmask = str(net.network.netmask)
+            from app.services.priv_helper import run_privileged
+            result = run_privileged("ifconfig.alias_add", iface=iface, ip=addr, netmask=netmask)
+            ok = result.returncode == 0
+            applied.append({
+                "id":    vip.get("id"),
+                "type":  vtype,
+                "iface": iface,
+                "addr":  f"{addr}/{prefix}",
+                "ok":    ok,
+                "message": (result.stderr or result.stdout or "").strip(),
+            })
+        except Exception as exc:
+            applied.append({"id": vip.get("id"), "iface": iface, "addr": addr, "ok": False, "message": str(exc)})
+
+    overall_ok = all(a.get("ok", True) for a in applied)
+    msg_parts = [f"{len(applied)} VIP(s) applied"]
+    if skipped:
+        msg_parts.append(f"{len(skipped)} skipped")
+    return {
+        "ok": overall_ok,
+        "applied": applied,
+        "skipped": skipped,
+        "message": ", ".join(msg_parts) + ".",
+    }

@@ -474,6 +474,218 @@ def prune_health_history(conn, keep: int = 168) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Daemon process checks (pgrep-based)
+# ---------------------------------------------------------------------------
+
+_DAEMON_CHECKS = [
+    ("dhcpd",      "dhcpd"),
+    ("unbound",    "unbound"),
+    ("openvpn",    "openvpn"),
+    ("charon",     "charon"),      # strongSwan / IPsec
+    ("mpd5",       "mpd5"),
+    ("suricata",   "suricata"),
+    ("ddclient",   "ddclient"),
+    ("miniupnpd",  "miniupnpd"),
+    ("igmpproxy",  "igmpproxy"),
+    ("kea-dhcp6",  "kea-dhcp6"),
+    ("rtadvd",     "rtadvd"),
+    ("bsnmpd",     "bsnmpd"),
+    ("ntpd",       "ntpd"),
+    ("nginx",      "nginx"),
+]
+
+
+def check_daemon_processes() -> dict:
+    """
+    Check whether each known daemon is running via ``pgrep -x <name>``.
+
+    On non-FreeBSD returns ``{"running": false, "reason": "non-FreeBSD"}``
+    for every entry.
+
+    Returns a dict keyed by daemon name::
+
+        {
+          "dhcpd":    {"running": true},
+          "unbound":  {"running": false},
+          ...
+        }
+    """
+    result: dict = {}
+
+    if not sys.platform.startswith("freebsd"):
+        for name, _ in _DAEMON_CHECKS:
+            result[name] = {"running": False, "reason": "non-FreeBSD"}
+        return result
+
+    from app.services.network_service import run_command
+
+    for key, proc_name in _DAEMON_CHECKS:
+        try:
+            r = run_command(
+                ["pgrep", "-x", proc_name],
+                check=False,
+                timeout_seconds=3,
+            )
+            result[key] = {"running": r.returncode == 0}
+        except Exception as exc:
+            result[key] = {"running": False, "error": str(exc)}
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# System metrics
+# ---------------------------------------------------------------------------
+
+def get_system_metrics() -> dict:
+    """
+    Return disk, memory and CPU metrics for the /var partition.
+
+    On FreeBSD, uses ``df`` for disk, ``sysctl`` for memory, and
+    ``sysctl kern.cp_time`` for CPU idle percentage.  Falls back to
+    cross-platform Python APIs on non-FreeBSD.
+
+    Returns::
+
+        {
+          "disk_pct":  45,
+          "mem_pct":   67,
+          "cpu_pct":   12,
+          "warnings":  ["Disk /var is 92% full"]
+        }
+    """
+    warnings: list = []
+
+    # ── Disk (/var) ──────────────────────────────────────────────────────────
+    disk_pct = 0
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(["df", "-h", "/var"], check=False, timeout_seconds=5)
+            for line in (r.stdout or "").splitlines()[1:]:
+                parts = line.split()
+                if len(parts) >= 5:
+                    pct_str = parts[4].rstrip("%")
+                    disk_pct = int(pct_str)
+                    break
+        except Exception:
+            pass
+    else:
+        try:
+            import shutil
+            total, used, _ = shutil.disk_usage("/var" if os.path.exists("/var") else ".")
+            disk_pct = round(used / total * 100) if total else 0
+        except Exception:
+            pass
+
+    if disk_pct > 90:
+        warnings.append(f"Disk /var is {disk_pct}% full")
+
+    # ── Memory ───────────────────────────────────────────────────────────────
+    mem_pct = 0
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(
+                ["sysctl", "-n",
+                 "vm.stats.vm.v_free_count",
+                 "vm.stats.vm.v_page_count",
+                 "vm.stats.vm.v_page_size"],
+                check=False, timeout_seconds=3,
+            )
+            lines = [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip()]
+            if len(lines) >= 3:
+                free_pages  = int(lines[0])
+                total_pages = int(lines[1])
+                if total_pages > 0:
+                    mem_pct = round((total_pages - free_pages) / total_pages * 100)
+        except Exception:
+            pass
+    else:
+        try:
+            mem_info = check_memory_cpu()
+            mem_pct = int(mem_info.get("memory_used_pct", 0))
+        except Exception:
+            pass
+
+    if mem_pct > 90:
+        warnings.append(f"Memory usage is {mem_pct}%")
+
+    # ── CPU ──────────────────────────────────────────────────────────────────
+    cpu_pct = 0
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.network_service import run_command
+            r = run_command(
+                ["sysctl", "-n", "kern.cp_time"],
+                check=False, timeout_seconds=3,
+            )
+            # kern.cp_time: user nice sys intr idle
+            parts = (r.stdout or "").strip().split()
+            if len(parts) >= 5:
+                values = [int(p) for p in parts]
+                total = sum(values)
+                idle  = values[-1]
+                cpu_pct = round((total - idle) / total * 100) if total else 0
+        except Exception:
+            pass
+    else:
+        try:
+            load = os.getloadavg()
+            # Rough approximation: clamp load_1 to 100
+            cpu_pct = min(int(load[0] * 10), 100)
+        except (OSError, AttributeError):
+            pass
+
+    if cpu_pct > 90:
+        warnings.append(f"CPU usage is {cpu_pct}%")
+
+    return {
+        "disk_pct": disk_pct,
+        "mem_pct":  mem_pct,
+        "cpu_pct":  cpu_pct,
+        "warnings": warnings,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Interface link status
+# ---------------------------------------------------------------------------
+
+def get_interface_link_status() -> list:
+    """
+    Return link up/down for each interface via ``ifconfig -a``.
+
+    On non-FreeBSD returns an empty list.
+
+    Returns::
+
+        [{"iface": "em0", "link": "active"}, {"iface": "lo0", "link": "active"}, ...]
+    """
+    if not sys.platform.startswith("freebsd"):
+        return []
+
+    interfaces: list = []
+    current_iface: str = ""
+
+    try:
+        from app.services.network_service import run_command
+        r = run_command(["ifconfig", "-a"], check=False, timeout_seconds=5)
+        for line in (r.stdout or "").splitlines():
+            # Interface header: starts with a non-whitespace char and contains ":"
+            if line and not line[0].isspace() and ":" in line:
+                current_iface = line.split(":")[0].strip()
+            elif "status:" in line and current_iface:
+                link_state = line.strip().split("status:")[-1].strip()
+                interfaces.append({"iface": current_iface, "link": link_state})
+                current_iface = ""
+    except Exception:
+        pass
+
+    return interfaces
+
+
+# ---------------------------------------------------------------------------
 # Health alerting
 # ---------------------------------------------------------------------------
 
