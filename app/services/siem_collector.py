@@ -490,3 +490,40 @@ def start_siem_collectors():
     for name, target, state in collectors:
         t = threading.Thread(target=target, args=(state,), name=name, daemon=True)
         t.start()
+
+
+def get_collector_status() -> dict:
+    """
+    Return the current status of the SIEM collector threads.
+    Used by health_monitor.check_all_services() for the health dashboard.
+    """
+    started = _STARTED.is_set()
+
+    if not _ON_FREEBSD:
+        return {
+            "running": False,
+            "state":   "dry-run",
+            "message": "SIEM collectors run on FreeBSD only",
+        }
+
+    if not started:
+        return {
+            "running": False,
+            "state":   "stopped",
+            "message": "SIEM collectors have not been started",
+        }
+
+    # Check that the collector daemon threads are actually alive.
+    alive = [t for t in threading.enumerate() if t.name.startswith("siem-")]
+    if alive:
+        return {
+            "running": True,
+            "state":   "running",
+            "message": f"{len(alive)} collector thread(s) active",
+        }
+
+    return {
+        "running": False,
+        "state":   "stopped",
+        "message": "SIEM collector threads have exited unexpectedly",
+    }

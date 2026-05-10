@@ -200,35 +200,89 @@ def _check_cpu_load() -> dict:
 # Service health
 # ---------------------------------------------------------------------------
 
+def _check_optional_service(svc_name: str, binary_path: str) -> dict:
+    """
+    Return a health entry for an optional service.
+    Returns {"state": "unavailable"} when the binary does not exist,
+    so missing packages are not shown as failures.
+    """
+    import os
+    from app.services.service_manager import service_status
+
+    if not os.path.exists(binary_path):
+        return {
+            "running": False,
+            "state":   "unavailable",
+            "message": f"{binary_path} not found — package may not be installed",
+        }
+    s = service_status(svc_name)
+    return {
+        "running": s.get("running", False),
+        "state":   _state(s.get("running", False)),
+        "message": s.get("message", ""),
+    }
+
+
 def check_all_services(conn) -> dict:
     """
     Return a health snapshot for all Smart Shield services.
 
     Builds on the existing ``service_manager.get_all_service_health()`` and
-    extends it with Phase 4 services and config-drift detection.
+    extends it with Phase 4/5 services and config-drift detection.
+    Services whose binary/package is not installed show state "unavailable",
+    not "stopped" or "failed".
     """
     from app.services.service_manager import get_all_service_health, service_status
 
     health = get_all_service_health(conn)
 
-    # Phase 4 services (best-effort)
-    _p4_services = [
-        ("ntpd",       "ntpd"),
-        ("kea_dhcp6",  "kea-dhcp6"),
-        ("rtadvd",     "rtadvd"),
-        ("ddclient",   "ddclient"),
-        ("bsnmpd",     "bsnmpd"),
-        ("miniupnpd",  "miniupnpd"),
-        ("igmpproxy",  "igmpproxy"),
+    # Additional services with their expected FreeBSD binary paths.
+    # (svc_key, svc_name, binary_path)
+    _extra_services = [
+        # Core network services not yet covered by get_all_service_health
+        ("pflog",          "pflog",          "/sbin/pflog"),
+        ("mpd5",           "mpd5",           "/usr/local/sbin/mpd5"),
+        ("nginx",          "nginx",          "/usr/local/sbin/nginx"),
+        # IPv6 services
+        ("kea_dhcp6",      "kea-dhcp6",      "/usr/local/sbin/kea-dhcp6"),
+        ("rtadvd",         "rtadvd",         "/usr/sbin/rtadvd"),
+        # Network utility services
+        ("ntpd",           "ntpd",           "/usr/sbin/ntpd"),
+        ("ddclient",       "ddclient",       "/usr/local/sbin/ddclient"),
+        ("bsnmpd",         "bsnmpd",         "/usr/sbin/bsnmpd"),
+        ("miniupnpd",      "miniupnpd",      "/usr/local/sbin/miniupnpd"),
+        ("igmpproxy",      "igmpproxy",      "/usr/local/sbin/igmpproxy"),
+        # IDS rule updater (separate from suricata daemon)
+        ("suricata_update", "suricata-update", "/usr/local/bin/suricata-update"),
     ]
-    for key, svc_name in _p4_services:
+    for key, svc_name, binary in _extra_services:
         if key not in health:
-            s = service_status(svc_name)
-            health[key] = {
-                "running": s.get("running", False),
-                "state":   _state(s.get("running", False)),
-                "message": s.get("message", ""),
+            health[key] = _check_optional_service(svc_name, binary)
+
+    # MRTG — runs via cron, not a persistent service; check if binary exists
+    import os as _os
+    mrtg_bin = "/usr/local/bin/mrtg"
+    if "mrtg" not in health:
+        if _os.path.exists(mrtg_bin):
+            health["mrtg"] = {
+                "running": True,  # cron-based, existence of binary = available
+                "state":   "cron",
+                "message": "MRTG runs via cron — not a persistent service",
             }
+        else:
+            health["mrtg"] = {
+                "running": False,
+                "state":   "unavailable",
+                "message": f"{mrtg_bin} not found — mrtg package may not be installed",
+            }
+
+    # SIEM collector health (thread-based, not a FreeBSD service)
+    if "siem" not in health:
+        try:
+            from app.services.siem_collector import get_collector_status
+            health["siem"] = get_collector_status()
+        except Exception:
+            health["siem"] = {"running": False, "state": "unknown", "message": "SIEM status unavailable"}
 
     # Captive portal enabled flag
     try:

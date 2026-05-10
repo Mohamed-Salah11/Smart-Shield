@@ -1164,24 +1164,85 @@ def delete_ipsec_phase1(phase1_id):
 @vpn_bp.route("/api/l2tp/save-config", methods=['POST'])
 @api_permission_required("api.vpn.edit")
 def save_l2tp_config():
+    import ipaddress
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         db = get_db()
         cursor = db.cursor()
-        
-        # Check if config exists
-        cursor.execute("SELECT id FROM l2tp_config LIMIT 1")
+
+        enabled              = 1 if data.get('enabled') else 0
+        interface            = (data.get('interface') or 'wan').strip()
+        server_address       = (data.get('server_address') or '').strip()
+        remote_address_range = (data.get('remote_address_range') or '').strip()
+        subnet_mask          = (data.get('subnet_mask') or '').strip()
+        dns_server1          = (data.get('dns_server1') or '').strip()
+        dns_server2          = (data.get('dns_server2') or '').strip()
+        wins_server          = (data.get('wins_server') or '').strip()
+        authentication       = (data.get('authentication') or 'chap').strip().lower()
+        require_chap         = 1 if data.get('require_chap') else 0
+        require_pap          = 1 if data.get('require_pap') else 0
+        radius_server        = (data.get('radius_server') or '').strip()
+        radius_secret_raw    = (data.get('radius_secret') or '').strip()
+
+        errors = []
+        for label, val in [
+            ('server_address', server_address),
+            ('remote_address_range', remote_address_range),
+            ('dns_server1', dns_server1),
+            ('dns_server2', dns_server2),
+        ]:
+            if val:
+                try:
+                    ipaddress.ip_address(val)
+                except ValueError:
+                    errors.append(f'{label}: {val!r} is not a valid IP address')
+
+        if authentication not in ('chap', 'pap', 'mschapv2'):
+            errors.append("authentication must be 'chap', 'pap', or 'mschapv2'")
+
+        if errors:
+            return jsonify({'status': 'error', 'message': '; '.join(errors)}), 400
+
+        cursor.execute("SELECT id, radius_secret FROM l2tp_config LIMIT 1")
         existing = cursor.fetchone()
-        
+
+        if radius_secret_raw:
+            radius_secret_enc = encrypt_secret(radius_secret_raw)
+        elif existing and existing[1]:
+            radius_secret_enc = existing[1]
+        else:
+            radius_secret_enc = ''
+
         if existing:
             cursor.execute("""
-                UPDATE l2tp_config SET enabled = ? WHERE id = ?
-            """, (1 if data.get('enabled') else 0, existing[0]))
+                UPDATE l2tp_config SET
+                    enabled=?, interface=?, server_address=?, remote_address_range=?,
+                    subnet_mask=?, dns_server1=?, dns_server2=?, wins_server=?,
+                    authentication=?, require_chap=?, require_pap=?,
+                    radius_server=?, radius_secret=?
+                WHERE id=?
+            """, (
+                enabled, interface, server_address, remote_address_range,
+                subnet_mask, dns_server1, dns_server2, wins_server,
+                authentication, require_chap, require_pap,
+                radius_server, radius_secret_enc,
+                existing[0],
+            ))
         else:
             cursor.execute("""
-                INSERT INTO l2tp_config (enabled) VALUES (?)
-            """, (1 if data.get('enabled') else 0,))
-        
+                INSERT INTO l2tp_config (
+                    enabled, interface, server_address, remote_address_range,
+                    subnet_mask, dns_server1, dns_server2, wins_server,
+                    authentication, require_chap, require_pap,
+                    radius_server, radius_secret
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                enabled, interface, server_address, remote_address_range,
+                subnet_mask, dns_server1, dns_server2, wins_server,
+                authentication, require_chap, require_pap,
+                radius_server, radius_secret_enc,
+            ))
+
         db.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -1194,11 +1255,23 @@ def get_l2tp_config():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT enabled FROM l2tp_config LIMIT 1")
+        cursor.execute("SELECT * FROM l2tp_config LIMIT 1")
         row = cursor.fetchone()
-        
-        enabled = bool(row[0]) if row else True
-        return jsonify({'status': 'success', 'enabled': enabled})
+
+        if row:
+            cfg = dict(row)
+            cfg.pop('radius_secret', None)  # never expose encrypted secret to UI
+        else:
+            cfg = {
+                'enabled': True, 'interface': 'wan',
+                'server_address': '', 'remote_address_range': '',
+                'subnet_mask': '', 'dns_server1': '', 'dns_server2': '',
+                'wins_server': '', 'authentication': 'chap',
+                'require_chap': False, 'require_pap': False,
+                'radius_server': '',
+            }
+        cfg['status'] = 'success'
+        return jsonify(cfg)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

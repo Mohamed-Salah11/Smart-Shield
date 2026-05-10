@@ -503,7 +503,9 @@ ON interface_assignments(interface_type)
         icmp_error INTEGER,
         other_first INTEGER,
         other_single INTEGER,
-        other_multiple INTEGER
+        other_multiple INTEGER,
+        block_bogons INTEGER DEFAULT 1,
+        block_private_nets INTEGER DEFAULT 1
     )
     """)
 
