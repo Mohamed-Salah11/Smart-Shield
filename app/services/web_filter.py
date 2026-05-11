@@ -21,6 +21,8 @@ apply_web_filter(conn)                      -> dict
 import re
 import sys
 
+from app.services.content_policy import get_block_page_ip
+
 
 WEB_CATEGORIES = [
     ("adult",     "Adult / Explicit Content"),
@@ -54,16 +56,6 @@ def _extract_domain(url_pattern: str) -> str:
 # Unbound config lines (consumed by dns_writer.py)
 # ---------------------------------------------------------------------------
 
-def _block_page_ip(conn) -> str:
-    """Return the Smart Shield LAN IP (without prefix) to use as DNS redirect target."""
-    try:
-        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
-        addr = (row["ipv4_address"] if row else "") or ""
-        return addr.split("/")[0].strip()
-    except Exception:
-        return ""
-
-
 def generate_web_filter_zones(conn) -> list:
     """
     Return Unbound server-block lines for all enabled web filter rules.
@@ -72,7 +64,7 @@ def generate_web_filter_zones(conn) -> list:
     Block rules redirect to Smart Shield's LAN IP so the browser hits the
     /portal/block page. Falls back to always_nxdomain if no LAN IP is set.
     """
-    block_ip = _block_page_ip(conn)
+    block_ip = get_block_page_ip(conn)
 
     rules = _rows(conn, """
         SELECT url_pattern, action
@@ -129,15 +121,88 @@ def add_web_filter_rule(
     return cur.lastrowid
 
 
+def update_web_filter_rule(
+    conn,
+    rule_id: int,
+    url_pattern: str,
+    action: str = "block",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    domain = _extract_domain(url_pattern)
+    if not domain:
+        raise ValueError("Could not extract a domain from the supplied URL/pattern.")
+    if action not in ("block", "allow"):
+        raise ValueError("Action must be 'block' or 'allow'.")
+    conn.execute(
+        """
+        UPDATE filter_web_rules
+           SET url_pattern=?, action=?, category=?, description=?
+         WHERE id=?
+        """,
+        (domain, action, category, description, rule_id),
+    )
+    conn.commit()
+
+
+def hot_apply_web_rule(conn, rule_id: int) -> None:
+    """Instantly inject or remove a single web filter DNS rule via unbound-control."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        row = conn.execute(
+            "SELECT url_pattern, action, enabled FROM filter_web_rules WHERE id=?",
+            (rule_id,),
+        ).fetchone()
+        if not row:
+            return
+        domain = row["url_pattern"]
+        if row["enabled"]:
+            zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
+            run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+        else:
+            try:
+                run_privileged("unbound.local_zone_remove", domain=domain)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def toggle_web_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_web_rules SET enabled = ? WHERE id = ?",
         (1 if enabled else 0, rule_id),
     )
     conn.commit()
+    hot_apply_web_rule(conn, rule_id)
+
+
+def _hot_remove_domain(domain: str) -> None:
+    """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_zone_remove", domain=domain)
+    except Exception:
+        pass
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_data_remove", domain=domain)
+    except Exception:
+        pass
 
 
 def delete_web_filter_rule(conn, rule_id: int) -> None:
+    row = conn.execute(
+        "SELECT url_pattern FROM filter_web_rules WHERE id=?", (rule_id,)
+    ).fetchone()
+    if row:
+        _hot_remove_domain(row["url_pattern"])
     conn.execute("DELETE FROM filter_web_rules WHERE id = ?", (rule_id,))
     conn.commit()
 

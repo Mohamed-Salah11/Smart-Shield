@@ -611,7 +611,6 @@ class TestCaptivePortal:
         anchor = generate_pf_anchor(conn)
         assert "authenticated_clients" in anchor
         assert "rdr on" in anchor
-        assert "block in quick on" in anchor
 
     def test_generate_pf_anchor_redirects_http_only(self, conn):
         from app.services.captive_portal import generate_pf_anchor

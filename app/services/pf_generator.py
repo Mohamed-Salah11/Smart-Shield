@@ -139,6 +139,29 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
             lines.append(f"# {desc}")
         lines.append(f"rdr on {iface} proto {proto} from {src} to {dst} {dst_port}-> {redir_target}")
 
+    # NAT Reflection (hairpin NAT) — LAN clients connecting to WAN IP for port-forwards
+    try:
+        _afn = conn.execute(
+            "SELECT nat_reflection FROM advanced_firewall_nat WHERE id=1"
+        ).fetchone()
+        _nat_reflection = bool(_afn["nat_reflection"]) if _afn and _afn["nat_reflection"] is not None else False
+    except Exception:
+        _nat_reflection = False
+
+    if _nat_reflection:
+        lines.append("# Hairpin NAT: LAN clients connecting to WAN IP for port-forwards")
+        lan_rows_nr = conn.execute(
+            "SELECT assigned_port, ipv4_address FROM lan_config LIMIT 1"
+        ).fetchone()
+        _lan_iface_nr = (lan_rows_nr["assigned_port"] or "em1") if lan_rows_nr else "em1"
+        _lan_net_nr   = (lan_rows_nr["ipv4_address"]  or "192.168.1.0/24") if lan_rows_nr else "192.168.1.0/24"
+        try:
+            import ipaddress as _ipaddress
+            _lan_net_nr = str(_ipaddress.ip_interface(_lan_net_nr).network)
+        except Exception:
+            pass
+        lines.append(f"nat on {_lan_iface_nr} from {_lan_net_nr} to any -> ({_lan_iface_nr})")
+
     # NPt — Network Prefix Translation (IPv6)
     for r in _rows(conn, "SELECT * FROM nat_npt WHERE disabled=0 ORDER BY rule_order, id"):
         iface    = (r.get("interface") or wan_iface).strip() or wan_iface
@@ -159,13 +182,26 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
 # ---------------------------------------------------------------------------
 # 3. Firewall rules  (floating → WAN → LAN)
+#    Rules with a non-empty schedule field are only included when the
+#    schedule is currently active (evaluated by schedule_service).
 # ---------------------------------------------------------------------------
 
 def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
+    from app.services.schedule_service import filter_rules_by_schedule
+
     lines = ["# ── Firewall Rules ──"]
 
+    def _label(rule_id, desc):
+        """Return a PF label string for rule tracking via pfctl -s labels."""
+        safe = (desc or "").replace('"', "'")[:60]
+        return f'label "ss-{rule_id} {safe}"' if safe else f'label "ss-{rule_id}"'
+
     # Floating
-    for r in _rows(conn, "SELECT * FROM firewall_rules_floating WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_floating = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_floating WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_floating):
         iface  = (r.get("interface") or "").strip()
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
@@ -175,12 +211,18 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         action = (r.get("action") or "pass").lower()
         ipart  = f"on {iface} " if iface else ""
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} quick {ipart}{proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} quick {ipart}{proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     # WAN
-    for r in _rows(conn, "SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_wan = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_wan WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_wan):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
         sport  = _port_line(r.get("source_port"))
@@ -188,12 +230,18 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         dport  = _port_line(r.get("dest_port"))
         action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     # LAN
-    for r in _rows(conn, "SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order, id"):
+    raw_lan = _rows(
+        conn,
+        "SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order, id",
+    )
+    for r in filter_rules_by_schedule(conn, raw_lan):
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
         sport  = _port_line(r.get("source_port"))
@@ -201,9 +249,11 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         dport  = _port_line(r.get("dest_port"))
         action = (r.get("action") or "pass").lower()
         desc   = (r.get("description") or "").strip()
+        sched  = (r.get("schedule") or "").strip()
+        lbl    = _label(r.get("id", 0), desc)
         if desc:
-            lines.append(f"# {desc}")
-        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}keep state")
+            lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
+        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
 
     lines.append("")
     return "\n".join(lines)
@@ -285,6 +335,305 @@ def _build_shaper_queues(conn, wan_iface: str, lan_iface: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 4b. Virtual IP rules
+# ---------------------------------------------------------------------------
+
+def _build_virtual_ip_rules(conn) -> str:
+    """
+    Read virtual_ips_configs and emit:
+    - CARP pass rule when any CARP VIPs are configured
+    - VIRTUAL_IPS macro listing all VIP addresses (for use in filter rules)
+    - Comment lines documenting each VIP
+    """
+    try:
+        rows = _rows(
+            conn,
+            "SELECT type, interface, address, prefix FROM virtual_ips_configs ORDER BY id",
+        )
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Virtual IPs ──"]
+    has_carp = False
+    vip_addrs = []
+
+    for vip in rows:
+        vtype  = (vip.get("type") or "").strip().lower()
+        addr   = (vip.get("address") or "").strip()
+        prefix = vip.get("prefix") or 32
+        iface  = (vip.get("interface") or "").strip()
+        if not addr:
+            continue
+        vip_addrs.append(addr)
+        if vtype == "carp":
+            has_carp = True
+        lines.append(f"# {vtype.title()} VIP: {addr}/{prefix} on {iface}")
+
+    if has_carp:
+        lines.append("pass quick proto carp keep state")
+    if vip_addrs:
+        lines.append(f'VIRTUAL_IPS = "{{ {" ".join(vip_addrs)} }}"')
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 4c. Dummynet limiter comment block (pipes applied in reload_pf_rules)
+# ---------------------------------------------------------------------------
+
+def _build_dummynet_pipes(conn) -> str:
+    """
+    Emit a comment block documenting the dummynet pipes that will be created
+    by _run_dnctl_setup() before pfctl loads this conf.  The pipe IDs (1-based,
+    ordered by limiters_configs.id) can be referenced in future match rules via
+    dnpipe N.
+    """
+    try:
+        rows = _rows(
+            conn,
+            "SELECT id, name, bandwidth, bandwidth_unit FROM limiters_configs "
+            "WHERE enable_disable=1 ORDER BY id",
+        )
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Dummynet Limiter Pipes ──"]
+    for i, row in enumerate(rows, start=1):
+        bw      = row.get("bandwidth") or 0
+        bw_unit = (row.get("bandwidth_unit") or "Mbit/s").rstrip("/s").lower()
+        name    = (row.get("name") or f"limiter_{i}").strip()
+        lines.append(f"# Pipe {i}: {name}  ({bw}{bw_unit})")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _run_dnctl_setup(conn) -> None:
+    """
+    Create dummynet pipes from limiters_configs via dnctl before applying
+    PF rules.  Pipe IDs are 1-based, ordered by row id.
+    No-op on non-FreeBSD or when no limiters are configured.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        rows = _rows(
+            conn,
+            "SELECT bandwidth, bandwidth_unit, delay_ms, queue_length "
+            "FROM limiters_configs WHERE enable_disable=1 ORDER BY id",
+        )
+    except Exception:
+        return
+    if not rows:
+        return
+
+    try:
+        run_command(["/sbin/dnctl", "-q", "flush"], check=False)
+    except Exception:
+        pass
+
+    for i, row in enumerate(rows, start=1):
+        bw      = row.get("bandwidth") or 0
+        bw_unit = (row.get("bandwidth_unit") or "Mbit/s").rstrip("/s")
+        delay   = row.get("delay_ms") or 0
+        qlimit  = row.get("queue_length") or 50
+        cmd = ["/sbin/dnctl", "pipe", str(i), "config",
+               "bw", f"{bw}{bw_unit}",
+               "queue", str(qlimit)]
+        if delay:
+            cmd += ["delay", str(delay)]
+        try:
+            run_command(cmd, check=False)
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# 4d. Hardening rules (anti-spoof, bogons, private-net block, ICMP, admin UI)
+# ---------------------------------------------------------------------------
+
+# Standard bogon / unroutable prefixes that should never appear as WAN sources.
+_BOGON_PREFIXES = [
+    "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8",
+    "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24",
+    "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24",
+    "224.0.0.0/3", "240.0.0.0/4",
+]
+
+# RFC-1918 private address blocks.
+_PRIVATE_NET_PREFIXES = [
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+]
+
+# ICMPv6 types always needed for neighbor discovery (must never be blocked).
+_ND_ICMPV6_TYPES = "133 134 135 136 137"
+
+# Default admin GUI port if not configured in the DB.
+_DEFAULT_ADMIN_PORT = 5000
+
+
+def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
+    """
+    Emit sane default firewall hardening rules:
+      - Bogon table (unroutable addresses) and block rule on WAN (configurable)
+      - Private-net block on WAN (configurable)
+      - anti-spoof rules on WAN and LAN
+      - Sane ICMP pass rules
+      - ICMPv6 Neighbor Discovery always-pass rules
+      - Admin GUI protection rule (always pass from LAN)
+    """
+    # Read hardening settings; fall back to safe defaults if table/columns missing.
+    block_bogons       = True
+    block_private_nets = True
+    admin_port         = _DEFAULT_ADMIN_PORT
+
+    try:
+        row = conn.execute(
+            "SELECT block_bogons, block_private_nets FROM advanced_firewall_nat LIMIT 1"
+        ).fetchone()
+        if row:
+            block_bogons       = bool(row[0]) if row[0] is not None else True
+            block_private_nets = bool(row[1]) if row[1] is not None else True
+    except Exception:
+        pass
+
+    try:
+        arow = conn.execute(
+            "SELECT tcp_port FROM advanced_admin_access LIMIT 1"
+        ).fetchone()
+        if arow and arow[0]:
+            admin_port = int(arow[0])
+    except Exception:
+        pass
+
+    lines = ["# ── Firewall Hardening ──"]
+
+    # IDS block table — populated by push_blocked_ips_to_pf() in ids_writer
+    lines.append("table <ss_ids_blocks> persist")
+    lines.append("block in quick from <ss_ids_blocks>")
+    lines.append("")
+
+    # Bogon table
+    if block_bogons:
+        bogon_list = " ".join(_BOGON_PREFIXES)
+        lines.append(f"table <bogons> const {{ {bogon_list} }}")
+
+    # Private nets table
+    if block_private_nets:
+        priv_list = " ".join(_PRIVATE_NET_PREFIXES)
+        lines.append(f"table <private_nets> const {{ {priv_list} }}")
+
+    lines.append("")
+
+    # anti-spoof — prevents spoofed source packets from the wrong interface
+    lines.append(f"antispoof quick for {wan_iface}")
+    lines.append(f"antispoof quick for {lan_iface}")
+    lines.append("")
+
+    # Block bogon sources arriving on WAN
+    if block_bogons:
+        lines.append(f"block in quick on {wan_iface} from <bogons> to any")
+
+    # Block private-net sources arriving on WAN (prevent RFC-1918 spoofing from internet)
+    if block_private_nets:
+        lines.append(f"block in quick on {wan_iface} from <private_nets> to any")
+
+    if block_bogons or block_private_nets:
+        lines.append("")
+
+    # Sane ICMP pass rules (types safe to pass; covers ping + path MTU discovery)
+    lines.append("# ICMP: allow essential types, drop the rest")
+    lines.append(
+        "pass in  quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+    )
+    lines.append(
+        "pass out quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+    )
+    lines.append("")
+
+    # ICMPv6 — Neighbor Discovery types must always be allowed
+    lines.append("# ICMPv6: Neighbor Discovery (must not be blocked)")
+    lines.append(
+        f"pass quick inet6 proto icmp6 icmp6-type {{ {_ND_ICMPV6_TYPES} }} keep state"
+    )
+    lines.append("")
+
+    # Admin GUI: nginx HTTPS is always reachable from LAN; gunicorn only from loopback
+    lines.append(f"# Admin GUI: nginx HTTPS always reachable from LAN")
+    lines.append(
+        f"pass in quick on {lan_iface} proto tcp from any to any port 443 keep state"
+    )
+    lines.append(f"# Admin GUI: restrict direct gunicorn access to loopback only")
+    lines.append(
+        f"pass in quick on lo0 proto tcp from 127.0.0.1 to 127.0.0.1 port {admin_port} keep state"
+    )
+    lines.append(
+        f"block in quick on {lan_iface} proto tcp from any to any port {admin_port}"
+    )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 4e. Policy-Based Routing (route-to)
+# ---------------------------------------------------------------------------
+
+def _build_policy_routes(conn, wan_iface: str, lan_iface: str) -> str:
+    """
+    Emit PF route-to rules for policy-based routing entries.
+    Queries policy_routes joined with gateways to get the gateway IP and interface.
+    Returns an empty string if the table doesn't exist or has no enabled rows.
+    """
+    try:
+        rows = _rows(
+            conn,
+            """
+            SELECT pr.id, pr.interface_type, pr.source, pr.destination,
+                   pr.description, g.gateway AS gw_ip, g.interface AS gw_iface
+            FROM policy_routes pr
+            LEFT JOIN gateways g ON g.id = pr.gateway_id
+            WHERE pr.enabled=1
+            ORDER BY pr.priority, pr.id
+            """,
+        )
+    except Exception:
+        return ""  # table doesn't exist yet — skip gracefully
+
+    if not rows:
+        return ""
+
+    lines = ["# ── Policy-Based Routing (route-to) ──"]
+    for r in rows:
+        itype    = (r.get("interface_type") or "LAN").upper()
+        iface    = wan_iface if itype == "WAN" else lan_iface
+        src      = _addr(r.get("source"))
+        dst      = _addr(r.get("destination"))
+        gw_ip    = (r.get("gw_ip") or "").strip()
+        gw_iface = (r.get("gw_iface") or wan_iface).strip() or wan_iface
+        desc     = (r.get("description") or "").strip()
+        if not gw_ip:
+            continue  # no gateway resolved — skip
+        if desc:
+            lines.append(f"# {desc}")
+        lines.append(
+            f"pass in quick on {iface} from {src} to {dst} "
+            f"route-to ({gw_iface} {gw_ip}) keep state"
+        )
+
+    if len(lines) == 1:
+        return ""  # only the header was added, nothing useful
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # 5. Application filter PF rules
 # ---------------------------------------------------------------------------
 
@@ -341,7 +690,10 @@ def generate_pf_conf(conn) -> str:
 
     """)
 
-    base_tables = "table <authenticated_clients> persist\n\n"
+    base_tables = (
+        "table <authenticated_clients> persist\n"
+        "table <admin_bypass_clients> persist\n\n"
+    )
 
     options = textwrap.dedent("""\
         set block-policy drop
@@ -368,25 +720,24 @@ def generate_pf_conf(conn) -> str:
     _cp_settings = _json.loads(_cp_row["value_json"]) if _cp_row else {}
     _cp_enabled = bool(_cp_settings.get("enabled", False))
 
-    if _cp_enabled:
-        translation_hooks = textwrap.dedent("""\
+    translation_hooks = textwrap.dedent("""\
     # Captive portal translation hook
     rdr-anchor "captive_portal"
 
     """)
-        cp_anchor_line = (
-            "# Captive portal filter hook must run before generic LAN allow.\n"
-            "anchor \"captive_portal\"\n\n"
-        )
-    else:
-        translation_hooks = ""
-        cp_anchor_line = ""
+    cp_anchor_line = (
+        "# Captive portal filter hook must run before generic LAN allow.\n"
+        "anchor \"captive_portal\"\n\n"
+    )
 
     default_policy = (
         textwrap.dedent("""\
     # Default policy
     block all
     pass out quick keep state
+
+    # Admin accounts bypass all content policy filtering
+    pass in quick from <admin_bypass_clients> to any keep state
 
     """)
         + cp_anchor_line
@@ -397,17 +748,38 @@ def generate_pf_conf(conn) -> str:
     """)
     )
 
+    # Check if L2TP is configured and add its required firewall rules
+    _l2tp_rules_block = ""
+    try:
+        _l2tp_rows = _rows(conn, "SELECT COUNT(*) as n FROM l2tp_users LIMIT 1")
+        if _l2tp_rows and _l2tp_rows[0].get("n", 0) > 0:
+            from app.services.l2tp_writer import get_l2tp_pf_rules
+            _l2tp_lines = get_l2tp_pf_rules(conn)
+            if _l2tp_lines:
+                _l2tp_rules_block = (
+                    "# ── L2TP/IPsec auto-rules ──\n"
+                    + "\n".join(_l2tp_lines)
+                    + "\n\n"
+                )
+    except Exception:
+        pass
+
     return (
         macros
         + base_tables
         + _build_alias_tables(conn)
+        + _build_dummynet_pipes(conn)
         + options
         + scrub
         + _build_shaper_queues(conn, wan_iface, lan_iface)
         + default_nat
         + _build_nat_rules(conn, wan_iface)
         + translation_hooks
+        + _build_virtual_ip_rules(conn)
+        + _build_hardening_rules(conn, wan_iface, lan_iface)
         + default_policy
+        + _build_policy_routes(conn, wan_iface, lan_iface)
+        + _l2tp_rules_block
         + _build_app_filter_rules(conn)
         + _build_firewall_rules(conn, wan_iface, lan_iface)
     )
@@ -564,6 +936,12 @@ def reload_pf_rules(conn) -> dict:
     except OSError as exc:
         return {"ok": False, "message": f"Failed to write {_PF_CONF_PATH}: {exc}", "conf": conf_text}
 
+    # Step 3b — apply dummynet limiter pipes before PF loads
+    try:
+        _run_dnctl_setup(conn)
+    except Exception:
+        pass
+
     # Step 4 — reload PF
     try:
         from app.services.priv_helper import run_privileged
@@ -584,5 +962,22 @@ def reload_pf_rules(conn) -> dict:
             "message": f"pfctl reload failed ({exc}). {rb_msg}",
             "conf": conf_text,
         }
+
+    # Step 5b — kill all states if configured
+    try:
+        _ks_row = conn.execute(
+            "SELECT kill_states_on_reload FROM advanced_firewall_nat WHERE id=1"
+        ).fetchone()
+        _kill_states = bool(_ks_row["kill_states_on_reload"]) if _ks_row and _ks_row["kill_states_on_reload"] is not None else False
+    except Exception:
+        _kill_states = False
+
+    if _kill_states:
+        import warnings
+        warnings.warn("All PF states flushed (kill_states_on_reload=1)", RuntimeWarning, stacklevel=1)
+        try:
+            run_command(["pfctl", "-k", "0.0.0.0/0"], check=False)
+        except Exception:
+            pass
 
     return {"ok": True, "message": "PF rules reloaded successfully.", "conf": conf_text}

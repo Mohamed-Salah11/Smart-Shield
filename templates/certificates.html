@@ -6,6 +6,48 @@
 <div class="container">
     <div class="ss-page-header"><div><h1 class="ss-page-title">Certificate Manager</h1><p class="ss-page-desc">CA authorities, certificates, and revocation lists</p></div></div>
 
+    <!-- Toast -->
+    <div id="cert-toast" class="alert d-none" role="alert"
+         style="position:fixed;top:70px;right:20px;z-index:9999;min-width:340px;"></div>
+
+    <!-- View Cert Modal -->
+    <div class="modal fade" id="viewCertModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Certificate Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <dl class="row" id="cert-detail-fields"></dl>
+            <pre id="cert-pem-display" class="bg-dark text-light p-3 rounded"
+                 style="font-size:.75rem;max-height:300px;overflow-y:auto;"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- P12 Export Modal -->
+    <div class="modal fade" id="p12ExportModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Export PKCS#12</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted small">The private key will be included in the bundle. Set an optional encryption password.</p>
+            <input type="password" id="p12-password" class="form-control" placeholder="Export password (optional)">
+            <input type="hidden" id="p12-cert-id">
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" onclick="doP12Export()">Download .p12</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Navigation Tabs -->
     <ul class="nav nav-tabs">
         <li class="nav-item">
@@ -75,7 +117,7 @@
                         <th>Certificates</th>
                         <th>Distinguished Name</th>
                         <th>In Use</th>
-                        <th style="width: 120px;">Actions</th>
+                        <th style="width: 140px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -102,13 +144,17 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button class="btn btn-outline-info" title="Export">
+                                <a href="/vpn/api/certs/{{ ca.id }}/export-pem"
+                                   download="ca-{{ ca.id }}.pem"
+                                   class="btn btn-outline-info" title="Export PEM">
                                     <i class="fa-solid fa-download"></i>
+                                </a>
+                                <button class="btn btn-outline-secondary" title="Generate CRL"
+                                        onclick="generateCrl({{ ca.id }})">
+                                    <i class="fa-solid fa-list-check"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" title="Delete">
+                                <button class="btn btn-outline-danger" title="Delete"
+                                        onclick="deleteCa({{ ca.id }}, '{{ ca.name | e }}')">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -141,7 +187,7 @@
                         <th>Issuer</th>
                         <th>Distinguished Name</th>
                         <th>In Use</th>
-                        <th style="width: 180px;">Actions</th>
+                        <th style="width: 210px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -160,19 +206,25 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-secondary" title="View">
+                                <button class="btn btn-outline-secondary" title="View"
+                                        onclick="viewCert({{ cert.id }})">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-primary" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button class="btn btn-outline-info" title="Export">
+                                <a href="/vpn/api/certs/{{ cert.id }}/export-pem"
+                                   download="cert-{{ cert.id }}.pem"
+                                   class="btn btn-outline-info" title="Export PEM">
                                     <i class="fa-solid fa-download"></i>
+                                </a>
+                                <button class="btn btn-outline-primary" title="Export P12"
+                                        onclick="openP12Export({{ cert.id }})">
+                                    <i class="fa-solid fa-box-archive"></i>
                                 </button>
-                                <button class="btn btn-outline-success" title="Copy">
-                                    <i class="fa-solid fa-copy"></i>
+                                <button class="btn btn-outline-warning" title="Revoke"
+                                        onclick="revokeCert({{ cert.id }}, '{{ cert.name | e }}')">
+                                    <i class="fa-solid fa-ban"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" title="Delete">
+                                <button class="btn btn-outline-danger" title="Delete"
+                                        onclick="deleteCert({{ cert.id }}, '{{ cert.name | e }}')">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -195,16 +247,15 @@
 
     <!-- Revocation Section -->
     <div class="ss-card" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
-        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div><div><div class="ss-card-title">Certificate Revocation Lists</div></div><button class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add or Import CRL</button></div>
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div><div><div class="ss-card-title">Certificate Revocation Lists</div></div></div>
         <div class="ss-card-body">
         <div class="table-responsive">
             <table class="table table-hover mb-0" style="font-size:.85rem;">
                 <thead style="background:var(--border-color-soft);">
                     <tr>
+                        <th>Name</th>
                         <th>CA</th>
-                        <th>Method</th>
-                        <th>Serial #</th>
-                        <th>Reason</th>
+                        <th>Common Name</th>
                         <th>Revoked At</th>
                         <th style="width: 100px;">Actions</th>
                     </tr>
@@ -213,19 +264,14 @@
                     {% if crls %}
                     {% for crl in crls %}
                     <tr>
-                        <td><strong>{{ crl.ca }}</strong></td>
-                        <td>{{ crl.method }}</td>
-                        <td><code>{{ crl.serial }}</code></td>
-                        <td>
-                            <span class="badge bg-danger">{{ crl.reason }}</span>
-                        </td>
+                        <td><strong>{{ crl.name }}</strong></td>
+                        <td>{{ crl.ca_id }}</td>
+                        <td><code>{{ crl.common_name }}</code></td>
                         <td>{{ crl.revoked_at }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary" title="Edit">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button class="btn btn-outline-danger" title="Delete">
+                                <button class="btn btn-outline-danger" title="Delete"
+                                        onclick="deleteCert({{ crl.id }}, '{{ crl.name | e }}')">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -234,7 +280,7 @@
                     {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="5" class="text-center text-muted py-4">
                             <i class="fa-solid fa-ban fa-2x mb-2 d-block opacity-50"></i>
                             No certificate revocations configured.
                         </td>
@@ -250,14 +296,11 @@
 
 <script>
     function showSection(section, linkEl) {
-        // Hide all content sections (not the search bar)
         document.querySelectorAll('.ss-card[id$="-section"]').forEach(s => {
             if (s.id !== 'search-section') s.style.display = 'none';
         });
-        // Show the selected section
         const target = document.getElementById(section + '-section');
         if (target) target.style.display = 'block';
-        // Update active tab highlight
         document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
         if (linkEl) linkEl.classList.add('active');
     }
@@ -274,12 +317,110 @@
         if (sel) sel.selectedIndex = 0;
     }
 
-    // On load: ensure the server-chosen section is visible
     document.addEventListener('DOMContentLoaded', () => {
         const active = '{{ active_section }}';
         const link = document.querySelector(`.nav-tabs .nav-link[onclick*="${active}"]`);
         showSection(active, link);
     });
+
+    // ── Toast ────────────────────────────────────────────────────────────────
+    function showToast(msg, ok) {
+        const t = document.getElementById('cert-toast');
+        t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+        t.textContent = msg;
+        t.classList.remove('d-none');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.add('d-none'), 6000);
+    }
+
+    // ── View cert details ────────────────────────────────────────────────────
+    async function viewCert(id) {
+        try {
+            const r = await fetch(`/system/api/certificates/${id}`);
+            const d = await r.json();
+            if (!d.ok) { showToast('Error: ' + d.message, false); return; }
+            const c = d.cert;
+            document.getElementById('cert-detail-fields').innerHTML =
+                `<dt class="col-sm-4">Name</dt><dd class="col-sm-8">${c.name || ''}</dd>
+                 <dt class="col-sm-4">Type</dt><dd class="col-sm-8">${c.cert_type || ''}</dd>
+                 <dt class="col-sm-4">Common Name</dt><dd class="col-sm-8">${c.common_name || ''}</dd>
+                 <dt class="col-sm-4">Valid Until</dt><dd class="col-sm-8">${c.not_after || ''}</dd>`;
+            document.getElementById('cert-pem-display').textContent = c.pem || '(not available)';
+            new bootstrap.Modal(document.getElementById('viewCertModal')).show();
+        } catch(e) { showToast('Network error: ' + e.message, false); }
+    }
+
+    // ── P12 export ───────────────────────────────────────────────────────────
+    function openP12Export(id) {
+        document.getElementById('p12-cert-id').value = id;
+        document.getElementById('p12-password').value = '';
+        new bootstrap.Modal(document.getElementById('p12ExportModal')).show();
+    }
+
+    async function doP12Export() {
+        const id  = document.getElementById('p12-cert-id').value;
+        const pwd = document.getElementById('p12-password').value;
+        try {
+            const r = await fetch(`/vpn/api/certs/${id}/export-p12`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd }),
+            });
+            if (!r.ok) { showToast('Export failed', false); return; }
+            const blob = await r.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `cert-${id}.p12`;
+            a.click();
+            bootstrap.Modal.getInstance(document.getElementById('p12ExportModal')).hide();
+        } catch(e) { showToast('Export error: ' + e.message, false); }
+    }
+
+    // ── Revoke ───────────────────────────────────────────────────────────────
+    async function revokeCert(id, name) {
+        if (!confirm(`Revoke certificate "${name}"? This cannot be undone.`)) return;
+        try {
+            const r = await fetch(`/system/api/certificates/${id}/revoke`, { method: 'POST' });
+            const d = await r.json();
+            showToast(d.ok ? `"${name}" revoked.` : 'Error: ' + d.message, d.ok);
+            if (d.ok) setTimeout(() => location.reload(), 1500);
+        } catch(e) { showToast('Network error: ' + e.message, false); }
+    }
+
+    // ── Delete cert ──────────────────────────────────────────────────────────
+    async function deleteCert(id, name) {
+        if (!confirm(`Delete certificate "${name}"?`)) return;
+        try {
+            const r = await fetch(`/system/api/certificates/${id}`, { method: 'DELETE' });
+            const d = await r.json();
+            showToast(d.ok ? `"${name}" deleted.` : 'Error: ' + d.message, d.ok);
+            if (d.ok) setTimeout(() => location.reload(), 1500);
+        } catch(e) { showToast('Network error: ' + e.message, false); }
+    }
+
+    // ── Delete CA ────────────────────────────────────────────────────────────
+    async function deleteCa(id, name) {
+        if (!confirm(`Delete CA "${name}"? This will fail if any active certificates depend on it.`)) return;
+        try {
+            const r = await fetch(`/system/api/certificates/ca/${id}`, { method: 'DELETE' });
+            const d = await r.json();
+            showToast(d.ok ? `CA "${name}" deleted.` : 'Error: ' + d.message, d.ok);
+            if (d.ok) setTimeout(() => location.reload(), 1500);
+        } catch(e) { showToast('Network error: ' + e.message, false); }
+    }
+
+    // ── Generate CRL (download) ──────────────────────────────────────────────
+    async function generateCrl(caId) {
+        try {
+            const r = await fetch(`/system/api/certificates/ca/${caId}/crl`, { method: 'POST' });
+            if (!r.ok) { showToast('CRL generation failed', false); return; }
+            const blob = await r.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `ca-${caId}.crl.pem`;
+            a.click();
+        } catch(e) { showToast('CRL error: ' + e.message, false); }
+    }
 </script>
 
 {% endblock %}

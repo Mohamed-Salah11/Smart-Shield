@@ -13,7 +13,7 @@
 #   A TLS certificate pair at the paths below (self-signed or ACME/Let's Encrypt).
 #
 # Self-signed cert (dev/testing only):
-#   openssl req -x509 -newkey rsa:4096 -nodes -days 365 \
+#   openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
 #     -keyout /usr/local/etc/smart-shield/ssl/key.pem \
 #     -out    /usr/local/etc/smart-shield/ssl/cert.pem \
 #     -subj "/CN=smart-shield.local"
@@ -22,7 +22,6 @@
 # Redirect plain HTTP to HTTPS
 server {
     listen      80;
-    listen      [::]:80;
     server_name _;
     return 301  https://$host$request_uri;
 }
@@ -30,7 +29,6 @@ server {
 # HTTPS front-end — proxies to gunicorn on localhost:5000
 server {
     listen      443 ssl;
-    listen      [::]:443 ssl;
     server_name smart-shield.local;   # ← change to your hostname or IP
 
     # ── TLS ──────────────────────────────────────────────────────────────────
@@ -65,9 +63,9 @@ server {
         proxy_set_header   X-Forwarded-Proto $scheme;
 
         # Timeouts — increase if backup downloads / restores time out
-        proxy_connect_timeout 90s;
-        proxy_read_timeout    90s;
-        proxy_send_timeout    90s;
+        proxy_connect_timeout  90s;
+        proxy_read_timeout    300s;
+        proxy_send_timeout     90s;
     }
 
     # ── Restrict management UI to trusted networks (optional hardening) ──────

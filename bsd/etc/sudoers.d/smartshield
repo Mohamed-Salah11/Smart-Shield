@@ -75,6 +75,15 @@ smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd start
 smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd stop
 smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd restart
 
+# ── IPsec (strongSwan CLI) ───────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/ipsec reload
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/ipsec statusall
+
+# ── L2TP (mpd5) ──────────────────────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 restart
+
 # ── sysrc (rc.conf persistence) ──────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc *_enable=YES
 smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc *_enable=NO
@@ -91,3 +100,7 @@ smartshield ALL=(root) NOPASSWD: /sbin/route -n delete default
 # ── Unbound control ──────────────────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control reload
 smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control status
+
+# ── Dummynet (traffic limiters) ───────────────────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /sbin/dnctl -q flush
+smartshield ALL=(root) NOPASSWD: /sbin/dnctl pipe * config *

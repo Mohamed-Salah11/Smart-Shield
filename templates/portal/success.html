@@ -62,8 +62,20 @@
     <div class="title">Access granted</div>
     <div class="subtitle">
       Your device has been granted a content-policy bypass{% if domain %} for {{ domain }}{% endif %}.<br>
-      You may close this window and browse normally.
+      Returning to your page…
     </div>
+    <script>
+    var _target = {{ orig_url | tojson }};
+    if (window.opener && !window.opener.closed) {
+      // Popup case: navigate the opener tab then close this popup.
+      if (_target) { window.opener.location.href = _target; }
+      else { window.opener.location.reload(); }
+      setTimeout(function() { window.close(); }, 600);
+    } else if (_target) {
+      // Direct-navigation case: redirect this tab to the original URL after 1.5 s.
+      setTimeout(function() { window.location.href = _target; }, 1500);
+    }
+    </script>
     {% else %}
     <div class="title">You are connected!</div>
     <div class="subtitle">Your device has been granted network access.<br>You may close this window and browse normally.</div>

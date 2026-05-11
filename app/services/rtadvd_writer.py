@@ -156,18 +156,18 @@ def apply_rtadvd(conn) -> dict:
         return {"ok": False, "message": "Validation failed: " + " | ".join(errors), "conf": conf}
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — rtadvd.conf generated but not written.", "conf": conf}
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — rtadvd.conf generated but not written.", "conf": conf}
 
-    try:
-        with open(_RTADVD_CONF_PATH, "w") as fh:
-            fh.write(conf)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     sysrc_set("rtadvd_enable", "YES")
-    r = service_action("rtadvd", "restart")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        return service_action("rtadvd", "restart")
+
+    result = apply_with_rollback(_RTADVD_CONF_PATH, conf, _restart)
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------

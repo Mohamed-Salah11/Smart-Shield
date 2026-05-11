@@ -19,7 +19,8 @@ import os
 import sys
 import tempfile
 
-_UNBOUND_CONF_PATH = "/usr/local/etc/unbound/unbound.conf"
+_UNBOUND_CONF_PATH       = "/usr/local/etc/unbound/unbound.conf"
+_UNBOUND_KNOWN_GOOD_PATH = "/usr/local/etc/unbound/unbound.conf.known_good"
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +121,10 @@ def generate_unbound_conf(conn) -> str:
     if lan_subnet:
         lines.append(f"    access-control: {lan_subnet} allow")
 
+    # SIEM DNS query logging (off by default — admin must enable)
+    siem_dns = _load_service_state(conn, "siem_settings")
+    dns_query_logging = bool(siem_dns.get("dns_query_logging", False))
+
     lines += [
         "",
         "    hide-identity: yes",
@@ -142,6 +147,14 @@ def generate_unbound_conf(conn) -> str:
         "    private-address: 10.0.0.0/8",
         "",
     ]
+
+    if dns_query_logging:
+        lines += [
+            "    # SIEM DNS query logging",
+            "    log-queries: yes",
+            '    logfile: "/var/log/unbound/query.log"',
+            "",
+        ]
 
     # Static host overrides
     host_overrides = resolver.get("host_overrides") or []
@@ -227,6 +240,42 @@ def validate_unbound_conf(text: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# Known-good rollback helpers
+# ---------------------------------------------------------------------------
+
+def _save_known_good_unbound() -> bool:
+    """Copy current unbound.conf to the known-good backup. Returns True on success."""
+    try:
+        if os.path.exists(_UNBOUND_CONF_PATH):
+            with open(_UNBOUND_CONF_PATH) as fh:
+                current = fh.read()
+            os.makedirs(os.path.dirname(_UNBOUND_KNOWN_GOOD_PATH), exist_ok=True)
+            with open(_UNBOUND_KNOWN_GOOD_PATH, "w") as fh:
+                fh.write(current)
+        return True
+    except OSError:
+        return False
+
+
+def _rollback_unbound() -> dict:
+    """Restore the known-good unbound.conf and reload Unbound."""
+    if not os.path.exists(_UNBOUND_KNOWN_GOOD_PATH):
+        return {"ok": False, "message": "No known-good unbound.conf backup found."}
+    try:
+        with open(_UNBOUND_KNOWN_GOOD_PATH) as fh:
+            old_conf = fh.read()
+        with open(_UNBOUND_CONF_PATH, "w") as fh:
+            fh.write(old_conf)
+        from app.services.service_manager import service_action
+        result = service_action("unbound", "reload")
+        if result["ok"]:
+            return {"ok": True, "message": "Rolled back to last known-good unbound.conf."}
+        return {"ok": False, "message": f"Rollback file restored but reload failed: {result['message']}"}
+    except OSError as exc:
+        return {"ok": False, "message": f"Rollback failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
 # Write
 # ---------------------------------------------------------------------------
 
@@ -266,6 +315,9 @@ def apply_unbound(conn) -> dict:
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — conf generated (validation OK).", "conf": conf}
 
+    # Backup current config as known-good before overwriting
+    _save_known_good_unbound()
+
     # Write
     os.makedirs(os.path.dirname(_UNBOUND_CONF_PATH), exist_ok=True)
     try:
@@ -278,10 +330,20 @@ def apply_unbound(conn) -> dict:
     from app.services.service_manager import service_action, sysrc_set
     sysrc_set("unbound_enable", "YES")
     result = service_action("unbound", "reload")
+    if not result["ok"]:
+        rb = _rollback_unbound()
+        rb_msg = rb.get("message", "rollback status unknown")
+        return {
+            "ok": False,
+            "message": f"Unbound reload failed ({result['message']}). {rb_msg}",
+            "conf": conf,
+            "rolled_back": rb["ok"],
+        }
     return {
-        "ok": result["ok"],
+        "ok": True,
         "message": result["message"],
         "conf": conf,
+        "rolled_back": False,
     }
 
 

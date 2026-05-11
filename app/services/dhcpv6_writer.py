@@ -186,6 +186,28 @@ def generate_kea_dhcp6_conf(conn) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Kea config syntax validation
+# ---------------------------------------------------------------------------
+
+def validate_kea_conf(conf_path: str) -> dict:
+    """
+    Run kea-dhcp6 -t <path> to syntax-check the config.
+    Returns {"ok": bool, "message": str}.
+    On non-FreeBSD: returns {"ok": True, "message": "dry-run — config not validated"}.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": "dry-run — config not validated"}
+    try:
+        from app.services.network_service import run_command
+        r = run_command(["kea-dhcp6", "-t", conf_path], check=False)
+        if r.returncode == 0:
+            return {"ok": True, "message": "Kea config syntax OK"}
+        return {"ok": False, "message": (r.stderr or r.stdout or "kea-dhcp6 -t failed").strip()}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # Write + apply
 # ---------------------------------------------------------------------------
 
@@ -211,6 +233,13 @@ def apply_dhcpv6(conn) -> dict:
             fh.write(conf)
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf, "errors": []}
+
+    # Validate the written config before restarting the service
+    kea_check = validate_kea_conf(_KEA_DHCP6_CONF)
+    if not kea_check["ok"]:
+        return {"ok": False,
+                "message": "Kea config syntax error — service not restarted: " + kea_check["message"],
+                "conf": conf, "errors": [kea_check["message"]]}
 
     from app.services.service_manager import service_action
     r = service_action("kea-dhcp6", "restart")
@@ -284,6 +313,61 @@ def get_dhcpv6_status() -> dict:
     running = r["ok"] and "running" in r.get("message", "").lower()
     return {"running": running, "state": "running" if running else "stopped",
             "message": r.get("message", "")}
+
+
+def apply_dhcpv6_and_ra(conn) -> dict:
+    """
+    Phase 25: Apply DHCPv6 (Kea) and Router Advertisements (rtadvd) together,
+    ensuring they are consistent.
+
+    When any DHCPv6 pool is enabled:
+    - Kea DHCPv6 is applied and started.
+    - rtadvd is applied with the Managed (M=1) and Other (O=1) flags set in
+      RA settings so that clients know to use stateful DHCPv6.
+
+    When no pools are enabled:
+    - Kea is stopped (if running).
+    - rtadvd continues to run for stateless autoconfiguration.
+
+    Returns ``{"ok": bool, "dhcpv6": dict, "rtadvd": dict, "message": str}``.
+    """
+    from app.services.rtadvd_writer import apply_rtadvd
+
+    pools_enabled = bool(_rows(conn, "SELECT id FROM dhcpv6_pools WHERE enabled=1 LIMIT 1"))
+
+    if pools_enabled:
+        # Ensure RA settings have M=1 and O=1 for managed address config
+        try:
+            conn.execute(
+                """
+                UPDATE ra_settings SET
+                    managed_flag    = 1,
+                    other_flag      = 1
+                WHERE id > 0
+                """
+            )
+            conn.commit()
+        except Exception:
+            pass
+
+    dhcpv6_result = apply_dhcpv6(conn) if pools_enabled else {"ok": True, "message": "DHCPv6 pools disabled."}
+
+    # Always apply rtadvd so RA flags are consistent with Kea state
+    rtadvd_result = apply_rtadvd(conn)
+
+    ok = dhcpv6_result.get("ok", True) and rtadvd_result.get("ok", True)
+    msgs = []
+    if dhcpv6_result.get("message"):
+        msgs.append(f"DHCPv6: {dhcpv6_result['message']}")
+    if rtadvd_result.get("message"):
+        msgs.append(f"RA: {rtadvd_result['message']}")
+
+    return {
+        "ok":     ok,
+        "dhcpv6": dhcpv6_result,
+        "rtadvd": rtadvd_result,
+        "message": " | ".join(msgs) if msgs else "Applied.",
+    }
 
 
 def get_dhcpv6_leases() -> list:

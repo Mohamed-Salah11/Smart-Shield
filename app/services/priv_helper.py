@@ -44,11 +44,15 @@ from app.services.network_service import (
 )
 
 
+import shutil as _shutil
+_SUDO_BIN = _shutil.which("sudo") or "/usr/local/bin/sudo"
+
+
 def _maybe_sudo(cmd: List[str]) -> List[str]:
     """Return cmd unchanged when root (uid 0); otherwise prepend sudo -n."""
     if os.getuid() == 0:
         return cmd
-    return ["/usr/local/bin/sudo", "-n"] + cmd
+    return [_SUDO_BIN, "-n"] + cmd
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +176,46 @@ def _val_sysrc_value(v: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+def _val_unbound_domain(v: str) -> str:
+    """Validate a DNS domain name for use with unbound-control; returns with trailing dot."""
+    v = str(v).strip().lower()
+    bare = v.rstrip(".")
+    if not bare or not re.match(r"^[a-z0-9]([a-z0-9\-_\.]{0,251}[a-z0-9])?$", bare):
+        raise ValueError(f"Invalid domain: {v!r}")
+    return bare + "."
+
+
+def _val_zone_type(v: str) -> str:
+    """Validate an unbound local-zone type."""
+    _SAFE = {
+        "always_refuse", "always_nxdomain", "always_noerror",
+        "static", "redirect", "transparent", "nodefault",
+    }
+    v = str(v).strip().lower()
+    if v not in _SAFE:
+        raise ValueError(f"Unknown zone type: {v!r}")
+    return v
+
+
+def _val_safe_pkg_name(v: str) -> str:
+    """Validate a FreeBSD package name (letters, digits, hyphens, dots, plus, underscore)."""
+    v = str(v).strip()
+    if not v or not re.match(r'^[A-Za-z0-9._+\-]{1,200}$', v):
+        raise ValueError(f"Invalid package name: {v!r}")
+    return v
+
+
+def _val_seconds(v) -> str:
+    """Validate a positive integer number of seconds (for PF table expire)."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        raise ValueError(f"seconds must be a positive integer, got {v!r}")
+    if n <= 0:
+        raise ValueError(f"seconds must be positive, got {n}")
+    return str(n)
+
+
 # Action allowlist
 # ---------------------------------------------------------------------------
 # Each entry describes one privileged action.
@@ -252,6 +296,16 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "netmask", "{netmask}"],
         "params": {"iface": _val_iface_name, "ip": _val_ip, "netmask": _val_ip},
     },
+    "ifconfig.alias_add": {
+        "description": "Add an IP alias (secondary address) to an interface.",
+        "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "netmask", "{netmask}", "alias"],
+        "params": {"iface": _val_iface_name, "ip": _val_ip, "netmask": _val_ip},
+    },
+    "ifconfig.alias_del": {
+        "description": "Remove an IP alias from an interface.",
+        "cmd": ["/sbin/ifconfig", "{iface}", "inet", "{ip}", "-alias"],
+        "params": {"iface": _val_iface_name, "ip": _val_ip},
+    },
     "ifconfig.up": {
         "description": "Bring an interface up.",
         "cmd": ["/sbin/ifconfig", "{iface}", "up"],
@@ -279,10 +333,67 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "cmd": ["/usr/local/sbin/unbound-control", "reload"],
         "params": {},
     },
+    # Unbound hot-update actions (no service restart — ~50ms per call)
+    "unbound.local_zone": {
+        "description": "Hot-add a local-zone override (block/redirect a domain instantly).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_zone", "{domain}", "{zone_type}"],
+        "params": {"domain": _val_unbound_domain, "zone_type": _val_zone_type},
+    },
+    "unbound.local_zone_remove": {
+        "description": "Remove a local-zone override (unblock a domain instantly).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_zone_remove", "{domain}"],
+        "params": {"domain": _val_unbound_domain},
+    },
+    "unbound.local_data_a": {
+        "description": "Hot-add a local A record (for redirect-to-IP action).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_data",
+                "{domain}", "IN", "A", "{ip}"],
+        "params": {"domain": _val_unbound_domain, "ip": _val_ip},
+    },
+    "unbound.local_data_remove": {
+        "description": "Remove a local data record (clears a redirect A record).",
+        "cmd": ["/usr/local/sbin/unbound-control", "local_data_remove", "{domain}"],
+        "params": {"domain": _val_unbound_domain},
+    },
+    "ipsec.reload": {
+        "description": "Hot-reload strongSwan IKE daemon configuration.",
+        "cmd": ["/usr/local/sbin/ipsec", "reload"],
+        "params": {},
+    },
+    "ipsec.statusall": {
+        "description": "Show all active IPsec tunnels and SAs.",
+        "cmd": ["/usr/local/sbin/ipsec", "statusall"],
+        "params": {},
+    },
     "pfctl.check": {
         "description": "Validate a PF config file without applying it.",
         "cmd": ["/sbin/pfctl", "-n", "-f", "{config_path}"],
         "params": {"config_path": _val_config_path},
+    },
+    "pkg.install": {
+        "description": "Install a package via pkg (non-interactive, auto-yes).",
+        "cmd": ["/usr/sbin/pkg", "install", "-y", "--", "{package_name}"],
+        "params": {"package_name": _val_safe_pkg_name},
+    },
+    "pkg.delete": {
+        "description": "Remove an installed package via pkg.",
+        "cmd": ["/usr/sbin/pkg", "delete", "-y", "--", "{package_name}"],
+        "params": {"package_name": _val_safe_pkg_name},
+    },
+    "pf.table_replace_file": {
+        "description": "Atomically replace all IPs in a PF table from a file.",
+        "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "replace", "-f", "{file_path}"],
+        "params": {"table": _val_table_name, "file_path": _val_config_path},
+    },
+    "kldload": {
+        "description": "Load a kernel module (e.g. netmap).",
+        "cmd": ["/sbin/kldload", "{module}"],
+        "params": {"module": _val_safe_pkg_name},
+    },
+    "pf.table_expire": {
+        "description": "Expire PF table entries older than N seconds.",
+        "cmd": ["/sbin/pfctl", "-t", "{table}", "-T", "expire", "{seconds}"],
+        "params": {"table": _val_table_name, "seconds": _val_seconds},
     },
 }
 

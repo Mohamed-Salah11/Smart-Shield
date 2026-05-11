@@ -1125,4 +1125,163 @@ sqlite3 /var/db/smart-shield/data.db "SELECT key_name, value_json FROM service_s
 
 ---
 
+## 23. Two-Kali Lab: Captive Portal & Content Policy End-to-End
+
+This section walks through a focused lab with two Kali VMs (one acting as admin, one as a regular user) connected to the BSD Smart Shield router.
+
+### Lab Topology
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  VMware / VirtualBox Host                                │
+│                                                          │
+│  ┌─────────────────┐  em0 (NAT/WAN)   ┌──────────────┐  │
+│  │  Smart Shield   │─────────────────▶│  Internet    │  │
+│  │  (FreeBSD)      │                  └──────────────┘  │
+│  │  em1 = LAN      │                                    │
+│  │  192.168.1.1    │────────┬──────────────────────────┐ │
+│  └─────────────────┘        │  Host-Only Adapter       │ │
+│                     ┌───────┴──────┐  ┌───────────────┐ │ │
+│                     │  Kali Admin  │  │  Kali User    │ │ │
+│                     │ 192.168.1.x  │  │ 192.168.1.y   │ │ │
+│                     └──────────────┘  └───────────────┘ │ │
+└──────────────────────────────────────────────────────────┘
+```
+
+### VM Network Adapters
+
+| VM | Adapter | Type | Network |
+|----|---------|------|---------|
+| Smart Shield | em0 | NAT | Internet |
+| Smart Shield | em1 | Host-Only | 192.168.1.0/24 |
+| Kali Admin | eth0 | Host-Only | Same as em1 |
+| Kali User | eth0 | Host-Only | Same as em1 |
+
+### 23.1 Baseline: DHCP + Connectivity
+
+```bash
+# On each Kali VM (set static or DHCP via BSD DHCP server):
+ip route add default via 192.168.1.1
+ping 192.168.1.1       # must reply
+curl -sI http://example.com  # should work if portal disabled
+```
+
+### 23.2 Enable Captive Portal
+
+In GUI: Services → Captive Portal → Settings
+- Enable: ON
+- LAN Interface: `em1`
+- Portal IP: `192.168.1.1`
+- Portal Port: `5000`
+- Save → Apply & Activate
+
+```bash
+# On Kali User VM:
+curl -v http://example.com
+# Expected: connection lands on portal login page (PF redirect)
+
+# In browser → navigate to http://example.com → portal appears
+```
+
+### 23.3 Authenticate as Regular User
+
+1. In portal, log in as `regularuser` (created in User Manager)
+2. After login → internet accessible
+3. **On BSD:** `pfctl -t authenticated_clients -T show` → Kali User IP listed
+
+### 23.4 Enable Content Policy (Block a Domain)
+
+In GUI: Services → Content Policy (or DNS Filter)
+- Add rule: block domain `facebook.com`
+- Apply
+
+```bash
+# On Kali User VM (already portal-authenticated):
+nslookup facebook.com 192.168.1.1
+# Expected: resolves to 192.168.1.1 (blocked A record)
+
+# In browser → visit http://facebook.com
+# Expected: "Access Blocked" interstitial page appears in same tab
+# "Open Login" button opens portal in a new tab
+```
+
+### 23.5 Bypass via Portal Login (Whitelisted User)
+
+In GUI: Services → Captive Portal → Settings → Whitelisted Users
+- Add `regularuser` to whitelist
+- Save Settings
+
+```bash
+# Log out of portal first, then log in again as regularuser
+# On BSD:
+pfctl -t admin_bypass_clients -T show
+# Expected: Kali User IP listed (whitelisted = treated as bypass)
+
+# In browser: visit http://facebook.com → loads normally
+```
+
+### 23.6 Admin Bypass Test (Kali Admin VM)
+
+1. On **Kali Admin VM**, open browser → visit any blocked domain
+2. Interstitial appears → "Open Login" opens portal in new tab
+3. Log in as `admin` (superuser)
+4. New tab closes, original tab reloads → domain loads (bypassed)
+
+```bash
+# On BSD:
+pfctl -t admin_bypass_clients -T show
+# Expected: Kali Admin IP listed
+
+# On Kali Admin VM:
+curl -sI http://facebook.com   # should get 200 response, not interstitial
+```
+
+### 23.7 Voucher Test
+
+In GUI: Captive Portal → Vouchers → Generate (60 min)
+- Copy the code
+
+```bash
+# Log out current session from Kali User VM first
+# In browser → visit any URL → portal appears → Voucher tab
+# Enter code → Submit → internet access granted for 60 min
+```
+
+**Revoke voucher:** Captive Portal → Vouchers → click trash icon → confirms deletion.
+
+### 23.8 MRTG Bandwidth Graphs
+
+In GUI: Status → Traffic History
+- Click **Reinitialize MRTG** → wait for success
+- Page reloads → daily graphs for `em0` and `em1` appear
+
+```bash
+# On BSD:
+ls /var/db/smart-shield/mrtg/*.png   # should show em0-day.png etc.
+crontab -l | grep mrtg               # should show */5 cron entry
+```
+
+### 23.9 Quick Diagnostic Reference
+
+```bash
+# BSD: check PF tables
+pfctl -t authenticated_clients -T show
+pfctl -t admin_bypass_clients -T show
+
+# BSD: check Unbound A-record (content policy)
+grep "local-data" /var/unbound/unbound.conf | head -10
+# Expected: "facebook.com. A 192.168.1.1" — bare IP only, never URL
+
+# BSD: validate Unbound config
+unbound-checkconf /var/unbound/unbound.conf
+
+# BSD: reload Unbound after content policy change
+service unbound reload
+
+# BSD: Smart Shield logs
+tail -f /var/log/smart-shield/app.log
+```
+
+---
+
 *Generated for Smart Shield — FreeBSD deployment guide.*

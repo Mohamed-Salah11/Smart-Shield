@@ -329,5 +329,118 @@
     </div>
 
   </form>
+
+  <!-- ── SmartShield AI (Gemini) ── -->
+  <div class="ss-card mt-3">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-robot"></i></div>
+      <div>
+        <div class="ss-card-title">SmartShield AI</div>
+        <div class="ss-card-subtitle">Google Gemini 2.0 Flash — security analysis, log insights, and firewall Q&amp;A</div>
+      </div>
+    </div>
+    <div class="ss-card-body">
+      <div id="ai-key-status" class="mb-3" style="font-size:.84rem;color:var(--muted);">Checking…</div>
+      <div class="mb-3 row align-items-center">
+        <label class="col-sm-3 col-form-label fw-semibold" for="geminiApiKeyInput">Google Gemini API Key</label>
+        <div class="col-sm-9">
+          <div class="input-group" style="max-width:480px;">
+            <input type="password" id="geminiApiKeyInput" class="form-control"
+                   placeholder="AIza… (paste to set; leave blank to clear)"
+                   autocomplete="new-password">
+            <button type="button" class="btn btn-primary" onclick="saveGeminiKey()">Save</button>
+          </div>
+          <div class="form-text">
+            Get a free key at <a href="https://aistudio.google.com" target="_blank" rel="noopener">aistudio.google.com</a>.
+            Stored encrypted (AES-256-GCM). The floating <i class="fa-solid fa-robot"></i> button in the bottom-right corner opens the AI assistant.
+          </div>
+        </div>
+      </div>
+      <div class="mb-3 row align-items-center">
+        <label class="col-sm-3 col-form-label fw-semibold" for="googleCseKeyInput">Google CSE API Key <span class="text-muted fw-normal">(optional)</span></label>
+        <div class="col-sm-9">
+          <input type="password" id="googleCseKeyInput" class="form-control"
+                 placeholder="AIza… (enables richer web search in AI chatbot)"
+                 autocomplete="new-password" style="max-width:480px;">
+          <div class="form-text">Enables Google Custom Search for the AI chatbot's web search tool (100 queries/day free).
+            Get a key at <a href="https://developers.google.com/custom-search/v1/introduction" target="_blank" rel="noopener">developers.google.com/custom-search</a>.
+          </div>
+        </div>
+      </div>
+      <div class="mb-3 row align-items-center">
+        <label class="col-sm-3 col-form-label fw-semibold" for="googleCseCxInput">Google CSE ID (cx) <span class="text-muted fw-normal">(optional)</span></label>
+        <div class="col-sm-9">
+          <div class="input-group" style="max-width:480px;">
+            <input type="text" id="googleCseCxInput" class="form-control"
+                   placeholder="017576…:xxxxx">
+            <button type="button" class="btn btn-secondary" onclick="saveCseKeys()">Save</button>
+          </div>
+          <div class="form-text">The Custom Search Engine ID from
+            <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener">programmablesearchengine.google.com</a>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (async function loadAiKeyStatus() {
+    try {
+      const r = await fetch('/chatbot/api/settings');
+      const d = await r.json();
+      const el = document.getElementById('ai-key-status');
+      if (d.ok && d.has_key) {
+        el.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--primary)"></i> Gemini API key is configured — AI chatbot is active.';
+      } else {
+        el.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b"></i> No API key set — AI chatbot is disabled.';
+      }
+    } catch(_) {}
+  })();
+
+  async function saveGeminiKey() {
+    const key = document.getElementById('geminiApiKeyInput').value.trim();
+    try {
+      const r = await fetch('/chatbot/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({gemini_api_key: key}),
+      });
+      const d = await r.json();
+      const el = document.getElementById('ai-key-status');
+      if (d.ok) {
+        document.getElementById('geminiApiKeyInput').value = '';
+        el.innerHTML = d.has_key
+          ? '<i class="fa-solid fa-circle-check" style="color:var(--primary)"></i> Gemini API key saved — AI chatbot is active.'
+          : '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b"></i> API key cleared — AI chatbot is disabled.';
+      } else {
+        alert('Error: ' + (d.message || 'Could not save key.'));
+      }
+    } catch(e) {
+      alert('Network error: ' + e.message);
+    }
+  }
+
+  async function saveCseKeys() {
+    const cseKey = document.getElementById('googleCseKeyInput').value.trim();
+    const cseCx  = document.getElementById('googleCseCxInput').value.trim();
+    try {
+      const r = await fetch('/chatbot/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({google_cse_key: cseKey, google_cse_cx: cseCx}),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        document.getElementById('googleCseKeyInput').value = '';
+        alert('Google CSE settings saved.');
+      } else {
+        alert('Error: ' + (d.message || 'Could not save CSE settings.'));
+      }
+    } catch(e) {
+      alert('Network error: ' + e.message);
+    }
+  }
+  </script>
+
 </div>
 {% endblock %}

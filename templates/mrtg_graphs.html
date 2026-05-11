@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container">
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Traffic History</h1>
+      <p class="ss-page-desc">MRTG bandwidth graphs — daily, weekly, monthly, yearly views</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <form method="post" action="/status/mrtg/apply" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="fa-solid fa-rotate me-1"></i>Regenerate Config
+        </button>
+      </form>
+      <button class="btn btn-outline-secondary btn-sm" id="btn-mrtg-reinit" onclick="reinitMrtg()">
+        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Reinitialize MRTG
+      </button>
+      <span id="mrtg-reinit-msg" style="font-size:.82rem;color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- Period tabs -->
+  <ul class="nav nav-tabs mb-4" id="mrtg-tabs">
+    <li class="nav-item">
+      <a class="nav-link active" data-period="day"   href="#" onclick="switchPeriod(event,'day')">Daily</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-period="week"  href="#" onclick="switchPeriod(event,'week')">Weekly</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-period="month" href="#" onclick="switchPeriod(event,'month')">Monthly</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-period="year"  href="#" onclick="switchPeriod(event,'year')">Yearly</a>
+    </li>
+  </ul>
+
+  {% if not on_freebsd %}
+  <div class="alert alert-info">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    MRTG graphs are only generated on the FreeBSD deployment. Live preview is unavailable in this environment.
+  </div>
+  {% endif %}
+
+  {% if not interfaces %}
+  <div class="alert alert-warning">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    No interfaces configured. Complete the setup wizard to configure WAN and LAN interfaces.
+  </div>
+  {% endif %}
+
+  {% for iface in interfaces %}
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-chart-area"></i></div>
+      <div>
+        <div class="ss-card-title">{{ iface.label }} — <code>{{ iface.name }}</code></div>
+        {% if iface.description %}
+        <div class="ss-card-subtitle">{{ iface.description }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="ss-card-body text-center" id="card-{{ iface.name }}">
+      <!-- Graph image — src is swapped by switchPeriod() -->
+      <img
+        id="img-{{ iface.name }}"
+        src="/status/mrtg/image/{{ iface.name }}.png?{{ now_ts }}"
+        alt="{{ iface.label }} daily traffic graph"
+        style="max-width:100%;border-radius:6px;"
+        onerror="this.style.display='none'; document.getElementById('nodata-{{ iface.name }}').style.display='block';"
+        onload="this.style.display=''; document.getElementById('nodata-{{ iface.name }}').style.display='none';"
+      >
+      <div id="nodata-{{ iface.name }}" style="display:none;padding:40px;color:var(--muted);">
+        <i class="fa-solid fa-hourglass-half fa-2x mb-3 d-block"></i>
+        Graph not yet available. MRTG runs every 5 minutes — check back shortly.<br>
+        <small class="mt-2 d-block">If this persists, click <strong>Regenerate Config</strong> above and ensure the MRTG cron job is installed.</small>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+const interfaces = {{ iface_names | tojson }};
+let currentPeriod = 'day';
+
+async function reinitMrtg() {
+  const btn = document.getElementById('btn-mrtg-reinit');
+  const msg = document.getElementById('mrtg-reinit-msg');
+  btn.disabled = true;
+  msg.textContent = 'Running…';
+  try {
+    const r = await fetch('/status/api/mrtg/reinitialize', { method: 'POST' });
+    const d = await r.json();
+    msg.textContent = d.ok ? 'Done — reloading page…' : 'Error: ' + (d.message || 'failed');
+    if (d.ok) setTimeout(() => location.reload(), 1200);
+  } catch(e) { msg.textContent = 'Network error'; }
+  btn.disabled = false;
+}
+
+function switchPeriod(evt, period) {
+  evt.preventDefault();
+  currentPeriod = period;
+
+  // Update tab active state
+  document.querySelectorAll('#mrtg-tabs .nav-link').forEach(a => {
+    a.classList.toggle('active', a.dataset.period === period);
+  });
+
+  // Update each interface image src
+  interfaces.forEach(name => {
+    const img = document.getElementById('img-' + name);
+    const nodata = document.getElementById('nodata-' + name);
+    if (!img) return;
+    img.style.display = '';
+    if (nodata) nodata.style.display = 'none';
+    const sfx = {day: '', week: '-w', month: '-m', year: '-y'};
+    img.src = '/status/mrtg/image/' + name + (sfx[period] || '') + '.png?' + Date.now();
+  });
+}
+</script>
+{% endblock %}

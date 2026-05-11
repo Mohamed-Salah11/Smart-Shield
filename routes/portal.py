@@ -12,6 +12,7 @@ GET  /portal/success       → shown after successful auth
 GET  /portal/logout        → end session and remove from PF table
 """
 
+import json
 import sys
 from urllib.parse import urlparse
 from flask import (
@@ -40,7 +41,11 @@ def _client_mac(ip: str) -> str:
     return ""
 
 def _safe_redirect_target(url: str) -> str:
-    """Only redirect to relative URLs or the same Smart Shield host."""
+    """Redirect to the original URL after captive portal login.
+    Allows relative URLs, same-host URLs, and any external http/https URL
+    (external redirects are the normal captive portal post-auth behaviour).
+    Rejects non-http schemes (javascript:, data:, etc.) as a safety measure.
+    """
     url = (url or "").strip()
     if not url:
         return url_for("portal.success")
@@ -51,8 +56,8 @@ def _safe_redirect_target(url: str) -> str:
     if not parsed.netloc:
         return url
 
-    # Allow only same host.
-    if parsed.netloc == request.host:
+    # Allow any absolute http or https URL (covers external sites after captive portal auth).
+    if parsed.scheme in ("http", "https"):
         return url
 
     return url_for("portal.success")
@@ -120,15 +125,26 @@ def auth():
                 **context,
             )
 
+        # Load portal whitelist once for both auth paths
+        _cp_row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        _cp_settings = json.loads(_cp_row["value_json"]) if _cp_row else {}
+        _whitelist = {u.strip().lower() for u in (_cp_settings.get("whitelist_users") or [])}
+        is_whitelisted = username.strip().lower() in _whitelist
+
         # Try RADIUS first; fall back to local user table
         radius_result = authenticate_radius(conn, username, password)
         if radius_result.get("ok"):
-            result = authenticate_session(conn, mac, ip, username=username)
+            result = authenticate_session(
+                conn, mac, ip, username=username,
+                is_superuser=is_whitelisted,
+            )
         else:
             # Local user check — use correct column names from the users table
             from werkzeug.security import check_password_hash as _chk
             row = conn.execute(
-                "SELECT password FROM users WHERE username=? AND (status IS NULL OR status='active')",
+                "SELECT password, is_superuser FROM users WHERE username=? AND (status IS NULL OR status='active')",
                 (username,),
             ).fetchone()
             if not row or not _chk(row["password"], password):
@@ -137,7 +153,8 @@ def auth():
                     error="Invalid username or password.",
                     **context,
                 )
-            result = authenticate_session(conn, mac, ip, username=username)
+            is_superuser = bool(row["is_superuser"]) or is_whitelisted
+            result = authenticate_session(conn, mac, ip, username=username, is_superuser=is_superuser)
 
     if not result.get("ok"):
         # Decide which template to return to (block page or generic login page)
@@ -158,14 +175,16 @@ def auth():
     session["content_filter_authenticated"] = True
     session["portal_ip"] = ip
 
-    if context["policy"] == "content":
-        return render_template("portal/success.html", **context)
-
-    # If came from block page, go back to block success view
     back_template = request.form.get("back_template", "login")
+
     if back_template == "block":
+        # User came via the DNS-redirect block page (direct navigation).
+        # Render block.html authenticated view — it has auto-redirect JS + Continue button.
         return render_template("portal/block.html", authenticated=True, **context)
 
+    # Redirect to the original URL the user was trying to visit.
+    # The interstitial was replaced with a direct portal redirect, so
+    # window.opener popup logic is no longer needed here.
     return redirect(_safe_redirect_target(orig_url))
 
 

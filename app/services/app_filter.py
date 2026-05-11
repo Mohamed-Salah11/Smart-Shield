@@ -29,6 +29,8 @@ apply_app_filter(conn)                      -> dict
 
 import sys
 
+from app.services.content_policy import get_block_page_ip
+
 
 # ---------------------------------------------------------------------------
 # Built-in application signature library
@@ -247,6 +249,38 @@ def add_app_from_signature(conn, sig_key: str, action: str = "block") -> int:
     )
 
 
+def update_app_filter_rule(
+    conn,
+    rule_id: int,
+    app_name: str,
+    action: str = "block",
+    block_dns: bool = True,
+    block_ports: bool = False,
+    ports: str = "",
+    protocol: str = "tcp+udp",
+    domains: str = "",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    if not app_name.strip():
+        raise ValueError("Application name must not be empty.")
+    conn.execute(
+        """
+        UPDATE filter_app_rules
+           SET app_name=?, action=?, block_dns=?, block_ports=?,
+               ports=?, protocol=?, domains=?, category=?, description=?
+         WHERE id=?
+        """,
+        (
+            app_name.strip(), action,
+            1 if block_dns else 0, 1 if block_ports else 0,
+            ports, protocol, domains, category, description,
+            rule_id,
+        ),
+    )
+    conn.commit()
+
+
 def toggle_app_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_app_rules SET enabled = ? WHERE id = ?",
@@ -255,7 +289,32 @@ def toggle_app_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.commit()
 
 
+def _hot_remove_domain(domain: str) -> None:
+    """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_zone_remove", domain=domain)
+    except Exception:
+        pass
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_data_remove", domain=domain)
+    except Exception:
+        pass
+
+
 def delete_app_filter_rule(conn, rule_id: int) -> None:
+    row = conn.execute(
+        "SELECT domains FROM filter_app_rules WHERE id=?", (rule_id,)
+    ).fetchone()
+    if row:
+        for d in (row["domains"] or "").split(","):
+            d = d.strip()
+            if d:
+                _hot_remove_domain(d)
     conn.execute("DELETE FROM filter_app_rules WHERE id = ?", (rule_id,))
     conn.commit()
 
@@ -263,16 +322,6 @@ def delete_app_filter_rule(conn, rule_id: int) -> None:
 # ---------------------------------------------------------------------------
 # Config generators
 # ---------------------------------------------------------------------------
-
-def _block_page_ip(conn) -> str:
-    """Return the Smart Shield LAN IP (without prefix) to use as DNS redirect target."""
-    try:
-        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
-        addr = (row["ipv4_address"] if row else "") or ""
-        return addr.split("/")[0].strip()
-    except Exception:
-        return ""
-
 
 def generate_app_filter_dns_zones(conn) -> list:
     """
@@ -282,7 +331,7 @@ def generate_app_filter_dns_zones(conn) -> list:
     Redirects blocked app domains to Smart Shield's LAN IP so the browser hits
     the /portal/block page. Falls back to always_nxdomain if no LAN IP is set.
     """
-    block_ip = _block_page_ip(conn)
+    block_ip = get_block_page_ip(conn)
 
     rules = _rows(conn, """
         SELECT domains, action
@@ -359,22 +408,32 @@ def generate_app_filter_pf_rules(conn) -> str:
 def apply_app_filter(conn) -> dict:
     """Regenerate unbound.conf (DNS blocking) and pf.conf (port blocking), then reload both."""
     results = []
+    ok = True
+
     try:
         from app.services.dns_writer import write_unbound_conf
         dns_result = write_unbound_conf(conn)
         results.append(f"DNS: {dns_result['message']}")
-        if sys.platform.startswith("freebsd") and dns_result["ok"]:
+        if not dns_result["ok"]:
+            ok = False
+        elif sys.platform.startswith("freebsd"):
             from app.services.service_manager import service_action
             r = service_action("unbound", "reload")
             results.append(f"Unbound reload: {r['message']}")
+            if not r["ok"]:
+                ok = False
     except Exception as exc:
         results.append(f"DNS apply error: {exc}")
+        ok = False
 
     try:
         from app.services.pf_generator import reload_pf_rules
         pf_result = reload_pf_rules(conn)
         results.append(f"PF: {pf_result['message']}")
+        if not pf_result["ok"]:
+            ok = False
     except Exception as exc:
         results.append(f"PF apply error: {exc}")
+        ok = False
 
-    return {"ok": True, "message": " | ".join(results)}
+    return {"ok": ok, "message": " | ".join(results)}

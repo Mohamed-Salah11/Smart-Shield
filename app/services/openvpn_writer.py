@@ -325,13 +325,13 @@ def write_openvpn_configs(conn) -> dict:
     os.makedirs(_OPENVPN_LOG, exist_ok=True)
     os.makedirs(_OPENVPN_RUN, exist_ok=True)
 
+    from app.services.config_file_utils import atomic_write, backup_config
     errors = []
     for item in configs:
         path = os.path.join(_OPENVPN_DIR, item["filename"])
         try:
-            with open(path, "w") as fh:
-                fh.write(item["conf"])
-            os.chmod(path, 0o640)
+            backup_config(path)
+            atomic_write(path, item["conf"], mode=0o640)
             item["path"] = path
         except OSError as exc:
             errors.append(f"{item['filename']}: {exc}")
@@ -364,18 +364,51 @@ def apply_openvpn(conn) -> dict:
     if all_errs:
         return {"ok": False, "message": "Validation failed: " + " | ".join(all_errs), "configs": []}
 
+    # Auto-export PKI from cert_manager DB to disk for servers that have
+    # ca_id + server_cert_id set.  Non-fatal if the cert store is empty.
+    pki_warnings = []
+    for row in servers:
+        ca_id          = row.get("ca_id")
+        server_cert_id = row.get("server_cert_id")
+        if ca_id and server_cert_id:
+            try:
+                pki_result = export_pki_to_disk(conn, row["id"], ca_id, server_cert_id)
+                if not pki_result.get("ok"):
+                    pki_warnings.append(
+                        f"Server {row.get('id')}: PKI export failed — {pki_result.get('message', '')}"
+                    )
+            except Exception as exc:
+                pki_warnings.append(f"Server {row.get('id')}: PKI export error — {exc}")
+
     result = write_openvpn_configs(conn)
     if not result["ok"] or not _on_freebsd():
-        return result
+        return {**result, "rolled_back": False, "pki_warnings": pki_warnings}
     try:
         from app.services.service_manager import service_action, sysrc_set
+        from app.services.config_file_utils import rollback_config
         sysrc_set("openvpn_enable", "YES")
         r = service_action("openvpn", "restart")
+        if not r["ok"]:
+            rolled_back = []
+            for item in result.get("configs", []):
+                path = item.get("path", "")
+                if path:
+                    rb = rollback_config(path)
+                    if rb["ok"]:
+                        rolled_back.append(path)
+            return {"ok": False,
+                    "rolled_back": bool(rolled_back),
+                    "pki_warnings": pki_warnings,
+                    "message": result["message"] + " | Service: " + r["message"],
+                    "configs": result["configs"]}
         return {"ok": r["ok"],
+                "rolled_back": False,
+                "pki_warnings": pki_warnings,
                 "message": result["message"] + " | Service: " + r["message"],
                 "configs": result["configs"]}
     except Exception as exc:
-        return {"ok": False, "message": f"Config written but restart failed: {exc}"}
+        return {"ok": False, "rolled_back": False, "pki_warnings": pki_warnings,
+                "message": f"Config written but restart failed: {exc}"}
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +463,208 @@ def get_openvpn_log(server_id: int, lines: int = 100) -> str:
         return "".join(all_lines[-lines:])
     except OSError:
         return ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 18: PKI lifecycle — export certs from cert_manager to disk
+# ---------------------------------------------------------------------------
+
+def export_pki_to_disk(conn, server_id: int, ca_id: int, server_cert_id: int) -> dict:
+    """
+    Write CA cert, server cert, and server key from the cert_manager DB to the
+    OpenVPN keys directory so that apply_openvpn() picks them up.
+
+    Parameters
+    ----------
+    server_id       : openvpn_servers.id (determines filenames)
+    ca_id           : certificates.id of the CA certificate
+    server_cert_id  : certificates.id of the server certificate
+
+    Returns ``{"ok": bool, "message": str, "files": list}``.
+    """
+    from app.services.cert_manager import get_cert_pem, get_key_pem, validate_cert_row, list_certs
+
+    # Load CA cert
+    ca_pem = get_cert_pem(conn, ca_id)
+    if not ca_pem:
+        return {"ok": False, "message": f"CA cert id={ca_id} not found.", "files": []}
+
+    # Load server cert + key
+    srv_pem = get_cert_pem(conn, server_cert_id)
+    srv_key = get_key_pem(conn, server_cert_id)
+    if not srv_pem or not srv_key:
+        return {"ok": False, "message": f"Server cert id={server_cert_id} not found or key unreadable.", "files": []}
+
+    # Warn on near-expiry
+    srv_rows = list_certs(conn)
+    srv_row  = next((r for r in srv_rows if r["id"] == server_cert_id), {})
+    warnings = validate_cert_row(srv_row)
+
+    if not _on_freebsd():
+        return {
+            "ok": True,
+            "message": f"Non-FreeBSD — PKI export skipped. Warnings: {warnings or 'none'}",
+            "files": [],
+            "warnings": warnings,
+        }
+
+    os.makedirs(_OPENVPN_KEYS, mode=0o700, exist_ok=True)
+
+    written = []
+    pairs = [
+        (f"server{server_id}-ca.crt",  ca_pem,  0o644),
+        (f"server{server_id}.crt",     srv_pem,  0o640),
+        (f"server{server_id}.key",     srv_key,  0o600),
+    ]
+    errors = []
+    for fname, content, mode in pairs:
+        path = os.path.join(_OPENVPN_KEYS, fname)
+        try:
+            with open(path, "w") as fh:
+                fh.write(content)
+            os.chmod(path, mode)
+            written.append(path)
+        except OSError as exc:
+            errors.append(f"{fname}: {exc}")
+
+    if errors:
+        return {"ok": False, "message": "; ".join(errors), "files": written, "warnings": warnings}
+    return {
+        "ok":       True,
+        "message":  f"PKI files written for server {server_id}.",
+        "files":    written,
+        "warnings": warnings,
+    }
+
+
+def generate_client_ovpn(conn, server_id: int, client_cert_id: int) -> str:
+    """
+    Generate a .ovpn inline-cert client config file content.
+
+    Embeds <ca>, <cert>, <key> blocks inline so the file is self-contained.
+    Returns the .ovpn file content as a string.
+
+    Parameters
+    ----------
+    server_id       : openvpn_servers.id — used to get proto/port/remote_host
+    client_cert_id  : certificates.id of the client certificate
+    """
+    from app.secret_store import decrypt_secret
+
+    # --- Load server row ---
+    srv_rows = _rows(conn, "SELECT * FROM openvpn_servers WHERE id=?", (server_id,))
+    srv = srv_rows[0] if srv_rows else {}
+
+    proto       = _v(srv, "protocol", "udp4").lower()
+    proto_clean = proto.replace("4", "").replace("6", "")
+    port        = srv.get("local_port") or 1194
+    # Prefer explicit remote_host field; fall back to server_hostname, then placeholder.
+    remote_host = (
+        srv.get("remote_host")
+        or srv.get("server_hostname")
+        or "YOUR-SERVER-IP"
+    )
+
+    # --- Load client cert ---
+    client_rows = _rows(conn, "SELECT * FROM certificates WHERE id=?", (client_cert_id,))
+    if not client_rows:
+        raise ValueError(f"Client certificate id={client_cert_id} not found.")
+    client_row = client_rows[0]
+
+    client_pem     = (client_row.get("cert_pem") or "").strip()
+    client_key_enc = client_row.get("private_key_enc") or ""
+    client_key     = decrypt_secret(client_key_enc) if client_key_enc else ""
+    if not client_pem:
+        raise ValueError(f"Client certificate id={client_cert_id} has no PEM cert.")
+    if not client_key:
+        raise ValueError(f"Client certificate id={client_cert_id} key could not be decrypted.")
+
+    # --- Load CA cert ---
+    ca_pem = ""
+    ca_id  = client_row.get("ca_id")
+    if ca_id:
+        ca_rows = _rows(conn, "SELECT cert_pem FROM certificates WHERE id=?", (ca_id,))
+        if ca_rows:
+            ca_pem = (ca_rows[0].get("cert_pem") or "").strip()
+    if not ca_pem:
+        # Fallback: look for any CA cert in the table
+        ca_rows = _rows(conn, "SELECT cert_pem FROM certificates WHERE cert_type='ca' LIMIT 1")
+        if ca_rows:
+            ca_pem = (ca_rows[0].get("cert_pem") or "").strip()
+    if not ca_pem:
+        ca_pem = "# CA certificate not found — insert CA PEM here"
+
+    desc = client_row.get("name") or f"client-{client_cert_id}"
+
+    lines = [
+        f"# Smart Shield — OpenVPN client config for {desc}",
+        "# Auto-generated — keep this file private",
+        "",
+        "client",
+        "dev tun",
+        f"proto {proto_clean}",
+        f"remote {remote_host} {port}",
+        "resolv-retry infinite",
+        "nobind",
+        "",
+        "data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC",
+        "data-ciphers-fallback AES-256-CBC",
+        "auth SHA256",
+        "tls-version-min 1.2",
+        "",
+        "persist-key",
+        "persist-tun",
+        "",
+        "verb 3",
+        "mute 10",
+        "",
+        "<ca>",
+        ca_pem,
+        "</ca>",
+        "",
+        "<cert>",
+        client_pem,
+        "</cert>",
+        "",
+        "<key>",
+        client_key.strip(),
+        "</key>",
+    ]
+
+    return "\n".join(lines) + "\n"
+
+
+def check_openvpn_cert_expiry(conn) -> list:
+    """
+    Check PKI cert files on disk for near-expiry (warn within 30 days).
+    Returns a list of alert dicts: {"file", "days_remaining", "expires"}.
+    On non-FreeBSD: returns [].
+    """
+    if not _on_freebsd():
+        return []
+
+    alerts = []
+    import datetime as _dt
+
+    try:
+        from cryptography import x509 as _x509
+        for fname in os.listdir(_OPENVPN_KEYS):
+            if not fname.endswith(".crt"):
+                continue
+            path = os.path.join(_OPENVPN_KEYS, fname)
+            try:
+                with open(path, "rb") as fh:
+                    cert = _x509.load_pem_x509_certificate(fh.read())
+                exp   = cert.not_valid_after_utc if hasattr(cert, "not_valid_after_utc") else cert.not_valid_after.replace(tzinfo=_dt.timezone.utc)
+                days  = (exp - _dt.datetime.now(_dt.timezone.utc)).days
+                if days < 30:
+                    alerts.append({"file": fname, "days_remaining": days, "expires": exp.isoformat()})
+            except Exception:
+                continue
+    except ImportError:
+        pass
+
+    return alerts
 
 
 def get_openvpn_status() -> dict:

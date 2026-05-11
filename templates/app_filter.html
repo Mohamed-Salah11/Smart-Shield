@@ -73,12 +73,21 @@
             <th>Block DNS</th>
             <th>Block Ports</th>
             <th>Ports</th>
-            <th style="width:70px;">Delete</th>
+            <th style="width:110px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rules %}
-          <tr id="row-{{ r.id }}">
+          <tr id="row-{{ r.id }}"
+              data-app-name="{{ r.app_name }}"
+              data-action="{{ r.action }}"
+              data-category="{{ r.category }}"
+              data-block-dns="{{ r.block_dns }}"
+              data-block-ports="{{ r.block_ports }}"
+              data-ports="{{ r.ports or '' }}"
+              data-domains="{{ r.domains or '' }}"
+              data-protocol="{{ r.protocol or 'tcp+udp' }}"
+              data-description="{{ r.description or '' }}">
             <td>
               <label class="sw">
                 <input type="checkbox" {% if r.enabled %}checked{% endif %}
@@ -101,6 +110,10 @@
             </td>
             <td class="mono">{{ r.ports or '—' }}</td>
             <td>
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
+                onclick="openEdit({{ r.id }})" title="Edit">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
               <button class="btn btn-sm btn-outline-danger py-0 px-2"
                 onclick="deleteRule({{ r.id }})">Delete</button>
             </td>
@@ -172,6 +185,13 @@
           <input type="text" id="f-ports" class="form-control" placeholder="e.g. 6881-6889,6969">
           <div class="form-text">Comma-separated ranges. Leave blank to skip port blocking.</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="f-action" class="form-select">
+            <option value="block">Block</option>
+            <option value="allow">Allow</option>
+          </select>
+        </div>
         <div class="row g-3">
           <div class="col-6">
             <label class="form-label fw-semibold">Protocol</label>
@@ -207,9 +227,75 @@
   </div>
 </div>
 
+<!-- Edit Rule Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Application Filter Rule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="e-id">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Application Name <span class="text-danger">*</span></label>
+          <input type="text" id="e-name" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Domains to block (DNS)</label>
+          <input type="text" id="e-domains" class="form-control" placeholder="e.g. example.com,cdn.example.com">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Ports to block (PF)</label>
+          <input type="text" id="e-ports" class="form-control" placeholder="e.g. 6881-6889,6969">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="e-action" class="form-select">
+            <option value="block">Block</option>
+            <option value="allow">Allow</option>
+          </select>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label fw-semibold">Protocol</label>
+            <select id="e-protocol" class="form-select">
+              <option value="tcp+udp">TCP + UDP</option>
+              <option value="tcp">TCP only</option>
+              <option value="udp">UDP only</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold">Category</label>
+            <select id="e-category" class="form-select">
+              <option value="custom">Custom</option>
+              <option value="social">Social</option>
+              <option value="streaming">Streaming</option>
+              <option value="gaming">Gaming</option>
+              <option value="messaging">Messaging</option>
+              <option value="voip">VoIP</option>
+              <option value="p2p">P2P</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3 mt-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" id="e-description" class="form-control" placeholder="Optional note">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
+const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
 function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
 
@@ -227,15 +313,26 @@ async function api(url, body) {
   return r.json();
 }
 
+let _applyTimer = null;
+function scheduleApply() {
+  clearTimeout(_applyTimer);
+  showToast('Syncing…', true);
+  _applyTimer = setTimeout(async () => {
+    const r = await api('/filters/app/apply', {});
+    showToast(r.message, r.ok);
+  }, 1500);
+}
+
 async function toggleRule(id, enabled) {
   const r = await api(`/filters/app/${id}/toggle`, { enabled });
-  if (!r.ok) showToast(r.message, false);
+  if (r.ok) scheduleApply();
+  else showToast(r.message, false);
 }
 
 async function deleteRule(id) {
   if (!confirm('Delete this rule?')) return;
   const r = await api(`/filters/app/${id}/delete`, {});
-  if (r.ok) { document.getElementById(`row-${id}`)?.remove(); showToast('Rule deleted.', true); }
+  if (r.ok) { document.getElementById(`row-${id}`)?.remove(); showToast('Rule deleted.', true); scheduleApply(); }
   else showToast(r.message, false);
 }
 
@@ -248,8 +345,109 @@ async function applyFilter() {
 async function addFromSig(sigKey, btn) {
   btn.textContent = '…';
   const r = await api('/filters/app/add-signature', { sig_key: sigKey, action: 'block' });
-  if (r.ok) { btn.textContent = 'Added'; btn.classList.add('added'); showToast(r.message, true); }
-  else { btn.textContent = 'Block'; showToast(r.message, false); }
+  if (r.ok) {
+    btn.textContent = 'Added';
+    btn.classList.add('added');
+    showToast(r.message, true);
+    if (r.rule) {
+      const tbody = document.querySelector('.ftbl tbody');
+      const emptyRow = tbody.querySelector('.empty-row');
+      if (emptyRow) emptyRow.remove();
+      tbody.insertAdjacentHTML('afterbegin', _buildRuleRow(r.rule));
+    }
+    scheduleApply();
+  } else {
+    btn.textContent = 'Block';
+    showToast(r.message, false);
+  }
+}
+
+function _buildRuleRow(v) {
+  return `<tr id="row-${v.id}"
+      data-app-name="${esc(v.app_name)}"
+      data-action="${esc(v.action)}"
+      data-category="${esc(v.category)}"
+      data-block-dns="${v.block_dns}"
+      data-block-ports="${v.block_ports}"
+      data-ports="${esc(v.ports||'')}"
+      data-domains="${esc(v.domains||'')}"
+      data-protocol="${esc(v.protocol||'tcp+udp')}"
+      data-description="${esc(v.description||'')}">
+    <td>
+      <label class="sw">
+        <input type="checkbox" checked onchange="toggleRule(${v.id}, this.checked)">
+        <span class="sw-track"><span class="sw-thumb"></span></span>
+      </label>
+    </td>
+    <td style="font-weight:600;">${esc(v.app_name)}</td>
+    <td><span class="badge-action badge-${esc(v.action)}">${esc(v.action)}</span></td>
+    <td><span class="badge-cat">${esc(v.category)}</span></td>
+    <td class="text-center"><span class="${v.block_dns ? 'check-yes' : 'check-no'}">${v.block_dns ? 'Yes' : 'No'}</span></td>
+    <td class="text-center"><span class="${v.block_ports ? 'check-yes' : 'check-no'}">${v.block_ports ? 'Yes' : 'No'}</span></td>
+    <td class="mono">${esc(v.ports || '—')}</td>
+    <td>
+      <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1" onclick="openEdit(${v.id})" title="Edit">
+        <i class="fa-solid fa-pen-to-square"></i>
+      </button>
+      <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteRule(${v.id})">Delete</button>
+    </td>
+  </tr>`;
+}
+
+function openEdit(id) {
+  const row = document.getElementById(`row-${id}`);
+  if (!row) return;
+  document.getElementById('e-id').value = id;
+  document.getElementById('e-name').value = row.dataset.appName || '';
+  document.getElementById('e-domains').value = row.dataset.domains || '';
+  document.getElementById('e-ports').value = row.dataset.ports || '';
+  document.getElementById('e-action').value = row.dataset.action || 'block';
+  document.getElementById('e-protocol').value = row.dataset.protocol || 'tcp+udp';
+  document.getElementById('e-category').value = row.dataset.category || 'custom';
+  document.getElementById('e-description').value = row.dataset.description || '';
+  openModal('editModal');
+}
+
+async function submitEdit() {
+  const id = document.getElementById('e-id').value;
+  const name = document.getElementById('e-name').value.trim();
+  if (!name) { showToast('Application name is required.', false); return; }
+  const domains = document.getElementById('e-domains').value.trim();
+  const ports   = document.getElementById('e-ports').value.trim();
+  const r = await fetch(`/filters/app/${id}/edit`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      app_name: name,
+      action: document.getElementById('e-action').value,
+      block_dns: !!domains,
+      block_ports: !!ports,
+      domains, ports,
+      protocol: document.getElementById('e-protocol').value,
+      category: document.getElementById('e-category').value,
+      description: document.getElementById('e-description').value.trim(),
+    }),
+  }).then(r => r.json());
+  if (r.ok) {
+    closeModal('editModal');
+    showToast('Rule updated.', true);
+    const row = document.getElementById(`row-${id}`);
+    if (row && r.rule) {
+      const ru = r.rule;
+      row.dataset.appName = ru.app_name;
+      row.dataset.category = ru.category;
+      row.dataset.blockDns = ru.block_dns;
+      row.dataset.blockPorts = ru.block_ports;
+      row.dataset.ports = ru.ports || '';
+      row.cells[1].textContent = ru.app_name;
+      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(ru.action)}">${esc(ru.action)}</span>`;
+      row.cells[3].innerHTML = `<span class="badge-cat">${esc(ru.category)}</span>`;
+      row.cells[4].innerHTML = `<span class="${ru.block_dns ? 'check-yes' : 'check-no'}">${ru.block_dns ? 'Yes' : 'No'}</span>`;
+      row.cells[5].innerHTML = `<span class="${ru.block_ports ? 'check-yes' : 'check-no'}">${ru.block_ports ? 'Yes' : 'No'}</span>`;
+      row.cells[6].textContent = ru.ports || '—';
+    }
+    scheduleApply();
+  } else showToast(r.message, false);
 }
 
 async function submitAdd() {
@@ -259,7 +457,7 @@ async function submitAdd() {
   const ports   = document.getElementById('f-ports').value.trim();
   const r = await api('/filters/app/add', {
     app_name: name,
-    action: 'block',
+    action: document.getElementById('f-action').value,
     block_dns: !!domains,
     block_ports: !!ports,
     domains, ports,
@@ -267,8 +465,16 @@ async function submitAdd() {
     category: document.getElementById('f-category').value,
     description: document.getElementById('f-description').value.trim(),
   });
-  if (r.ok) { closeModal('addModal'); showToast(r.message, true); setTimeout(() => location.reload(), 900); }
-  else showToast(r.message, false);
+  if (r.ok) {
+    closeModal('addModal');
+    showToast(r.message, true);
+    const tbody = document.querySelector('.ftbl tbody');
+    const emptyRow = tbody.querySelector('.empty-row');
+    if (emptyRow) emptyRow.remove();
+    tbody.insertAdjacentHTML('afterbegin', _buildRuleRow(r.rule));
+  } else {
+    showToast(r.message, false);
+  }
 }
 
 function filterSigs(q) {

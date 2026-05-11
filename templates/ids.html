@@ -211,6 +211,26 @@
           <button class="btn btn-sm btn-secondary" onclick="loadAlerts()"><i class="fa-solid fa-rotate"></i> Reload</button>
         </div>
       </div>
+      <!-- Alert filter toolbar -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-color);">
+        <input type="text" id="alertSearch" class="form-control form-control-sm"
+               placeholder="Search signature, IP…" style="max-width:260px;"
+               oninput="debounceAlerts()">
+        <select id="alertSeverity" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+          <option value="0">All Severities</option>
+          <option value="1">Sev 1 — Critical</option>
+          <option value="2">Sev 2 — High</option>
+          <option value="3">Sev 3 — Info</option>
+        </select>
+        <select id="alertHours" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+          <option value="0">All Time</option>
+          <option value="1">Last 1 h</option>
+          <option value="6">Last 6 h</option>
+          <option value="24">Last 24 h</option>
+          <option value="168">Last 7 d</option>
+        </select>
+        <span id="alertCount" class="text-muted ms-auto" style="font-size:.78rem;"></span>
+      </div>
       <div class="alert-scroll">
         <table class="alert-tbl">
           <thead>
@@ -432,14 +452,21 @@
           </div>
         </div>
 
-        <!-- Dry-run note -->
-        <div class="mb-4 row">
-          <div class="col-sm-9 offset-sm-3">
-            <div class="alert alert-secondary py-2 px-3 mb-0" style="font-size:.8rem;">
-              <i class="fa-solid fa-flask me-1"></i>
-              <strong>Dry-run mode is active by default.</strong>
-              Lookups are logged but no blocking actions are taken until
-              <code>ABUSECH_DRY_RUN=0</code> is set in your environment.
+        <!-- Live API toggle -->
+        <div class="mb-4 row align-items-center">
+          <label class="col-sm-3 col-form-label fw-semibold" for="feedsLiveToggle">
+            Live API Calls
+          </label>
+          <div class="col-sm-9">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="feedsLiveToggle">
+              <label class="form-check-label" for="feedsLiveToggle" id="feedsLiveLabel">
+                Dry-run (logging only)
+              </label>
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+              When enabled, lookups reach abuse.ch live. When disabled, calls are logged but not sent.
+              Automatically enabled when you save an Auth-Key.
             </div>
           </div>
         </div>
@@ -572,12 +599,21 @@ document.getElementById('btnRefreshStatus').addEventListener('click', async func
 
 /* ── Load alerts ── */
 async function loadAlerts() {
-  const tbody = document.getElementById('alertTbody');
+  const tbody  = document.getElementById('alertTbody');
+  const search = encodeURIComponent((document.getElementById('alertSearch')?.value || '').trim());
+  const sev    = document.getElementById('alertSeverity')?.value || '0';
+  const hours  = document.getElementById('alertHours')?.value   || '0';
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Loading…</td></tr>';
-  const res = await fetch('{{ url_for("ids.ids_alerts") }}?limit=200').then(r=>r.json()).catch(()=>({ok:false,alerts:[]}));
+  let url = '{{ url_for("ids.ids_alerts") }}?limit=500';
+  if (search)        url += '&search='   + search;
+  if (sev   !== '0') url += '&severity=' + sev;
+  if (hours !== '0') url += '&hours='    + hours;
+  const res = await fetch(url).then(r=>r.json()).catch(()=>({ok:false,alerts:[]}));
   const alerts = res.alerts || [];
+  const countEl = document.getElementById('alertCount');
+  if (countEl) countEl.textContent = alerts.length + ' alert' + (alerts.length!==1?'s':'') + ' shown';
   if (!alerts.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No alerts recorded yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No alerts match the current filter.</td></tr>';
     return;
   }
   const sevClass = s => s==1?'sev-1':s==2?'sev-2':'sev-3';
@@ -595,6 +631,12 @@ async function loadAlerts() {
       <td class="td-mono">${esc(a.proto)}</td>
       <td>${actionBadge(a.action)}</td>
     </tr>`).join('');
+}
+
+let _alertDebounce;
+function debounceAlerts() {
+  clearTimeout(_alertDebounce);
+  _alertDebounce = setTimeout(loadAlerts, 350);
 }
 
 /* ── Ruleset toggles ── */
@@ -686,6 +728,39 @@ function _setFeedsStatus(hasKey) {
   }
 }
 
+function _setDryRunUI(dryRun) {
+  const toggle = document.getElementById('feedsLiveToggle');
+  const label  = document.getElementById('feedsLiveLabel');
+  if (!toggle) return;
+  toggle.checked = !dryRun;  // checked = live mode (dry_run=0)
+  if (label) label.textContent = dryRun ? 'Dry-run (logging only)' : 'Live (calls go to abuse.ch)';
+}
+
+// Load current dry_run state on page load
+(async function() {
+  try {
+    const r = await apiFetch('{{ url_for("ids.ids_feeds_get") }}').then(r => r.json());
+    if (r.ok && r.dry_run !== undefined) _setDryRunUI(r.dry_run);
+  } catch(_) {}
+})();
+
+const feedsLiveToggle = document.getElementById('feedsLiveToggle');
+if (feedsLiveToggle) {
+  feedsLiveToggle.addEventListener('change', async function() {
+    const dryRun = this.checked ? 0 : 1;
+    const res = await apiFetch('{{ url_for("ids.ids_feeds_save") }}', {
+      method: 'POST',
+      body: JSON.stringify({dry_run: dryRun}),
+    }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
+    if (res.ok) {
+      _setDryRunUI(res.dry_run);
+    } else {
+      this.checked = !this.checked;  // revert on error
+      alert('Error updating setting: ' + (res.message || 'Unknown error'));
+    }
+  });
+}
+
 const btnSaveFeeds = document.getElementById('btnSaveFeeds');
 if (btnSaveFeeds) {
   btnSaveFeeds.addEventListener('click', async function() {
@@ -701,6 +776,7 @@ if (btnSaveFeeds) {
       document.getElementById('feedsAuthKey').value = '';
       document.getElementById('feedsAuthKey').placeholder = 'Key already stored — paste new key to replace';
       _setFeedsStatus(true);
+      if (res.dry_run !== undefined) _setDryRunUI(res.dry_run);
     } else {
       alert('Error saving key: ' + (res.message || 'Unknown error'));
     }
@@ -709,9 +785,24 @@ if (btnSaveFeeds) {
 function _showAbusechResult(obj) {
   const box = document.getElementById('abusechResult');
   if (!box) return;
-
   box.classList.remove('d-none');
-  box.textContent = JSON.stringify(obj, null, 2);
+  box.style.color = '';
+
+  if (!obj.ok) {
+    box.style.color = 'var(--danger, #dc2626)';
+    box.textContent = 'Error: ' + (obj.message || 'Unknown error');
+    return;
+  }
+
+  if (obj.dry_run || obj.result?.query_status === 'dry_run') {
+    box.style.color = 'var(--warning, #d97706)';
+    box.textContent =
+      'Dry-run mode is active — no API call was made.\n' +
+      'Toggle "Live" mode in the Threat Feeds settings to run real lookups.';
+    return;
+  }
+
+  box.textContent = JSON.stringify(obj.result ?? obj, null, 2);
 }
 
 const btnAbusechLookup = document.getElementById('btnAbusechLookup');
@@ -776,6 +867,7 @@ if (btnClearFeeds) {
       document.getElementById('feedsAuthKey').value = '';
       document.getElementById('feedsAuthKey').placeholder = 'Paste your Auth-Key here';
       _setFeedsStatus(false);
+      _setDryRunUI(true);  // clearing the key resets to dry-run
       this.remove();
     } else {
       alert('Error clearing key: ' + (res.message || 'Unknown error'));

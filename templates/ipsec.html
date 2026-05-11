@@ -3,14 +3,22 @@
 {% block main %}
 <div class="container">
 
+  <div id="ipsec-toast" class="alert d-none" role="alert"
+       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:320px;"></div>
+
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">IPsec</h1>
       <p class="ss-page-desc">IKEv1/IKEv2 site-to-site and mobile VPN tunnels</p>
     </div>
-    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">
-      <i class="fa-solid fa-plus me-1"></i>Add P1
-    </button>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-success" onclick="applyIpsec()">
+        <i class="fa-solid fa-play me-1"></i>Apply
+      </button>
+      <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#ipsecAddP1Modal">
+        <i class="fa-solid fa-plus me-1"></i>Add P1
+      </button>
+    </div>
   </div>
 
   <ul class="nav nav-tabs mb-4">
@@ -42,6 +50,27 @@
         <tbody id="ipsecTunnelsTable">
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="ss-card mt-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <div class="ss-card-title">Tunnel Status</div>
+        <div class="ss-card-subtitle">Live output from ipsec statusall</div>
+      </div>
+      <div class="ss-card-actions">
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadIpsecStatus()">
+          <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh
+        </button>
+      </div>
+    </div>
+    <div class="ss-card-body">
+      <div id="ipsec-status-badge" class="mb-3"></div>
+      <pre id="ipsec-status-raw"
+           class="bg-dark text-light p-3 rounded"
+           style="font-size:.8rem;max-height:400px;overflow-y:auto;">Loading…</pre>
     </div>
   </div>
 </div>
@@ -655,5 +684,43 @@ function deleteIpsecP1(id) {
 			alert(err.message || String(err));
 		});
 }
+
+function showIpsecToast(msg, ok) {
+	const t = document.getElementById('ipsec-toast');
+	t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+	t.textContent = msg;
+	t.classList.remove('d-none');
+	clearTimeout(t._timer);
+	t._timer = setTimeout(() => t.classList.add('d-none'), 5000);
+}
+
+async function applyIpsec() {
+	try {
+		const r = await fetch('/vpn/api/ipsec/apply', { method: 'POST' });
+		const d = await r.json();
+		const ok = d.ok ?? d.success ?? false;
+		showIpsecToast(ok ? 'IPsec configuration applied.' : 'Error: ' + (d.message || d.error || 'Unknown error'), ok);
+		loadIpsecStatus();
+	} catch(e) {
+		showIpsecToast('Network error: ' + e.message, false);
+	}
+}
+
+async function loadIpsecStatus() {
+	try {
+		const r = await fetch('/vpn/api/ipsec/status');
+		const d = await r.json();
+		const badge = document.getElementById('ipsec-status-badge');
+		const tunnelCount = (d.tunnels || []).length;
+		badge.innerHTML = d.running
+			? '<span class="badge bg-success">Running</span> &nbsp;' + tunnelCount + ' tunnel(s) established'
+			: '<span class="badge bg-danger">Stopped</span>';
+		document.getElementById('ipsec-status-raw').textContent = d.raw || d.message || '(no output)';
+	} catch(e) {
+		document.getElementById('ipsec-status-raw').textContent = 'Error: ' + e.message;
+	}
+}
+
+document.addEventListener('DOMContentLoaded', loadIpsecStatus);
 </script>
 {% endblock %}

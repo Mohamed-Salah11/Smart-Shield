@@ -170,12 +170,22 @@ def api_interface_stats():
             r = run_command(["netstat", "-ibn"], check=False)
             for line in (r.stdout or "").splitlines():
                 parts = line.split()
-                if len(parts) >= 8 and not line.startswith("Name"):
+                # Filter to link-layer rows only (<Link#N>) to avoid duplicate
+                # entries per interface (netstat outputs one row per address family).
+                # FreeBSD netstat -ibn columns:
+                #   Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+                #   [0]  [1] [2]     [3]     [4]   [5]   [6]    [7]   [8]   [9]   [10]
+                if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2], re.IGNORECASE):
                     try:
                         stats.append({
-                            "name": parts[0], "mtu": parts[1],
-                            "rx_pkts": int(parts[4]), "rx_errs": int(parts[5]),
-                            "tx_pkts": int(parts[6]), "tx_errs": int(parts[7]),
+                            "name":     parts[0],
+                            "mtu":      parts[1],
+                            "rx_pkts":  int(parts[4]),
+                            "rx_errs":  int(parts[5]),
+                            "rx_bytes": int(parts[6]),
+                            "tx_pkts":  int(parts[7]),
+                            "tx_errs":  int(parts[8]),
+                            "tx_bytes": int(parts[9]),
                         })
                     except (ValueError, IndexError):
                         pass
@@ -656,3 +666,459 @@ def api_health_system():
     """Return memory and CPU load averages."""
     from app.services.health_monitor import check_memory_cpu
     return jsonify({"ok": True, **check_memory_cpu()})
+
+
+@status_bp.route("/api/health/services")
+@login_required
+def api_health_services():
+    """
+    Return pgrep-based running/stopped status for all known daemons.
+
+    Response::
+
+        {
+          "ok": true,
+          "services": {
+            "dhcpd":     {"running": true},
+            "unbound":   {"running": true},
+            "openvpn":   {"running": false},
+            "charon":    {"running": false},
+            "mpd5":      {"running": false},
+            "suricata":  {"running": true},
+            "ddclient":  {"running": false},
+            "miniupnpd": {"running": false},
+            "igmpproxy": {"running": false},
+            "kea-dhcp6": {"running": false},
+            "rtadvd":    {"running": false},
+            "bsnmpd":    {"running": false},
+            "ntpd":      {"running": true},
+            "nginx":     {"running": true}
+          }
+        }
+    """
+    from app.services.health_monitor import check_daemon_processes
+    return jsonify({"ok": True, "services": check_daemon_processes()})
+
+
+@status_bp.route("/api/health/metrics")
+@login_required
+def api_health_metrics():
+    """
+    Return disk, memory and CPU percentage metrics.
+
+    Response::
+
+        {"ok": true, "disk_pct": 45, "mem_pct": 67, "cpu_pct": 12, "warnings": [...]}
+    """
+    from app.services.health_monitor import get_system_metrics
+    return jsonify({"ok": True, **get_system_metrics()})
+
+
+@status_bp.route("/api/health/interfaces")
+@login_required
+def api_health_interfaces():
+    """
+    Return link up/down state for each network interface.
+
+    Response::
+
+        {"ok": true, "interfaces": [{"iface": "em0", "link": "active"}, ...]}
+    """
+    from app.services.health_monitor import get_interface_link_status
+    return jsonify({"ok": True, "interfaces": get_interface_link_status()})
+
+
+# ══════════════════════════════════════════════════
+# MRTG TRAFFIC HISTORY GRAPHS
+# ══════════════════════════════════════════════════
+
+@status_bp.route("/mrtg")
+@login_required
+def mrtg_graphs():
+    """MRTG historical bandwidth graphs page."""
+    import sys
+    from app.database import get_db
+    conn = get_db()
+    wan_row = conn.execute("SELECT assigned_port, description FROM wan_config LIMIT 1").fetchone()
+    lan_row = conn.execute("SELECT assigned_port, description FROM lan_config LIMIT 1").fetchone()
+
+    interfaces = []
+    seen = set()
+    for row, label in [(wan_row, "WAN"), (lan_row, "LAN")]:
+        if not row:
+            continue
+        name = (row["assigned_port"] or "").strip()
+        if name and name not in seen:
+            seen.add(name)
+            interfaces.append({
+                "name": name,
+                "label": label,
+                "description": (row["description"] or "").strip(),
+            })
+
+    iface_names = [i["name"] for i in interfaces]
+    import time
+    return render_template(
+        "mrtg_graphs.html",
+        interfaces=interfaces,
+        iface_names=iface_names,
+        on_freebsd=sys.platform.startswith("freebsd"),
+        now_ts=int(time.time()),
+    )
+
+
+@status_bp.route("/mrtg/apply", methods=["POST"])
+@login_required
+def mrtg_apply():
+    """Regenerate mrtg.cfg and do a first run to initialise log files."""
+    from app.database import get_db
+    from app.services.mrtg_writer import apply_mrtg
+    from app.audit_log import log_event
+    conn   = get_db()
+    result = apply_mrtg(conn)
+    log_event(
+        category="system", action="mrtg_apply",
+        username=request.values.get("username"),
+        remote_addr=request.remote_addr,
+        details={"ok": result["ok"], "message": result.get("message", "")},
+    )
+    from flask import flash, redirect, url_for
+    if result.get("ok"):
+        flash("MRTG configuration regenerated successfully.", "success")
+    else:
+        flash(f"MRTG error: {result.get('message', 'Unknown error')}", "danger")
+    return redirect(url_for("status.mrtg_graphs"))
+
+
+@status_bp.route("/mrtg/image/<path:filename>")
+@login_required
+def mrtg_image(filename):
+    """Serve MRTG-generated PNG graph files from the MRTG work directory."""
+    from flask import send_from_directory, abort, make_response
+    if ".." in filename or filename.startswith("/"):
+        abort(400)
+    mrtg_dir = "/var/db/smart-shield/mrtg"
+    resp = make_response(send_from_directory(mrtg_dir, filename))
+    resp.cache_control.no_store = True
+    resp.cache_control.max_age = 0
+    return resp
+
+
+@status_bp.route("/api/mrtg/reinitialize", methods=["POST"])
+@login_required
+def mrtg_reinitialize():
+    """Re-run apply_mrtg() to regenerate MRTG config and prime graph files."""
+    try:
+        from app.database import get_db
+        from app.services.mrtg_writer import apply_mrtg
+        conn   = get_db()
+        result = apply_mrtg(conn)
+        return jsonify({"ok": result.get("ok", False), "message": result.get("message", "")})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)})
+
+
+# --------------------------------------------------
+# FEATURE REGISTRY  (Phase 0)
+# --------------------------------------------------
+
+@status_bp.route("/api/features")
+@login_required
+def api_features():
+    """
+    Return the complete feature capability registry.
+
+    Response shape:
+    {
+      "features": [{"key", "name", "mode", "color", "category", ...}, ...],
+      "by_category": {"core": [...], "vpn": [...], ...},
+      "summary": {"live": N, "dry-run": N, ..., "total": N},
+      "runtime_mode": "live" | "dry-run" | "degraded" | "development"
+    }
+    """
+    from app.services.feature_registry import (
+        get_all_features, get_features_by_category, feature_summary,
+    )
+    from app.services.runtime_mode import current_mode
+    return jsonify({
+        "features":     get_all_features(),
+        "by_category":  get_features_by_category(),
+        "summary":      feature_summary(),
+        "runtime_mode": current_mode(),
+    })
+
+
+@status_bp.route("/api/features/<feature_key>")
+@login_required
+def api_feature_detail(feature_key: str):
+    """Return status for a single feature plus its recent apply history."""
+    from app.services.feature_registry import get_feature_status
+    from app.services.apply_state import get_feature_state, get_recent_jobs
+    from app.database import get_db
+
+    feat = get_feature_status(feature_key)
+    if feat is None:
+        return jsonify({"ok": False, "error": f"Unknown feature: {feature_key}"}), 404
+
+    conn         = get_db()
+    apply_state  = get_feature_state(conn, feature_key)
+    recent_jobs  = get_recent_jobs(conn, feature_key=feature_key, limit=10)
+
+    return jsonify({
+        "feature":    feat,
+        "state":      apply_state,
+        "recent_jobs": recent_jobs,
+    })
+
+
+@status_bp.route("/api/apply-jobs")
+@login_required
+def api_apply_jobs():
+    """Return the most recent apply job records across all features."""
+    from app.services.apply_state import get_recent_jobs
+    from app.database import get_db
+
+    limit = min(int(request.args.get("limit", 50)), 200)
+    feature_key = request.args.get("feature") or None
+    conn  = get_db()
+    jobs  = get_recent_jobs(conn, feature_key=feature_key, limit=limit)
+    return jsonify({"jobs": jobs, "count": len(jobs)})
+
+
+@status_bp.route("/api/schedules")
+@login_required
+def api_schedules():
+    """Return current active/inactive state for all firewall schedules."""
+    from app.services.schedule_service import get_all_schedule_states
+    from app.database import get_db
+    conn   = get_db()
+    states = get_all_schedule_states(conn)
+    return jsonify({"schedules": states})
+
+
+@status_bp.route("/api/preflight")
+@login_required
+def api_preflight():
+    """
+    Return the full FreeBSD preflight report including kernel capabilities
+    and syntax validator results.
+    """
+    from app.services.freebsd_setup import preflight_check
+    from app.services.runtime_mode import production_ready, current_mode
+    report          = preflight_check()
+    prod_ok, issues = production_ready()
+    report["production_ready"] = prod_ok
+    report["production_issues"] = issues
+    report["runtime_mode"] = current_mode()
+    return jsonify(report)
+
+
+# --------------------------------------------------
+# PRODUCTION GATE  (Phase 42)
+# --------------------------------------------------
+
+@status_bp.route("/api/production-gate")
+@login_required
+def api_production_gate():
+    """
+    Comprehensive production-readiness checklist.
+
+    Returns a list of gate items, each with:
+      id, label, ok (bool), severity ('critical'|'warning'|'info'), detail
+    And a top-level ok=True only when ALL critical gates pass.
+    """
+    import os as _os
+    import sys as _sys
+    from app.services.runtime_mode import current_mode, startup_warnings
+    from app.services.freebsd_setup import preflight_check
+    from app.database import get_db
+    from app.migrations import CURRENT_SCHEMA_VERSION
+
+    mode    = current_mode()
+    report  = preflight_check()
+    warns   = startup_warnings()
+    conn    = get_db()
+    gates   = []
+
+    def _gate(gid, label, ok, severity="critical", detail=""):
+        gates.append({"id": gid, "label": label, "ok": bool(ok),
+                      "severity": severity, "detail": str(detail)})
+
+    # ── Platform ──────────────────────────────────────────────────────────────
+    _gate("platform_freebsd", "Running on FreeBSD",
+          _sys.platform.startswith("freebsd"), "critical",
+          f"Current platform: {_sys.platform}")
+
+    # ── Mode ──────────────────────────────────────────────────────────────────
+    _gate("mode_live", "Runtime mode is live",
+          mode == "live", "critical", f"Current mode: {mode}")
+
+    # ── Required tools ────────────────────────────────────────────────────────
+    missing_req = report.get("missing_required", [])
+    _gate("tools_required", "All required daemons installed",
+          len(missing_req) == 0, "critical",
+          f"Missing: {', '.join(missing_req)}" if missing_req else "All present")
+
+    missing_opt = report.get("missing_optional", [])
+    _gate("tools_optional", "All optional daemons present",
+          len(missing_opt) == 0, "warning",
+          f"Missing optional: {', '.join(missing_opt)}" if missing_opt else "All present")
+
+    # ── Directories ───────────────────────────────────────────────────────────
+    dir_ok = report.get("dirs_ok", True)
+    missing_dirs = report.get("missing_dirs", [])
+    _gate("dirs", "Required directories exist",
+          dir_ok, "critical",
+          f"Missing: {', '.join(missing_dirs)}" if missing_dirs else "All present")
+
+    # ── Kernel capabilities ───────────────────────────────────────────────────
+    kernel_caps = report.get("kernel_caps", [])
+    if isinstance(kernel_caps, dict):
+        kernel_caps = [{"cap": k, "ok": v} for k, v in kernel_caps.items()]
+    for entry in kernel_caps:
+        cap    = entry.get("cap", "unknown")
+        cap_ok = bool(entry.get("ok", True))
+        _gate(f"kernel_{cap}", f"Kernel capability: {cap}",
+              cap_ok, "warning", "Check sysctl / kernel module" if not cap_ok else "OK")
+
+    # ── Syntax validators ────────────────────────────────────────────────────
+    validators = report.get("validators", [])
+    if isinstance(validators, dict):
+        validators = [{"name": k, **v} for k, v in validators.items()]
+    for v in validators:
+        tool_name = v.get("name", "unknown")
+        v_ok      = bool(v.get("ok", True))
+        _gate(f"validator_{tool_name}", f"Config syntax: {tool_name}",
+              v_ok, "critical", v.get("warning", "") if not v_ok else "OK")
+
+    # ── Environment / secrets ────────────────────────────────────────────────
+    _gate("secret_key_set", "SECRET_KEY is set",
+          bool(_os.getenv("SECRET_KEY")), "critical")
+    secret_key = _os.getenv("SECRET_KEY", "")
+    _weak = {"change-me", "replace-this", "changeme", "secret", "dev", "test",
+             "flask-secret", "insecure", "please-change"}
+    weak_key = any(m in secret_key.lower() for m in _weak) or len(secret_key) < 24
+    _gate("secret_key_strong", "SECRET_KEY is strong (≥24 chars, not default)",
+          not weak_key, "critical",
+          "Generate: python3 -c \"import secrets; print(secrets.token_hex(32))\"" if weak_key else "OK")
+
+    _gate("master_key", "SMARTSHIELD_MASTER_KEY is set",
+          bool(_os.getenv("SMARTSHIELD_MASTER_KEY")), "warning",
+          "Auto-generated key will not survive reboots")
+
+    _gate("debug_off", "FLASK_DEBUG is not 1 in production",
+          _os.getenv("FLASK_DEBUG", "0") != "1", "critical",
+          "Set FLASK_DEBUG=0 in .env")
+
+    _gate("network_apply_enabled", "SMARTSHIELD_ENABLE_NETWORK_APPLY=1",
+          _os.getenv("SMARTSHIELD_ENABLE_NETWORK_APPLY", "0") == "1", "critical",
+          "Set SMARTSHIELD_ENABLE_NETWORK_APPLY=1 to enable live config application")
+
+    # ── Database schema ───────────────────────────────────────────────────────
+    try:
+        db_ver = conn.execute(
+            "SELECT MAX(version) FROM schema_version"
+        ).fetchone()[0] or 0
+        schema_ok = db_ver >= CURRENT_SCHEMA_VERSION
+        _gate("schema_version", f"DB schema is current (v{CURRENT_SCHEMA_VERSION})",
+              schema_ok, "critical",
+              f"DB at v{db_ver}, expected v{CURRENT_SCHEMA_VERSION}" if not schema_ok else f"v{db_ver}")
+    except Exception as exc:
+        _gate("schema_version", "DB schema check", False, "critical", str(exc))
+
+    # ── Startup warnings ─────────────────────────────────────────────────────
+    for w in warns:
+        if w["level"] == "critical":
+            _gate(f"warn_{w['feature']}", f"Startup check: {w['feature']}",
+                  False, "critical", w["message"])
+
+    critical_failed = [g for g in gates if g["severity"] == "critical" and not g["ok"]]
+    return jsonify({
+        "ok":             len(critical_failed) == 0,
+        "mode":           mode,
+        "gates":          gates,
+        "critical_failed": len(critical_failed),
+        "total":          len(gates),
+    })
+
+
+@status_bp.route("/api/mrtg/status")
+@login_required
+def api_mrtg_status():
+    """Return MRTG daemon status — binary presence, config mtime, graph availability."""
+    from app.services.mrtg_writer import get_mrtg_status
+    result = get_mrtg_status()
+    return jsonify({"ok": True, **result})
+
+
+@status_bp.route("/api/feature-states")
+@login_required
+def api_feature_states():
+    """
+    Return applied/pending state for all features.
+
+    Response::
+
+        {
+          "states": {
+            "<feature_key>": {
+              "status": "applied" | "pending" | "never_applied" | "saved" | ...,
+              "last_applied": "<ISO timestamp or null>",
+              "last_saved":   "<ISO timestamp or null>",
+              "color":        "<badge colour>",
+              "label":        "<human-readable label>",
+              "message":      "<detail string>"
+            },
+            ...
+          }
+        }
+    """
+    from app.database import get_db
+    from app.services.apply_state import get_all_feature_states
+    conn   = get_db()
+    raw    = get_all_feature_states(conn)
+    states = {}
+    for key, d in raw.items():
+        states[key] = {
+            "status":       d.get("state", "never_applied"),
+            "last_applied": d.get("updated_at") if d.get("state") == "applied" else None,
+            "last_saved":   d.get("updated_at") if d.get("state") == "saved"   else None,
+            "color":        d.get("color", "gray"),
+            "label":        d.get("label", d.get("state", "")),
+            "message":      d.get("message", ""),
+        }
+    return jsonify({"ok": True, "states": states})
+
+
+@status_bp.route("/api/pending-changes")
+@login_required
+def api_pending_changes():
+    """Return features that have been saved but not yet applied."""
+    from app.database import get_db
+    from app.services.apply_state import get_all_feature_states
+    conn   = get_db()
+    states = get_all_feature_states(conn)
+    pending = {k: v for k, v in states.items() if v.get("state") == "saved"}
+    return jsonify({"ok": True, "pending_count": len(pending), "pending": pending})
+
+
+@status_bp.route("/api/certificates/expiry")
+@login_required
+def api_certificates_expiry():
+    """
+    Return a summary of certificate expiry across all managed certs.
+
+    Response:
+      {
+        "ok": bool,
+        "certs": [{"id", "name", "days_remaining", "status", ...}, ...],
+        "expired": N,
+        "expiring_soon": N,
+        "total": N
+      }
+    """
+    from app.database import get_db
+    from app.services.cert_manager import get_expiring_certs
+    conn   = get_db()
+    result = get_expiring_certs(conn)
+    return jsonify({"ok": True, **result})

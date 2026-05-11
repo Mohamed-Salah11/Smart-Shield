@@ -13,7 +13,7 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from app.auth_utils import login_required, superuser_required
+from app.auth_utils import login_required, superuser_required, reauth_required
 import os
 from app.db_utils import db_cursor
 from app.uploads import (
@@ -390,6 +390,7 @@ def delete_user(user_id):
 
 @users_bp.route("/change-password/<int:user_id>", methods=["POST"])
 @superuser_required
+@reauth_required(reason="change password")
 def change_password(user_id):
     old_password = request.form.get("old_password") or ""
     new_password = request.form.get("new_password") or ""

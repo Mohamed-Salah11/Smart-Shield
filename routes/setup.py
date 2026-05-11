@@ -110,8 +110,24 @@ def _get_saved_setup_ports(conn):
 
 
 def _wizard_guard():
-    """Redirect away from wizard if it's already done."""
+    """Redirect non-admin users away from wizard if it's already done."""
     if _is_setup_complete():
+        # Admins (superusers) may re-enter the wizard after completion.
+        from flask import session as _session
+        from app.database import get_db as _get_db
+        try:
+            user_id = _session.get("user_id")
+            if user_id:
+                conn = _get_db()
+                row  = conn.execute(
+                    "SELECT is_superuser FROM users WHERE id=?", (user_id,)
+                ).fetchone()
+                if row and row["is_superuser"]:
+                    return None  # Admins can always re-run setup
+        except Exception:
+            pass
+        from flask import flash as _flash
+        _flash("Setup has already been completed.", "info")
         return redirect(url_for("system.dashboard"))
     return None
 
@@ -221,6 +237,22 @@ def api_step1_save():
 # Step 2 — LAN IP configuration
 # ---------------------------------------------------------------------------
 
+@setup_bp.route("/api/step2/bsd-detect", methods=["GET"])
+def api_step2_bsd_detect():
+    """Read current BSD state for both WAN and LAN interfaces assigned in step 1."""
+    conn = get_db()
+    from app.services.network_service import read_interface_config_from_bsd
+    wan_row = conn.execute("SELECT assigned_port FROM wan_config WHERE id=1").fetchone()
+    lan_row = conn.execute("SELECT assigned_port FROM lan_config WHERE id=1").fetchone()
+    wan_iface = ((wan_row["assigned_port"] or "").strip()) if wan_row else ""
+    lan_iface = ((lan_row["assigned_port"] or "").strip()) if lan_row else ""
+    return jsonify({
+        "ok": True,
+        "wan": read_interface_config_from_bsd(wan_iface) if wan_iface else {},
+        "lan": read_interface_config_from_bsd(lan_iface) if lan_iface else {},
+    })
+
+
 @setup_bp.route("/step2", methods=["GET"])
 def step2():
     guard = _wizard_guard()
@@ -323,6 +355,14 @@ def api_step2_save():
         (lan_port,),
     )
     conn.commit()
+
+    # Auto-configure a DHCP pool from the saved LAN CIDR so devices get IPs on first boot
+    try:
+        from app.services.dhcp_writer import auto_configure_pool
+        auto_configure_pool(conn, "LAN")
+    except Exception:
+        pass  # Non-fatal — admin can configure DHCP manually via the services page
+
     return jsonify({"ok": True, "message": "Network configuration saved."})
 
 
@@ -430,7 +470,20 @@ def api_step4_apply():
     except Exception as exc:
         results.append({"step": "services", "ok": False, "details": str(exc)})
 
-    overall_ok = all(r.get("ok", False) for r in results)
+    try:
+        from app.services.mrtg_writer import apply_mrtg
+        mrtg_result = apply_mrtg(conn)
+        results.append({
+            "step": "mrtg",
+            "ok": mrtg_result.get("ok", False),
+            "details": mrtg_result.get("message", ""),
+        })
+    except Exception as exc:
+        results.append({"step": "mrtg", "ok": False, "details": str(exc)})
+
+    # Only require the three network steps; MRTG is optional and must not block completion
+    _REQUIRED = {"rc_conf", "interfaces", "services"}
+    overall_ok = all(r.get("ok", False) for r in results if r.get("step") in _REQUIRED)
     if overall_ok:
         _mark_setup_complete(conn)
 

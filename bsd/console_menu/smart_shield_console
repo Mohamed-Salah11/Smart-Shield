@@ -1,0 +1,163 @@
+#!/bin/sh
+#
+# smart_shield_console
+# --------------------
+# Interactive console recovery menu for the Smart Shield appliance.
+# Run from the FreeBSD console (physical or serial) when the web UI is
+# unreachable.  Requires root.
+#
+# Install:
+#   cp bsd/console_menu/smart_shield_console /usr/local/sbin/smart_shield_console
+#   chmod 700 /usr/local/sbin/smart_shield_console
+#
+# Optional: add to /etc/ttys to launch on ttyv1 (Alt-F2):
+#   ttyv1 "/bin/sh /usr/local/sbin/smart_shield_console" xterm on secure
+
+set -e
+
+ENV_FILE="/usr/local/etc/smart-shield/smart-shield.env"
+SS_DIR="/var/db/smart-shield"
+SVCNAME="smart_shield"
+LOGFILE="/var/log/smart-shield/console.log"
+
+_log() { echo "[console] $*" | tee -a "$LOGFILE"; }
+
+# ── Root check ────────────────────────────────────────────────────────────────
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: This script must be run as root."
+    exit 1
+fi
+
+clear
+cat <<'BANNER'
+╔══════════════════════════════════════════════════════════════╗
+║           Smart Shield — Console Recovery Menu               ║
+╚══════════════════════════════════════════════════════════════╝
+BANNER
+
+_menu() {
+    echo ""
+    echo "  1) Show service status"
+    echo "  2) Start Smart Shield service"
+    echo "  3) Stop Smart Shield service"
+    echo "  4) Restart Smart Shield service"
+    echo "  5) View recent application log"
+    echo "  6) View recent audit log"
+    echo "  7) Reset admin password"
+    echo "  8) Reset network interfaces (reload PF)"
+    echo "  9) Run first-boot setup again"
+    echo " 10) Open a root shell"
+    echo "  q) Quit"
+    echo ""
+    printf "Choice: "
+}
+
+_show_status() {
+    echo "── Service status ──────────────────────────────────────────"
+    service "$SVCNAME" status 2>&1 || true
+    echo ""
+    echo "── PF status ───────────────────────────────────────────────"
+    pfctl -s info 2>&1 | head -5 || true
+    echo ""
+    echo "── Listening ports ─────────────────────────────────────────"
+    sockstat -l -p 5000 2>/dev/null | head -10 || true
+}
+
+_view_log() {
+    local logpath="/var/log/smart-shield/app.log"
+    if [ -f "$logpath" ]; then
+        tail -40 "$logpath"
+    else
+        echo "Log not found: $logpath"
+    fi
+}
+
+_view_audit() {
+    local apath="/var/log/smart-shield/audit.log"
+    if [ -f "$apath" ]; then
+        tail -40 "$apath"
+    else
+        echo "Audit log not found: $apath"
+    fi
+}
+
+_reset_admin_password() {
+    echo ""
+    printf "New admin password (min 8 chars): "
+    stty -echo
+    read NEW_PW
+    stty echo
+    echo ""
+    if [ ${#NEW_PW} -lt 8 ]; then
+        echo "Password too short. Aborted."
+        return
+    fi
+    printf "Confirm password: "
+    stty -echo
+    read CONFIRM_PW
+    stty echo
+    echo ""
+    if [ "$NEW_PW" != "$CONFIRM_PW" ]; then
+        echo "Passwords do not match. Aborted."
+        return
+    fi
+    DB_PATH=$(grep SMARTSHIELD_DB_PATH "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+    DB_PATH=${DB_PATH:-/var/db/smart-shield/data.db}
+    PY_SCRIPT=$(cat <<PYEOF
+import sqlite3, sys
+from werkzeug.security import generate_password_hash
+db = sqlite3.connect(sys.argv[1])
+pw_hash = generate_password_hash(sys.argv[2])
+rows = db.execute("UPDATE users SET password=? WHERE is_superuser=1 OR username='admin'", (pw_hash,)).rowcount
+db.commit()
+db.close()
+print(f"Updated {rows} admin account(s).")
+PYEOF
+)
+    python3 -c "$PY_SCRIPT" "$DB_PATH" "$NEW_PW" 2>&1
+    _log "Admin password reset via console menu"
+}
+
+_reload_pf() {
+    echo "Reloading PF rules..."
+    if [ -f /etc/pf.conf ]; then
+        pfctl -f /etc/pf.conf && echo "PF rules reloaded." || echo "pfctl failed — check /etc/pf.conf"
+    else
+        echo "No /etc/pf.conf found."
+    fi
+}
+
+_run_firstboot() {
+    local fb="/usr/local/libexec/smart_shield_firstboot"
+    local sentinel="$SS_DIR/.firstboot_done"
+    rm -f "$sentinel" 2>/dev/null || true
+    if [ -x "$fb" ]; then
+        "$fb"
+    else
+        echo "First-boot script not found at $fb"
+    fi
+}
+
+while true; do
+    _menu
+    read CHOICE
+    case "$CHOICE" in
+        1) _show_status ;;
+        2) service "$SVCNAME" start  2>&1 || true ;;
+        3) service "$SVCNAME" stop   2>&1 || true ;;
+        4) service "$SVCNAME" restart 2>&1 || true ;;
+        5) _view_log ;;
+        6) _view_audit ;;
+        7) _reset_admin_password ;;
+        8) _reload_pf ;;
+        9) _run_firstboot ;;
+       10) echo "Opening root shell. Type 'exit' to return to this menu."
+           /bin/sh || true ;;
+        q|Q) echo "Bye."; exit 0 ;;
+        *) echo "Invalid choice." ;;
+    esac
+    echo ""
+    printf "Press Enter to continue..."
+    read _DUMMY
+    clear
+done
