@@ -113,8 +113,7 @@ def generate_rc_conf_block(conn) -> str:
                 ip      = str(iface_obj.ip)
                 netmask = str(iface_obj.network.netmask)
                 lines.append(f'ifconfig_{_rc_iface(lan_iface)}="inet {ip} netmask {netmask}"')
-                # Keep gunicorn bound to the current LAN IP so the web UI stays reachable
-                lines.append(f'smart_shield_bind="{ip}:5000"')
+                lines.append('smart_shield_bind="127.0.0.1:5000"')
             except ValueError:
                 pass
 
@@ -258,7 +257,7 @@ _NGINX_CONF = "/usr/local/etc/nginx/nginx.conf"
 
 
 def _update_nginx_lan_ip(ip: str) -> None:
-    """Replace the listen IP and proxy_pass IP in nginx.conf with the current LAN IP."""
+    """Replace the listen IP in nginx.conf with the current LAN IP."""
     if not os.path.exists(_NGINX_CONF):
         return
     try:
@@ -270,12 +269,9 @@ def _update_nginx_lan_ip(ip: str) -> None:
             lambda m: m.group(1) + ip + m.group(2),
             content,
         )
-        # Replace proxy_pass target IP
-        content = re.sub(
-            r'(proxy_pass\s+http://)\d+\.\d+\.\d+\.\d+(:\d+)',
-            lambda m: m.group(1) + ip + m.group(2),
-            content,
-        )
+        # proxy_pass is intentionally NOT updated here — gunicorn always binds
+        # to 127.0.0.1:5000 and nginx proxies to that address regardless of
+        # which LAN IP nginx listens on.
         with open(_NGINX_CONF, "w") as fh:
             fh.write(content)
         # Reload nginx so the new listen address takes effect immediately
