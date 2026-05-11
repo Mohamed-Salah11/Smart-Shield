@@ -185,6 +185,13 @@
           <input type="text" id="f-ports" class="form-control" placeholder="e.g. 6881-6889,6969">
           <div class="form-text">Comma-separated ranges. Leave blank to skip port blocking.</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="f-action" class="form-select">
+            <option value="block">Block</option>
+            <option value="allow">Allow</option>
+          </select>
+        </div>
         <div class="row g-3">
           <div class="col-6">
             <label class="form-label fw-semibold">Protocol</label>
@@ -241,6 +248,13 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Ports to block (PF)</label>
           <input type="text" id="e-ports" class="form-control" placeholder="e.g. 6881-6889,6969">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="e-action" class="form-select">
+            <option value="block">Block</option>
+            <option value="allow">Allow</option>
+          </select>
         </div>
         <div class="row g-3">
           <div class="col-6">
@@ -356,9 +370,9 @@ function _buildRuleRow(v) {
       data-block-dns="${v.block_dns}"
       data-block-ports="${v.block_ports}"
       data-ports="${esc(v.ports||'')}"
-      data-domains=""
-      data-protocol="tcp+udp"
-      data-description="">
+      data-domains="${esc(v.domains||'')}"
+      data-protocol="${esc(v.protocol||'tcp+udp')}"
+      data-description="${esc(v.description||'')}">
     <td>
       <label class="sw">
         <input type="checkbox" checked onchange="toggleRule(${v.id}, this.checked)">
@@ -387,6 +401,7 @@ function openEdit(id) {
   document.getElementById('e-name').value = row.dataset.appName || '';
   document.getElementById('e-domains').value = row.dataset.domains || '';
   document.getElementById('e-ports').value = row.dataset.ports || '';
+  document.getElementById('e-action').value = row.dataset.action || 'block';
   document.getElementById('e-protocol').value = row.dataset.protocol || 'tcp+udp';
   document.getElementById('e-category').value = row.dataset.category || 'custom';
   document.getElementById('e-description').value = row.dataset.description || '';
@@ -404,7 +419,7 @@ async function submitEdit() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       app_name: name,
-      action: 'block',
+      action: document.getElementById('e-action').value,
       block_dns: !!domains,
       block_ports: !!ports,
       domains, ports,
@@ -442,7 +457,7 @@ async function submitAdd() {
   const ports   = document.getElementById('f-ports').value.trim();
   const r = await api('/filters/app/add', {
     app_name: name,
-    action: 'block',
+    action: document.getElementById('f-action').value,
     block_dns: !!domains,
     block_ports: !!ports,
     domains, ports,

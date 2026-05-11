@@ -162,7 +162,7 @@ def hot_apply_dns_rule(conn, rule_id: int) -> None:
                 run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
                 run_privileged("unbound.local_data_a", domain=domain, ip=row["redirect_ip"])
             else:
-                zone_type = "transparent" if row["action"] == "allow" else "always_refuse"
+                zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
                 run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
         else:
             try:

@@ -30,12 +30,16 @@ def get_gateway_health() -> dict:
     return dict(_GATEWAY_HEALTH)
 
 
+import shutil as _shutil
+_PING_BIN = _shutil.which("ping") or "/sbin/ping"
+
+
 def _ping_gateway(ip: str) -> bool:
     """Ping a gateway IP. Returns True if reachable."""
     try:
         from app.services.network_service import run_command
         result = run_command(
-            ["/sbin/ping", "-c", "2", "-W", "1", "-q", ip],
+            [_PING_BIN, "-c", "2", "-W", "1", "-q", ip],
             check=False,
             timeout_seconds=5,
         )

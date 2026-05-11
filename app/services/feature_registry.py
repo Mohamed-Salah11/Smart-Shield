@@ -331,7 +331,11 @@ def _cmd_present(cmd: str) -> bool:
 
 
 def _service_present(svc: str) -> bool:
-    """Return True if a service script exists in the rc.d directories."""
+    """Return True if a service script exists in the rc.d directories.
+    On non-FreeBSD (dev machines) always returns True so features aren't
+    incorrectly reported as unavailable during development."""
+    if not sys.platform.startswith("freebsd"):
+        return True
     for svcdir in ("/etc/rc.d", "/usr/local/etc/rc.d"):
         if os.path.exists(os.path.join(svcdir, svc)):
             return True

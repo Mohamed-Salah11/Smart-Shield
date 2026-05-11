@@ -52,11 +52,11 @@
                             <tr>
                                 <td class="align-middle"><strong>{{ g.name }}</strong></td>
                                 <td class="align-middle">
-                                    {% for gw in g.gateways %}
-                                        <span class="badge bg-secondary me-1">{{ gw }}</span>
+                                    {% for mem in g.members %}
+                                        <span class="badge bg-secondary me-1">{{ mem.gateway }} (Tier {{ mem.tier }})</span>
                                     {% endfor %}
                                 </td>
-                                <td class="align-middle"><span class="badge bg-info">{{ g.priority }}</span></td>
+                                <td class="align-middle"><span class="badge bg-info">{{ g.trigger_level }}</span></td>
                                 <td class="align-middle">{{ g.description }}</td>
                                 <td class="align-middle text-end">
                                     <a class="btn btn-outline-primary btn-sm"

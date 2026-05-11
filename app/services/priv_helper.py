@@ -44,11 +44,15 @@ from app.services.network_service import (
 )
 
 
+import shutil as _shutil
+_SUDO_BIN = _shutil.which("sudo") or "/usr/local/bin/sudo"
+
+
 def _maybe_sudo(cmd: List[str]) -> List[str]:
     """Return cmd unchanged when root (uid 0); otherwise prepend sudo -n."""
     if os.getuid() == 0:
         return cmd
-    return ["/usr/local/bin/sudo", "-n"] + cmd
+    return [_SUDO_BIN, "-n"] + cmd
 
 
 # ---------------------------------------------------------------------------

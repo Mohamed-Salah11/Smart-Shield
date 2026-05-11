@@ -211,6 +211,26 @@
           <button class="btn btn-sm btn-secondary" onclick="loadAlerts()"><i class="fa-solid fa-rotate"></i> Reload</button>
         </div>
       </div>
+      <!-- Alert filter toolbar -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-color);">
+        <input type="text" id="alertSearch" class="form-control form-control-sm"
+               placeholder="Search signature, IP…" style="max-width:260px;"
+               oninput="debounceAlerts()">
+        <select id="alertSeverity" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+          <option value="0">All Severities</option>
+          <option value="1">Sev 1 — Critical</option>
+          <option value="2">Sev 2 — High</option>
+          <option value="3">Sev 3 — Info</option>
+        </select>
+        <select id="alertHours" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+          <option value="0">All Time</option>
+          <option value="1">Last 1 h</option>
+          <option value="6">Last 6 h</option>
+          <option value="24">Last 24 h</option>
+          <option value="168">Last 7 d</option>
+        </select>
+        <span id="alertCount" class="text-muted ms-auto" style="font-size:.78rem;"></span>
+      </div>
       <div class="alert-scroll">
         <table class="alert-tbl">
           <thead>
@@ -579,12 +599,21 @@ document.getElementById('btnRefreshStatus').addEventListener('click', async func
 
 /* ── Load alerts ── */
 async function loadAlerts() {
-  const tbody = document.getElementById('alertTbody');
+  const tbody  = document.getElementById('alertTbody');
+  const search = encodeURIComponent((document.getElementById('alertSearch')?.value || '').trim());
+  const sev    = document.getElementById('alertSeverity')?.value || '0';
+  const hours  = document.getElementById('alertHours')?.value   || '0';
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Loading…</td></tr>';
-  const res = await fetch('{{ url_for("ids.ids_alerts") }}?limit=200').then(r=>r.json()).catch(()=>({ok:false,alerts:[]}));
+  let url = '{{ url_for("ids.ids_alerts") }}?limit=500';
+  if (search)        url += '&search='   + search;
+  if (sev   !== '0') url += '&severity=' + sev;
+  if (hours !== '0') url += '&hours='    + hours;
+  const res = await fetch(url).then(r=>r.json()).catch(()=>({ok:false,alerts:[]}));
   const alerts = res.alerts || [];
+  const countEl = document.getElementById('alertCount');
+  if (countEl) countEl.textContent = alerts.length + ' alert' + (alerts.length!==1?'s':'') + ' shown';
   if (!alerts.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No alerts recorded yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No alerts match the current filter.</td></tr>';
     return;
   }
   const sevClass = s => s==1?'sev-1':s==2?'sev-2':'sev-3';
@@ -602,6 +631,12 @@ async function loadAlerts() {
       <td class="td-mono">${esc(a.proto)}</td>
       <td>${actionBadge(a.action)}</td>
     </tr>`).join('');
+}
+
+let _alertDebounce;
+function debounceAlerts() {
+  clearTimeout(_alertDebounce);
+  _alertDebounce = setTimeout(loadAlerts, 350);
 }
 
 /* ── Ruleset toggles ── */

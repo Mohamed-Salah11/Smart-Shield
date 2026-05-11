@@ -23,8 +23,8 @@ import textwrap
 
 from app.services.network_service import FreeBSDNetworkError
 
-_DHCPD_CONF_PATH       = "/usr/local/etc/dhcpd.conf"
-_DHCPD_KNOWN_GOOD_PATH = "/usr/local/etc/dhcpd.conf.known_good"
+_DHCPD_CONF_PATH       = "/etc/dhcpd.conf"
+_DHCPD_KNOWN_GOOD_PATH = "/etc/dhcpd.conf.known_good"
 _DHCPD_LEASE_PATH      = "/var/db/dhcpd/dhcpd.leases"
 
 

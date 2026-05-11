@@ -111,7 +111,6 @@ def generate_mrtg_conf(conn) -> str:
         "Interval: 5",
         "Language: English",
         "Options[_]: growright, bits",
-        "LogFormat: rrdtool",
         "PathAdd: /usr/local/bin",
         "# Log rotation: newsyslog(8) rotates /var/log/mrtg.log weekly.",
         "# Add to /etc/newsyslog.conf:  /var/log/mrtg.log  644 7 * @T00 Z",

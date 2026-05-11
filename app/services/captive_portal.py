@@ -737,6 +737,6 @@ def get_captive_status(conn) -> dict:
     enabled = bool(settings.get("enabled", False))
     return {
         "enabled": enabled,
-        "active_sessions": len(active),
+        "active_sessions_count": len(active),
         "state": "running" if enabled else "stopped",
     }

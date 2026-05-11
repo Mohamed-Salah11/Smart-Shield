@@ -73,7 +73,7 @@ if [ -f "$RCD/$SVCNAME" ]; then
 fi
 
 # ── 5. Copy default .env if not present ─────────────────────────────────────
-ENV_FILE="/usr/local/etc/smart-shield/.env"
+ENV_FILE="/usr/local/etc/smart-shield/smart-shield.env"
 ENV_EXAMPLE="/usr/local/share/smart-shield/.env.example"
 if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
     cp "$ENV_EXAMPLE" "$ENV_FILE"

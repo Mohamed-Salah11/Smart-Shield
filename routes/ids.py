@@ -353,9 +353,26 @@ def ids_abusech_lookup():
 @login_required
 def ids_alerts():
     import os, json as _json
-    limit   = min(int(request.args.get("limit", 100)), 500)
-    eve_path = "/var/log/suricata/eve.json"
+    from datetime import datetime, timezone, timedelta
 
+    try:
+        limit = min(int(request.args.get("limit", 100)), 500)
+    except (ValueError, TypeError):
+        limit = 100
+
+    search = (request.args.get("search") or "").lower().strip()
+    try:
+        severity = int(request.args.get("severity", 0))
+    except (ValueError, TypeError):
+        severity = 0
+    try:
+        hours = int(request.args.get("hours", 0))
+    except (ValueError, TypeError):
+        hours = 0
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)) if hours > 0 else None
+
+    eve_path = "/var/log/suricata/eve.json"
     alerts = []
     if os.path.exists(eve_path):
         try:
@@ -364,21 +381,34 @@ def ids_alerts():
             for line in reversed(lines):
                 try:
                     obj = _json.loads(line)
-                    if obj.get("event_type") == "alert":
-                        alerts.append({
-                            "timestamp":  obj.get("timestamp", ""),
-                            "src_ip":     obj.get("src_ip", ""),
-                            "src_port":   obj.get("src_port", ""),
-                            "dest_ip":    obj.get("dest_ip", ""),
-                            "dest_port":  obj.get("dest_port", ""),
-                            "proto":      obj.get("proto", ""),
-                            "signature":  obj.get("alert", {}).get("signature", ""),
-                            "category":   obj.get("alert", {}).get("category", ""),
-                            "severity":   obj.get("alert", {}).get("severity", 3),
-                            "action":     obj.get("alert", {}).get("action", "allowed"),
-                        })
-                        if len(alerts) >= limit:
-                            break
+                    if obj.get("event_type") != "alert":
+                        continue
+                    a = {
+                        "timestamp": obj.get("timestamp", ""),
+                        "src_ip":    obj.get("src_ip", ""),
+                        "src_port":  obj.get("src_port", ""),
+                        "dest_ip":   obj.get("dest_ip", ""),
+                        "dest_port": obj.get("dest_port", ""),
+                        "proto":     obj.get("proto", ""),
+                        "signature": obj.get("alert", {}).get("signature", ""),
+                        "category":  obj.get("alert", {}).get("category", ""),
+                        "severity":  obj.get("alert", {}).get("severity", 3),
+                        "action":    obj.get("alert", {}).get("action", "allowed"),
+                    }
+                    if severity and a["severity"] != severity:
+                        continue
+                    if cutoff and a["timestamp"]:
+                        try:
+                            ts = datetime.fromisoformat(a["timestamp"].replace("Z", "+00:00"))
+                            if ts < cutoff:
+                                continue
+                        except Exception:
+                            pass
+                    if search and search not in (a["signature"] + a["src_ip"] + a["dest_ip"]).lower():
+                        continue
+                    alerts.append(a)
+                    if len(alerts) >= limit:
+                        break
                 except Exception:
                     pass
         except OSError:

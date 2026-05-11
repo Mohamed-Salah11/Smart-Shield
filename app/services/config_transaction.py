@@ -148,9 +148,13 @@ class ConfigTransaction:
             )
 
         try:
-            result  = apply_fn(*args, **kwargs)
-            ok      = result.get("ok", True) if isinstance(result, dict) else True
-            message = result.get("message", "") if isinstance(result, dict) else str(result or "")
+            result = apply_fn(*args, **kwargs)
+            if not isinstance(result, dict):
+                raise TypeError(
+                    f"apply_fn for '{feature_key}' returned {type(result).__name__}, expected dict"
+                )
+            ok      = result.get("ok", False)
+            message = result.get("message", "")
 
             if not ok:
                 raise RuntimeError(message or f"{feature_key} apply returned ok=False")

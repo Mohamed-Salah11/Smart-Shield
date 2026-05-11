@@ -71,7 +71,7 @@ section "1. Package Installation"
 info "Updating pkg repository..."
 pkg update -q
 
-REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata nano mrtg nginx kea mpd5 miniupnpd igmpproxy ddclient bind-tools tcpdump"
+REQUIRED_PKGS="python3 git sqlite3 ca_root_nss unbound isc-dhcp44-server openvpn strongswan suricata sudo nano mrtg nginx kea mpd5 miniupnpd igmpproxy ddclient bind-tools tcpdump"
 info "Installing required packages: ${REQUIRED_PKGS}"
 # shellcheck disable=SC2086
 pkg install -y ${REQUIRED_PKGS}
@@ -164,6 +164,11 @@ install -d -m 0755 /usr/local/etc/suricata/rules  2>/dev/null && info "Created: 
 install -d -m 0755 /var/log/suricata              2>/dev/null && info "Created: /var/log/suricata" || true
 install -d -m 0755 /var/run/suricata              2>/dev/null && info "Created: /var/run/suricata" || true
 
+# Kea DHCPv6 (used by app/services/dhcpv6_writer.py)
+for _KEA_DIR in /usr/local/etc/kea /var/db/kea /var/log/kea; do
+    install -d -m 0755 -o root -g wheel "${_KEA_DIR}" 2>/dev/null && info "Created: ${_KEA_DIR}" || true
+done
+
 # Nginx
 install -d -m 0755 /usr/local/etc/nginx  2>/dev/null && info "Created: /usr/local/etc/nginx" || true
 install -d -m 0755 /var/log/nginx        2>/dev/null && info "Created: /var/log/nginx" || true
@@ -179,6 +184,16 @@ if [ -f "${_NEWSYSLOG_SRC}" ]; then
     install -d -m 0755 /usr/local/etc/newsyslog.d 2>/dev/null || true
     install -m 0644 "${_NEWSYSLOG_SRC}" /usr/local/etc/newsyslog.d/smart-shield.conf
     info "Log rotation config installed → /usr/local/etc/newsyslog.d/smart-shield.conf"
+fi
+
+# Ensure /etc/newsyslog.conf includes the drop-in directory (minimal installs may omit it)
+if [ -f /etc/newsyslog.conf ]; then
+    if ! grep -q "/usr/local/etc/newsyslog.d" /etc/newsyslog.conf 2>/dev/null; then
+        printf '\n<include> /usr/local/etc/newsyslog.d/*.conf\n' >> /etc/newsyslog.conf
+        info "Added newsyslog.d include to /etc/newsyslog.conf"
+    else
+        info "newsyslog.d already included in /etc/newsyslog.conf"
+    fi
 fi
 
 # ── Required runtime files ───────────────────────────────────────────────────
@@ -348,12 +363,26 @@ else
     warn "mrtg-probe.sh not found at ${MRTG_PROBE_SRC}"
 fi
 
-# MRTG cron job (every 5 minutes)
-CRON_FILE="/etc/cron.d/smart-shield-mrtg"
-CRON_LINE="*/5 * * * * root /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
-printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
-chmod 0644 "${CRON_FILE}"
-info "MRTG cron job installed: ${CRON_FILE}"
+# First-boot recovery script
+FB_SRC="${APP_ROOT}/bsd/firstboot/smart_shield_firstboot"
+FB_DEST="/usr/local/libexec/smart_shield_firstboot"
+install -d -m 0755 /usr/local/libexec 2>/dev/null || true
+if [ -f "${FB_SRC}" ]; then
+    install -m 0555 "${FB_SRC}" "${FB_DEST}"
+    info "Installed: ${FB_DEST}"
+else
+    warn "First-boot script not found at ${FB_SRC}"
+fi
+
+# Console recovery menu
+CONSOLE_SRC="${APP_ROOT}/bsd/console_menu/smart_shield_console"
+CONSOLE_DEST="/usr/local/sbin/smart_shield_console"
+if [ -f "${CONSOLE_SRC}" ]; then
+    install -m 0700 "${CONSOLE_SRC}" "${CONSOLE_DEST}"
+    info "Installed: ${CONSOLE_DEST}"
+else
+    warn "Console menu not found at ${CONSOLE_SRC}"
+fi
 
 # Bootstrap MRTG: write initial config and run two passes to create .log files + first PNGs.
 # The web UI "Regenerate Config" will update this later with wizard-configured interface names.
@@ -386,6 +415,12 @@ MRTGEOF
 fi
 
 if [ -x "${MRTG_BIN}" ]; then
+    # Install cron job only when MRTG binary exists
+    CRON_FILE="/etc/cron.d/smart-shield-mrtg"
+    CRON_LINE="*/5 * * * * root /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
+    printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
+    chmod 0644 "${CRON_FILE}"
+    info "MRTG cron job installed: ${CRON_FILE}"
     # Pass 1: creates .log RRD files (non-zero exit on new files is expected)
     "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     # Pass 2: reads .log files and generates initial PNG graph images
@@ -506,24 +541,20 @@ sed -i '' "s|proxy_pass         http://127\.0\.0\.1:5000;|proxy_pass         htt
     /usr/local/etc/nginx/nginx.conf
 info "nginx bound to LAN interface only (${LAN_IP}:443)"
 
-# Enable and start nginx
-sysrc nginx_enable=YES
-info "nginx_enable=YES written to rc.conf"
+# Test nginx config BEFORE writing to rc.conf — prevents a broken config surviving a reboot
 if nginx -t 2>/dev/null; then
+    sysrc nginx_enable=YES
+    info "nginx_enable=YES written to rc.conf"
     service nginx restart 2>/dev/null || service nginx start 2>/dev/null || true
     info "Nginx started — dashboard now available over HTTPS."
 else
-    warn "Nginx config test failed — check /usr/local/etc/nginx/nginx.conf. Start manually: service nginx start"
+    warn "Nginx config test FAILED — nginx NOT enabled in rc.conf."
+    warn "Fix /usr/local/etc/nginx/nginx.conf then run:"
+    warn "  nginx -t && sysrc nginx_enable=YES && service nginx start"
 fi
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
 section "5b. sudo / Sudoers (optional fallback)"
-
-# Ensure sudo is installed
-if ! command -v sudo >/dev/null 2>&1; then
-    pkg install -y sudo
-    info "sudo installed."
-fi
 
 SUDOERS_DIR="/usr/local/etc/sudoers.d"
 SUDOERS_SRC="${APP_ROOT}/bsd/etc/sudoers.d/smartshield"
@@ -581,13 +612,19 @@ info "gateway_enable=YES written to rc.conf"
 sysctl net.inet.ip.forwarding=1 >/dev/null
 info "IP forwarding activated immediately (net.inet.ip.forwarding=1)"
 
-# DHCP server
+# DHCP server — only enable after the wizard generates /etc/dhcpd.conf
+# A stub placeholder prevents dhcpd from logging "file not found" errors on boot
+if [ ! -f /etc/dhcpd.conf ]; then
+    printf '# Smart Shield placeholder — replaced by setup wizard\nnot authoritative;\nsubnet 192.168.1.0 netmask 255.255.255.0 {}\n' \
+        > /etc/dhcpd.conf
+    info "Created stub /etc/dhcpd.conf (wizard will replace)"
+fi
 sysrc isc_dhcpd_enable=YES
 info "isc_dhcpd_enable=YES written to rc.conf"
 
-# SNMP daemon (bsnmpd) — used by MRTG for bandwidth graphs
-sysrc bsnmpd_enable=YES
-info "bsnmpd_enable=YES written to rc.conf"
+# bsnmpd — only enable when SNMP is configured via the web UI
+# MRTG uses mrtg-probe.sh (direct ifconfig), not bsnmpd, so this is not required for graphs
+# sysrc bsnmpd_enable=YES  (deferred — enable via Services → SNMP in web UI)
 
 section "6b. Live Network Activation"
 

@@ -1679,7 +1679,7 @@ ON static_leases(mac_address)
     """)
 
     # Bootstrap version records for all migrations that fresh-install skips
-    for _bootstrap_ver in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+    for _bootstrap_ver in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
         if _current_schema_version < _bootstrap_ver:
             cursor.execute("INSERT INTO schema_version (version) VALUES (?)", (_bootstrap_ver,))
 

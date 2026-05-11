@@ -15,7 +15,7 @@
 
 set -e
 
-ENV_FILE="/usr/local/etc/smart-shield/.env"
+ENV_FILE="/usr/local/etc/smart-shield/smart-shield.env"
 SS_DIR="/var/db/smart-shield"
 SVCNAME="smart_shield"
 LOGFILE="/var/log/smart-shield/console.log"
@@ -108,7 +108,7 @@ import sqlite3, sys
 from werkzeug.security import generate_password_hash
 db = sqlite3.connect(sys.argv[1])
 pw_hash = generate_password_hash(sys.argv[2])
-rows = db.execute("UPDATE users SET password_hash=? WHERE is_superuser=1 OR username='admin'", (pw_hash,)).rowcount
+rows = db.execute("UPDATE users SET password=? WHERE is_superuser=1 OR username='admin'", (pw_hash,)).rowcount
 db.commit()
 db.close()
 print(f"Updated {rows} admin account(s).")

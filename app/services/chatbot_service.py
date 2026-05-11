@@ -38,6 +38,8 @@ Agent capabilities (require user approval):
   system will pause and show the user an approval card before any change is applied.
 - Do NOT ask the user "shall I proceed?" in text — just call the tool and let the approval
   UI handle the confirmation.
+- Use get_firewall_help when users ask how to configure, navigate, or find any section of
+  this firewall's UI. Always prefer this tool over guessing at page names or menu paths.
 """
 
 # ---------------------------------------------------------------------------
@@ -185,6 +187,27 @@ TOOLS = [
             "required": ["query"],
         },
     },
+    {
+        "name": "get_firewall_help",
+        "description": (
+            "Get detailed guidance on how to use a specific section of the Smart Shield "
+            "firewall UI. Use this whenever a user asks 'how do I configure X', "
+            "'where do I find Y', 'what does the VPN page do', or any navigation/how-to "
+            "question about this appliance. "
+            "Sections: dashboard, firewall, nat, dhcp, dhcpv6, dns, ids, vpn, "
+            "routing, content_policy, captive_portal, certificates, system, siem."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": "The section name, e.g. 'firewall', 'vpn', 'ids', 'dhcp'.",
+                }
+            },
+            "required": ["section"],
+        },
+    },
     # ── Write / action tools (require user confirmation) ──────────────────
     {
         "name": "block_domain",
@@ -299,7 +322,9 @@ def _execute_tool(conn, name: str, args: dict) -> Any:
         if name == "get_vpn_status":
             return _tool_vpn_status(conn)
         if name == "search_web":
-            return _tool_search_web(args.get("query", ""))
+            return _tool_search_web(args.get("query", ""), conn=conn)
+        if name == "get_firewall_help":
+            return _tool_firewall_help(args)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         return {"error": str(exc)}
@@ -329,7 +354,10 @@ def _tool_audit_logs(conn, args: dict) -> dict:
     category = args.get("category") or None
     limit    = min(int(args.get("limit") or 50), 200)
     search   = args.get("search") or ""
-    events   = tail_events(limit=limit, category=category, search=search)
+    events   = tail_events(limit=limit, category=category)
+    if search:
+        events = [e for e in events
+                  if search.lower() in (e.get("action", "") + str(e.get("details", ""))).lower()]
     return {"count": len(events), "events": events}
 
 
@@ -414,10 +442,59 @@ def _tool_vpn_status(conn) -> dict:
     }
 
 
-def _tool_search_web(query: str) -> dict:
-    """Search DuckDuckGo instant answers API (no key required)."""
+def _load_search_settings(conn) -> dict:
+    """Read Google CSE key/cx from service_state or env vars."""
+    try:
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
+        ).fetchone()
+        if row:
+            s = json.loads(row["value_json"])
+            key = (s.get("google_cse_key") or "").strip() or os.environ.get("GOOGLE_CSE_KEY", "").strip()
+            cx  = (s.get("google_cse_cx")  or "").strip() or os.environ.get("GOOGLE_CSE_CX",  "").strip()
+            return {"key": key, "cx": cx}
+    except Exception:
+        pass
+    return {
+        "key": os.environ.get("GOOGLE_CSE_KEY", "").strip(),
+        "cx":  os.environ.get("GOOGLE_CSE_CX",  "").strip(),
+    }
+
+
+def _tool_search_web(query: str, conn=None) -> dict:
+    """Search the web. Uses Google Custom Search if configured, else DuckDuckGo."""
     if not query.strip():
         return {"error": "Empty query."}
+
+    # Tier 1: Google Custom Search (if configured)
+    if conn is not None:
+        try:
+            cse = _load_search_settings(conn)
+            if cse["key"] and cse["cx"]:
+                resp = requests.get(
+                    "https://www.googleapis.com/customsearch/v1",
+                    params={"key": cse["key"], "cx": cse["cx"], "q": query, "num": 5},
+                    timeout=10,
+                    headers={"User-Agent": "SmartShield-AI/1.0"},
+                )
+                data = resp.json()
+                if "items" in data:
+                    return {
+                        "query": query,
+                        "source": "google",
+                        "results": [
+                            {
+                                "title":   i.get("title", ""),
+                                "source":  i.get("link", ""),
+                                "snippet": i.get("snippet", ""),
+                            }
+                            for i in data["items"]
+                        ],
+                    }
+        except Exception:
+            pass  # fall through to DDG
+
+    # Tier 2: DuckDuckGo Instant Answers (no key required)
     try:
         resp = requests.get(
             "https://api.duckduckgo.com/",
@@ -428,13 +505,229 @@ def _tool_search_web(query: str) -> dict:
         data = resp.json()
         results = []
         if data.get("AbstractText"):
-            results.append({"source": data.get("AbstractURL", ""), "snippet": data["AbstractText"]})
-        for r in data.get("RelatedTopics", [])[:5]:
+            results.append({
+                "title":   data.get("Heading", ""),
+                "source":  data.get("AbstractURL", ""),
+                "snippet": data["AbstractText"],
+            })
+        for r in data.get("Results", [])[:4]:
             if isinstance(r, dict) and r.get("Text"):
-                results.append({"source": r.get("FirstURL", ""), "snippet": r["Text"]})
-        return {"query": query, "results": results or [{"snippet": "No instant answer found. Try a more specific query."}]}
+                results.append({"title": r.get("Text", "")[:80], "source": r.get("FirstURL", ""), "snippet": r["Text"]})
+        for r in data.get("RelatedTopics", [])[:4]:
+            if isinstance(r, dict) and r.get("Text"):
+                results.append({"title": "", "source": r.get("FirstURL", ""), "snippet": r["Text"]})
+        if results:
+            return {"query": query, "source": "duckduckgo", "results": results}
+        return {
+            "query": query,
+            "source": "duckduckgo",
+            "results": [{"snippet": "No results found. The query may be too specific — try rephrasing or use broader terms."}],
+        }
     except Exception as exc:
         return {"error": f"Web search failed: {exc}"}
+
+
+_FIREWALL_GUIDE = {
+    "dashboard": {
+        "title": "Dashboard",
+        "url": "/",
+        "description": "Central overview: service health cards, live WAN/LAN traffic sparklines, "
+                       "recent alert count, and gateway status.",
+        "common_tasks": [
+            "Check if all services (PF, DHCP, DNS, IDS) are running — each card shows green/red status",
+            "See current WAN IP and uptime in the WAN card",
+            "Click a service card to jump to its configuration page",
+        ],
+    },
+    "firewall": {
+        "title": "Firewall Rules",
+        "url": "/firewall/rules",
+        "description": "Manage PF packet-filter rules across three tabs: Floating (global, "
+                       "any-interface), WAN (inbound from internet), and LAN (outbound from clients).",
+        "common_tasks": [
+            "Add a rule: click 'Add Rule' on the relevant tab, fill in Protocol/Source/Destination/Port, then Apply",
+            "Disable a rule temporarily: toggle the enable switch without deleting it",
+            "Rule order matters — rules are evaluated top-to-bottom; first match wins",
+            "Use the Floating tab for rules that apply regardless of interface (IDS bypass, management access)",
+            "WAN rules mainly control port-forwarding and inbound blocks; LAN rules control client egress",
+        ],
+        "tips": "Changes require clicking 'Apply Changes' — unsaved changes show a banner at the top.",
+    },
+    "nat": {
+        "title": "NAT / Advanced Firewall",
+        "url": "/firewall/nat",
+        "description": "Port forwarding (DNAT), outbound NAT overrides, bogon/private-net blocking, "
+                       "NAT reflection, policy-based routing, and CARP virtual IPs.",
+        "common_tasks": [
+            "Forward port 443 to an internal server: Add port-forward rule, set Destination Port=443, Redirect IP=server IP",
+            "Enable bogon blocking: check 'Block Bogons' toggle in the Hardening card",
+            "Enable NAT reflection (hairpin): toggle 'NAT Reflection' for accessing port-forwarded services from LAN",
+        ],
+    },
+    "dhcp": {
+        "title": "DHCP Server (IPv4)",
+        "url": "/dhcp",
+        "description": "Configure the ISC DHCPv4 server: address pools, lease time, DNS servers, "
+                       "gateway, domain, static leases (MAC→IP mapping), and DHCP options.",
+        "common_tasks": [
+            "Change IP pool range: edit the Pool start/end addresses in the main settings card",
+            "Reserve a fixed IP for a device: Static Leases tab → Add, enter MAC address and desired IP",
+            "Check active leases: the Leases tab shows all currently assigned IPs with hostnames",
+            "Change DNS servers served to clients: set DNS1/DNS2 fields (default: this appliance's LAN IP)",
+        ],
+    },
+    "dhcpv6": {
+        "title": "DHCPv6 / RA",
+        "url": "/dhcp/ipv6",
+        "description": "Configure DHCPv6 address pools and Router Advertisement (RA) settings for IPv6 clients.",
+        "common_tasks": [
+            "Enable IPv6 DHCP: set a prefix pool and enable RA on the LAN interface",
+            "Configure prefix delegation: set PD Prefix to delegate from upstream ISP",
+        ],
+    },
+    "dns": {
+        "title": "DNS / Unbound",
+        "url": "/dns",
+        "description": "Unbound recursive DNS resolver. Settings include listen port, DNSSEC, "
+                       "DNS-over-TLS (DoT), local host overrides, and access control.",
+        "common_tasks": [
+            "Add a local hostname override: DNS → Local Overrides → Add, enter hostname and IP",
+            "Enable DNSSEC: toggle DNSSEC in the main settings form",
+            "Enable DNS-over-TLS: set upstream DoT server (e.g. 1.1.1.1@853)",
+            "Block a domain: use Content Policy → DNS Filter instead — not Unbound directly",
+        ],
+    },
+    "ids": {
+        "title": "IDS / IPS (Suricata)",
+        "url": "/ids",
+        "description": "Intrusion Detection/Prevention with Suricata. Four tabs: "
+                       "Status & Alerts (live alert feed with search/filter), "
+                       "Configuration (mode, interface, HOME_NET), "
+                       "Rulesets (enable/disable rule sources), "
+                       "Threat Feeds (abuse.ch API key for IOC lookups).",
+        "common_tasks": [
+            "Enable IDS: click the Enable button at top; set an interface in Configuration tab first",
+            "Switch to IPS mode (active blocking): Configuration → Mode = IPS (requires netmap kernel module)",
+            "Add Emerging Threats rules: Rulesets → Add Source, name='et/open'",
+            "Update rules to latest version: Rulesets → Update Rules button",
+            "Look up a suspicious IP or domain: Threat Feeds tab → IOC Lookup input",
+            "Filter alerts by severity: use the severity dropdown above the alerts table",
+            "Search alerts by signature or IP: type in the search box above the alerts table",
+        ],
+        "tips": "IPS mode requires the netmap kernel module and a compatible NIC. If IPS fails, "
+                "Smart Shield automatically falls back to IDS mode. EVE JSON logging must be enabled "
+                "in Configuration for the alert viewer to work.",
+    },
+    "vpn": {
+        "title": "VPN",
+        "url": "/vpn",
+        "description": "Three VPN subsystems: OpenVPN (site-to-site or road-warrior with certs), "
+                       "IPSec (IKEv1/v2 tunnels), and L2TP/IPSec (Windows/mobile remote access).",
+        "common_tasks": [
+            "Create a road-warrior OpenVPN server: VPN → OpenVPN → Servers → Add, mode=tun; "
+            "generate or import a CA certificate first from the Certificates page",
+            "Add an OpenVPN client: VPN → OpenVPN → Clients → Add, set server hostname and port",
+            "Create an IPSec tunnel: VPN → IPSec → Phase 1 → Add, then add Phase 2 selectors",
+            "Enable L2TP for Windows/mobile: VPN → L2TP → enable, set server IP range and shared secret",
+        ],
+    },
+    "routing": {
+        "title": "Routing",
+        "url": "/routing",
+        "description": "Three sub-pages: Gateways (define upstream routers with health monitoring), "
+                       "Static Routes (add specific network routes), "
+                       "Gateway Groups (failover/load-balance across multiple gateways).",
+        "common_tasks": [
+            "Add a gateway: Routing → Gateways → Add, enter gateway IP and interface",
+            "Add a static route: Routing → Static Routes → Add, enter destination network and gateway",
+            "Set up WAN failover: create two gateways, then Routing → Gateway Groups → Add, "
+            "assign gateways to tiers (Tier 1 = primary, Tier 2 = backup)",
+            "Check gateway health: gateway list shows reachable/unreachable status with last-seen time",
+        ],
+    },
+    "content_policy": {
+        "title": "Content Policy",
+        "url": "/content-policy",
+        "description": "Three filtering layers: DNS Filter (block domains at DNS resolution), "
+                       "Web Filter (URL/keyword blocking via proxy), "
+                       "App Filter (block by application protocol — BitTorrent, Skype, etc.).",
+        "common_tasks": [
+            "Block a website: DNS Filter → Add Rule, enter domain, action=Block, click Apply",
+            "Allow a specific domain through a category block: Add Rule with action=Allow "
+            "(allow rules take priority over block rules for the same domain)",
+            "Block a category of sites: Web Filter → Add, select category",
+            "Block BitTorrent: App Filter → Add, select protocol=bittorrent",
+        ],
+    },
+    "captive_portal": {
+        "title": "Captive Portal",
+        "url": "/captive-portal",
+        "description": "Redirect unauthenticated clients to a login/voucher page before granting "
+                       "internet access. Supports time-limited vouchers and per-session bandwidth limits.",
+        "common_tasks": [
+            "Enable captive portal: set interface, enable toggle, then apply",
+            "Create time-limited vouchers: Vouchers tab → Add voucher, set duration and bandwidth limit",
+            "View active sessions: Sessions tab shows connected clients and expiry times",
+            "Manually log out a client: click Logout next to the session in the Sessions tab",
+        ],
+    },
+    "certificates": {
+        "title": "Certificates",
+        "url": "/certificates",
+        "description": "PKI management: create Certificate Authorities (CAs), issue server/client "
+                       "certificates, and import external certificate/key pairs. Used by OpenVPN and HTTPS.",
+        "common_tasks": [
+            "Create a CA: Certificates → Add CA, fill in Common Name and validity period",
+            "Issue a server cert: Certificates → Add Certificate, select the CA, type=server",
+            "Issue a client cert for VPN: type=client, enter client common name",
+            "Import an existing cert/key pair: use the Import tab, paste PEM-encoded cert and key",
+        ],
+    },
+    "system": {
+        "title": "System Settings",
+        "url": "/system/general-setup",
+        "description": "Hostname, timezone, admin password, SSH access, firmware/package updates, "
+                       "config backups/restore, SmartShield AI key, and scheduled tasks.",
+        "common_tasks": [
+            "Change admin password: System → General Setup → Admin Password section",
+            "Configure the AI chatbot: System → General Setup → SmartShield AI section, paste Gemini API key",
+            "Download config backup: System → Backup → Download",
+            "Restore from backup: System → Backup → Restore, upload the backup file",
+            "Enable SSH access: System → Advanced → Admin Access → Enable SSH",
+        ],
+    },
+    "siem": {
+        "title": "SIEM / Live Log Monitor",
+        "url": "/status/system-logs",
+        "description": "Real-time event stream from the audit log. "
+                       "Filters by category (session, system, security, browsing, IDS), "
+                       "action type, and free-text search. Exports to JSON. Auto-polls every 5 seconds.",
+        "common_tasks": [
+            "Find login failures: filter Category=Security, or use the Action filter → Auth Events",
+            "Watch IDS alerts live: filter Category=IDS/IPS",
+            "Search for activity from a specific IP: type the IP in the search box",
+            "Export logs: click Export button (downloads JSON of current view)",
+            "Pause auto-scroll: scroll down in the log viewport",
+            "Adjust refresh rate: use the refresh dropdown (2s/5s/10s/30s/paused)",
+        ],
+    },
+}
+
+
+def _tool_firewall_help(args: dict) -> dict:
+    """Return UI guidance for a Smart Shield section by fuzzy name match."""
+    section = (args.get("section") or "").lower().strip()
+    for key, data in _FIREWALL_GUIDE.items():
+        if key == section or key in section or section in key:
+            return {"section": key, "found": True, **data}
+    return {
+        "found": False,
+        "message": f"No guide found for '{section}'. Available sections:",
+        "sections": [
+            {"key": k, "title": v["title"], "url": v["url"]}
+            for k, v in _FIREWALL_GUIDE.items()
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -645,10 +938,13 @@ def process_chat(conn, messages: list, username: str) -> dict:
         except Exception as exc:
             return {"ok": False, "message": f"Gemini API error: {exc}"}
 
+        if not response.candidates:
+            return {"ok": False, "message": "Gemini returned an empty response (rate limit or safety filter)."}
         parts = response.candidates[0].content.parts
 
         # Collect parts that contain a real function call (name is non-empty)
-        fc_parts = [p for p in parts if p.function_call.name]
+        fc_parts = [p for p in parts
+                    if hasattr(p, "function_call") and p.function_call and p.function_call.name]
 
         if not fc_parts:
             # No function calls — this is the final text response.

@@ -12,6 +12,22 @@ _LOCK_FILE = "/var/run/smart-shield/worker.lock"
 _lock_fd = None  # module-level file descriptor; held for process lifetime
 
 
+def _remove_stale_lock() -> None:
+    """Remove the lock file if it was left by a process that no longer exists."""
+    if not os.path.exists(_LOCK_FILE):
+        return
+    try:
+        with open(_LOCK_FILE) as fh:
+            pid_str = fh.read().strip()
+        if pid_str and pid_str.isdigit():
+            try:
+                os.kill(int(pid_str), 0)  # raises OSError if process is gone
+            except OSError:
+                os.unlink(_LOCK_FILE)
+    except OSError:
+        pass
+
+
 def acquire_worker_lock() -> bool:
     """
     Try to acquire an exclusive non-blocking flock.
@@ -24,7 +40,9 @@ def acquire_worker_lock() -> bool:
         return True
     try:
         import fcntl
-        os.makedirs(os.path.dirname(_LOCK_FILE), exist_ok=True)
+        lock_dir = os.path.dirname(_LOCK_FILE)
+        os.makedirs(lock_dir, exist_ok=True)
+        _remove_stale_lock()
         _lock_fd = open(_LOCK_FILE, "w")
         fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         _lock_fd.write(str(os.getpid()))
