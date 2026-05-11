@@ -421,6 +421,40 @@ ON interface_assignments(interface_type)
     )
     """)
 
+    # LOGIN BRUTE-FORCE FAILURE TRACKING
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS login_failures (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        remote_addr TEXT    NOT NULL,
+        failed_at   REAL    NOT NULL
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_failures_ip_time ON login_failures(remote_addr, failed_at)"
+    )
+    # Migration: add username column for per-account lockout tracking.
+    cursor.execute("PRAGMA table_info(login_failures)")
+    _lf_cols = {row["name"] for row in cursor.fetchall()}
+    if _lf_cols and "username" not in _lf_cols:
+        cursor.execute("ALTER TABLE login_failures ADD COLUMN username TEXT")
+
+    # HIGH AVAILABILITY SETTINGS
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ha_settings (
+        id                  INTEGER PRIMARY KEY DEFAULT 1,
+        ss_sync_enabled     INTEGER DEFAULT 1,
+        sync_interface      TEXT    DEFAULT 'WAN',
+        filter_host_id      TEXT    DEFAULT '',
+        peer_ip             TEXT    DEFAULT '',
+        xmlrpc_ip           TEXT    DEFAULT '',
+        remote_username     TEXT    DEFAULT '',
+        remote_password_enc TEXT    DEFAULT '',
+        sync_admin          INTEGER DEFAULT 0,
+        sync_options        TEXT    DEFAULT '[]',
+        updated_at          TEXT    DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # ADVANCED FIREWALL & NAT TABLE
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS advanced_firewall_nat (
@@ -474,9 +508,23 @@ ON interface_assignments(interface_type)
         icmp_error INTEGER,
         other_first INTEGER,
         other_single INTEGER,
-        other_multiple INTEGER
+        other_multiple INTEGER,
+        block_bogons INTEGER DEFAULT 1,
+        block_private_nets INTEGER DEFAULT 1,
+        nat_reflection INTEGER DEFAULT 0,
+        kill_states_on_reload INTEGER DEFAULT 0
     )
     """)
+
+    # Bring existing advanced_firewall_nat rows up to date with new columns.
+    for _afn_col, _afn_ddl in [
+        ("nat_reflection",       "ALTER TABLE advanced_firewall_nat ADD COLUMN nat_reflection INTEGER DEFAULT 0"),
+        ("kill_states_on_reload","ALTER TABLE advanced_firewall_nat ADD COLUMN kill_states_on_reload INTEGER DEFAULT 0"),
+    ]:
+        try:
+            cursor.execute(_afn_ddl)
+        except Exception:
+            pass  # column already exists
 
     # ----------------------------
     # VPN / IPsec Mobile Clients
@@ -657,6 +705,10 @@ ON interface_assignments(interface_type)
         prefix INTEGER DEFAULT 32,
         expansion INTEGER DEFAULT 0,
         description TEXT DEFAULT '',
+        vhid INTEGER DEFAULT 1,
+        carp_pass TEXT DEFAULT '',
+        advskew INTEGER DEFAULT 0,
+        advbase INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1009,11 +1061,19 @@ ON interface_assignments(interface_type)
         interface TEXT,
         protocol TEXT,
         source TEXT,
+        source_port TEXT,
         destination TEXT,
+        dest_port TEXT,
         description TEXT,
         rule_order INTEGER DEFAULT 0
     )
     """)
+    # Migrate existing LAN tables that predate source_port/dest_port columns
+    for col in ("source_port", "dest_port"):
+        try:
+            cursor.execute(f"ALTER TABLE firewall_rules_lan ADD COLUMN {col} TEXT")
+        except Exception:
+            pass  # column already exists
 
     # Firewall Aliases
     cursor.execute("""
@@ -1039,6 +1099,23 @@ ON interface_assignments(interface_type)
         queue_limit INTEGER,
         tbr_size INTEGER,
         description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Traffic Shaper Queue Assignments (match rules that send traffic to queues)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS traffic_shaper_queues (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled INTEGER DEFAULT 1,
+        queue_name TEXT NOT NULL,
+        ack_queue TEXT DEFAULT '',
+        protocol TEXT DEFAULT 'any',
+        source TEXT DEFAULT 'any',
+        source_port TEXT DEFAULT '',
+        destination TEXT DEFAULT 'any',
+        dest_port TEXT DEFAULT '',
+        description TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1269,7 +1346,9 @@ CREATE TABLE IF NOT EXISTS dhcp_pools (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """)
-
+    cursor.execute(
+        "INSERT OR IGNORE INTO dhcp_pools (interface_type, start_ip, end_ip) VALUES ('LAN', '', '')"
+    )
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS static_leases (
@@ -1355,17 +1434,71 @@ ON static_leases(mac_address)
     )
     """)
 
+    # Seed default built-in suricata-update sources for new installs.
+    # Blank URL = use "suricata-update enable-source <name>" (indexed source).
+    cursor.executemany(
+        "INSERT OR IGNORE INTO ids_rulesets (name, enabled, url, description) VALUES (?, 1, ?, ?)",
+        [
+            ("et/open", "", "Emerging Threats Open Rules (free, no registration required)"),
+            ("oisf/trafficid", "", "OISF Traffic ID rules (free, protocol identification)"),
+        ],
+    )
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ids_threat_feeds (
         id               INTEGER PRIMARY KEY CHECK (id = 1),
         abusech_auth_key TEXT    DEFAULT '',
+        abusech_dry_run  INTEGER DEFAULT 0,
         updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     cursor.execute(
-        "INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)"
+        "INSERT OR IGNORE INTO ids_threat_feeds (id, abusech_dry_run) VALUES (1, 0)"
     )
+
+    # SIEM collector offset persistence
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Seed abuse.ch key + dry-run flag from env into DB if install.sh set it and DB has no key yet
+    _env_abusech_key  = os.environ.get("ABUSECH_AUTH_KEY",  "").strip()
+    _env_dry_run_flag = 0 if os.environ.get("ABUSECH_DRY_RUN", "1").strip() == "0" else 1
+    if _env_abusech_key:
+        _existing_key = cursor.execute(
+            "SELECT abusech_auth_key FROM ids_threat_feeds WHERE id=1"
+        ).fetchone()
+        if not (_existing_key and _existing_key["abusech_auth_key"]):
+            try:
+                from app.secret_store import encrypt_secret
+                cursor.execute(
+                    "UPDATE ids_threat_feeds SET abusech_auth_key=?, abusech_dry_run=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+                    (encrypt_secret(_env_abusech_key), _env_dry_run_flag),
+                )
+            except Exception:
+                pass  # secret_store may be unavailable during early migration — skip
+
+    # Seed Google API key from env into service_state if install.sh set it and DB has no entry yet
+    _env_google_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    if _env_google_key:
+        _existing_chatbot = cursor.execute(
+            "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
+        ).fetchone()
+        if not _existing_chatbot:
+            try:
+                import json as _json2
+                from app.secret_store import encrypt_secret as _enc2
+                cursor.execute(
+                    "INSERT OR IGNORE INTO service_state (key_name, value_json) VALUES (?, ?)",
+                    ("chatbot_settings", _json2.dumps({"google_api_key": _enc2(_env_google_key)})),
+                )
+            except Exception:
+                pass
 
     # ── Routing: Gateways ─────────────────────────────────────────────────────
     cursor.execute("""
@@ -1488,6 +1621,38 @@ ON static_leases(mac_address)
         "ON certificates(name, cert_type)"
     )
 
+    # ── Phase 13: Applied-state tracking (Phases 37 & 38) ────────────────────
+    # config_apply_jobs: one record per apply operation with full lifecycle state
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS config_apply_jobs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        feature_key TEXT    NOT NULL,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        config_hash TEXT    DEFAULT '',
+        applied_by  TEXT    DEFAULT 'system',
+        notes       TEXT    DEFAULT '',
+        message     TEXT    DEFAULT '',
+        created_at  REAL    NOT NULL DEFAULT 0,
+        updated_at  REAL    NOT NULL DEFAULT 0
+    )
+    """)
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_cap_jobs_feature_created
+    ON config_apply_jobs(feature_key, created_at DESC)
+    """)
+
+    # feature_applied_state: current summary state per feature (UI badge source)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS feature_applied_state (
+        feature_key TEXT PRIMARY KEY,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        message     TEXT    DEFAULT '',
+        last_job_id INTEGER,
+        updated_at  REAL    NOT NULL DEFAULT 0,
+        FOREIGN KEY(last_job_id) REFERENCES config_apply_jobs(id)
+    )
+    """)
+
     # ── Schema version ────────────────────────────────────────────────────────
     # Monotonically increasing integer; bumped each time the DB schema changes.
     cursor.execute("""
@@ -1498,14 +1663,25 @@ ON static_leases(mac_address)
     """)
     cursor.execute("SELECT COALESCE(MAX(version), 0) AS v FROM schema_version")
     _current_schema_version = cursor.fetchone()["v"]
-    if _current_schema_version < 2:
-        cursor.execute("INSERT INTO schema_version (version) VALUES (2)")
-    if _current_schema_version < 3:
-        cursor.execute("INSERT INTO schema_version (version) VALUES (3)")
-    if _current_schema_version < 4:
-        cursor.execute("INSERT INTO schema_version (version) VALUES (4)")
-    if _current_schema_version < 5:
-        cursor.execute("INSERT INTO schema_version (version) VALUES (5)")
+    # ── Policy-Based Routing ──────────────────────────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS policy_routes (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled          INTEGER DEFAULT 1,
+        priority         INTEGER DEFAULT 100,
+        description      TEXT    DEFAULT '',
+        interface_type   TEXT    DEFAULT 'LAN',
+        source           TEXT    DEFAULT 'any',
+        destination      TEXT    DEFAULT 'any',
+        gateway_id       INTEGER REFERENCES gateways(id),
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Bootstrap version records for all migrations that fresh-install skips
+    for _bootstrap_ver in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
+        if _current_schema_version < _bootstrap_ver:
+            cursor.execute("INSERT INTO schema_version (version) VALUES (?)", (_bootstrap_ver,))
 
     # ── Phase 4: DHCPv6 pools ─────────────────────────────────────────────────
     cursor.execute("""
@@ -1582,6 +1758,7 @@ ON static_leases(mac_address)
         mac_address  TEXT    NOT NULL UNIQUE,
         ip_address   TEXT    NOT NULL,
         username     TEXT    DEFAULT '',
+        is_superuser INTEGER DEFAULT 0,
         expires_at   INTEGER NOT NULL,
         logged_out   INTEGER DEFAULT 0,
         bytes_in     INTEGER DEFAULT 0,
@@ -1589,6 +1766,12 @@ ON static_leases(mac_address)
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    try:
+        cursor.execute(
+            "ALTER TABLE captive_sessions ADD COLUMN is_superuser INTEGER DEFAULT 0"
+        )
+    except Exception:
+        pass  # column already exists
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_captive_sessions_expires "
         "ON captive_sessions(expires_at, logged_out)"
@@ -1602,6 +1785,7 @@ ON static_leases(mac_address)
         duration_minutes  INTEGER NOT NULL DEFAULT 60,
         bandwidth_kbps    INTEGER DEFAULT 0,
         redeemed          INTEGER DEFAULT 0,
+        disabled          INTEGER DEFAULT 0,
         redeemed_at       TIMESTAMP,
         created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )

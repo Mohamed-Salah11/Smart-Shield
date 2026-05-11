@@ -1369,3 +1369,26 @@ def get_connections():
         return jsonify({"status": "error", "message": str(e)}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@network_api_bp.route("/vips/apply", methods=["POST"])
+@api_permission_required("api.network.edit")
+def apply_vips_endpoint():
+    """Apply all virtual IPs (IP aliases) from the DB to the live system."""
+    conn = get_db()
+    from app.services.network_service import apply_vips
+    result = apply_vips(conn)
+    log_event(category="network", action="vips_apply", username=session.get("username"),
+              remote_addr=request.remote_addr, details={"ok": result["ok"]})
+    return jsonify(result)
+
+
+@network_api_bp.route("/vips", methods=["GET"])
+@login_required
+def list_vips():
+    """List configured virtual IPs from the database."""
+    conn = get_db()
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM virtual_ips_configs ORDER BY interface_type, ip_address"
+    )]
+    return jsonify({"ok": True, "vips": rows})

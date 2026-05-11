@@ -156,6 +156,29 @@
     line-height: 1.5;
   }
 
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.1rem; }
+  .tab-btn {
+    flex: 1; padding: .55rem .5rem; background: none; border: none;
+    font-size: .82rem; font-weight: 600; color: #6b7280;
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn.active { color: #1e3a5f; border-color: #1e3a5f; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .btn-open-full {
+    display: block; margin-top: .9rem; text-align: center;
+    font-size: .75rem; color: #6b7280; text-decoration: underline;
+  }
+  .btn-open-full:hover { color: #1e3a5f; }
+
+  input[type=text].voucher-input {
+    text-transform: uppercase; letter-spacing: .2em; font-size: 1rem;
+    text-align: center; font-family: monospace;
+  }
+
   /* ── Footer ── */
   .footer {
     text-align: center;
@@ -193,6 +216,15 @@
     {% endif %}
     <p class="hint">Your session is active. Access will remain open until you log out or close your browser.</p>
   </div>
+  {% if orig_url %}
+  <script>
+  setTimeout(function() { window.location.href = {{ orig_url | tojson }}; }, 1000);
+  </script>
+  {% elif domain %}
+  <script>
+  setTimeout(function() { window.location.href = "http://" + {{ domain | tojson }}; }, 1000);
+  </script>
+  {% endif %}
 
   {% else %}
   <!-- ── Blocked view ── -->
@@ -210,33 +242,14 @@
     </div>
   </div>
 
-  <div class="card-body">
-    {% if error %}
-    <div class="alert-error">{{ error }}</div>
-    {% endif %}
-
-    <div class="divider">Sign in to access</div>
-
-    <form method="POST" action="/portal/auth">
-      <input type="hidden" name="csrf_token"    value="{{ csrf_token() }}">
-      <input type="hidden" name="auth_type"     value="credentials">
-      <input type="hidden" name="back_template" value="block">
-      <input type="hidden" name="domain"        value="{{ domain|default('') }}">
-      <input type="hidden" name="orig_url"      value="{{ orig_url|default('') }}">
-
-      <label for="username">Smart Shield Username</label>
-      <input type="text" id="username" name="username"
-             autocomplete="username" required placeholder="your username">
-
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password"
-             autocomplete="current-password" required placeholder="••••••••">
-
-      <button type="submit" class="btn-primary">Sign In &amp; Access Site</button>
-    </form>
-
-    <p class="hint">Only users with a Smart Shield account can bypass this block.<br>
-    Contact your network administrator if you need access.</p>
+  <div class="card-body" style="text-align:center;padding:2rem;">
+    <p style="font-size:.88rem;color:#6b7280;margin-bottom:1.5rem;">
+      Authorized users can sign in to bypass this restriction and access the site.
+    </p>
+    <a href="/portal/?policy=content&amp;domain={{ domain|urlencode }}&amp;url={{ orig_url|urlencode }}"
+       class="btn-primary" style="display:inline-block;text-decoration:none;padding:.75rem 2rem;border-radius:6px;">
+      🔑 Proceed to Login
+    </a>
   </div>
   {% endif %}
 

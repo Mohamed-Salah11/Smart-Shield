@@ -51,7 +51,7 @@
                             {% for r in static_routes %}
                             <tr>
                                 <td class="align-middle">
-                                    <strong>{{ r.network }}{% if r.prefix %}/{{ r.prefix }}{% endif %}</strong>
+                                    <strong>{{ r.destination }}</strong>
                                 </td>
                                 <td class="align-middle">{{ r.gateway }}</td>
                                 <td class="align-middle">

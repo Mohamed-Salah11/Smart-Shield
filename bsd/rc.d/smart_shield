@@ -46,7 +46,7 @@ load_rc_config "${name}"
 : ${smart_shield_python:="/usr/local/share/smart-shield/.venv/bin/python3"}
 : ${smart_shield_gunicorn:="/usr/local/share/smart-shield/.venv/bin/gunicorn"}
 : ${smart_shield_wsgi:="wsgi:app"}
-: ${smart_shield_bind:="0.0.0.0:5000"}
+: ${smart_shield_bind:="127.0.0.1:5000"}
 : ${smart_shield_workers:="2"}
 
 required_files="${smart_shield_gunicorn}"
@@ -103,14 +103,20 @@ smart_shield_prestart()
     touch "${SMARTSHIELD_AUDIT_LOG_PATH}"
 
     # Export variables used by app startup logic.
+    export APP_ENV
     export FLASK_DEBUG
     export SECRET_KEY
     export SMARTSHIELD_DB_PATH
     export SMARTSHIELD_CONFIG_PATH
     export SMARTSHIELD_UPLOAD_DIR
     export SMARTSHIELD_AUDIT_LOG_PATH
+    export SMARTSHIELD_APP_LOG_PATH
     export SMARTSHIELD_ENABLE_NETWORK_APPLY
     export SMARTSHIELD_NETWORK_DRY_RUN
+    export SMARTSHIELD_MASTER_KEY
+    export GOOGLE_API_KEY
+    export ABUSECH_AUTH_KEY
+    export ABUSECH_DRY_RUN
 }
 
 smart_shield_poststop()

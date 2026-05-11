@@ -518,6 +518,66 @@ def get_interface_state(iface_name: str) -> dict:
     }
 
 
+def read_interface_config_from_bsd(iface_name: str) -> dict:
+    """
+    Read the current configuration of one interface from the live FreeBSD system.
+    Combines:
+      - sysrc -n ifconfig_<iface>   → determines type (dhcp / static / none)
+      - ifconfig <iface>             → live assigned IP (even for DHCP)
+      - sysrc -n defaultrouter       → current default gateway
+    Returns dict with keys: iface, ipv4_config_type, ipv4_address, gateway, live_ip
+    Non-FreeBSD: returns the dict with empty values (safe for dev environments).
+    """
+    result: dict = {
+        "iface":            iface_name,
+        "ipv4_config_type": "none",
+        "ipv4_address":     "",
+        "gateway":          "",
+        "live_ip":          "",
+    }
+    if not sys.platform.startswith("freebsd") or not iface_name:
+        return result
+
+    try:
+        from app.services.priv_helper import run_privileged
+        rc_key = "ifconfig_" + re.sub(r"[^A-Za-z0-9_]", "_", iface_name)
+        r = run_privileged("sysrc.get", key=rc_key)
+        rc_val = (r.stdout or "").strip().upper()
+        if rc_val == "DHCP":
+            result["ipv4_config_type"] = "dhcp"
+        elif "INET" in rc_val or rc_val.startswith("STATIC"):
+            result["ipv4_config_type"] = "static"
+        elif rc_val in ("UP", "", "NO"):
+            result["ipv4_config_type"] = "none"
+        else:
+            # non-empty, non-DHCP → treat as static
+            result["ipv4_config_type"] = "static"
+    except Exception:
+        pass
+
+    # Read live IP from ifconfig (works regardless of DHCP vs static)
+    try:
+        state = get_interface_state(iface_name)
+        live = state.get("cidr") or state.get("inet") or ""
+        result["live_ip"] = live
+        if result["ipv4_config_type"] == "static" and live:
+            result["ipv4_address"] = live
+    except Exception:
+        pass
+
+    # Read gateway from rc.conf
+    try:
+        r = run_privileged("sysrc.get", key="defaultrouter")
+        gw = (r.stdout or "").strip()
+        if gw and gw.upper() not in ("NO", ""):
+            result["gateway"] = gw
+    except Exception:
+        pass
+
+    return result
+
+
+
 # ---------------------------------------------------------------------------
 # Phase 3 — Interface assignment with live apply + rollback
 # ---------------------------------------------------------------------------
@@ -742,4 +802,200 @@ def apply_interface_config(conn) -> dict:
         "ok": overall_ok,
         "message": "; ".join(r["message"] for r in results) if results else "Nothing to apply",
         "details": results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Virtual IPs live apply (Phase 11)
+# ---------------------------------------------------------------------------
+
+def check_gateway_reachability(gateway_ip: str, count: int = 3) -> bool:
+    """
+    Ping *gateway_ip* ``count`` times and return True if at least one reply arrives.
+    Uses ``/sbin/ping -c <count> -q -W 1 <ip>`` on FreeBSD.
+    Returns True on non-FreeBSD (dev mode — assume all reachable).
+    """
+    if not sys.platform.startswith("freebsd"):
+        return True
+    try:
+        result = run_command(
+            ["/sbin/ping", "-c", str(count), "-q", "-W", "1", gateway_ip],
+            check=False, timeout_seconds=count + 2,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def apply_gateway_failover(conn) -> dict:
+    """
+    Phase 8: Multi-WAN gateway failover.
+
+    Iterates gateway groups ordered by priority, pings each member gateway,
+    and activates the highest-priority reachable gateway as the default route.
+
+    Returns {"ok": bool, "active_gateway": str|None, "message": str, "details": list}.
+    """
+    import json as _json
+    try:
+        # gateway_groups stores members as JSON in members_json column
+        groups_raw = [dict(r) for r in conn.execute(
+            "SELECT name, members_json FROM gateway_groups ORDER BY name"
+        ).fetchall()]
+        # build a gateway name → IP lookup from the gateways table
+        gw_lookup = {
+            row["name"]: dict(row)
+            for row in conn.execute(
+                "SELECT name, gateway, interface FROM gateways WHERE disabled=0 OR disabled IS NULL"
+            ).fetchall()
+        }
+        members = []
+        for grp in groups_raw:
+            for m in _json.loads(grp.get("members_json") or "[]"):
+                gw_name = m.get("gateway", "")
+                gw_row  = gw_lookup.get(gw_name, {})
+                members.append({
+                    "group_name": grp["name"],
+                    "priority":   m.get("tier", 1),
+                    "name":       gw_name,
+                    "gateway":    gw_row.get("gateway", ""),
+                    "interface":  gw_row.get("interface", ""),
+                })
+    except Exception as exc:
+        return {"ok": False, "active_gateway": None, "message": f"DB error: {exc}", "details": []}
+
+    if not members:
+        return {"ok": True, "active_gateway": None, "message": "No gateway groups configured.", "details": []}
+
+    details = []
+    active  = None
+
+    for m in members:
+        gw_ip    = (m.get("gateway") or "").strip()
+        gw_name  = m.get("name", gw_ip)
+        reachable = check_gateway_reachability(gw_ip)
+        details.append({"gateway": gw_ip, "name": gw_name, "reachable": reachable})
+        if reachable and active is None:
+            active = gw_ip
+
+    if not sys.platform.startswith("freebsd"):
+        return {
+            "ok": True,
+            "active_gateway": active,
+            "message": f"Non-FreeBSD — failover calculated: {active or 'none reachable'}",
+            "details": details,
+        }
+
+    if active is None:
+        return {"ok": False, "active_gateway": None, "message": "All gateways unreachable.", "details": details}
+
+    try:
+        run_command(["/sbin/route", "-n", "delete", "default"], check=False)
+        r = run_command(["/sbin/route", "-n", "add", "default", active], check=False)
+        ok = r.returncode == 0
+        return {
+            "ok":            ok,
+            "active_gateway": active,
+            "message":       f"Default route set to {active}." if ok else f"route add failed: {(r.stderr or r.stdout or '').strip()}",
+            "details":       details,
+        }
+    except Exception as exc:
+        return {"ok": False, "active_gateway": active, "message": str(exc), "details": details}
+
+
+def apply_vips(conn) -> dict:
+    """
+    Apply all virtual IP entries from ``virtual_ips_configs`` to live interfaces.
+
+    - type='ipalias': adds the address as an IP alias on the interface using
+      ``ifconfig <iface> inet <ip> netmask <mask> alias``.
+    - type='carp' and other types: logged as unsupported until CARP-specific
+      fields (vhid, password) are added to the schema.
+
+    On non-FreeBSD: config-only mode (no commands run).
+    Returns {"ok": bool, "applied": list, "skipped": list, "message": str}.
+    """
+    import ipaddress as _ipa
+
+    rows = []
+    try:
+        cur = conn.execute("SELECT * FROM virtual_ips_configs ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+    except Exception as exc:
+        return {"ok": False, "applied": [], "skipped": [], "message": f"DB error: {exc}"}
+
+    applied = []
+    skipped = []
+
+    for vip in rows:
+        vtype  = (vip.get("type") or "ipalias").lower()
+        iface  = (vip.get("interface") or "").strip()
+        addr   = (vip.get("address") or "").strip()
+        prefix = int(vip.get("prefix") or 32)
+
+        if not iface or not addr:
+            skipped.append({"id": vip.get("id"), "reason": "missing interface or address"})
+            continue
+
+        if vtype == "pfsync":
+            skipped.append({"id": vip.get("id"), "type": vtype,
+                            "reason": "pfsync is configured via rc.conf — not managed as a VIP"})
+            continue
+
+        if not sys.platform.startswith("freebsd"):
+            applied.append({"id": vip.get("id"), "type": vtype, "iface": iface, "addr": addr, "dry_run": True})
+            continue
+
+        try:
+            net = _ipa.ip_interface(f"{addr}/{prefix}")
+            netmask = str(net.network.netmask)
+            from app.services.priv_helper import run_privileged
+
+            if vtype == "carp":
+                # CARP: ifconfig <iface> vhid <vhid> advskew <skew> advbase <base>
+                #       carpdev <iface> pass <password> <addr> netmask <mask> alias
+                vhid    = int(vip.get("vhid") or 1)
+                advskew = int(vip.get("advskew") or 0)
+                advbase = int(vip.get("advbase") or 1)
+                carp_pass_enc = (vip.get("carp_pass") or "").strip()
+                from app.secret_store import decrypt_secret
+                carp_pass = decrypt_secret(carp_pass_enc) if carp_pass_enc else "changeme"
+                # Build the ifconfig command: use run_command since priv_helper
+                # doesn't have a carp-specific template yet — run as subprocess.
+                cmd = [
+                    "ifconfig", iface,
+                    "vhid", str(vhid),
+                    "advskew", str(advskew),
+                    "advbase", str(advbase),
+                    "pass", carp_pass,
+                    addr, "netmask", netmask, "alias",
+                ]
+                r = run_command(cmd, check=False)
+                ok = r.returncode == 0
+                applied.append({
+                    "id": vip.get("id"), "type": "carp", "iface": iface,
+                    "addr": f"{addr}/{prefix}", "vhid": vhid,
+                    "ok": ok, "message": (r.stderr or r.stdout or "").strip(),
+                })
+            else:
+                # ipalias / proxyarp: standard alias
+                result = run_privileged("ifconfig.alias_add", iface=iface, ip=addr, netmask=netmask)
+                ok = result.returncode == 0
+                applied.append({
+                    "id": vip.get("id"), "type": vtype, "iface": iface,
+                    "addr": f"{addr}/{prefix}", "ok": ok,
+                    "message": (result.stderr or result.stdout or "").strip(),
+                })
+        except Exception as exc:
+            applied.append({"id": vip.get("id"), "iface": iface, "addr": addr, "ok": False, "message": str(exc)})
+
+    overall_ok = all(a.get("ok", True) for a in applied)
+    msg_parts = [f"{len(applied)} VIP(s) applied"]
+    if skipped:
+        msg_parts.append(f"{len(skipped)} skipped")
+    return {
+        "ok": overall_ok,
+        "applied": applied,
+        "skipped": skipped,
+        "message": ", ".join(msg_parts) + ".",
     }

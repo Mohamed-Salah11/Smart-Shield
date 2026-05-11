@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, Response, session
 from app.database import get_db
 from app.auth_utils import login_required
 from app.api_auth import api_permission_required
@@ -6,6 +6,7 @@ from app.secret_store import seal, decrypt_secret
 from app.validators import validate_ip, validate_port, validate_username, collect_errors
 import sqlite3
 from app.secret_store import encrypt_secret
+from app.audit_log import log_event
 
 vpn_bp = Blueprint("vpn", __name__, url_prefix="/vpn")
 
@@ -1164,24 +1165,85 @@ def delete_ipsec_phase1(phase1_id):
 @vpn_bp.route("/api/l2tp/save-config", methods=['POST'])
 @api_permission_required("api.vpn.edit")
 def save_l2tp_config():
+    import ipaddress
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         db = get_db()
         cursor = db.cursor()
-        
-        # Check if config exists
-        cursor.execute("SELECT id FROM l2tp_config LIMIT 1")
+
+        enabled              = 1 if data.get('enabled') else 0
+        interface            = (data.get('interface') or 'wan').strip()
+        server_address       = (data.get('server_address') or '').strip()
+        remote_address_range = (data.get('remote_address_range') or '').strip()
+        subnet_mask          = (data.get('subnet_mask') or '').strip()
+        dns_server1          = (data.get('dns_server1') or '').strip()
+        dns_server2          = (data.get('dns_server2') or '').strip()
+        wins_server          = (data.get('wins_server') or '').strip()
+        authentication       = (data.get('authentication') or 'chap').strip().lower()
+        require_chap         = 1 if data.get('require_chap') else 0
+        require_pap          = 1 if data.get('require_pap') else 0
+        radius_server        = (data.get('radius_server') or '').strip()
+        radius_secret_raw    = (data.get('radius_secret') or '').strip()
+
+        errors = []
+        for label, val in [
+            ('server_address', server_address),
+            ('remote_address_range', remote_address_range),
+            ('dns_server1', dns_server1),
+            ('dns_server2', dns_server2),
+        ]:
+            if val:
+                try:
+                    ipaddress.ip_address(val)
+                except ValueError:
+                    errors.append(f'{label}: {val!r} is not a valid IP address')
+
+        if authentication not in ('chap', 'pap', 'mschapv2'):
+            errors.append("authentication must be 'chap', 'pap', or 'mschapv2'")
+
+        if errors:
+            return jsonify({'status': 'error', 'message': '; '.join(errors)}), 400
+
+        cursor.execute("SELECT id, radius_secret FROM l2tp_config LIMIT 1")
         existing = cursor.fetchone()
-        
+
+        if radius_secret_raw:
+            radius_secret_enc = encrypt_secret(radius_secret_raw)
+        elif existing and existing[1]:
+            radius_secret_enc = existing[1]
+        else:
+            radius_secret_enc = ''
+
         if existing:
             cursor.execute("""
-                UPDATE l2tp_config SET enabled = ? WHERE id = ?
-            """, (1 if data.get('enabled') else 0, existing[0]))
+                UPDATE l2tp_config SET
+                    enabled=?, interface=?, server_address=?, remote_address_range=?,
+                    subnet_mask=?, dns_server1=?, dns_server2=?, wins_server=?,
+                    authentication=?, require_chap=?, require_pap=?,
+                    radius_server=?, radius_secret=?
+                WHERE id=?
+            """, (
+                enabled, interface, server_address, remote_address_range,
+                subnet_mask, dns_server1, dns_server2, wins_server,
+                authentication, require_chap, require_pap,
+                radius_server, radius_secret_enc,
+                existing[0],
+            ))
         else:
             cursor.execute("""
-                INSERT INTO l2tp_config (enabled) VALUES (?)
-            """, (1 if data.get('enabled') else 0,))
-        
+                INSERT INTO l2tp_config (
+                    enabled, interface, server_address, remote_address_range,
+                    subnet_mask, dns_server1, dns_server2, wins_server,
+                    authentication, require_chap, require_pap,
+                    radius_server, radius_secret
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                enabled, interface, server_address, remote_address_range,
+                subnet_mask, dns_server1, dns_server2, wins_server,
+                authentication, require_chap, require_pap,
+                radius_server, radius_secret_enc,
+            ))
+
         db.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -1194,11 +1256,23 @@ def get_l2tp_config():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT enabled FROM l2tp_config LIMIT 1")
+        cursor.execute("SELECT * FROM l2tp_config LIMIT 1")
         row = cursor.fetchone()
-        
-        enabled = bool(row[0]) if row else True
-        return jsonify({'status': 'success', 'enabled': enabled})
+
+        if row:
+            cfg = dict(row)
+            cfg.pop('radius_secret', None)  # never expose encrypted secret to UI
+        else:
+            cfg = {
+                'enabled': True, 'interface': 'wan',
+                'server_address': '', 'remote_address_range': '',
+                'subnet_mask': '', 'dns_server1': '', 'dns_server2': '',
+                'wins_server': '', 'authentication': 'chap',
+                'require_chap': False, 'require_pap': False,
+                'radius_server': '',
+            }
+        cfg['status'] = 'success'
+        return jsonify(cfg)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1912,3 +1986,133 @@ def export_cert_p12(cert_id):
                         headers={"Content-Disposition": f"attachment; filename=cert-{cert_id}.p12"})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@vpn_bp.route("/api/openvpn/export-pki/<int:server_id>", methods=["POST"])
+@api_permission_required("api.vpn.edit")
+def openvpn_export_pki(server_id):
+    """
+    Write CA, server cert, and server key from the cert_manager DB to disk
+    so that apply_openvpn() can reference them from the filesystem.
+
+    Request JSON (all optional — if omitted, the server's own IDs are used):
+      { "ca_id": int, "server_cert_id": int }
+    """
+    try:
+        from app.services.openvpn_writer import export_pki_to_disk
+        conn = get_db()
+        data = request.get_json(silent=True) or {}
+
+        # Resolve defaults from openvpn_servers row
+        row = conn.execute(
+            "SELECT ca_id, server_cert_id FROM openvpn_servers WHERE id=?", (server_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"ok": False, "message": f"OpenVPN server {server_id} not found."}), 404
+
+        ca_id          = data.get("ca_id")          or (row["ca_id"]          if row else None)
+        server_cert_id = data.get("server_cert_id") or (row["server_cert_id"] if row else None)
+
+        result = export_pki_to_disk(conn, server_id, ca_id, server_cert_id)
+        log_event(category="vpn", action="openvpn_export_pki",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"server_id": server_id, "ok": result["ok"]})
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+# ── Certificate Revocation List (CRL) ──────────────────────────────────────
+
+@vpn_bp.route("/api/certs/<int:ca_id>/crl", methods=["GET"])
+@login_required
+def get_crl_json(ca_id):
+    """
+    Generate (or regenerate) a CRL for the given CA and return it as JSON.
+
+    Response::
+
+        {
+          "ok": true,
+          "revoked_count": <int>,
+          "pem": "<PEM string>"
+        }
+    """
+    try:
+        from app.services.cert_manager import generate_crl
+        conn   = get_db()
+        result = generate_crl(conn, ca_id)
+        if not result["ok"]:
+            return jsonify(result), 404 if "not found" in result.get("message", "") else 500
+
+        # Count revoked certs in the PEM (each entry starts with BEGIN X509 CRL; count lines)
+        revoked_rows = conn.execute(
+            "SELECT COUNT(*) FROM certificates WHERE ca_id=? AND revoked=1",
+            (ca_id,),
+        ).fetchone()
+        revoked_count = revoked_rows[0] if revoked_rows else 0
+
+        return jsonify({"ok": True, "revoked_count": revoked_count, "pem": result["pem"]})
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+@vpn_bp.route("/api/certs/<int:ca_id>/crl.pem", methods=["GET"])
+@login_required
+def download_crl_pem(ca_id):
+    """
+    Generate a CRL for the given CA and return it as a PEM file download.
+    Content-Type: application/x-pem-file
+    """
+    try:
+        from app.services.cert_manager import generate_crl
+        conn   = get_db()
+        result = generate_crl(conn, ca_id)
+        if not result["ok"]:
+            status = 404 if "not found" in result.get("message", "") else 500
+            return jsonify(result), status
+        return Response(
+            result["pem"],
+            mimetype="application/x-pem-file",
+            headers={"Content-Disposition": f"attachment; filename=ca-{ca_id}.crl.pem"},
+        )
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+
+
+# ── OpenVPN client config (.ovpn) export ──────────────────────────────────────
+
+@vpn_bp.route("/api/openvpn/client-export/<int:server_id>/<int:client_cert_id>", methods=["GET"])
+@login_required
+def openvpn_client_export(server_id, client_cert_id):
+    """
+    Generate and download a self-contained .ovpn client config file.
+
+    The file embeds inline <ca>, <cert>, and <key> blocks so no separate
+    PKI files need to be distributed to the end-user.
+
+    URL: GET /vpn/api/openvpn/client-export/<server_id>/<client_cert_id>
+    Response: application/x-openvpn-profile download
+    """
+    try:
+        from app.services.openvpn_writer import generate_client_ovpn
+        conn    = get_db()
+        ovpn    = generate_client_ovpn(conn, server_id, client_cert_id)
+        log_event(
+            category="vpn",
+            action="openvpn_client_export",
+            username=session.get("username"),
+            remote_addr=request.remote_addr,
+            details={"server_id": server_id, "client_cert_id": client_cert_id},
+        )
+        return Response(
+            ovpn,
+            mimetype="application/x-openvpn-profile",
+            headers={
+                "Content-Disposition": f"attachment; filename=client-{client_cert_id}.ovpn"
+            },
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500

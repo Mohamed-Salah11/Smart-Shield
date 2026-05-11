@@ -142,3 +142,41 @@ def has_active_captive_session(conn, ip: str, now: int | None = None) -> bool:
         (ip, now),
     ).fetchone()
     return row is not None
+
+
+def is_admin_bypass_session(conn, ip: str, now: int | None = None) -> bool:
+    """Return True when ip belongs to an active admin (superuser) portal session."""
+    ip = (ip or "").strip()
+    if not ip:
+        return False
+    now = int(time.time()) if now is None else int(now)
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM captive_sessions
+        WHERE ip_address=?
+          AND is_superuser=1
+          AND logged_out=0
+          AND expires_at > ?
+        LIMIT 1
+        """,
+        (ip, now),
+    ).fetchone()
+    return row is not None
+
+
+def get_block_page_ip(conn) -> str:
+    """
+    Return the LAN IP for Unbound local-data A records (block page redirect target).
+    Always uses the LAN interface IP from lan_config — never localhost or a URL.
+    Returns '' if LAN IP is not configured (Unbound falls back to NXDOMAIN).
+    """
+    try:
+        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
+        raw = ((row["ipv4_address"] if row else "") or "").strip()
+        ip = raw.split("/")[0].strip()  # strip CIDR prefix, e.g. "192.168.1.1/24" → "192.168.1.1"
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return ""

@@ -61,10 +61,11 @@ def generate_rc_conf_block(conn) -> str:
     """
     lines = []
 
-    # ── PF (always enabled on a firewall appliance) ──────────────────────────
+    # ── PF + IP forwarding (always enabled on a firewall appliance) ─────────
     lines += [
         'pf_enable="YES"',
         'pflog_enable="YES"',
+        'gateway_enable="YES"',   # IPv4 packet forwarding — required for router/NAT operation
     ]
 
     # ── WAN interface ────────────────────────────────────────────────────────
@@ -112,6 +113,8 @@ def generate_rc_conf_block(conn) -> str:
                 ip      = str(iface_obj.ip)
                 netmask = str(iface_obj.network.netmask)
                 lines.append(f'ifconfig_{_rc_iface(lan_iface)}="inet {ip} netmask {netmask}"')
+                # Keep gunicorn bound to the current LAN IP so the web UI stays reachable
+                lines.append(f'smart_shield_bind="{ip}:5000"')
             except ValueError:
                 pass
 
@@ -120,28 +123,19 @@ def generate_rc_conf_block(conn) -> str:
     for vlan in _rows(conn, "SELECT * FROM vlan_configs ORDER BY id"):
         parent = (vlan.get("parent_interface") or "").strip()
         tag    = vlan.get("vlan_tag") or 0
-        ip_raw = (vlan.get("ip_address") or "").strip()
         if not parent or not tag:
             continue
         vname = f"{parent}.{tag}"
         vlan_list.append(vname)
-        if ip_raw:
-            try:
-                iface_obj = ipaddress.ip_interface(ip_raw)
-                ip      = str(iface_obj.ip)
-                netmask = str(iface_obj.network.netmask)
-                lines.append(f'ifconfig_{_rc_iface(vname)}="inet {ip} netmask {netmask} vlan {tag} vlandev {parent}"')
-            except ValueError:
-                lines.append(f'ifconfig_{_rc_iface(vname)}="vlan {tag} vlandev {parent}"')
+        lines.append(f'ifconfig_{_rc_iface(vname)}="vlan {tag} vlandev {parent}"')
     if vlan_list:
         lines.append(f'vlans_{"_".join(vlan_list[:1])}="{" ".join(vlan_list)}"')
 
     # ── LAGG (bonding) ───────────────────────────────────────────────────────
     for lagg in _rows(conn, "SELECT * FROM lagg_configs ORDER BY id"):
-        name     = (lagg.get("lagg_interface") or f"lagg{lagg.get('id',0)}").strip()
-        members  = (lagg.get("member_interfaces") or "").strip()
-        protocol = (lagg.get("lagg_protocol") or "lacp").lower()
-        ip_raw   = (lagg.get("ip_address") or "").strip()
+        name     = f"lagg{lagg.get('id', 0)}"
+        members  = (lagg.get("parent_interfaces") or "").strip()
+        protocol = (lagg.get("aggregation_protocol") or "lacp").lower()
         if not members:
             continue
         for m in members.split(","):
@@ -153,12 +147,6 @@ def generate_rc_conf_block(conn) -> str:
             m = m.strip()
             if m:
                 cfg_parts.append(f"laggport {m}")
-        if ip_raw:
-            try:
-                iface_obj = ipaddress.ip_interface(ip_raw)
-                cfg_parts.append(f"inet {iface_obj.ip} netmask {iface_obj.network.netmask}")
-            except ValueError:
-                pass
         lines.append(f'ifconfig_{_rc_iface(name)}="{" ".join(cfg_parts)}"')
         lines.append(f'cloned_interfaces="${{cloned_interfaces}} {name}"')
 
@@ -166,7 +154,6 @@ def generate_rc_conf_block(conn) -> str:
     for bridge in _rows(conn, "SELECT * FROM bridge_configs ORDER BY id"):
         name    = (bridge.get("bridge_interface") or f"bridge{bridge.get('id',0)}").strip()
         members = (bridge.get("member_interfaces") or "").strip()
-        ip_raw  = (bridge.get("ip_address") or "").strip()
         if not members:
             continue
         cfg_parts = []
@@ -174,21 +161,15 @@ def generate_rc_conf_block(conn) -> str:
             m = m.strip()
             if m:
                 cfg_parts.append(f"addm {m}")
-        if ip_raw:
-            try:
-                iface_obj = ipaddress.ip_interface(ip_raw)
-                cfg_parts.append(f"inet {iface_obj.ip} netmask {iface_obj.network.netmask}")
-            except ValueError:
-                pass
         lines.append(f'ifconfig_{_rc_iface(name)}="{" ".join(cfg_parts)}"')
         lines.append(f'cloned_interfaces="${{cloned_interfaces}} {name}"')
 
     # ── GRE tunnels ──────────────────────────────────────────────────────────
     for gre in _rows(conn, "SELECT * FROM gre_configs ORDER BY id"):
-        name    = (gre.get("tunnel_interface") or f"gre{gre.get('id',0)}").strip()
-        local   = (gre.get("local_address") or "").strip()
-        remote  = (gre.get("remote_address") or "").strip()
-        tunnel_ip = (gre.get("tunnel_ip") or "").strip()
+        name      = (gre.get("parent_interface") or f"gre{gre.get('id',0)}").strip()
+        local     = (gre.get("gre_local_address") or "").strip()
+        remote    = (gre.get("gre_remote_address") or "").strip()
+        tunnel_ip = (gre.get("ipv4_tunnel_local_address") or "").strip()
         if not local or not remote:
             continue
         cfg = f"tunnel {local} {remote}"
@@ -273,6 +254,40 @@ def get_current_rc_conf_block() -> str:
         return ""
 
 
+_NGINX_CONF = "/usr/local/etc/nginx/nginx.conf"
+
+
+def _update_nginx_lan_ip(ip: str) -> None:
+    """Replace the listen IP and proxy_pass IP in nginx.conf with the current LAN IP."""
+    if not os.path.exists(_NGINX_CONF):
+        return
+    try:
+        with open(_NGINX_CONF) as fh:
+            content = fh.read()
+        # Replace any existing x.x.x.x:80 / x.x.x.x:443 listen directives
+        content = re.sub(
+            r'(\blisten\s+)\d+\.\d+\.\d+\.\d+(:\d+)',
+            lambda m: m.group(1) + ip + m.group(2),
+            content,
+        )
+        # Replace proxy_pass target IP
+        content = re.sub(
+            r'(proxy_pass\s+http://)\d+\.\d+\.\d+\.\d+(:\d+)',
+            lambda m: m.group(1) + ip + m.group(2),
+            content,
+        )
+        with open(_NGINX_CONF, "w") as fh:
+            fh.write(content)
+        # Reload nginx so the new listen address takes effect immediately
+        try:
+            from app.services.network_service import run_command
+            run_command(["service", "nginx", "reload"], check=False, timeout_seconds=10)
+        except Exception:
+            pass
+    except OSError:
+        pass
+
+
 def apply_rc_conf(conn) -> dict:
     """
     Write/replace the Smart Shield block in /etc/rc.conf.local.
@@ -308,6 +323,20 @@ def apply_rc_conf(conn) -> dict:
     try:
         with open(_RC_CONF_LOCAL, "w") as fh:
             fh.write(new_content)
+        if _on_freebsd():
+            from app.services.network_service import run_command
+            # Activate IP forwarding immediately so LAN clients can route without a reboot
+            run_command(["sysctl", "net.inet.ip.forwarding=1"], check=False)
+            # Keep nginx listen address in sync with the current LAN IP
+            lan_rows = _rows(conn, "SELECT ipv4_address FROM lan_config WHERE id=1")
+            if lan_rows:
+                lan_cidr = (lan_rows[0].get("ipv4_address") or "").strip()
+                if lan_cidr:
+                    try:
+                        lan_ip = str(ipaddress.ip_interface(lan_cidr).ip)
+                        _update_nginx_lan_ip(lan_ip)
+                    except ValueError:
+                        pass
         return {
             "ok": True,
             "message": f"Network config written to {_RC_CONF_LOCAL}",

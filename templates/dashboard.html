@@ -144,6 +144,14 @@
 @keyframes numPop { 0%{transform:scale(.85);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
 .num-pop { animation:numPop .35s cubic-bezier(.34,1.56,.64,1) forwards; }
 @keyframes dbEvSlide { from{opacity:0;background:rgba(59,130,246,.1)} to{opacity:1;background:transparent} }
+
+/* ── Drag-and-drop ── */
+.db-card-head { cursor:grab;user-select:none; }
+.db-card-head:active { cursor:grabbing; }
+.db-sort-ghost { opacity:.25;border:2px dashed var(--primary)!important;border-radius:10px; }
+.db-sort-chosen { box-shadow:0 0 0 2px var(--primary),0 8px 24px rgba(0,0,0,.25); }
+.db-kpi.sortable-ghost { opacity:.25; }
+.db-kpi.sortable-chosen { box-shadow:0 0 0 2px var(--primary);border-radius:10px; }
 </style>
 {% endblock %}
 
@@ -552,6 +560,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (() => {
 const P   = {{ dashboard_payload | tojson }};
@@ -722,6 +731,28 @@ const byWid   = id=>document.querySelector(`[data-wid="${id}"]`);
 const getHid  = ()=>new Set(ls.get('hidden',[]));
 const getCol  = ()=>new Set(ls.get('collapsed',[]));
 
+/* ── Drag-and-drop order ── */
+const saveGridOrder=()=>{
+  const order=[...document.querySelectorAll('#dbGrid [data-wid]')].map(el=>el.dataset.wid);
+  ls.set('grid_order',order);
+};
+const saveKpiOrder=()=>{
+  const order=[...document.querySelectorAll('.db-kpi-strip [data-wid]')].map(el=>el.dataset.wid);
+  ls.set('kpi_order',order);
+};
+const restoreGridOrder=()=>{
+  const order=ls.get('grid_order',null);
+  if(!order||!order.length)return;
+  const grid=document.getElementById('dbGrid');
+  order.forEach(wid=>{const el=grid?grid.querySelector(`[data-wid="${wid}"]`):null;if(el)grid.appendChild(el);});
+};
+const restoreKpiOrder=()=>{
+  const order=ls.get('kpi_order',null);
+  if(!order||!order.length)return;
+  const strip=document.querySelector('.db-kpi-strip');
+  order.forEach(wid=>{const el=strip?strip.querySelector(`[data-wid="${wid}"]`):null;if(el)strip.appendChild(el);});
+};
+
 const applyVis=()=>{
   const h=getHid();
   ALL_WIDS.forEach(({id})=>{const el=byWid(id);if(el)el.style.display=h.has(id)?'none':'';});
@@ -824,7 +855,21 @@ arEl.addEventListener('change',()=>setAR(arEl.checked));
 
 /* ── Buttons ── */
 $('dbRefreshBtn').addEventListener('click',refresh);
-$('dbResetBtn').addEventListener('click',()=>{['hidden','collapsed','ar'].forEach(k=>localStorage.removeItem(NS+k));location.reload();});
+$('dbResetBtn').addEventListener('click',()=>{['hidden','collapsed','ar','grid_order','kpi_order'].forEach(k=>localStorage.removeItem(NS+k));location.reload();});
+
+/* ── Sortable init ── */
+if(typeof Sortable!=='undefined'){
+  Sortable.create(document.getElementById('dbGrid'),{
+    animation:150,handle:'.db-card-head',
+    ghostClass:'db-sort-ghost',chosenClass:'db-sort-chosen',
+    onEnd:saveGridOrder,
+  });
+  Sortable.create(document.querySelector('.db-kpi-strip'),{
+    animation:150,
+    ghostClass:'sortable-ghost',chosenClass:'sortable-chosen',
+    onEnd:saveKpiOrder,
+  });
+}
 
 /* ── Clock ── */
 const pad=n=>String(n).padStart(2,'0');
@@ -832,7 +877,7 @@ const tick=()=>{const n=new Date();const el=$('dbClock');if(el)el.textContent=`$
 tick();setInterval(tick,1000);
 
 /* ── Init ── */
-applyVis();applyCol();render(P);
+restoreGridOrder();restoreKpiOrder();applyVis();applyCol();render(P);
 evPoll(true);setInterval(()=>evPoll(false),5000);
 })();
 </script>

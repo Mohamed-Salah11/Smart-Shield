@@ -102,10 +102,8 @@ $RECYCLE.BIN/
 # ── Process output ───────────────────────────────────────────
 nohup.out
 
-# ── Claude Code local machine state (never shared) ───────────
-.claude/settings.local.json
-.claude/settings.local.json.bak
-.claude/keybindings.json
+# ── Claude Code project state (not needed on FreeBSD deployment) ──
+.claude/
 
 # ── Local / generated project artifacts ──────────────────────
 edits.txt
@@ -129,3 +127,8 @@ smart-shield-transfer-*.tar.gz
 *.ova
 *.qcow2
 *.iso
+
+# ── Windows-only scripts (not needed on FreeBSD) ─────────────
+*.bat
+*.cmd
+*.ps1

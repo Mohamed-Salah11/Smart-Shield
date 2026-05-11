@@ -1086,12 +1086,41 @@ def save_wan_config():
     try:
         data = request.get_json() or {}
         encrypted_password = encrypt_secret(data.get('password')) if data.get('password') else None
-        with db_cursor(commit=True) as (_, cursor):
-            cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = COALESCE(NULLIF(?, ''), password), dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
-                           (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], encrypted_password, data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
-        return jsonify({'status': 'success', 'message': 'Config saved'})
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = COALESCE(NULLIF(?, ''), password), dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
+                       (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], encrypted_password, data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
+        conn.commit()
+        # Auto-apply to BSD so changes take effect immediately
+        bsd_applied = False
+        bsd_message = ""
+        try:
+            from app.services.network_service import apply_interface_config
+            from app.services.rc_conf_writer import apply_rc_conf
+            apply_rc_conf(conn)
+            res = apply_interface_config(conn)
+            bsd_applied = res.get("ok", False)
+            bsd_message = res.get("message", "")
+        except Exception as exc:
+            bsd_message = str(exc)
+        return jsonify({'status': 'success', 'message': 'Config saved',
+                        'bsd_applied': bsd_applied, 'bsd_message': bsd_message})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+
+@interfaces_bp.route("/bsd-state/<interface_type>", methods=["GET"])
+@login_required
+def get_interface_bsd_state(interface_type):
+    """Read live BSD state for LAN or WAN interface (ifconfig + sysrc)."""
+    conn = get_db()
+    table = "lan_config" if interface_type.upper() == "LAN" else "wan_config"
+    row = conn.execute(f"SELECT assigned_port FROM {table} WHERE id=1").fetchone()
+    iface = ((row["assigned_port"] or "").strip()) if row else ""
+    if not iface:
+        return jsonify({"ok": False, "message": "Interface not assigned yet."})
+    from app.services.network_service import read_interface_config_from_bsd
+    return jsonify({"ok": True, "bsd_state": read_interface_config_from_bsd(iface)})
 
 
 # ----------------------------
@@ -1142,7 +1171,20 @@ def save_lan_config():
         cursor.execute('''UPDATE lan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
         conn.commit()
-        return jsonify({'status': 'success', 'message': 'Config saved'})
+        # Auto-apply to BSD so changes take effect immediately
+        bsd_applied = False
+        bsd_message = ""
+        try:
+            from app.services.network_service import apply_interface_config
+            from app.services.rc_conf_writer import apply_rc_conf
+            apply_rc_conf(conn)
+            res = apply_interface_config(conn)
+            bsd_applied = res.get("ok", False)
+            bsd_message = res.get("message", "")
+        except Exception as exc:
+            bsd_message = str(exc)
+        return jsonify({'status': 'success', 'message': 'Config saved',
+                        'bsd_applied': bsd_applied, 'bsd_message': bsd_message})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
 

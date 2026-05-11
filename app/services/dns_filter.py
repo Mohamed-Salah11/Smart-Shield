@@ -20,6 +20,8 @@ apply_dns_filter(conn)                       -> dict        # {"ok", "message"}
 import re
 import sys
 
+from app.services.content_policy import get_block_page_ip
+
 
 def _rows(conn, sql, params=()):
     cur = conn.cursor()
@@ -39,15 +41,6 @@ def _sanitize_domain(raw: str) -> str:
 # Unbound config line generator (consumed by dns_writer.py)
 # ---------------------------------------------------------------------------
 
-def _block_page_ip(conn) -> str:
-    """Return the Smart Shield LAN IP (without prefix) to use as the DNS redirect target."""
-    try:
-        row = conn.execute("SELECT ipv4_address FROM lan_config WHERE id=1").fetchone()
-        addr = (row["ipv4_address"] if row else "") or ""
-        return addr.split("/")[0].strip()
-    except Exception:
-        return ""
-
 
 def generate_dns_filter_zones(conn) -> list:
     """
@@ -58,7 +51,7 @@ def generate_dns_filter_zones(conn) -> list:
     /portal/block page instead of getting a raw NXDOMAIN.  Falls back to
     always_nxdomain when no LAN IP is configured.
     """
-    block_ip = _block_page_ip(conn)
+    block_ip = get_block_page_ip(conn)
 
     rules = _rows(conn, """
         SELECT domain, action, redirect_ip
@@ -76,14 +69,16 @@ def generate_dns_filter_zones(conn) -> list:
         fqdn = domain + "."
         if action == "block":
             if block_ip:
-                # Redirect to Smart Shield so the block/login page is served
+                # Redirect to Smart Shield so the block/login page is served.
+                # TTL=5 s so the browser DNS cache expires quickly after the user
+                # authenticates and PF switches them to the upstream resolver.
                 lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
             else:
                 lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
         elif action == "redirect" and redirect_ip:
             lines.append(f'    local-zone: "{fqdn}" redirect')
-            lines.append(f'    local-data: "{fqdn} A {redirect_ip}"')
+            lines.append(f'    local-data: "{fqdn} 5 A {redirect_ip}"')
         elif action == "allow":
             lines.append(f'    local-zone: "{fqdn}" transparent')
     return lines
@@ -121,15 +116,98 @@ def add_dns_filter_rule(
     return cur.lastrowid
 
 
+def update_dns_filter_rule(
+    conn,
+    rule_id: int,
+    domain: str,
+    action: str = "block",
+    redirect_ip: str = "",
+    category: str = "custom",
+    description: str = "",
+) -> None:
+    domain = _sanitize_domain(domain)
+    if not domain:
+        raise ValueError("Domain must not be empty.")
+    if action not in ("block", "allow", "redirect"):
+        raise ValueError("Action must be 'block', 'allow', or 'redirect'.")
+    if action == "redirect" and not redirect_ip:
+        raise ValueError("redirect_ip is required when action is 'redirect'.")
+    conn.execute(
+        """
+        UPDATE filter_dns_rules
+           SET domain=?, action=?, redirect_ip=?, category=?, description=?
+         WHERE id=?
+        """,
+        (domain, action, redirect_ip, category, description, rule_id),
+    )
+    conn.commit()
+
+
+def hot_apply_dns_rule(conn, rule_id: int) -> None:
+    """Instantly inject or remove a single DNS rule via unbound-control (no service restart)."""
+    import sys
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        row = conn.execute(
+            "SELECT domain, action, redirect_ip, enabled FROM filter_dns_rules WHERE id=?",
+            (rule_id,),
+        ).fetchone()
+        if not row:
+            return
+        domain = row["domain"]
+        if row["enabled"]:
+            if row["action"] == "redirect" and row["redirect_ip"]:
+                run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
+                run_privileged("unbound.local_data_a", domain=domain, ip=row["redirect_ip"])
+            else:
+                zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
+                run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+        else:
+            try:
+                run_privileged("unbound.local_zone_remove", domain=domain)
+            except Exception:
+                pass
+            try:
+                run_privileged("unbound.local_data_remove", domain=domain)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def toggle_dns_filter_rule(conn, rule_id: int, enabled: bool) -> None:
     conn.execute(
         "UPDATE filter_dns_rules SET enabled = ? WHERE id = ?",
         (1 if enabled else 0, rule_id),
     )
     conn.commit()
+    hot_apply_dns_rule(conn, rule_id)
+
+
+def _hot_remove_domain(domain: str) -> None:
+    """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_zone_remove", domain=domain)
+    except Exception:
+        pass
+    try:
+        from app.services.priv_helper import run_privileged
+        run_privileged("unbound.local_data_remove", domain=domain)
+    except Exception:
+        pass
 
 
 def delete_dns_filter_rule(conn, rule_id: int) -> None:
+    row = conn.execute(
+        "SELECT domain FROM filter_dns_rules WHERE id=?", (rule_id,)
+    ).fetchone()
+    if row:
+        _hot_remove_domain(row["domain"])
     conn.execute("DELETE FROM filter_dns_rules WHERE id = ?", (rule_id,))
     conn.commit()
 

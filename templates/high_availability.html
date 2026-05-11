@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% block main %}
+{% set ha = ha if ha is defined else {} %}
+{% set sync_opts = ha.get('sync_options_list', []) if ha else [] %}
 <script>
 function toggleAllCheckboxes(source) {
   document.querySelectorAll('input[name="sync_options"]').forEach(cb => cb.checked = source.checked);
@@ -27,7 +29,11 @@ function toggleAllCheckboxes(source) {
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" id="SS-Sync_enabled" name="SS-Sync_enabled" checked><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle">
+            <input type="checkbox" id="SS-Sync_enabled" name="SS-Sync_enabled"
+                   {{ 'checked' if ha.get('ss_sync_enabled', 1) else '' }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable State Synchronization</p><p class="ss-toggle-desc">Transfers state insertion, update and deletion messages between nodes</p></div>
         </div>
         <hr class="ss-divider">
@@ -35,20 +41,22 @@ function toggleAllCheckboxes(source) {
           <div class="ss-field">
             <label class="ss-label" for="sync_interface">Sync Interface</label>
             <select id="sync_interface" name="sync_interface" class="form-select">
-              <option value="WAN" selected>WAN</option>
-              <option value="LAN">LAN</option>
-              <option value="SYNC_DEDICATED">SYNC (Dedicated)</option>
+              <option value="WAN" {{ 'selected' if ha.get('sync_interface', 'WAN') == 'WAN' }}>WAN</option>
+              <option value="LAN" {{ 'selected' if ha.get('sync_interface') == 'LAN' }}>LAN</option>
+              <option value="SYNC_DEDICATED" {{ 'selected' if ha.get('sync_interface') == 'SYNC_DEDICATED' }}>SYNC (Dedicated)</option>
             </select>
             <p class="ss-hint">A dedicated sync interface is recommended for best reliability</p>
           </div>
           <div class="ss-field">
             <label class="ss-label" for="filter_host_id">Filter Host ID</label>
-            <input type="text" id="filter_host_id" name="filter_host_id" class="form-control" value="fa94412b" placeholder="Up to 8 hex chars">
+            <input type="text" id="filter_host_id" name="filter_host_id" class="form-control"
+                   value="{{ ha.get('filter_host_id', '') }}" placeholder="Up to 8 hex chars">
             <p class="ss-hint">Unique non-zero hex ID per node — must differ across the cluster</p>
           </div>
           <div class="ss-field">
             <label class="ss-label" for="SS-Sync_peer_ip">Peer IP Address</label>
-            <input type="text" id="SS-Sync_peer_ip" name="SS-Sync_peer_ip" class="form-control" placeholder="e.g. 192.168.1.2">
+            <input type="text" id="SS-Sync_peer_ip" name="SS-Sync_peer_ip" class="form-control"
+                   value="{{ ha.get('peer_ip', '') }}" placeholder="e.g. 192.168.1.2">
             <p class="ss-hint">Force unicast to this IP; blank = directed multicast</p>
           </div>
         </div>
@@ -69,15 +77,18 @@ function toggleAllCheckboxes(source) {
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label" for="sync_config_ip">Sync Config to IP</label>
-            <input type="text" id="sync_config_ip" name="sync_config_ip" class="form-control" placeholder="Secondary node IP address">
+            <input type="text" id="sync_config_ip" name="sync_config_ip" class="form-control"
+                   value="{{ ha.get('xmlrpc_ip', '') }}" placeholder="Secondary node IP address">
           </div>
           <div class="ss-field">
             <label class="ss-label" for="remote_username">Remote Username</label>
-            <input type="text" id="remote_username" name="remote_username" class="form-control" placeholder="Admin username on remote node">
+            <input type="text" id="remote_username" name="remote_username" class="form-control"
+                   value="{{ ha.get('remote_username', '') }}" placeholder="Admin username on remote node">
           </div>
           <div class="ss-field">
             <label class="ss-label" for="remote_password">Remote Password</label>
-            <input type="password" id="remote_password" name="remote_password" class="form-control" placeholder="Password">
+            <input type="password" id="remote_password" name="remote_password" class="form-control"
+                   placeholder="{{ '(saved — leave blank to keep)' if ha.get('remote_password_enc') else 'Password' }}">
           </div>
           <div class="ss-field">
             <label class="ss-label" for="remote_password_confirm">Confirm Password</label>
@@ -86,7 +97,11 @@ function toggleAllCheckboxes(source) {
         </div>
         <hr class="ss-divider">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" id="sync_admin" name="sync_admin"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle">
+            <input type="checkbox" id="sync_admin" name="sync_admin"
+                   {{ 'checked' if ha.get('sync_admin') else '' }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Sync Admin Account</p><p class="ss-toggle-desc">Keep the admin account and sync password consistent across nodes</p></div>
         </div>
       </div>
@@ -106,24 +121,24 @@ function toggleAllCheckboxes(source) {
       </div>
       <div class="ss-card-body">
         <div class="ss-field-grid ss-field-grid-3">
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="user_managers"      id="sync_user_managers"><span>User managers &amp; groups</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="auth_servers"       id="sync_auth_servers"><span>Authentication servers (LDAP, RADIUS)</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="certs_ca_crl"       id="sync_certs"><span>Certificates, CAs &amp; CRLs</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_rules"     id="sync_firewall_rules"     checked><span>Firewall rule sets</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_schedules" id="sync_firewall_schedules"><span>Time policies (schedules)</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_aliases"   id="sync_firewall_aliases"><span>Address groups (aliases)</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="nat_config"         id="sync_nat"                checked><span>NAT &amp; forwarding rules</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="ipsec_config"       id="sync_ipsec"><span>IPsec tunnels</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="openvpn_config"     id="sync_openvpn"><span>OpenVPN configuration</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_server"        id="sync_dhcp_server"><span>DHCP server settings</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_relay"         id="sync_dhcp_relay"><span>DHCP relay settings</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dns_forwarder"      id="sync_dns"><span>DNS resolver &amp; forwarder</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcpv6_relay"       id="sync_dhcpv6"><span>DHCPv6 relay settings</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="wol_server"         id="sync_wol"><span>Wake on LAN</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="static_routes"      id="sync_routes"><span>Static routes</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="virtual_ips"        id="sync_vips"><span>Virtual addresses (VIPs)</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="traffic_shaper"     id="sync_shaper"><span>QoS &amp; traffic shaping</span></label>
-          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="captive_portal"     id="sync_captive"><span>Captive portal</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="user_managers"      {{ 'checked' if 'user_managers'      in sync_opts }}><span>User managers &amp; groups</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="auth_servers"       {{ 'checked' if 'auth_servers'       in sync_opts }}><span>Authentication servers (LDAP, RADIUS)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="certs_ca_crl"       {{ 'checked' if 'certs_ca_crl'       in sync_opts }}><span>Certificates, CAs &amp; CRLs</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_rules"     {{ 'checked' if 'firewall_rules'     in sync_opts else 'checked' }}><span>Firewall rule sets</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_schedules" {{ 'checked' if 'firewall_schedules' in sync_opts }}><span>Time policies (schedules)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="firewall_aliases"   {{ 'checked' if 'firewall_aliases'   in sync_opts }}><span>Address groups (aliases)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="nat_config"         {{ 'checked' if 'nat_config'         in sync_opts else 'checked' }}><span>NAT &amp; forwarding rules</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="ipsec_config"       {{ 'checked' if 'ipsec_config'       in sync_opts }}><span>IPsec tunnels</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="openvpn_config"     {{ 'checked' if 'openvpn_config'     in sync_opts }}><span>OpenVPN configuration</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_server"        {{ 'checked' if 'dhcp_server'        in sync_opts }}><span>DHCP server settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcp_relay"         {{ 'checked' if 'dhcp_relay'         in sync_opts }}><span>DHCP relay settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dns_forwarder"      {{ 'checked' if 'dns_forwarder'      in sync_opts }}><span>DNS resolver &amp; forwarder</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="dhcpv6_relay"       {{ 'checked' if 'dhcpv6_relay'       in sync_opts }}><span>DHCPv6 relay settings</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="wol_server"         {{ 'checked' if 'wol_server'         in sync_opts }}><span>Wake on LAN</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="static_routes"      {{ 'checked' if 'static_routes'      in sync_opts }}><span>Static routes</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="virtual_ips"        {{ 'checked' if 'virtual_ips'        in sync_opts }}><span>Virtual addresses (VIPs)</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="traffic_shaper"     {{ 'checked' if 'traffic_shaper'     in sync_opts }}><span>QoS &amp; traffic shaping</span></label>
+          <label class="ss-check-item"><input type="checkbox" name="sync_options" value="captive_portal"     {{ 'checked' if 'captive_portal'     in sync_opts }}><span>Captive portal</span></label>
         </div>
       </div>
     </div>

@@ -61,12 +61,17 @@
             <th>Redirect IP</th>
             <th>Category</th>
             <th>Description</th>
-            <th style="width:70px;">Delete</th>
+            <th style="width:110px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rules %}
-          <tr id="row-{{ r.id }}">
+          <tr id="row-{{ r.id }}"
+              data-domain="{{ r.domain }}"
+              data-action="{{ r.action }}"
+              data-redirect="{{ r.redirect_ip or '' }}"
+              data-category="{{ r.category }}"
+              data-description="{{ r.description or '' }}">
             <td>
               <label class="sw">
                 <input type="checkbox" {% if r.enabled %}checked{% endif %}
@@ -80,6 +85,10 @@
             <td><span class="badge-cat">{{ r.category }}</span></td>
             <td style="color:var(--muted);font-size:.78rem;">{{ r.description or '—' }}</td>
             <td>
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
+                onclick="openEdit({{ r.id }})" title="Edit">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
               <button class="btn btn-sm btn-outline-danger py-0 px-2"
                 onclick="deleteRule({{ r.id }})">Delete</button>
             </td>
@@ -144,15 +153,73 @@
   </div>
 </div>
 
+<!-- Edit Rule Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit DNS Filter Rule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="e-id">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Domain / Zone <span class="text-danger">*</span></label>
+          <input type="text" id="e-domain" class="form-control" placeholder="e.g. facebook.com">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Action</label>
+          <select id="e-action" class="form-select" onchange="toggleEditRedirect()">
+            <option value="block">Block (NXDOMAIN)</option>
+            <option value="allow">Allow (whitelist override)</option>
+            <option value="redirect">Redirect to IP (block page)</option>
+          </select>
+        </div>
+        <div class="mb-3 d-none" id="e-redirect-group">
+          <label class="form-label fw-semibold">Redirect IP</label>
+          <input type="text" id="e-redirect-ip" class="form-control" placeholder="e.g. 192.168.1.10">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Category</label>
+          <select id="e-category" class="form-select">
+            <option value="custom">Custom</option>
+            <option value="malware">Malware / Phishing</option>
+            <option value="adult">Adult Content</option>
+            <option value="social">Social Media</option>
+            <option value="streaming">Streaming</option>
+            <option value="gaming">Gaming</option>
+            <option value="ads">Ads / Trackers</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <input type="text" id="e-description" class="form-control" placeholder="Optional note">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
+const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
 function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
 
 function toggleRedirect() {
   document.getElementById('redirect-group').classList.toggle('d-none',
     document.getElementById('f-action').value !== 'redirect');
+}
+
+function toggleEditRedirect() {
+  document.getElementById('e-redirect-group').classList.toggle('d-none',
+    document.getElementById('e-action').value !== 'redirect');
 }
 
 function showToast(msg, ok) {
@@ -164,20 +231,32 @@ function showToast(msg, ok) {
   el._t = setTimeout(() => el.style.display = 'none', 4000);
 }
 
-async function api(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function api(url, body, method='POST') {
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json();
+}
+
+let _applyTimer = null;
+function scheduleApply() {
+  clearTimeout(_applyTimer);
+  showToast('Syncing…', true);
+  _applyTimer = setTimeout(async () => {
+    const r = await api('/filters/dns/apply', {});
+    showToast(r.message, r.ok);
+  }, 1500);
 }
 
 async function toggleRule(id, enabled) {
   const r = await api(`/filters/dns/${id}/toggle`, { enabled });
-  if (!r.ok) showToast(r.message, false);
+  if (r.ok) showToast(enabled ? 'Rule enabled.' : 'Rule disabled.', true);
+  else showToast(r.message, false);
+  // Hot-update fires server-side instantly via unbound-control; no full reload needed
 }
 
 async function deleteRule(id) {
   if (!confirm('Delete this rule?')) return;
   const r = await api(`/filters/dns/${id}/delete`, {});
-  if (r.ok) { document.getElementById(`row-${id}`)?.remove(); showToast('Rule deleted.', true); }
+  if (r.ok) { document.getElementById(`row-${id}`)?.remove(); showToast('Rule deleted.', true); scheduleApply(); }
   else showToast(r.message, false);
 }
 
@@ -199,6 +278,49 @@ async function submitAdd() {
   });
   if (r.ok) { closeModal('addModal'); showToast(r.message, true); setTimeout(() => location.reload(), 900); }
   else showToast(r.message, false);
+}
+
+function openEdit(id) {
+  const row = document.getElementById(`row-${id}`);
+  if (!row) return;
+  document.getElementById('e-id').value = id;
+  document.getElementById('e-domain').value = row.dataset.domain || '';
+  const action = row.dataset.action || 'block';
+  document.getElementById('e-action').value = action;
+  document.getElementById('e-redirect-ip').value = row.dataset.redirect || '';
+  document.getElementById('e-redirect-group').classList.toggle('d-none', action !== 'redirect');
+  document.getElementById('e-category').value = row.dataset.category || 'custom';
+  document.getElementById('e-description').value = row.dataset.description || '';
+  openModal('editModal');
+}
+
+async function submitEdit() {
+  const id = document.getElementById('e-id').value;
+  const domain = document.getElementById('e-domain').value.trim();
+  if (!domain) { showToast('Domain is required.', false); return; }
+  const action = document.getElementById('e-action').value;
+  const redirect_ip = document.getElementById('e-redirect-ip').value.trim();
+  const category = document.getElementById('e-category').value;
+  const description = document.getElementById('e-description').value.trim();
+  const r = await api(`/filters/dns/${id}/edit`, { domain, action, redirect_ip, category, description }, 'PUT');
+  if (r.ok) {
+    closeModal('editModal');
+    showToast('Rule updated.', true);
+    const row = document.getElementById(`row-${id}`);
+    if (row) {
+      row.dataset.domain = domain;
+      row.dataset.action = action;
+      row.dataset.redirect = redirect_ip;
+      row.dataset.category = category;
+      row.dataset.description = description;
+      row.cells[1].textContent = domain;
+      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(action)}">${esc(action)}</span>`;
+      row.cells[3].textContent = redirect_ip || '—';
+      row.cells[4].innerHTML = `<span class="badge-cat">${esc(category)}</span>`;
+      row.cells[5].textContent = description || '—';
+    }
+    scheduleApply();
+  } else showToast(r.message, false);
 }
 </script>
 {% endblock %}

@@ -124,23 +124,23 @@ def apply_igmp(conn) -> dict:
         return {"ok": False, "message": "Validation failed: " + " | ".join(errors), "conf": conf}
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — igmpproxy.conf generated but not written.", "conf": conf}
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — igmpproxy.conf generated but not written.", "conf": conf}
 
-    try:
-        with open(_IGMPPROXY_CONF, "w") as fh:
-            fh.write(conf)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action, sysrc_set
     enabled = bool(settings.get("enabled", True))
-    if enabled:
-        sysrc_set("igmpproxy_enable", "YES")
-        r = service_action("igmpproxy", "restart")
-    else:
-        sysrc_set("igmpproxy_enable", "NO")
-        r = service_action("igmpproxy", "stop")
-    return {"ok": r["ok"], "message": r["message"], "conf": conf}
+
+    def _restart():
+        if enabled:
+            sysrc_set("igmpproxy_enable", "YES")
+            return service_action("igmpproxy", "restart")
+        else:
+            sysrc_set("igmpproxy_enable", "NO")
+            return service_action("igmpproxy", "stop")
+
+    result = apply_with_rollback(_IGMPPROXY_CONF, conf, _restart)
+    return {**result, "conf": conf}
 
 
 # ---------------------------------------------------------------------------

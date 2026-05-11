@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 16
 
 
 class SchemaVersionError(RuntimeError):
@@ -196,6 +196,212 @@ def _migration_v6(conn):
     conn.execute("INSERT OR IGNORE INTO ids_threat_feeds (id) VALUES (1)")
 
 
+def _migration_v7(conn):
+    """Phase 7: add disabled flag to captive_vouchers for temporary suspension."""
+    try:
+        conn.execute("ALTER TABLE captive_vouchers ADD COLUMN disabled INTEGER DEFAULT 0")
+    except Exception:
+        pass  # column already exists on fresh installs
+
+
+def _migration_v8(conn):
+    """Phase 8: add abusech_dry_run flag to ids_threat_feeds for GUI control."""
+    try:
+        conn.execute(
+            "ALTER TABLE ids_threat_feeds ADD COLUMN abusech_dry_run INTEGER DEFAULT 1"
+        )
+    except Exception:
+        pass  # column already exists on fresh installs
+
+
+def _migration_v9(conn):
+    """Phase 9: add missing columns to dhcpv6_pools.
+
+    Migration v4 created dhcpv6_pools without interface_type, enabled,
+    pd_prefix, and pd_prefix_len, but dhcpv6_writer.py reads all four.
+    Fresh installs (database.py) already have these columns; this migration
+    brings existing installs up to the same schema.
+    """
+    for ddl in [
+        "ALTER TABLE dhcpv6_pools ADD COLUMN interface_type TEXT DEFAULT 'LAN'",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN enabled INTEGER DEFAULT 0",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN pd_prefix TEXT DEFAULT ''",
+        "ALTER TABLE dhcpv6_pools ADD COLUMN pd_prefix_len INTEGER DEFAULT 64",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists (fresh install or re-run)
+
+
+def _migration_v10(conn):
+    """Phase 10: siem_state table for SIEM collector offset persistence."""
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS siem_state (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+
+def _migration_v11(conn):
+    """Phase 11: Fix certificates table column name mismatches.
+
+    Migration v3 created the certificates table with:
+      - key_pem_enc   (fresh installs use private_key_enc)
+      - serial_number (fresh installs use serial)
+      - chain_pem     (not in fresh schema; left in place as harmless extra column)
+      - no revoked_at (fresh installs include revoked_at TIMESTAMP)
+
+    This migration renames the mismatched columns and adds revoked_at so that
+    upgraded databases have the same schema as fresh installs.
+    """
+    info = conn.execute("PRAGMA table_info(certificates)").fetchall()
+    # PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+    cols = {row[1] for row in info}
+
+    if "key_pem_enc" in cols and "private_key_enc" not in cols:
+        conn.execute(
+            "ALTER TABLE certificates RENAME COLUMN key_pem_enc TO private_key_enc"
+        )
+
+    if "serial_number" in cols and "serial" not in cols:
+        conn.execute(
+            "ALTER TABLE certificates RENAME COLUMN serial_number TO serial"
+        )
+
+    if "revoked_at" not in cols:
+        try:
+            conn.execute("ALTER TABLE certificates ADD COLUMN revoked_at TIMESTAMP")
+        except Exception:
+            pass  # already present
+
+
+def _migration_v12(conn):
+    """Phase 12: Add firewall hardening toggle columns to advanced_firewall_nat.
+
+    block_bogons       — block bogon/unroutable addresses arriving on WAN (default ON)
+    block_private_nets — block RFC-1918 private source addresses on WAN (default ON)
+    """
+    for ddl in [
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN block_bogons INTEGER DEFAULT 1",
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN block_private_nets INTEGER DEFAULT 1",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists (fresh install or re-run)
+
+
+def _migration_v13(conn):
+    """Phase 13: Applied-state tracking tables (Phases 37 and 38).
+
+    config_apply_jobs     — one row per apply operation with full lifecycle state
+    feature_applied_state — one row per feature with current summary state
+
+    These tables power the UI applied-state badges and the config transaction
+    manager rollback decisions.
+    """
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS config_apply_jobs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        feature_key TEXT    NOT NULL,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        config_hash TEXT    DEFAULT '',
+        applied_by  TEXT    DEFAULT 'system',
+        notes       TEXT    DEFAULT '',
+        message     TEXT    DEFAULT '',
+        created_at  REAL    NOT NULL DEFAULT 0,
+        updated_at  REAL    NOT NULL DEFAULT 0
+    )
+    """)
+
+    conn.execute("""
+    CREATE INDEX IF NOT EXISTS idx_cap_jobs_feature_created
+    ON config_apply_jobs(feature_key, created_at DESC)
+    """)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS feature_applied_state (
+        feature_key TEXT PRIMARY KEY,
+        state       TEXT    NOT NULL DEFAULT 'saved',
+        message     TEXT    DEFAULT '',
+        last_job_id INTEGER,
+        updated_at  REAL    NOT NULL DEFAULT 0,
+        FOREIGN KEY(last_job_id) REFERENCES config_apply_jobs(id)
+    )
+    """)
+
+
+def _migration_v14(conn):
+    """Phase 14: Policy-based routing table and new columns for advanced_firewall_nat.
+
+    policy_routes       — per-rule entries for PF route-to policy routing
+    nat_reflection      — integer toggle for hairpin NAT on advanced_firewall_nat
+    kill_states_on_reload — integer toggle to flush all PF states after reload
+    """
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS policy_routes (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        enabled          INTEGER DEFAULT 1,
+        priority         INTEGER DEFAULT 100,
+        description      TEXT    DEFAULT '',
+        interface_type   TEXT    DEFAULT 'LAN',
+        source           TEXT    DEFAULT 'any',
+        destination      TEXT    DEFAULT 'any',
+        gateway_id       INTEGER REFERENCES gateways(id),
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    for ddl in [
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN nat_reflection INTEGER DEFAULT 0",
+        "ALTER TABLE advanced_firewall_nat ADD COLUMN kill_states_on_reload INTEGER DEFAULT 0",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
+def _migration_v15(conn):
+    """Phase 15: Add CARP-specific columns to virtual_ips_configs.
+
+    vhid         — CARP virtual host ID (1-255)
+    carp_pass    — CARP password (encrypted)
+    advskew      — CARP advertisement skew (0-254); 0 = master, higher = backup
+    advbase      — CARP advertisement base interval (seconds, default 1)
+    """
+    for ddl in [
+        "ALTER TABLE virtual_ips_configs ADD COLUMN vhid INTEGER DEFAULT 1",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN carp_pass TEXT DEFAULT ''",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN advskew INTEGER DEFAULT 0",
+        "ALTER TABLE virtual_ips_configs ADD COLUMN advbase INTEGER DEFAULT 1",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
+def _migration_v16(conn):
+    """
+    Add gateway health tracking columns to the gateways table.
+
+    reachable  — last known ping result (1=up, 0=down, NULL=never checked)
+    last_seen  — timestamp of last successful reachability check
+    """
+    for ddl in [
+        "ALTER TABLE gateways ADD COLUMN reachable INTEGER DEFAULT NULL",
+        "ALTER TABLE gateways ADD COLUMN last_seen  TIMESTAMP DEFAULT NULL",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -204,6 +410,16 @@ MIGRATIONS = [
     (4, _migration_v4),
     (5, _migration_v5),
     (6, _migration_v6),
+    (7, _migration_v7),
+    (8, _migration_v8),
+    (9, _migration_v9),
+    (10, _migration_v10),
+    (11, _migration_v11),
+    (12, _migration_v12),
+    (13, _migration_v13),
+    (14, _migration_v14),
+    (15, _migration_v15),
+    (16, _migration_v16),
 ]
 
 

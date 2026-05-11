@@ -1,0 +1,16 @@
+{% set mode = runtime_mode_badge.mode %}
+{% if mode != 'live' %}
+<div class="mode-banner mode-banner--{{ runtime_mode_badge.color }}" role="status" aria-live="polite">
+  {% if mode == 'development' %}
+  <span class="mode-banner__icon">&#x1F4BB;</span>
+  <strong>Development Mode</strong> &mdash; Running on a non-FreeBSD host. Network changes are generated but not applied.
+  {% elif mode == 'dry-run' %}
+  <span class="mode-banner__icon">&#x26A0;&#xFE0F;</span>
+  <strong>Dry-Run Mode</strong> &mdash; Config is generated and validated but not applied to the system. Set <code>SMARTSHIELD_ENABLE_NETWORK_APPLY=1</code> to enable live apply.
+  {% elif mode == 'degraded' %}
+  <span class="mode-banner__icon">&#x1F534;</span>
+  <strong>Degraded Mode</strong> &mdash; One or more required system daemons are missing.
+  <a href="{{ url_for('system.preflight') }}" class="mode-banner__link">View details</a>
+  {% endif %}
+</div>
+{% endif %}

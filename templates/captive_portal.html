@@ -2,105 +2,592 @@
 {% block main %}
 <div class="container">
 
+  <!-- Toast -->
+  <div id="cp-toast" class="alert d-none" role="alert"
+       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:340px;"></div>
+
+  <!-- Page Header -->
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">Captive Portal Sessions</h1>
-      <p class="ss-page-desc">Active authenticated portal sessions</p>
+      <h1 class="ss-page-title">Captive Portal</h1>
+      <p class="ss-page-desc">Guest network authentication, vouchers, and session management</p>
     </div>
-    <div class="d-flex gap-2">
-      <button type="button" class="btn btn-outline-secondary" onclick="loadSessions()">
-        <i class="fa-solid fa-rotate me-1"></i>Refresh
-      </button>
-      <button type="button" class="btn btn-danger" onclick="disconnectAll()">
-        <i class="fa-solid fa-plug-circle-xmark me-1"></i>Disconnect All
-      </button>
+    <button type="button" class="btn btn-primary" onclick="applyPortal()">
+      <i class="fa-solid fa-play me-1"></i>Apply &amp; Activate
+    </button>
+  </div>
+
+  <!-- Status bar -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:14px 20px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="ss-card-title" style="margin:0;">Status</span>
+        <span id="cp-status-badge" class="badge bg-secondary">Loading…</span>
+      </div>
+      <div style="color:var(--muted);font-size:.85rem;">
+        <i class="fa-solid fa-users me-1"></i>
+        <span id="cp-session-count">—</span> active session(s)
+      </div>
+      <div style="margin-left:auto;">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadStatus()">
+          <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh Status
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="ss-card">
-    <div class="ss-card-head">
-      <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
-      <div>
-        <div class="ss-card-title">Active Sessions</div>
-        <div class="ss-card-subtitle" id="session-count">Loading…</div>
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" id="tab-sessions" href="#"
+        onclick="showTab('sessions'); return false;"><i class="fa-solid fa-users me-1"></i>Sessions</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-vouchers" href="#"
+        onclick="showTab('vouchers'); return false;"><i class="fa-solid fa-ticket me-1"></i>Vouchers</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-settings" href="#"
+        onclick="showTab('settings'); return false;"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-preview" href="#"
+        onclick="showTab('preview'); return false;"><i class="fa-solid fa-code me-1"></i>PF Preview</a></li>
+  </ul>
+
+  <!-- ── TAB: Sessions ─────────────────────────────────────────────────── -->
+  <div id="content-sessions">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+        <div>
+          <div class="ss-card-title">Active Sessions</div>
+          <div class="ss-card-subtitle" id="session-count">Loading…</div>
+        </div>
+        <div class="ss-card-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSessions()">
+            <i class="fa-solid fa-rotate me-1"></i>Refresh
+          </button>
+          <button type="button" class="btn btn-sm btn-danger" onclick="disconnectAll()">
+            <i class="fa-solid fa-plug-circle-xmark me-1"></i>Disconnect All
+          </button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr>
+              <th style="padding:10px 14px;">IP Address</th>
+              <th>MAC Address</th>
+              <th>Username</th>
+              <th>Session Start</th>
+              <th>Expires</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sessions-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading sessions…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
-          <tr>
-            <th style="padding:10px 14px;">IP Address</th>
-            <th>MAC Address</th>
-            <th>Username</th>
-            <th>Session Start</th>
-            <th>Expires</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="sessions-tbody">
-          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading sessions…</td></tr>
-        </tbody>
-      </table>
+  </div>
+
+  <!-- ── TAB: Vouchers ─────────────────────────────────────────────────── -->
+  <div id="content-vouchers" style="display:none;">
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-ticket"></i></div>
+        <div><div class="ss-card-title">Generate Voucher</div>
+             <div class="ss-card-subtitle">Single-use access codes for guest Wi-Fi</div></div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:16px;">
+          <div class="ss-field">
+            <label class="ss-label">Duration (minutes)</label>
+            <input type="number" id="v-duration" class="form-control" value="60" min="1">
+            <p class="ss-hint">How long the voucher grants access</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Bandwidth Limit (kbps)</label>
+            <input type="number" id="v-bw" class="form-control" value="0" min="0">
+            <p class="ss-hint">0 = unlimited</p>
+          </div>
+          <div class="ss-field" style="display:flex;align-items:flex-end;">
+            <button type="button" class="btn btn-success w-100" onclick="generateVoucher()">
+              <i class="fa-solid fa-plus me-1"></i>Generate
+            </button>
+          </div>
+        </div>
+        <div id="voucher-result" class="d-none">
+          <div class="alert alert-success d-flex align-items-center justify-content-between gap-3" style="border-radius:10px;">
+            <div>
+              <strong>Voucher Code:</strong>
+              <code id="voucher-code" style="font-size:1.2rem;letter-spacing:.1em;margin-left:8px;"></code>
+            </div>
+            <button class="btn btn-sm btn-outline-success" onclick="copyVoucher()">
+              <i class="fa-solid fa-copy me-1"></i>Copy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-list"></i></div>
+        <div><div class="ss-card-title">Voucher List</div></div>
+        <div class="ss-card-actions">
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadVouchers()">
+            <i class="fa-solid fa-rotate me-1"></i>Refresh
+          </button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft);">
+            <tr>
+              <th style="padding:10px 14px;">Code</th>
+              <th>Duration</th>
+              <th>Bandwidth</th>
+              <th>Status</th>
+              <th>Redeemed</th>
+              <th>Redeemed At</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="vouchers-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Loading vouchers…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
+
+  <!-- ── TAB: Settings ─────────────────────────────────────────────────── -->
+  <div id="content-settings" style="display:none;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div><div class="ss-card-title">Portal Configuration</div></div>
+        <div class="ss-card-actions">
+          <button type="button" class="btn btn-sm btn-warning me-1" onclick="reloadFirewall()">
+            <i class="fa-solid fa-fire me-1"></i>Reload Firewall
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()">
+            <i class="fa-solid fa-check me-1"></i>Save Settings
+          </button>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" id="cp-enabled"><span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable Captive Portal</p>
+            <p class="ss-toggle-desc">Intercept unauthenticated LAN traffic and redirect to the login page</p>
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">LAN Interface</label>
+            <input type="text" id="cp-iface" class="form-control" placeholder="e.g. em1">
+            <p class="ss-hint">The interface where guests connect</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Portal IP Address</label>
+            <input type="text" id="cp-ip" class="form-control" placeholder="e.g. 192.168.1.1">
+            <p class="ss-hint">IP address where the portal login page is hosted</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Portal Port</label>
+            <input type="number" id="cp-port" class="form-control" placeholder="5000">
+            <p class="ss-hint">Port the Smart Shield web app listens on</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">HTTP Redirect Port</label>
+            <input type="number" id="cp-redir-port" class="form-control" placeholder="80">
+            <p class="ss-hint">Port to capture and redirect to the portal (usually 80)</p>
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-toggle-row">
+          <label class="ss-toggle">
+            <input type="checkbox" id="cp-dns"><span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Allow DNS Before Authentication</p>
+            <p class="ss-toggle-desc">Permit DNS queries from unauthenticated guests (required for most devices to detect the captive portal)</p>
+          </div>
+        </div>
+        <hr class="ss-divider">
+        <div class="ss-card-title" style="margin-bottom:14px;font-size:.85rem;">RADIUS Authentication (optional)</div>
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label">RADIUS Server</label>
+            <input type="text" id="cp-radius-server" class="form-control" placeholder="192.168.1.10:1812">
+            <p class="ss-hint">Leave blank to use local user accounts only</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">RADIUS Shared Secret</label>
+            <input type="password" id="cp-radius-secret" class="form-control" placeholder="(saved — leave blank to keep)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Whitelisted Users -->
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-user-check"></i></div>
+        <div>
+          <div class="ss-card-title">Whitelisted Users</div>
+          <div class="ss-card-subtitle">These users bypass all content policy filtering after portal login</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="d-flex gap-2 mb-3">
+          <input type="text" id="wl-username-input" class="form-control"
+                 placeholder="Enter username to whitelist" style="max-width:300px;">
+          <button class="btn btn-outline-primary btn-sm" onclick="addWhitelistUser()">
+            <i class="fa-solid fa-plus me-1"></i>Add
+          </button>
+        </div>
+        <ul id="wl-user-list" class="list-group" style="max-width:420px;"></ul>
+        <p class="ss-hint mt-2">
+          Whitelisted users still authenticate via the portal login page but their traffic
+          is exempt from content filtering and domain blocking.
+        </p>
+        <div class="mt-3">
+          <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()">
+            <i class="fa-solid fa-check me-1"></i>Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: PF Preview ───────────────────────────────────────────────── -->
+  <div id="content-preview" style="display:none;">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-code"></i></div>
+        <div>
+          <div class="ss-card-title">Generated PF Anchor</div>
+          <div class="ss-card-subtitle">PF rules that will be written to the FreeBSD packet filter</div>
+        </div>
+        <div class="ss-card-actions">
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadPreview()">
+            <i class="fa-solid fa-rotate me-1"></i>Refresh
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="applyPortal()">
+            <i class="fa-solid fa-play me-1"></i>Apply &amp; Activate
+          </button>
+        </div>
+      </div>
+      <div class="ss-card-body" style="padding:0;">
+        <pre id="pf-preview-text"
+             style="margin:0;padding:20px;background:var(--bg);color:var(--text-color);
+                    font-size:.8rem;border-radius:0 0 10px 10px;max-height:500px;overflow-y:auto;
+                    border-top:1px solid var(--border-color);">Loading…</pre>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-function loadSessions() {
-  fetch('/services/api/captive-portal/sessions')
-    .then(r => r.json())
-    .then(data => {
-      const sessions = data.sessions || [];
-      document.getElementById('session-count').textContent = sessions.length + ' user' + (sessions.length === 1 ? '' : 's') + ' logged in';
-      const tbody = document.getElementById('sessions-tbody');
-      if (!sessions.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
-        return;
-      }
-      tbody.innerHTML = sessions.map(s => `
-  <tr>
-    <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${escapeHtml(s.ip_address)}</td>
-    <td style="font-family:monospace;font-size:.8rem;">${escapeHtml(s.mac_address || '—')}</td>
-    <td>${escapeHtml(s.username || '—')}</td>
-    <td>${escapeHtml(s.created_at || '—')}</td>
-    <td>${escapeHtml(formatExpiry(s.expires_at))}</td>
-    <td>
-      <button class="btn btn-sm btn-danger" onclick="disconnectUser(${Number(s.id)})">
-        <i class="fa-solid fa-plug-circle-xmark"></i>
-      </button>
-    </td>
-  </tr>`).join('');
-    })
-    .catch(() => {
-      document.getElementById('session-count').textContent = '0 users logged in';
-      document.getElementById('sessions-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
-    });
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+// ── Whitelist state ───────────────────────────────────────────────────────────
+let _whitelistUsers = [];
+
+function renderWhitelistUsers() {
+  const ul = document.getElementById('wl-user-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (_whitelistUsers.length === 0) {
+    ul.innerHTML = '<li class="list-group-item" style="background:var(--card-bg);border-color:var(--border-color);color:var(--muted);font-size:.85rem;">No whitelisted users</li>';
+    return;
+  }
+  _whitelistUsers.forEach((u, i) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.style.cssText = 'background:var(--card-bg);border-color:var(--border-color);';
+    li.innerHTML = `<span><i class="fa-solid fa-user me-2" style="color:var(--primary);"></i>${esc(u)}</span>
+      <button class="btn btn-sm btn-outline-danger" onclick="removeWhitelistUser(${i})">
+        <i class="fa-solid fa-trash"></i>
+      </button>`;
+    ul.appendChild(li);
+  });
 }
 
-function disconnectUser(sessionId) {
-  if (!confirm('Disconnect this user?')) return;
-  fetch(`/services/api/captive-portal/sessions/${sessionId}/logout`, {
-    method: 'POST'
-  }).then(() => loadSessions());
+function addWhitelistUser() {
+  const inp = document.getElementById('wl-username-input');
+  const val = (inp.value || '').trim().toLowerCase();
+  if (!val) return;
+  if (_whitelistUsers.includes(val)) { showToast('User already in whitelist', false); return; }
+  _whitelistUsers.push(val);
+  inp.value = '';
+  renderWhitelistUsers();
 }
 
-function disconnectAll() {
-  if (!confirm('Disconnect all portal users?')) return;
-  fetch('/services/api/captive-portal/sessions/logout-all', {method:'POST'})
-    .then(() => loadSessions());
+function removeWhitelistUser(idx) {
+  _whitelistUsers.splice(idx, 1);
+  renderWhitelistUsers();
 }
-function formatExpiry(ts) {
+
+function showToast(msg, ok) {
+  const t = document.getElementById('cp-toast');
+  t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+  t.textContent = msg;
+  t.classList.remove('d-none');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.add('d-none'), 6000);
+}
+
+async function apiFetch(url, opts={}) {
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function fmtTs(ts) {
   if (!ts) return '—';
   const d = new Date(Number(ts) * 1000);
-  if (isNaN(d.getTime())) return String(ts);
-  return d.toLocaleString();
+  return isNaN(d) ? String(ts) : d.toLocaleString();
 }
 
-function escapeHtml(t) {
-  if (!t) return '';
-  return String(t).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+// ── Tab switching ────────────────────────────────────────────────────────────
+const _loaded = {};
+function showTab(tab) {
+  document.querySelectorAll('[id^="content-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-tabs .nav-link').forEach(a => a.classList.remove('active'));
+  document.getElementById('content-' + tab).style.display = '';
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'vouchers' && !_loaded.vouchers)  { loadVouchers(); _loaded.vouchers = true; }
+  if (tab === 'settings' && !_loaded.settings)  { loadSettings(); _loaded.settings = true; }
+  if (tab === 'preview'  && !_loaded.preview)   { loadPreview();  _loaded.preview  = true; }
 }
 
-document.addEventListener('DOMContentLoaded', loadSessions);
+// ── Status ───────────────────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const d = await apiFetch('/services/api/captive-portal/status');
+    const badge = document.getElementById('cp-status-badge');
+    const count = document.getElementById('cp-session-count');
+    if (d.enabled) {
+      badge.className = 'badge bg-success';
+      badge.textContent = '● Enabled';
+    } else {
+      badge.className = 'badge bg-secondary';
+      badge.textContent = '✗ Disabled';
+    }
+    count.textContent = (d.active_sessions_count ?? '0');
+  } catch(e) { /* silently ignore */ }
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+async function loadSessions() {
+  try {
+    const data = await apiFetch('/services/api/captive-portal/sessions');
+    const sessions = data.sessions || [];
+    document.getElementById('session-count').textContent =
+      sessions.length + ' user' + (sessions.length === 1 ? '' : 's') + ' logged in';
+    const tbody = document.getElementById('sessions-tbody');
+    if (!sessions.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+      return;
+    }
+    tbody.innerHTML = sessions.map(s => `
+      <tr>
+        <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${esc(s.ip_address)}</td>
+        <td style="font-family:monospace;font-size:.8rem;">${esc(s.mac_address||'—')}</td>
+        <td>${esc(s.username||'—')}</td>
+        <td>${esc(s.created_at||'—')}</td>
+        <td>${esc(fmtTs(s.expires_at))}</td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="disconnectUser(${Number(s.id)})" title="Disconnect">
+            <i class="fa-solid fa-plug-circle-xmark"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+    loadStatus();
+  } catch(e) {
+    document.getElementById('session-count').textContent = '0 users logged in';
+    document.getElementById('sessions-tbody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+  }
+}
+
+async function disconnectUser(sessionId) {
+  if (!confirm('Disconnect this user?')) return;
+  await apiFetch(`/services/api/captive-portal/sessions/${sessionId}/logout`, { method: 'POST' });
+  loadSessions();
+}
+
+async function disconnectAll() {
+  if (!confirm('Disconnect ALL portal users?')) return;
+  await apiFetch('/services/api/captive-portal/sessions/logout-all', { method: 'POST' });
+  loadSessions();
+}
+
+// ── Vouchers ─────────────────────────────────────────────────────────────────
+async function generateVoucher() {
+  const dur = parseInt(document.getElementById('v-duration').value) || 60;
+  const bw  = parseInt(document.getElementById('v-bw').value)       || 0;
+  try {
+    const d = await apiFetch('/services/api/captive-portal/vouchers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_minutes: dur, bandwidth_kbps: bw }),
+    });
+    if (d.ok && d.code) {
+      document.getElementById('voucher-code').textContent = d.code;
+      document.getElementById('voucher-result').classList.remove('d-none');
+      showToast('Voucher generated: ' + d.code, true);
+      _loaded.vouchers = false;
+      loadVouchers();
+    } else {
+      showToast('Error: ' + (d.message || 'Could not generate voucher'), false);
+    }
+  } catch(e) { showToast('Network error: ' + e.message, false); }
+}
+
+function copyVoucher() {
+  const code = document.getElementById('voucher-code').textContent;
+  navigator.clipboard.writeText(code).then(() => showToast('Copied: ' + code, true));
+}
+
+async function loadVouchers() {
+  try {
+    const d = await apiFetch('/services/api/captive-portal/vouchers');
+    const vouchers = d.vouchers || [];
+    const tbody = document.getElementById('vouchers-tbody');
+    if (!vouchers.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">No vouchers generated yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = vouchers.map(v => {
+      const isDisabled = !!v.disabled;
+      const statusBadge = isDisabled
+        ? '<span class="badge bg-danger">Disabled</span>'
+        : (v.redeemed ? '<span class="badge bg-secondary">Used</span>' : '<span class="badge bg-success">Active</span>');
+      const disableBtn = v.redeemed ? '' : `
+        <button class="btn btn-sm ${isDisabled ? 'btn-outline-success' : 'btn-outline-warning'} me-1"
+          onclick="toggleVoucherDisabled(${v.id}, ${isDisabled})"
+          title="${isDisabled ? 'Enable voucher' : 'Disable voucher'}">
+          <i class="fa-solid ${isDisabled ? 'fa-circle-check' : 'fa-ban'}"></i>
+        </button>`;
+      return `<tr style="${isDisabled ? 'opacity:.55;' : ''}">
+        <td style="padding:8px 14px;font-family:monospace;font-weight:700;letter-spacing:.05em;">${esc(v.code)}</td>
+        <td>${esc(v.duration_minutes)} min</td>
+        <td>${v.bandwidth_kbps ? esc(v.bandwidth_kbps) + ' kbps' : 'Unlimited'}</td>
+        <td>${statusBadge}</td>
+        <td>${v.redeemed ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+        <td>${esc(v.redeemed_at ? fmtTs(v.redeemed_at) : '—')}</td>
+        <td style="color:var(--muted);font-size:.78rem;">${esc(v.created_at||'—')}</td>
+        <td style="white-space:nowrap;">${disableBtn}<button class="btn btn-sm btn-outline-danger" onclick="revokeVoucher(${v.id})">
+          <i class="fa-solid fa-trash"></i>
+        </button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('vouchers-tbody').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Error loading vouchers</td></tr>';
+  }
+}
+
+async function toggleVoucherDisabled(id, currentlyDisabled) {
+  const d = await apiFetch(`/services/api/captive-portal/vouchers/${id}/disabled`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ disabled: !currentlyDisabled }),
+  });
+  showToast(d.ok ? (d.disabled ? 'Voucher disabled.' : 'Voucher enabled.') : 'Error: ' + d.message, d.ok);
+  if (d.ok) loadVouchers();
+}
+
+async function revokeVoucher(id) {
+  if (!confirm('Delete this voucher permanently?')) return;
+  const d = await apiFetch('/services/api/captive-portal/vouchers/' + id, { method: 'DELETE' });
+  showToast(d.ok ? 'Voucher deleted.' : 'Error: ' + d.message, d.ok);
+  if (d.ok) loadVouchers();
+}
+
+async function reloadFirewall() {
+  showToast('Reloading firewall rules…', true);
+  try {
+    const d = await apiFetch('/status/filter-reload/apply', { method: 'POST' });
+    showToast(d.ok ? 'Firewall reloaded successfully.' : 'Error: ' + (d.message || 'Unknown error'), d.ok);
+  } catch(e) { showToast('Network error: ' + e.message, false); }
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const d = await apiFetch('/services/api/captive-portal/settings');
+    const s = d.settings || {};
+    document.getElementById('cp-enabled').checked  = !!s.enabled;
+    document.getElementById('cp-iface').value      = s.lan_interface     || '';
+    document.getElementById('cp-ip').value         = s.portal_ip         || '';
+    document.getElementById('cp-port').value       = s.portal_port       || '';
+    document.getElementById('cp-redir-port').value = s.http_redirect_port || '';
+    document.getElementById('cp-dns').checked      = !!s.allow_dns;
+    document.getElementById('cp-radius-server').value = s.radius_server  || '';
+    // Never pre-fill the secret field
+    _whitelistUsers = Array.isArray(s.whitelist_users) ? s.whitelist_users : [];
+    renderWhitelistUsers();
+  } catch(e) { showToast('Could not load settings', false); }
+}
+
+async function saveSettings() {
+  const secret = document.getElementById('cp-radius-secret').value.trim();
+  const payload = {
+    enabled:            document.getElementById('cp-enabled').checked,
+    lan_interface:      document.getElementById('cp-iface').value.trim(),
+    portal_ip:          document.getElementById('cp-ip').value.trim(),
+    portal_port:        parseInt(document.getElementById('cp-port').value) || 5000,
+    http_redirect_port: parseInt(document.getElementById('cp-redir-port').value) || 80,
+    allow_dns:          document.getElementById('cp-dns').checked,
+    radius_server:      document.getElementById('cp-radius-server').value.trim(),
+    whitelist_users:    _whitelistUsers,
+  };
+  if (secret) payload.radius_secret = secret;
+  try {
+    const d = await apiFetch('/services/api/captive-portal/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    showToast(d.ok ? 'Settings saved.' : 'Error: ' + d.message, d.ok);
+    loadStatus();
+  } catch(e) { showToast('Network error: ' + e.message, false); }
+}
+
+// ── PF Preview ────────────────────────────────────────────────────────────────
+async function loadPreview() {
+  const pre = document.getElementById('pf-preview-text');
+  pre.textContent = 'Loading…';
+  try {
+    const d = await apiFetch('/services/api/captive-portal/preview');
+    pre.textContent = d.conf || d.anchor || d.preview || '(empty)';
+  } catch(e) { pre.textContent = 'Error: ' + e.message; }
+}
+
+async function applyPortal() {
+  try {
+    const d = await apiFetch('/services/api/captive-portal/apply', { method: 'POST' });
+    const ok = d.ok ?? d.success ?? false;
+    showToast(ok ? 'Captive portal applied and PF anchor reloaded.' : 'Error: ' + (d.message || 'Unknown error'), ok);
+    loadStatus();
+    if (ok) { _loaded.preview = false; loadPreview(); }
+  } catch(e) { showToast('Network error: ' + e.message, false); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  showTab('sessions');
+  loadStatus();
+  loadSessions();
+  // Auto-refresh sessions every 30 seconds
+  setInterval(loadSessions, 30000);
+});
 </script>
 {% endblock %}

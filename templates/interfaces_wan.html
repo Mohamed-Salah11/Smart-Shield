@@ -2,14 +2,32 @@
 {% block main %}
 <div class="container">
 
+  <div id="iface-toast" class="alert d-none" role="alert"
+       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:340px;"></div>
+
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">WAN Interface</h1>
       <p class="ss-page-desc">Configure the wide area network uplink interface</p>
     </div>
-    <button type="button" class="btn btn-primary" onclick="saveWANConfig()">
-      <i class="fa-solid fa-check me-1"></i>Save
-    </button>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary" onclick="readFromBsd()">
+        <i class="fa-solid fa-arrows-rotate me-1"></i>Read from BSD
+      </button>
+      <button type="button" class="btn btn-primary" onclick="saveWANConfig()">
+        <i class="fa-solid fa-check me-1"></i>Save &amp; Apply
+      </button>
+    </div>
+  </div>
+
+  <!-- Live BSD state bar -->
+  <div class="ss-card mb-3" style="padding:0;">
+    <div class="ss-card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 18px;font-size:.82rem;">
+      <span style="color:var(--muted);">Live BSD state:</span>
+      <span><strong>IP:</strong> <span id="bsd-live-ip" style="font-family:monospace;">—</span></span>
+      <span><strong>Mode:</strong> <span id="bsd-live-type">—</span></span>
+      <span><strong>Gateway:</strong> <span id="bsd-live-gw" style="font-family:monospace;">—</span></span>
+    </div>
   </div>
 
   <form method="POST">
@@ -206,7 +224,34 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() { loadWANConfig(); });
+function showToast(msg, ok) {
+  const t = document.getElementById('iface-toast');
+  t.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+  t.textContent = msg;
+  t.classList.remove('d-none');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.add('d-none'), 6000);
+}
+
+async function readFromBsd() {
+  try {
+    const r = await fetch('/interfaces/bsd-state/WAN');
+    const d = await r.json();
+    if (!d.ok) return;
+    const s = d.bsd_state;
+    document.getElementById('bsd-live-ip').textContent   = s.live_ip   || '—';
+    document.getElementById('bsd-live-type').textContent = s.ipv4_config_type || '—';
+    document.getElementById('bsd-live-gw').textContent   = s.gateway   || '—';
+    // Pre-fill form fields if currently empty
+    if (s.ipv4_config_type) document.getElementById('ipv4type').value = s.ipv4_config_type;
+    if (!document.getElementById('ipv4addr').value && s.ipv4_address)
+      document.getElementById('ipv4addr').value = s.ipv4_address;
+    if (!document.getElementById('ipv4gw').value && s.gateway)
+      document.getElementById('ipv4gw').value = s.gateway;
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function() { loadWANConfig(); readFromBsd(); });
 
 function loadWANConfig() {
     fetch('/interfaces/get-wan-config')
@@ -262,8 +307,17 @@ function saveWANConfig() {
         body: JSON.stringify(formData)
     })
     .then(r => r.json())
-    .then(data => alert(data.status === 'success' ? 'WAN configuration saved!' : 'Error: ' + (data.message || 'Unknown error')))
-    .catch(() => alert('Error saving WAN configuration'));
+    .then(data => {
+        if (data.status === 'success') {
+          const bsdMsg = data.bsd_applied
+            ? 'Saved & applied to BSD.' : 'Saved to DB. BSD: ' + (data.bsd_message || 'dry-run');
+          showToast(bsdMsg, true);
+          readFromBsd();
+        } else {
+          showToast('Error: ' + (data.message || 'Unknown error'), false);
+        }
+    })
+    .catch(() => showToast('Error saving WAN configuration', false));
 }
 
 function resetWANConfig() { loadWANConfig(); }
