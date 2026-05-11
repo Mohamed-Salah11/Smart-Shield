@@ -121,7 +121,15 @@ async function applyConfig() {
         credentials: 'same-origin',
       body: JSON.stringify({})
     });
-    const d = await r.json();
+    let d;
+    try {
+      d = await r.json();
+    } catch {
+      addLog(`Server error (HTTP ${r.status}) — check server logs.`, false);
+      document.getElementById('btn-apply').disabled = false;
+      document.getElementById('btn-back').disabled  = false;
+      return;
+    }
 
     fill.style.width = '80%';
     (d.results || []).forEach(res => {

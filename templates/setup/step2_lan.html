@@ -132,7 +132,14 @@ async function saveStep2() {
       credentials: 'same-origin',
       body: JSON.stringify({ lan_ip, wan_type, wan_ip, wan_gw })
     });
-    const d = await r.json();
+    let d;
+    try {
+      d = await r.json();
+    } catch {
+      showAlert(`Server error (HTTP ${r.status}) — check server logs.`, 'danger');
+      document.getElementById('btn-next').disabled = false;
+      return;
+    }
     if (d.ok) {
       window.location.href = '/setup/step3';
     } else {

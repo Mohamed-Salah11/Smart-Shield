@@ -549,25 +549,31 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
     # Sane ICMP pass rules (types safe to pass; covers ping + path MTU discovery)
     lines.append("# ICMP: allow essential types, drop the rest")
     lines.append(
-        "pass in  quick proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+        "pass in  quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
     )
     lines.append(
-        "pass out quick proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+        "pass out quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
     )
     lines.append("")
 
     # ICMPv6 — Neighbor Discovery types must always be allowed
     lines.append("# ICMPv6: Neighbor Discovery (must not be blocked)")
     lines.append(
-        f"pass quick proto icmp6 icmp6-type {{ {_ND_ICMPV6_TYPES} }} keep state"
+        f"pass quick inet6 proto icmp6 icmp6-type {{ {_ND_ICMPV6_TYPES} }} keep state"
     )
     lines.append("")
 
-    # Admin GUI protection — always allow from LAN so admins can't be locked out
-    lines.append(f"# Admin GUI: always reachable from LAN on port {admin_port}")
+    # Admin GUI: nginx HTTPS is always reachable from LAN; gunicorn only from loopback
+    lines.append(f"# Admin GUI: nginx HTTPS always reachable from LAN")
     lines.append(
-        f"pass in quick on {lan_iface} proto tcp "
-        f"from any to any port {admin_port} keep state"
+        f"pass in quick on {lan_iface} proto tcp from any to any port 443 keep state"
+    )
+    lines.append(f"# Admin GUI: restrict direct gunicorn access to loopback only")
+    lines.append(
+        f"pass in quick on lo0 proto tcp from 127.0.0.1 to 127.0.0.1 port {admin_port} keep state"
+    )
+    lines.append(
+        f"block in quick on {lan_iface} proto tcp from any to any port {admin_port}"
     )
     lines.append("")
 
@@ -762,15 +768,15 @@ def generate_pf_conf(conn) -> str:
         macros
         + base_tables
         + _build_alias_tables(conn)
-        + _build_virtual_ip_rules(conn)
         + _build_dummynet_pipes(conn)
         + options
         + scrub
-        + _build_hardening_rules(conn, wan_iface, lan_iface)
         + _build_shaper_queues(conn, wan_iface, lan_iface)
         + default_nat
         + _build_nat_rules(conn, wan_iface)
         + translation_hooks
+        + _build_virtual_ip_rules(conn)
+        + _build_hardening_rules(conn, wan_iface, lan_iface)
         + default_policy
         + _build_policy_routes(conn, wan_iface, lan_iface)
         + _l2tp_rules_block

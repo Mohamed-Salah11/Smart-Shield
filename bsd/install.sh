@@ -417,14 +417,14 @@ fi
 if [ -x "${MRTG_BIN}" ]; then
     # Install cron job only when MRTG binary exists
     CRON_FILE="/etc/cron.d/smart-shield-mrtg"
-    CRON_LINE="*/5 * * * * root /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
+    CRON_LINE="*/5 * * * * root env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
     printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
     chmod 0644 "${CRON_FILE}"
     info "MRTG cron job installed: ${CRON_FILE}"
     # Pass 1: creates .log RRD files (non-zero exit on new files is expected)
-    "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
+    env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     # Pass 2: reads .log files and generates initial PNG graph images
-    "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
+    env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     info "MRTG initialised — initial graphs generated in /var/db/smart-shield/mrtg"
 else
     warn "MRTG binary not found at ${MRTG_BIN} — ensure net-mgmt/mrtg is installed"
@@ -443,14 +443,18 @@ SSL_CERT="${SSL_DIR}/cert.pem"
 SSL_KEY="${SSL_DIR}/key.pem"
 if [ ! -f "${SSL_CERT}" ] || [ ! -f "${SSL_KEY}" ]; then
     if command -v openssl >/dev/null 2>&1; then
-        openssl req -x509 -newkey rsa:4096 -nodes -days 3650 \
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
             -keyout "${SSL_KEY}" \
             -out    "${SSL_CERT}" \
-            -subj   "/CN=smart-shield.local" \
-            2>/dev/null
-        chmod 0600 "${SSL_KEY}"
-        chmod 0644 "${SSL_CERT}"
-        info "Self-signed TLS certificate generated (valid 10 years): ${SSL_CERT}"
+            -subj   "/CN=smart-shield.local"
+        if [ ! -f "${SSL_CERT}" ] || [ ! -f "${SSL_KEY}" ]; then
+            warn "openssl failed — TLS certificate not generated. Nginx cannot start."
+            warn "Re-run install or place cert.pem / key.pem in ${SSL_DIR} manually."
+        else
+            chmod 0600 "${SSL_KEY}"
+            chmod 0644 "${SSL_CERT}"
+            info "Self-signed TLS certificate generated (rsa:2048, valid 10 years): ${SSL_CERT}"
+        fi
     else
         warn "openssl not found — TLS certificate not generated. Place cert.pem / key.pem in ${SSL_DIR}"
     fi
@@ -484,7 +488,6 @@ http {
     # ── HTTP → HTTPS redirect ─────────────────────────────────────────────────
     server {
         listen      80;
-        listen      [::]:80;
         server_name _;
         return 301  https://$host$request_uri;
     }
@@ -492,7 +495,6 @@ http {
     # ── HTTPS — Smart Shield dashboard ───────────────────────────────────────
     server {
         listen      443 ssl;
-        listen      [::]:443 ssl;
         server_name _;
 
         ssl_certificate     /usr/local/etc/smart-shield/ssl/cert.pem;
@@ -531,18 +533,10 @@ http {
 NGINXEOF
 info "Nginx configuration written to /usr/local/etc/nginx/nginx.conf"
 
-# Restrict nginx listeners and gunicorn proxy_pass to the LAN interface IP.
-# The heredoc above uses single-quotes so $LAN_IP is substituted here via sed.
-sed -i '' "s|listen      80;|listen      ${LAN_IP}:80;|"    /usr/local/etc/nginx/nginx.conf
-sed -i '' '/listen      \[::\]:80;/d'                        /usr/local/etc/nginx/nginx.conf
-sed -i '' "s|listen      443 ssl;|listen      ${LAN_IP}:443 ssl;|" /usr/local/etc/nginx/nginx.conf
-sed -i '' '/listen      \[::\]:443 ssl;/d'                   /usr/local/etc/nginx/nginx.conf
-sed -i '' "s|proxy_pass         http://127\.0\.0\.1:5000;|proxy_pass         http://${LAN_IP}:5000;|" \
-    /usr/local/etc/nginx/nginx.conf
-info "nginx bound to LAN interface only (${LAN_IP}:443)"
+info "nginx listening on all interfaces — PF restricts LAN-only access to port 443"
 
 # Test nginx config BEFORE writing to rc.conf — prevents a broken config surviving a reboot
-if nginx -t 2>/dev/null; then
+if /usr/local/sbin/nginx -t; then
     sysrc nginx_enable=YES
     info "nginx_enable=YES written to rc.conf"
     service nginx restart 2>/dev/null || service nginx start 2>/dev/null || true
@@ -550,7 +544,7 @@ if nginx -t 2>/dev/null; then
 else
     warn "Nginx config test FAILED — nginx NOT enabled in rc.conf."
     warn "Fix /usr/local/etc/nginx/nginx.conf then run:"
-    warn "  nginx -t && sysrc nginx_enable=YES && service nginx start"
+    warn "  /usr/local/sbin/nginx -t && sysrc nginx_enable=YES && service nginx start"
 fi
 
 # ── Privilege separation: sudoers allowlist ───────────────────────────────────
@@ -632,9 +626,9 @@ section "6b. Live Network Activation"
 sysrc "ifconfig_${LAN_IFACE}=inet ${LAN_IP} netmask ${LAN_MASK}"
 info "ifconfig_${LAN_IFACE} written to rc.conf (${LAN_IP}/${LAN_MASK})"
 
-# Bind gunicorn to the LAN IP so the app only listens on the management interface.
-sysrc "smart_shield_bind=${LAN_IP}:5000"
-info "smart_shield_bind=${LAN_IP}:5000 written to rc.conf"
+# Bind gunicorn to loopback only — nginx proxies from 127.0.0.1:5000.
+sysrc smart_shield_bind=127.0.0.1:5000
+info "smart_shield_bind=127.0.0.1:5000 written to rc.conf"
 
 if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
     if ifconfig "${LAN_IFACE}" 2>/dev/null | grep -q "flags="; then
@@ -649,6 +643,10 @@ if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
 else
     info "Dry-run: LAN IP written to rc.conf only; run in LIVE mode to apply ifconfig immediately."
 fi
+
+# Load PF and pflog kernel modules if not already loaded (required on VMs / fresh installs)
+kldload pf    2>/dev/null || true
+kldload pflog 2>/dev/null || true
 
 # ── PF ────────────────────────────────────────────────────────────────────────
 if pfctl -s info 2>/dev/null | grep -q "^Status: Enabled"; then
