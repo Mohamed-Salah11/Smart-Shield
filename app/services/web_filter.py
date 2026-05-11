@@ -160,7 +160,7 @@ def hot_apply_web_rule(conn, rule_id: int) -> None:
             return
         domain = row["url_pattern"]
         if row["enabled"]:
-            zone_type = "transparent" if row["action"] == "allow" else "always_refuse"
+            zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
             run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
         else:
             try:

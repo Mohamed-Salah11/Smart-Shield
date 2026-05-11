@@ -836,15 +836,31 @@ def apply_gateway_failover(conn) -> dict:
 
     Returns {"ok": bool, "active_gateway": str|None, "message": str, "details": list}.
     """
+    import json as _json
     try:
-        cur = conn.execute("""
-            SELECT g.name, g.gateway, g.interface, gg.priority, gg.group_name
-            FROM gateway_group_members gg
-            JOIN gateways g ON gg.gateway_id = g.id
-            WHERE g.disabled = 0
-            ORDER BY gg.group_name, gg.priority ASC
-        """)
-        members = [dict(r) for r in cur.fetchall()]
+        # gateway_groups stores members as JSON in members_json column
+        groups_raw = [dict(r) for r in conn.execute(
+            "SELECT name, members_json FROM gateway_groups ORDER BY name"
+        ).fetchall()]
+        # build a gateway name → IP lookup from the gateways table
+        gw_lookup = {
+            row["name"]: dict(row)
+            for row in conn.execute(
+                "SELECT name, gateway, interface FROM gateways WHERE disabled=0 OR disabled IS NULL"
+            ).fetchall()
+        }
+        members = []
+        for grp in groups_raw:
+            for m in _json.loads(grp.get("members_json") or "[]"):
+                gw_name = m.get("gateway", "")
+                gw_row  = gw_lookup.get(gw_name, {})
+                members.append({
+                    "group_name": grp["name"],
+                    "priority":   m.get("tier", 1),
+                    "name":       gw_name,
+                    "gateway":    gw_row.get("gateway", ""),
+                    "interface":  gw_row.get("interface", ""),
+                })
     except Exception as exc:
         return {"ok": False, "active_gateway": None, "message": f"DB error: {exc}", "details": []}
 

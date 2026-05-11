@@ -291,7 +291,7 @@ def check_all_services(conn) -> dict:
         health["captive_portal"] = {
             "running":         cp.get("enabled", False),
             "state":           cp.get("state", "stopped"),
-            "active_sessions": cp.get("active_sessions", 0),
+            "active_sessions": cp.get("active_sessions_count", 0),
             "message":         "",
         }
     except Exception as exc:

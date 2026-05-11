@@ -1466,7 +1466,7 @@ def api_cp_create_voucher():
 def api_cp_list_vouchers():
     conn = get_db()
     vouchers = [dict(r) for r in conn.execute(
-        "SELECT id, code, duration_minutes, bandwidth_kbps, redeemed, redeemed_at, created_at"
+        "SELECT id, code, duration_minutes, bandwidth_kbps, redeemed, redeemed_at, created_at, disabled"
         " FROM captive_vouchers ORDER BY created_at DESC LIMIT 200"
     )]
     return jsonify({"ok": True, "vouchers": vouchers})

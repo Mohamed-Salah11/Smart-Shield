@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 15
+CURRENT_SCHEMA_VERSION = 16
 
 
 class SchemaVersionError(RuntimeError):
@@ -385,6 +385,23 @@ def _migration_v15(conn):
             pass  # column already exists on fresh installs
 
 
+def _migration_v16(conn):
+    """
+    Add gateway health tracking columns to the gateways table.
+
+    reachable  — last known ping result (1=up, 0=down, NULL=never checked)
+    last_seen  — timestamp of last successful reachability check
+    """
+    for ddl in [
+        "ALTER TABLE gateways ADD COLUMN reachable INTEGER DEFAULT NULL",
+        "ALTER TABLE gateways ADD COLUMN last_seen  TIMESTAMP DEFAULT NULL",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists on fresh installs
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -402,6 +419,7 @@ MIGRATIONS = [
     (13, _migration_v13),
     (14, _migration_v14),
     (15, _migration_v15),
+    (16, _migration_v16),
 ]
 
 

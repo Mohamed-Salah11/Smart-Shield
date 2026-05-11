@@ -83,9 +83,28 @@ def api_save_settings():
 
     from app.secret_store import encrypt_secret
     conn = get_db()
+
+    # Load existing settings to merge (don't overwrite fields not in this request)
+    existing = {}
+    try:
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
+        ).fetchone()
+        if row:
+            existing = json.loads(row["value_json"])
+    except Exception:
+        pass
+
+    if "gemini_api_key" in data:
+        existing["gemini_api_key"] = encrypt_secret(raw_key) if raw_key else ""
+    if "google_cse_key" in data:
+        existing["google_cse_key"] = (data["google_cse_key"] or "").strip()
+    if "google_cse_cx" in data:
+        existing["google_cse_cx"] = (data["google_cse_cx"] or "").strip()
+
     conn.execute(
         "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES (?, ?)",
-        ("chatbot_settings", json.dumps({"gemini_api_key": encrypt_secret(raw_key) if raw_key else ""})),
+        ("chatbot_settings", json.dumps(existing)),
     )
     conn.commit()
 
@@ -94,7 +113,7 @@ def api_save_settings():
         action="chatbot_key_update",
         username=session.get("username"),
         remote_addr=request.remote_addr,
-        details={"key_set": bool(raw_key)},
+        details={"key_set": bool(raw_key), "cse_set": bool(existing.get("google_cse_key"))},
     )
     return jsonify({"ok": True, "has_key": bool(raw_key)})
 
