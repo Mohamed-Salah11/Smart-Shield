@@ -19,11 +19,26 @@
 #     -subj "/CN=smart-shield.local"
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Redirect plain HTTP to HTTPS
+# Captive portal and content-policy block page must be reachable over plain HTTP
+# (no cert warning, mobile CNA detection works).  /portal/ is proxied directly
+# to Flask; everything else is redirected to HTTPS.
 server {
     listen      80;
     server_name _;
-    return 301  https://$host$request_uri;
+
+    location /portal/ {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto http;
+        proxy_read_timeout 60s;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 
 # HTTPS front-end — proxies to gunicorn on localhost:5000

@@ -80,7 +80,27 @@ def generate_dns_filter_zones(conn) -> list:
             lines.append(f'    local-zone: "{fqdn}" redirect')
             lines.append(f'    local-data: "{fqdn} 5 A {redirect_ip}"')
         elif action == "allow":
-            lines.append(f'    local-zone: "{fqdn}" transparent')
+            # "Allow whitelist only" — block for everyone; whitelist_view overrides back to transparent.
+            if block_ip:
+                lines.append(f'    local-zone: "{fqdn}" redirect')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
+            else:
+                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+    return lines
+
+
+def generate_dns_whitelist_overrides(conn) -> list:
+    """
+    Return local-zone transparent overrides for 'allow whitelist only' DNS rules.
+    Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
+    """
+    rules = _rows(conn, "SELECT domain FROM filter_dns_rules WHERE action='allow' AND enabled=1")
+    lines = []
+    for rule in rules:
+        domain = _sanitize_domain(rule.get("domain") or "")
+        if not domain:
+            continue
+        lines.append(f'    local-zone: "{domain}." transparent')
     return lines
 
 
@@ -103,6 +123,10 @@ def add_dns_filter_rule(
     domain = _sanitize_domain(domain)
     if not domain:
         raise ValueError("Domain must not be empty.")
+    if action not in ("block", "allow", "redirect"):
+        raise ValueError("Action must be 'block', 'allow', or 'redirect'.")
+    if action == "redirect" and not redirect_ip:
+        raise ValueError("A redirect IP is required for 'redirect' action.")
     cur = conn.cursor()
     cur.execute(
         """

@@ -1405,6 +1405,10 @@ ON static_leases(mac_address)
         ON tracked_hosts(last_seen)
         """
     )
+    cursor.execute("PRAGMA table_info(tracked_hosts)")
+    _th_cols = {row["name"] for row in cursor.fetchall()}
+    if _th_cols and "is_whitelisted" not in _th_cols:
+        cursor.execute("ALTER TABLE tracked_hosts ADD COLUMN is_whitelisted INTEGER DEFAULT 0")
 
     # ----------------------------
     # IDS / IPS (Suricata)

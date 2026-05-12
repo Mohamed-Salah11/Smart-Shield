@@ -58,7 +58,6 @@
             <th style="width:40px;">On</th>
             <th>Domain / Zone</th>
             <th>Action</th>
-            <th>Redirect IP</th>
             <th>Category</th>
             <th>Description</th>
             <th style="width:110px;">Actions</th>
@@ -80,8 +79,7 @@
               </label>
             </td>
             <td class="mono">{{ r.domain }}</td>
-            <td><span class="badge-action badge-{{ r.action }}">{{ r.action }}</span></td>
-            <td class="mono" style="font-size:.78rem;color:var(--muted);">{{ r.redirect_ip or '—' }}</td>
+            <td><span class="badge-action badge-{{ r.action }}">{{ 'Redirect to block page' if r.action == 'block' else ('Allow whitelist only' if r.action == 'allow' else r.action) }}</span></td>
             <td><span class="badge-cat">{{ r.category }}</span></td>
             <td style="color:var(--muted);font-size:.78rem;">{{ r.description or '—' }}</td>
             <td>
@@ -118,15 +116,10 @@
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
-          <select id="f-action" class="form-select" onchange="toggleRedirect()">
-            <option value="block">Block (NXDOMAIN)</option>
-            <option value="allow">Allow (whitelist override)</option>
-            <option value="redirect">Redirect to IP (block page)</option>
+          <select id="f-action" class="form-select">
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
-        </div>
-        <div class="mb-3 d-none" id="redirect-group">
-          <label class="form-label fw-semibold">Redirect IP</label>
-          <input type="text" id="f-redirect-ip" class="form-control" placeholder="e.g. 192.168.1.10">
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Category</label>
@@ -169,15 +162,10 @@
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
-          <select id="e-action" class="form-select" onchange="toggleEditRedirect()">
-            <option value="block">Block (NXDOMAIN)</option>
-            <option value="allow">Allow (whitelist override)</option>
-            <option value="redirect">Redirect to IP (block page)</option>
+          <select id="e-action" class="form-select">
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
-        </div>
-        <div class="mb-3 d-none" id="e-redirect-group">
-          <label class="form-label fw-semibold">Redirect IP</label>
-          <input type="text" id="e-redirect-ip" class="form-control" placeholder="e.g. 192.168.1.10">
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Category</label>
@@ -212,15 +200,6 @@ const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
 function closeModal(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
 
-function toggleRedirect() {
-  document.getElementById('redirect-group').classList.toggle('d-none',
-    document.getElementById('f-action').value !== 'redirect');
-}
-
-function toggleEditRedirect() {
-  document.getElementById('e-redirect-group').classList.toggle('d-none',
-    document.getElementById('e-action').value !== 'redirect');
-}
 
 function showToast(msg, ok) {
   const el = document.getElementById('toast');
@@ -272,7 +251,6 @@ async function submitAdd() {
   const r = await api('/filters/dns/add', {
     domain,
     action: document.getElementById('f-action').value,
-    redirect_ip: document.getElementById('f-redirect-ip').value.trim(),
     category: document.getElementById('f-category').value,
     description: document.getElementById('f-description').value.trim(),
   });
@@ -286,9 +264,7 @@ function openEdit(id) {
   document.getElementById('e-id').value = id;
   document.getElementById('e-domain').value = row.dataset.domain || '';
   const action = row.dataset.action || 'block';
-  document.getElementById('e-action').value = action;
-  document.getElementById('e-redirect-ip').value = row.dataset.redirect || '';
-  document.getElementById('e-redirect-group').classList.toggle('d-none', action !== 'redirect');
+  document.getElementById('e-action').value = action === 'redirect' ? 'block' : action;
   document.getElementById('e-category').value = row.dataset.category || 'custom';
   document.getElementById('e-description').value = row.dataset.description || '';
   openModal('editModal');
@@ -299,10 +275,9 @@ async function submitEdit() {
   const domain = document.getElementById('e-domain').value.trim();
   if (!domain) { showToast('Domain is required.', false); return; }
   const action = document.getElementById('e-action').value;
-  const redirect_ip = document.getElementById('e-redirect-ip').value.trim();
   const category = document.getElementById('e-category').value;
   const description = document.getElementById('e-description').value.trim();
-  const r = await api(`/filters/dns/${id}/edit`, { domain, action, redirect_ip, category, description }, 'PUT');
+  const r = await api(`/filters/dns/${id}/edit`, { domain, action, category, description }, 'PUT');
   if (r.ok) {
     closeModal('editModal');
     showToast('Rule updated.', true);
@@ -310,14 +285,13 @@ async function submitEdit() {
     if (row) {
       row.dataset.domain = domain;
       row.dataset.action = action;
-      row.dataset.redirect = redirect_ip;
       row.dataset.category = category;
       row.dataset.description = description;
       row.cells[1].textContent = domain;
-      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(action)}">${esc(action)}</span>`;
-      row.cells[3].textContent = redirect_ip || '—';
-      row.cells[4].innerHTML = `<span class="badge-cat">${esc(category)}</span>`;
-      row.cells[5].textContent = description || '—';
+      const actionLabel = action === 'block' ? 'Redirect to block page' : action === 'allow' ? 'Allow whitelist only' : action;
+      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(action)}">${esc(actionLabel)}</span>`;
+      row.cells[3].innerHTML = `<span class="badge-cat">${esc(category)}</span>`;
+      row.cells[4].textContent = description || '—';
     }
     scheduleApply();
   } else showToast(r.message, false);

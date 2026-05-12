@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, render_template, request, session
 from app.audit_log import log_event
 from app.database import get_db
 from app.auth_utils import login_required
@@ -441,7 +441,7 @@ def _list_tracked_hosts(cur, interface_type_filter=None):
         cur.execute(
             """
             SELECT id, interface_type, interface_name, ip_address, mac_address, hostname,
-                   discovered_via, first_seen, last_seen
+                   discovered_via, first_seen, last_seen, is_whitelisted
             FROM tracked_hosts
             WHERE interface_type = ?
             ORDER BY interface_type, ip_address
@@ -452,7 +452,7 @@ def _list_tracked_hosts(cur, interface_type_filter=None):
         cur.execute(
             """
             SELECT id, interface_type, interface_name, ip_address, mac_address, hostname,
-                   discovered_via, first_seen, last_seen
+                   discovered_via, first_seen, last_seen, is_whitelisted
             FROM tracked_hosts
             ORDER BY interface_type, ip_address
             """
@@ -998,6 +998,54 @@ def refresh_hosts():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def sync_device_whitelist_pf(conn):
+    """Flush and repopulate the <device_whitelist> PF table from is_whitelisted hosts."""
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.priv_helper import run_privileged
+        ips = [
+            r["ip_address"]
+            for r in conn.execute(
+                "SELECT ip_address FROM tracked_hosts WHERE is_whitelisted=1"
+            ).fetchall()
+        ]
+        run_privileged("pf.table_flush", {"table": "device_whitelist"})
+        if ips:
+            run_privileged("pf.table_add", {"table": "device_whitelist", "ips": ips})
+    except Exception:
+        pass
+
+
+@network_api_bp.route("/hosts/<int:host_id>/whitelist", methods=["PATCH"])
+@login_required
+def toggle_whitelist(host_id):
+    """Set or clear is_whitelisted for a tracked host and sync the PF table."""
+    data = request.get_json(force=True) or {}
+    whitelisted = 1 if data.get("whitelisted") else 0
+    conn = get_db()
+    row = conn.execute("SELECT id FROM tracked_hosts WHERE id=?", (host_id,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "message": "Host not found."}), 404
+    conn.execute("UPDATE tracked_hosts SET is_whitelisted=? WHERE id=?", (whitelisted, host_id))
+    conn.commit()
+    sync_device_whitelist_pf(conn)
+    log_event(
+        category="system", action="device_whitelist_toggle",
+        username=session.get("username"), remote_addr=request.remote_addr,
+        details={"host_id": host_id, "whitelisted": bool(whitelisted)},
+    )
+    return jsonify({"ok": True, "whitelisted": bool(whitelisted)})
+
+
+@network_api_bp.route("/devices", methods=["GET"])
+@login_required
+def devices_page():
+    """Render the network devices page."""
+    return render_template("network_devices.html")
+
 
 @network_api_bp.route("/web-activity", methods=["GET"])
 @login_required

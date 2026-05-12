@@ -48,12 +48,26 @@ def _addr(addr: Optional[str]) -> str:
 
 def _proto_line(proto: Optional[str]) -> str:
     p = (proto or "").strip().lower()
-    return f"proto {p} " if p and p not in {"any", "all", ""} else ""
+    if not p or p in {"any", "all", ""}:
+        return ""
+    if p in {"tcp+udp", "tcp/udp"}:
+        return "proto { tcp udp } "
+    if p in {"icmpv6", "ipv6-icmp"}:
+        return "proto icmp6 "
+    return f"proto {p} "
 
 
 def _port_line(port: Optional[str], prefix="port ") -> str:
+    import re as _re
     p = (port or "").strip()
-    return f"{prefix}{p} " if p and p not in {"any", ""} else ""
+    if not p or p.lower() in {"any", ""}:
+        return ""
+    # Split on commas or whitespace, normalize each range separator - → :
+    parts = [x.strip() for x in _re.split(r"[,\s]+", p) if x.strip()]
+    normalized = [_re.sub(r"^(\d+)-(\d+)$", r"\1:\2", part) for part in parts]
+    if len(normalized) == 1:
+        return f"{prefix}{normalized[0]} "
+    return f"{prefix}{{ {' '.join(normalized)} }} "
 
 
 # ---------------------------------------------------------------------------
@@ -127,13 +141,21 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
         iface       = (r.get("interface") or wan_iface).strip() or wan_iface
         proto       = (r.get("protocol") or "tcp").lower()
         src         = _addr(r.get("src_address"))
-        dst         = _addr(r.get("dst_address"))
         redirect    = _addr(r.get("redirect_ip"))
         redir_port  = (r.get("redirect_port") or r.get("local_port") or "").strip()
         dst_port    = _port_line(r.get("dst_port") or r.get("destination_port"))
         desc        = (r.get("description") or "").strip()
         if not redirect or redirect == "any":
             continue  # skip rules with no redirect target
+        # Resolve destination: dst_type=wan_address → (iface); otherwise use dst_address
+        dst_type = (r.get("dst_type") or "").strip().lower()
+        dst_raw  = _addr(r.get("dst_address"))
+        if dst_type == "wan_address":
+            dst = f"({iface})"
+        elif dst_raw and dst_raw != "any":
+            dst = dst_raw
+        else:
+            dst = "any"
         redir_target = f"{redirect} port {redir_port}" if redir_port else redirect
         if desc:
             lines.append(f"# {desc}")
@@ -141,10 +163,11 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
     # NAT Reflection (hairpin NAT) — LAN clients connecting to WAN IP for port-forwards
     try:
-        _afn = conn.execute(
-            "SELECT nat_reflection FROM advanced_firewall_nat WHERE id=1"
+        _afn_nr = conn.execute(
+            "SELECT nat_reflection_mode FROM advanced_firewall_nat WHERE id=1"
         ).fetchone()
-        _nat_reflection = bool(_afn["nat_reflection"]) if _afn and _afn["nat_reflection"] is not None else False
+        _mode = (_afn_nr["nat_reflection_mode"] or "disabled") if _afn_nr else "disabled"
+        _nat_reflection = _mode.lower() not in ("disabled", "", "none")
     except Exception:
         _nat_reflection = False
 
@@ -546,10 +569,12 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
     if block_bogons or block_private_nets:
         lines.append("")
 
-    # Sane ICMP pass rules (types safe to pass; covers ping + path MTU discovery)
-    lines.append("# ICMP: allow essential types, drop the rest")
+    # Sane ICMP pass rules.
+    # pass in does NOT include echoreq so that user firewall rules can block ping.
+    # pass out keeps echoreq so the firewall itself can ping outbound.
+    lines.append("# ICMP: allow essential error types inbound; echoreq handled by user rules")
     lines.append(
-        "pass in  quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
+        "pass in  inet proto icmp  icmp-type  { unreach timex paramprob } keep state"
     )
     lines.append(
         "pass out quick inet proto icmp  icmp-type  { echoreq unreach timex paramprob squench } keep state"
@@ -677,6 +702,15 @@ def generate_pf_conf(conn) -> str:
     except Exception:
         pass
 
+    # Read advanced firewall/NAT settings once; fall back to safe defaults if missing
+    _afn = {}
+    try:
+        _afn_row = conn.execute("SELECT * FROM advanced_firewall_nat WHERE id=1").fetchone()
+        if _afn_row:
+            _afn = dict(_afn_row)
+    except Exception:
+        pass
+
     macros = textwrap.dedent(f"""\
         # ============================================================
         # Smart Shield — auto-generated pf.conf
@@ -692,19 +726,52 @@ def generate_pf_conf(conn) -> str:
 
     base_tables = (
         "table <authenticated_clients> persist\n"
-        "table <admin_bypass_clients> persist\n\n"
+        "table <admin_bypass_clients> persist\n"
+        "table <device_whitelist> persist\n\n"
     )
 
-    options = textwrap.dedent("""\
-        set block-policy drop
-        set skip on lo0
+    opt_value = (_afn.get("firewall_optimization") or "normal").strip().lower()
+    options = (
+        f"set block-policy drop\n"
+        f"set skip on lo0\n"
+        f"set optimization {opt_value}\n\n"
+    )
 
-    """)
+    _max_states = int(_afn.get("firewall_max_states") or 1990000)
+    _max_frags  = int(_afn.get("firewall_max_fragment") or 5000)
+    _max_table  = int(_afn.get("firewall_max_table") or 400000)
+    limits = (
+        f"set limit {{ states {_max_states}, frags {_max_frags} }}\n"
+        f"set limit table-entries {_max_table}\n\n"
+    )
 
-    scrub = textwrap.dedent("""\
-        scrub in all
+    _adp_start = int(_afn.get("adaptive_start") or 1134000)
+    _adp_end   = int(_afn.get("adaptive_end") or 2333332)
+    _timeout_keys = [
+        ("tcp_first", "tcp.first"), ("tcp_opening", "tcp.opening"),
+        ("tcp_established", "tcp.established"), ("tcp_closing", "tcp.closing"),
+        ("tcp_fin_wait", "tcp.fin_wait"), ("tcp_closed", "tcp.closed"),
+        ("tcp_tsdiff", "tcp.tsdiff"),
+        ("udp_first", "udp.first"), ("udp_single", "udp.single"),
+        ("udp_multiple", "udp.multiple"),
+        ("icmp_first", "icmp.first"), ("icmp_error", "icmp.error"),
+        ("other_first", "other.first"), ("other_single", "other.single"),
+        ("other_multiple", "other.multiple"),
+    ]
+    _tv = [f"{pf_key} {int(_afn[db_key])}" for db_key, pf_key in _timeout_keys if _afn.get(db_key)]
+    _tv += [f"adaptive.start {_adp_start}", f"adaptive.end {_adp_end}"]
+    timeouts = f"set timeout {{ {', '.join(_tv)} }}\n\n"
 
-    """)
+    if _afn.get("disable_scrub"):
+        scrub = ""
+    elif _afn.get("enable_mss") and _afn.get("maximum_mss"):
+        scrub = f"scrub in all max-mss {int(_afn['maximum_mss'])}\n\n"
+    else:
+        scrub = "scrub in all\n\n"
+
+    # Routing-only mode: disable all filtering when admin requests it
+    if _afn.get("disable_firewall"):
+        return macros + base_tables + "# Firewall disabled — pass all traffic\npass all\n"
 
     # Default outbound masquerade only when no explicit outbound rules
     out_count = _rows(conn, "SELECT COUNT(*) AS c FROM nat_outbound WHERE disabled=0")[0]["c"]
@@ -770,6 +837,8 @@ def generate_pf_conf(conn) -> str:
         + _build_alias_tables(conn)
         + _build_dummynet_pipes(conn)
         + options
+        + limits
+        + timeouts
         + scrub
         + _build_shaper_queues(conn, wan_iface, lan_iface)
         + default_nat

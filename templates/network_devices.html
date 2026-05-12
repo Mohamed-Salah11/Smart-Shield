@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container">
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Network Devices</h1>
+      <p class="ss-page-desc">LAN device inventory with content policy whitelist management</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadDevices()">
+        <i class="fa-solid fa-rotate me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-laptop-code"></i></div>
+      <div>
+        <div class="ss-card-title">LAN Devices</div>
+        <div class="ss-card-subtitle">Auto-discovered via ARP and DHCP. Whitelisted devices bypass "Allow whitelist only" content policy rules.</div>
+      </div>
+      <div class="ss-card-actions">
+        <span id="deviceCount" style="padding:3px 12px;background:var(--primary-soft);color:var(--primary);border-radius:20px;font-size:.8rem;font-weight:600;">0 devices</span>
+      </div>
+    </div>
+
+    <div class="ss-card-body" style="padding-bottom:0;">
+      <input type="text" id="deviceSearch" class="form-control form-control-sm mb-3"
+             placeholder="Search by hostname, IP, or MAC…" oninput="filterTable()">
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Hostname</th>
+            <th>IP Address</th>
+            <th>MAC Address</th>
+            <th>Joined</th>
+            <th>Discovered Via</th>
+            <th style="min-width:120px;">Whitelist</th>
+          </tr>
+        </thead>
+        <tbody id="devicesTbody">
+          <tr><td colspan="6" class="text-center text-muted p-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let _allDevices = [];
+
+function escapeHtml(t) {
+  const d = document.createElement('div');
+  d.textContent = t == null ? '' : String(t);
+  return d.innerHTML;
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts.replace(' ', 'T') + 'Z');
+  if (isNaN(d)) return ts;
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function renderRows(devices) {
+  const tbody = document.getElementById('devicesTbody');
+  if (!devices.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted p-4">No LAN devices found. Click Refresh to discover devices.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = devices.map(h => `
+    <tr>
+      <td>${escapeHtml(h.hostname || '—')}</td>
+      <td><code class="text-primary">${escapeHtml(h.ip_address || '—')}</code></td>
+      <td><code>${escapeHtml(h.mac_address || '—')}</code></td>
+      <td class="small text-muted">${formatDate(h.first_seen)}</td>
+      <td><span class="badge bg-secondary">${escapeHtml(h.discovered_via || '—')}</span></td>
+      <td>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch"
+                 id="wl-${h.id}" ${h.is_whitelisted ? 'checked' : ''}
+                 onchange="toggleWhitelist(${h.id}, this)">
+          <label class="form-check-label" for="wl-${h.id}" style="font-size:.8rem;">
+            ${h.is_whitelisted ? '<span class="text-success">Whitelisted</span>' : '<span class="text-muted">Not listed</span>'}
+          </label>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('deviceSearch').value.toLowerCase();
+  if (!q) { renderRows(_allDevices); return; }
+  const filtered = _allDevices.filter(h =>
+    (h.hostname || '').toLowerCase().includes(q) ||
+    (h.ip_address || '').toLowerCase().includes(q) ||
+    (h.mac_address || '').toLowerCase().includes(q)
+  );
+  renderRows(filtered);
+}
+
+async function loadDevices() {
+  const tbody = document.getElementById('devicesTbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted p-4">Refreshing…</td></tr>';
+  try {
+    const r = await fetch('/api/network/hosts/refresh', {method: 'POST'});
+    const rd = await r.json();
+  } catch (_) {}
+  try {
+    const r = await fetch('/api/network/hosts?interface_type=LAN');
+    const d = await r.json();
+    _allDevices = (d.data || []);
+    document.getElementById('deviceCount').textContent = `${_allDevices.length} device${_allDevices.length !== 1 ? 's' : ''}`;
+    filterTable();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger p-4">Failed to load devices: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+async function toggleWhitelist(hostId, checkbox) {
+  const whitelisted = checkbox.checked;
+  const label = checkbox.nextElementSibling;
+  checkbox.disabled = true;
+  try {
+    const r = await fetch(`/api/network/hosts/${hostId}/whitelist`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({whitelisted}),
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      checkbox.checked = !whitelisted;
+      alert(d.message || 'Failed to update whitelist.');
+    } else {
+      label.innerHTML = whitelisted
+        ? '<span class="text-success">Whitelisted</span>'
+        : '<span class="text-muted">Not listed</span>';
+      const host = _allDevices.find(h => h.id === hostId);
+      if (host) host.is_whitelisted = whitelisted ? 1 : 0;
+    }
+  } catch (e) {
+    checkbox.checked = !whitelisted;
+    alert('Error: ' + e.message);
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadDevices);
+</script>
+{% endblock %}

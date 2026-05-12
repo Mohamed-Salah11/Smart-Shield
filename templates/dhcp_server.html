@@ -260,7 +260,7 @@ function serializeDhcpServerForm() {
   let anonCounter = 0;
   document.querySelectorAll('.ss-card:not(:last-child) input, .ss-card:not(:last-child) select, .ss-card:not(:last-child) textarea').forEach(el => {
     if (el.type === 'button' || el.type === 'submit') return;
-    const key = el.id || `__anon_${anonCounter++}`;
+    const key = el.name || el.id || `__anon_${anonCounter++}`;
     if (el.type === 'checkbox') settings.fields[key] = { type: 'checkbox', value: !!el.checked };
     else settings.fields[key] = { type: el.tagName.toLowerCase(), value: el.value };
   });
@@ -271,7 +271,7 @@ function applyDhcpServerForm(settings) {
   const fields = (settings || {}).fields || {};
   Object.keys(fields).forEach(key => {
     const entry = fields[key]; if (!entry) return;
-    const el = document.getElementById(key); if (!el) return;
+    const el = document.querySelector(`[name="${key}"]`) || document.getElementById(key); if (!el) return;
     if (entry.type === 'checkbox') el.checked = !!entry.value;
     else el.value = entry.value ?? '';
   });
@@ -294,35 +294,30 @@ function saveDhcpServerSettings() {
   }).catch(err => alert(err.message || String(err)));
 }
 
-function loadStaticMappings() {
-  const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-  const tbody = document.getElementById('static_mappings_body');
-  const emptyRow = document.getElementById('empty_row');
-  if (mappings.length > 0) {
-    emptyRow.style.display = 'none';
-    tbody.innerHTML = mappings.map((m, i) => `
-      <tr>
-        <td style="padding:8px 14px;">${m.ip_address}</td><td>${m.hostname}</td>
-        <td><code>${m.mac_address}</code></td><td>${m.description}</td>
-        <td>
-          <button onclick="editMapping(${i})" class="btn btn-sm btn-primary me-1">Edit</button>
-          <button onclick="deleteMapping(${i})" class="btn btn-sm btn-danger">Delete</button>
-        </td>
-      </tr>`).join('');
-  } else { emptyRow.style.display = 'table-row'; }
+async function loadStaticMappings() {
+  try {
+    const r = await fetch('/api/network/leases');
+    const d = await r.json();
+    const mappings = (d.data || []).filter(m => m.interface_type === 'wan');
+    const tbody = document.getElementById('static_mappings_body');
+    const emptyRow = document.getElementById('empty_row');
+    if (mappings.length > 0) {
+      emptyRow.style.display = 'none';
+      tbody.innerHTML = mappings.map(m => `
+        <tr>
+          <td style="padding:8px 14px;">${m.ip_address}</td>
+          <td>${m.hostname || ''}</td>
+          <td><code>${m.mac_address}</code></td>
+          <td>${m.description || ''}</td>
+          <td><button onclick="deleteMapping(${m.id})" class="btn btn-sm btn-danger">Delete</button></td>
+        </tr>`).join('');
+    } else { emptyRow.style.display = 'table-row'; }
+  } catch (e) { console.error('Failed to load static mappings:', e); }
 }
-
-function editMapping(index) {
-  localStorage.setItem('edit_mapping_index', index);
-  window.location.href = '{{ url_for("services.dhcp_static_mapping") }}';
-}
-function deleteMapping(index) {
-  if (confirm('Delete this static mapping?')) {
-    const m = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-    m.splice(index, 1);
-    localStorage.setItem('dhcp_static_mappings', JSON.stringify(m));
-    loadStaticMappings();
-  }
+async function deleteMapping(id) {
+  if (!confirm('Delete this static mapping?')) return;
+  await fetch(`/api/network/leases/${id}`, { method: 'DELETE' });
+  loadStaticMappings();
 }
 
 document.addEventListener('DOMContentLoaded', function() {

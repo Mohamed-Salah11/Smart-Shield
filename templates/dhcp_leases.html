@@ -92,5 +92,53 @@
       {% endif %}
     </div>
   </div>
+
+  <div class="ss-card mt-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div><div class="ss-card-title">Active Dynamic Leases</div><div class="ss-card-subtitle">Live data from dhcpd.leases file</div></div>
+      <div class="ss-card-actions">
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadLiveLeases()">
+          <i class="fa-solid fa-rotate me-1"></i>Refresh
+        </button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr><th>IP Address</th><th>MAC Address</th><th>Hostname</th><th>Starts</th><th>Ends</th></tr>
+        </thead>
+        <tbody id="live-leases-body">
+          <tr><td colspan="5" class="text-center text-muted p-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
+
+<script>
+async function loadLiveLeases() {
+    const tbody = document.getElementById('live-leases-body');
+    try {
+        const r = await fetch('/status/api/dhcp/leases');
+        const d = await r.json();
+        const leases = d.leases || [];
+        if (!leases.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4">No active leases.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = leases.map(l => `
+          <tr>
+            <td><code class="text-primary">${l.ip_address || '&mdash;'}</code></td>
+            <td><code>${l.mac_address || '&mdash;'}</code></td>
+            <td>${l.hostname || '&mdash;'}</td>
+            <td class="small text-muted">${l.starts || '&mdash;'}</td>
+            <td class="small text-muted">${l.ends || '&mdash;'}</td>
+          </tr>`).join('');
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">Failed to load live leases.</td></tr>';
+    }
+}
+document.addEventListener('DOMContentLoaded', loadLiveLeases);
+</script>
 {% endblock %}

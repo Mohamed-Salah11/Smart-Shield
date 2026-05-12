@@ -1,9 +1,14 @@
 import json as _json
 from flask import Blueprint, render_template, request, jsonify, session
 from app.auth_utils import login_required
+from app.api_auth import api_permission_required
 from app.audit_log import tail_events, tail_events_since, log_stats
 
 status_bp = Blueprint("status", __name__, url_prefix="/status")
+
+# Interfaces to exclude from network stats (loopback, PF log, IPsec enc).
+# VPN tunnel interfaces (tun*, gif*, gre*) are kept — they carry real user traffic.
+_VIRTUAL_IFACE_PREFIXES = frozenset(("lo", "pflog", "enc"))
 
 
 # --------------------------------------------------
@@ -176,6 +181,8 @@ def api_interface_stats():
                 #   Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
                 #   [0]  [1] [2]     [3]     [4]   [5]   [6]    [7]   [8]   [9]   [10]
                 if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2], re.IGNORECASE):
+                    if parts[0].rstrip("0123456789").lower() in _VIRTUAL_IFACE_PREFIXES:
+                        continue
                     try:
                         stats.append({
                             "name":     parts[0],
@@ -404,6 +411,7 @@ def api_pf_rollback():
 
 @status_bp.route("/api/dhcp/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def api_dhcp_apply():
     """Validate, write, and restart isc-dhcpd."""
     from app.database import get_db

@@ -137,15 +137,8 @@ def dns_add():
 
     if not domain:
         return jsonify({"ok": False, "message": "Domain is required."}), 400
-    if action not in ("block", "allow", "redirect"):
-        return jsonify({"ok": False, "message": "Invalid action."}), 400
-    if action == "redirect":
-        if not redirect_ip:
-            return jsonify({"ok": False, "message": "Redirect IP is required for redirect action."}), 400
-        try:
-            validate_ip(redirect_ip, allow_empty=False)
-        except ValueError as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+    if action not in ("block", "allow"):
+        return jsonify({"ok": False, "message": "Invalid action. Use 'block' or 'allow'."}), 400
 
     try:
         conn = get_db()
@@ -388,23 +381,14 @@ def app_add():
             username=session.get("username"), remote_addr=request.remote_addr,
             details={"app_name": app_name, "id": row_id},
         )
-        block_dns_val = bool(data.get("block_dns", True))
-        block_ports_val = bool(data.get("block_ports", False))
-        ports_val = (data.get("ports") or "").strip()
+        rule = dict(conn.execute(
+            "SELECT * FROM filter_app_rules WHERE id=?", (row_id,)
+        ).fetchone())
         return jsonify({
             "ok": True,
             "message": f"Application filter added for '{app_name}'.",
             "id": row_id,
-            "rule": {
-                "id": row_id,
-                "app_name": app_name,
-                "action": (data.get("action") or "block").lower(),
-                "category": (data.get("category") or "custom").strip(),
-                "block_dns": 1 if block_dns_val else 0,
-                "block_ports": 1 if block_ports_val else 0,
-                "ports": ports_val,
-                "enabled": 1,
-            },
+            "rule": rule,
         })
     except ValueError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400

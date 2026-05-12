@@ -341,18 +341,43 @@ def generate_app_filter_dns_zones(conn) -> list:
     """)
     lines = []
     for rule in rules:
-        if (rule.get("action") or "block").lower() != "block":
-            continue
+        action = (rule.get("action") or "block").lower()
         for raw in (rule.get("domains") or "").split(","):
             domain = raw.strip().lower().lstrip("*.").strip(".")
             if not domain:
                 continue
             fqdn = domain + "."
-            if block_ip:
-                lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} A {block_ip}"')
-            else:
-                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+            if action == "block":
+                if block_ip:
+                    lines.append(f'    local-zone: "{fqdn}" redirect')
+                    lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                else:
+                    lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+            elif action == "allow":
+                # "Allow whitelist only" — block for everyone; whitelist_view overrides.
+                if block_ip:
+                    lines.append(f'    local-zone: "{fqdn}" redirect')
+                    lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                else:
+                    lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+    return lines
+
+
+def generate_app_filter_dns_overrides(conn) -> list:
+    """
+    Return local-zone transparent overrides for 'allow whitelist only' app DNS rules.
+    Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
+    """
+    rules = _rows(conn, """
+        SELECT domains FROM filter_app_rules
+        WHERE action='allow' AND block_dns=1 AND enabled=1
+    """)
+    lines = []
+    for rule in rules:
+        for raw in (rule.get("domains") or "").split(","):
+            domain = raw.strip().lower().lstrip("*.").strip(".")
+            if domain:
+                lines.append(f'    local-zone: "{domain}." transparent')
     return lines
 
 
@@ -369,7 +394,13 @@ def generate_app_filter_pf_rules(conn) -> str:
     """)
     lines = []
     for rule in rules:
-        if (rule.get("action") or "block").lower() != "block":
+        action = (rule.get("action") or "block").lower()
+        if action == "block":
+            src_excl = "!<admin_bypass_clients>"
+        elif action == "allow":
+            # "Allow whitelist only" — block non-whitelisted devices only.
+            src_excl = "!<device_whitelist>"
+        else:
             continue
         ports_raw = (rule.get("ports") or "").strip()
         if not ports_raw:
@@ -391,10 +422,10 @@ def generate_app_filter_pf_rules(conn) -> str:
         port_list = "{ " + " ".join(parts) + " }"
         lines.append(f"# {app_name}")
         if protocol == "tcp+udp":
-            lines.append(f"block quick proto tcp from !<admin_bypass_clients> to any port {port_list}")
-            lines.append(f"block quick proto udp from !<admin_bypass_clients> to any port {port_list}")
+            lines.append(f"block quick proto tcp from {src_excl} to any port {port_list}")
+            lines.append(f"block quick proto udp from {src_excl} to any port {port_list}")
         else:
-            lines.append(f"block quick proto {protocol} from !<admin_bypass_clients> to any port {port_list}")
+            lines.append(f"block quick proto {protocol} from {src_excl} to any port {port_list}")
 
     if not lines:
         return ""

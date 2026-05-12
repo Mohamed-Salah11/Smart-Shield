@@ -121,6 +121,19 @@ def generate_unbound_conf(conn) -> str:
     if lan_subnet:
         lines.append(f"    access-control: {lan_subnet} allow")
 
+    # Whitelist view: whitelisted devices get transparent overrides for "allow whitelist only" rules.
+    try:
+        whitelisted_ips = [
+            r["ip_address"]
+            for r in conn.execute(
+                "SELECT ip_address FROM tracked_hosts WHERE is_whitelisted=1"
+            ).fetchall()
+        ]
+    except Exception:
+        whitelisted_ips = []
+    for ip in whitelisted_ips:
+        lines.append(f"    access-control-view: {ip}/32 whitelist_view")
+
     # SIEM DNS query logging (off by default — admin must enable)
     siem_dns = _load_service_state(conn, "siem_settings")
     dns_query_logging = bool(siem_dns.get("dns_query_logging", False))
@@ -194,6 +207,27 @@ def generate_unbound_conf(conn) -> str:
     for dns in upstream:
         lines.append(f"    forward-addr: {dns}")
     lines.append("")
+
+    # Whitelist view — transparent overrides for "allow whitelist only" rules.
+    if whitelisted_ips:
+        try:
+            import importlib
+            overrides = []
+            for mod_name, fn_name in [
+                ("app.services.dns_filter", "generate_dns_whitelist_overrides"),
+                ("app.services.web_filter", "generate_web_whitelist_overrides"),
+                ("app.services.app_filter", "generate_app_filter_dns_overrides"),
+            ]:
+                mod = importlib.import_module(mod_name)
+                fn  = getattr(mod, fn_name)
+                overrides.extend(fn(conn))
+            if overrides:
+                lines.append("view:")
+                lines.append('    name: "whitelist_view"')
+                lines.extend(overrides)
+                lines.append("")
+        except Exception:
+            pass
 
     return "\n".join(lines)
 

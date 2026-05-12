@@ -20,6 +20,7 @@ function toggleAllCheckboxes(source) {
   </div>
 
   <form action="{{ url_for('system.high_availability') }}" method="POST" id="ha-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- State Sync -->
     <div class="ss-card">
