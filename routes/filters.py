@@ -38,6 +38,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 from app.audit_log import log_event
 from app.auth_utils import login_required
 from app.database import get_db
+from app.validators import validate_ip
 from app.services.app_filter import (
     APP_SIGNATURES,
     add_app_filter_rule,
@@ -138,8 +139,13 @@ def dns_add():
         return jsonify({"ok": False, "message": "Domain is required."}), 400
     if action not in ("block", "allow", "redirect"):
         return jsonify({"ok": False, "message": "Invalid action."}), 400
-    if action == "redirect" and not redirect_ip:
-        return jsonify({"ok": False, "message": "Redirect IP is required for redirect action."}), 400
+    if action == "redirect":
+        if not redirect_ip:
+            return jsonify({"ok": False, "message": "Redirect IP is required for redirect action."}), 400
+        try:
+            validate_ip(redirect_ip, allow_empty=False)
+        except ValueError as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
 
     try:
         conn = get_db()
@@ -177,6 +183,13 @@ def dns_edit(rule_id):
     description = (data.get("description") or "").strip()
     if not domain:
         return jsonify({"ok": False, "message": "Domain is required."}), 400
+    if action == "redirect":
+        if not redirect_ip:
+            return jsonify({"ok": False, "message": "Redirect IP is required for redirect action."}), 400
+        try:
+            validate_ip(redirect_ip, allow_empty=False)
+        except ValueError as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
     try:
         conn = get_db()
         update_dns_filter_rule(conn, rule_id, domain, action, redirect_ip, category, description)

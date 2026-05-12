@@ -31,6 +31,11 @@ smartshield ALL=(root) NOPASSWD: /sbin/pfctl -a captive_portal -f /etc/pf.captiv
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T add *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T delete *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T expire *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T show
 
 # ── Services ─────────────────────────────────────────────────────────────────
@@ -100,6 +105,10 @@ smartshield ALL=(root) NOPASSWD: /sbin/route -n delete default
 # ── Unbound control ──────────────────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control reload
 smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control status
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control local_zone *
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control local_zone_remove *
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control local_data *
+smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control local_data_remove *
 
 # ── Dummynet (traffic limiters) ───────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /sbin/dnctl -q flush

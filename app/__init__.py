@@ -211,7 +211,7 @@ def create_app():
                         'by content policy for your account.</div>'
                         '</div>'
                         '<script>'
-                        f'if(!sessionStorage.getItem("{ss_key}"){{'
+                        f'if(!sessionStorage.getItem("{ss_key}")){{'
                         f'sessionStorage.setItem("{ss_key}","1");'
                         f'setTimeout(function(){{window.location.href="{safe_url}";}},3000);}}'
                         '</script>'

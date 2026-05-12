@@ -391,10 +391,10 @@ def generate_app_filter_pf_rules(conn) -> str:
         port_list = "{ " + " ".join(parts) + " }"
         lines.append(f"# {app_name}")
         if protocol == "tcp+udp":
-            lines.append(f"block quick proto tcp from !<authenticated_clients> to any port {port_list}")
-            lines.append(f"block quick proto udp from !<authenticated_clients> to any port {port_list}")
+            lines.append(f"block quick proto tcp from !<admin_bypass_clients> to any port {port_list}")
+            lines.append(f"block quick proto udp from !<admin_bypass_clients> to any port {port_list}")
         else:
-            lines.append(f"block quick proto {protocol} from !<authenticated_clients> to any port {port_list}")
+            lines.append(f"block quick proto {protocol} from !<admin_bypass_clients> to any port {port_list}")
 
     if not lines:
         return ""

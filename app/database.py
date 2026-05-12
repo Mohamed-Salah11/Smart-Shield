@@ -962,12 +962,20 @@ ON interface_assignments(interface_type)
         src_address TEXT,
         dst_type TEXT,
         dst_address TEXT,
+        dst_port TEXT,
         redirect_ip TEXT,
+        redirect_port TEXT,
         description TEXT,
         nat_reflection TEXT,
         rule_order INTEGER DEFAULT 0
     )
     """)
+    # Migration: add dst_port and redirect_port to existing deployments
+    for _col, _def in [("dst_port", "TEXT"), ("redirect_port", "TEXT")]:
+        try:
+            cursor.execute(f"ALTER TABLE nat_pf ADD COLUMN {_col} {_def}")
+        except Exception:
+            pass
 
     # 1:1 NAT Mappings
     cursor.execute("""
@@ -1483,9 +1491,9 @@ ON static_leases(mac_address)
             except Exception:
                 pass  # secret_store may be unavailable during early migration — skip
 
-    # Seed Google API key from env into service_state if install.sh set it and DB has no entry yet
-    _env_google_key = os.environ.get("GOOGLE_API_KEY", "").strip()
-    if _env_google_key:
+    # Seed Groq API key from env into service_state if install.sh set it and DB has no entry yet
+    _env_groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if _env_groq_key:
         _existing_chatbot = cursor.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
@@ -1495,7 +1503,7 @@ ON static_leases(mac_address)
                 from app.secret_store import encrypt_secret as _enc2
                 cursor.execute(
                     "INSERT OR IGNORE INTO service_state (key_name, value_json) VALUES (?, ?)",
-                    ("chatbot_settings", _json2.dumps({"google_api_key": _enc2(_env_google_key)})),
+                    ("chatbot_settings", _json2.dumps({"groq_api_key": _enc2(_env_groq_key)})),
                 )
             except Exception:
                 pass
