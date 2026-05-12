@@ -86,7 +86,27 @@ def generate_web_filter_zones(conn) -> list:
             else:
                 lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
         elif action == "allow":
-            lines.append(f'    local-zone: "{fqdn}" transparent')
+            # "Allow whitelist only" — block for everyone; whitelist_view overrides back to transparent.
+            if block_ip:
+                lines.append(f'    local-zone: "{fqdn}" redirect')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
+            else:
+                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+    return lines
+
+
+def generate_web_whitelist_overrides(conn) -> list:
+    """
+    Return local-zone transparent overrides for 'allow whitelist only' web rules.
+    Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
+    """
+    rules = _rows(conn, "SELECT url_pattern FROM filter_web_rules WHERE action='allow' AND enabled=1")
+    lines = []
+    for rule in rules:
+        domain = _extract_domain(rule.get("url_pattern") or "")
+        if not domain:
+            continue
+        lines.append(f'    local-zone: "{domain}." transparent')
     return lines
 
 

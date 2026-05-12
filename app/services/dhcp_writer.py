@@ -23,8 +23,8 @@ import textwrap
 
 from app.services.network_service import FreeBSDNetworkError
 
-_DHCPD_CONF_PATH       = "/etc/dhcpd.conf"
-_DHCPD_KNOWN_GOOD_PATH = "/etc/dhcpd.conf.known_good"
+_DHCPD_CONF_PATH       = "/usr/local/etc/dhcpd.conf"
+_DHCPD_KNOWN_GOOD_PATH = "/usr/local/etc/dhcpd.conf.known_good"
 _DHCPD_LEASE_PATH      = "/var/db/dhcpd/dhcpd.leases"
 
 
@@ -274,7 +274,8 @@ def generate_dhcpd_conf(conn) -> str:
             lines.append(f"    hardware ethernet {mac};")
             lines.append(f"    fixed-address {ip};")
             if hostname:
-                lines.append(f'    option host-name "{hostname}";')
+                safe_hostname = hostname.replace('\\', '\\\\').replace('"', '\\"')
+                lines.append(f'    option host-name "{safe_hostname}";')
             lines.append("}")
             lines.append("")
 
@@ -513,7 +514,7 @@ def get_live_leases() -> list:
         leases.append(entry)
 
     # Return only active leases
-    return [l for l in leases if l.get("state", "active") == "active"]
+    return [l for l in leases if l.get("state") == "active"]
 
 
 # ---------------------------------------------------------------------------

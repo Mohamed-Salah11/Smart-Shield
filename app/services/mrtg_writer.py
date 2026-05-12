@@ -40,19 +40,23 @@ def _get_snmp_settings(conn) -> dict:
 
 def _discover_interfaces(conn) -> list:
     """
-    Return list of active interface names from the DB (interfaces table),
-    falling back to ['em0', 'em1'] if no interfaces configured.
+    Return list of active interface port names from wan_config / lan_config,
+    falling back to ['em0', 'em1'] if no interfaces are configured.
     """
+    ifaces, seen = [], set()
     try:
-        rows = [dict(r) for r in conn.execute(
-            "SELECT interface_name FROM interfaces WHERE enabled=1 OR enabled IS NULL ORDER BY interface_type"
-        )]
-        ifaces = [r["interface_name"] for r in rows if r.get("interface_name")]
-        if ifaces:
-            return ifaces
+        for table in ("wan_config", "lan_config"):
+            row = conn.execute(
+                f"SELECT assigned_port FROM {table} LIMIT 1"
+            ).fetchone()
+            if row:
+                port = (row["assigned_port"] or "").strip()
+                if port and port not in seen:
+                    seen.add(port)
+                    ifaces.append(port)
     except Exception:
         pass
-    return ["em0", "em1"]
+    return ifaces or ["em0", "em1"]
 
 
 def generate_mrtg_conf(conn) -> str:

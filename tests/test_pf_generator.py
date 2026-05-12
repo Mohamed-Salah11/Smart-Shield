@@ -301,3 +301,153 @@ class TestReloadPfRules:
         assert "conf" in result
         assert "WAN" in result["conf"]
         assert "Non-FreeBSD" in result["message"]
+
+
+# ---------------------------------------------------------------------------
+# FreeBSD PF correctness — ensures generated config is valid pfctl syntax
+# ---------------------------------------------------------------------------
+
+class TestPfFreeBSDCorrectness:
+    """
+    These tests verify that pf_generator produces syntactically correct PF
+    output that pfctl -nf would accept on FreeBSD.  No FreeBSD required to
+    run; we inspect the generated text directly.
+    """
+
+    # ── Protocol rendering ────────────────────────────────────────────────────
+
+    def test_proto_tcp_udp_renders_braces(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination)"
+            " VALUES ('pass', 0, 'tcp+udp', 'any', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "proto { tcp udp }" in conf
+        assert "proto tcp+udp" not in conf
+
+    def test_proto_tcp_slash_udp_also_renders_braces(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination)"
+            " VALUES ('pass', 0, 'tcp/udp', 'any', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "proto { tcp udp }" in conf
+        assert "proto tcp/udp" not in conf
+
+    def test_proto_icmpv6_renders_icmp6(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_floating (disabled, protocol, source, destination)"
+            " VALUES (0, 'icmpv6', 'any', 'any')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "proto icmp6" in conf
+        assert "proto icmpv6" not in conf
+
+    # ── Port expression rendering ─────────────────────────────────────────────
+
+    def test_port_list_renders_braces(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination, dest_port)"
+            " VALUES ('pass', 0, 'tcp', 'any', 'any', '80,443')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "port { 80 443 }" in conf
+        assert "port 80,443" not in conf
+
+    def test_port_range_renders_colon(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination, dest_port)"
+            " VALUES ('pass', 0, 'tcp', 'any', 'any', '8080-8090')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "port 8080:8090" in conf
+        assert "port 8080-8090" not in conf
+
+    def test_single_port_renders_without_braces(self, fresh_conn):
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination, dest_port)"
+            " VALUES ('pass', 0, 'tcp', 'any', 'any', '443')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "port 443 " in conf
+
+    # ── ICMP echoreq / ping-block ordering ────────────────────────────────────
+
+    def test_hardening_does_not_quick_pass_inbound_echoreq(self, conn):
+        """The hardening section must NOT emit 'pass in quick ... echoreq'.
+        If it did, user block-ping rules would be unreachable."""
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        for line in conf.splitlines():
+            stripped = line.strip()
+            if "echoreq" in stripped and stripped.startswith("pass in") and "quick" in stripped:
+                raise AssertionError(
+                    f"Hardening emits 'pass in quick' with echoreq — user block-ping rules "
+                    f"will never be reached.\nOffending line: {line!r}"
+                )
+
+    def test_user_block_ping_rule_is_present_in_output(self, fresh_conn):
+        """A user-created 'block in on WAN proto icmp' rule must appear in the
+        generated conf and must not be shadowed by an earlier quick-pass."""
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO firewall_rules_wan (action, disabled, protocol, source, destination, description)"
+            " VALUES ('block', 0, 'icmp', 'any', 'any', 'BlockPingTest')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "BlockPingTest" in conf
+        # Ensure the block rule is present
+        block_lines = [l for l in conf.splitlines() if "BlockPingTest" in l or
+                       ("block in on" in l and "proto icmp" in l)]
+        assert block_lines, "User block-icmp rule not found in generated conf"
+
+    # ── NAT port-forward dst_type ─────────────────────────────────────────────
+
+    def test_nat_dst_type_wan_address_renders_iface(self, fresh_conn):
+        """dst_type=wan_address must produce 'to (em0)', not 'to any'.
+        Uses a unique redirect IP (192.168.1.201) to avoid collision with other
+        tests that also insert into nat_pf on the shared pftest2 DB."""
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_pf (disabled, interface, protocol, src_address,"
+            " dst_address, dst_type, redirect_ip, redirect_port)"
+            " VALUES (0, 'em0', 'tcp', 'any', 'any', 'wan_address', '192.168.1.201', '8443')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        rdr_lines = [l for l in conf.splitlines() if "rdr on em0" in l and "192.168.1.201" in l]
+        assert rdr_lines, "Port-forward rule for 192.168.1.201 not found in generated conf"
+        for line in rdr_lines:
+            assert "to (em0)" in line, (
+                f"Expected 'to (em0)' for wan_address dst_type, got: {line!r}"
+            )
+            assert "to any" not in line, (
+                f"dst_type=wan_address must not render as 'to any': {line!r}"
+            )
+
+    def test_nat_dst_type_any_renders_any(self, fresh_conn):
+        """dst_type=any (or unset) must produce 'to any'."""
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_pf (disabled, interface, protocol, src_address,"
+            " dst_address, dst_type, redirect_ip)"
+            " VALUES (0, 'em0', 'tcp', 'any', 'any', 'any', '10.0.0.5')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        rdr_lines = [l for l in conf.splitlines() if "rdr on em0" in l and "10.0.0.5" in l]
+        assert rdr_lines, "Port-forward rule not found"
+        assert any("to any" in l for l in rdr_lines)

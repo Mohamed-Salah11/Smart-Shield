@@ -408,7 +408,7 @@
 </div>
 
 <div class="d-flex gap-2 mt-3">
-    <button class="btn btn-primary">Save</button>
+    <button class="btn btn-primary" id="dhcpServerSaveBtnLan">Save</button>
 </div>
 
 <div class="ss-card mt-4">
@@ -441,47 +441,72 @@
 </div>
 
 <script>
-    // Load static mappings from localStorage
-    function loadStaticMappings() {
-        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
-        const tbody = document.getElementById('static_mappings_body');
-        const emptyRow = document.getElementById('empty_row');
-
-        if (mappings.length > 0) {
-            emptyRow.style.display = 'none';
-            tbody.innerHTML = mappings.map((mapping, index) => `
-                <tr>
-                    <td>${mapping.ip_address}</td>
-                    <td>${mapping.hostname}</td>
-                    <td>${mapping.mac_address}</td>
-                    <td>${mapping.description}</td>
-                    <td>
-                        <button onclick="editMapping(${index})" class="btn btn-sm btn-primary">Edit</button>
-                        <button onclick="deleteMapping(${index})" class="btn btn-sm btn-danger">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        } else {
-            emptyRow.style.display = 'table-row';
-        }
+    function serializeDhcpLanForm() {
+        const settings = { fields: {} };
+        document.querySelectorAll('.ss-card input, .ss-card select, .ss-card textarea').forEach(el => {
+            if (el.type === 'button' || el.type === 'submit') return;
+            const key = el.name || el.id; if (!key) return;
+            if (el.type === 'checkbox') settings.fields[key] = { type: 'checkbox', value: !!el.checked };
+            else settings.fields[key] = { type: el.tagName.toLowerCase(), value: el.value };
+        });
+        return settings;
     }
-
-    function editMapping(index) {
-        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
-        localStorage.setItem('edit_mapping_index_lan', index);
-        window.location.href = '{{ url_for("services.dhcp_static_mapping_lan") }}';
+    function applyDhcpLanForm(settings) {
+        const fields = (settings || {}).fields || {};
+        Object.keys(fields).forEach(key => {
+            const entry = fields[key]; if (!entry) return;
+            const el = document.querySelector(`[name="${key}"]`) || document.getElementById(key);
+            if (!el) return;
+            if (entry.type === 'checkbox') el.checked = !!entry.value;
+            else el.value = entry.value ?? '';
+        });
     }
-
-    function deleteMapping(index) {
-        if (confirm('Are you sure you want to delete this mapping?')) {
-            const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings_lan') || '[]');
-            mappings.splice(index, 1);
-            localStorage.setItem('dhcp_static_mappings_lan', JSON.stringify(mappings));
-            loadStaticMappings();
-        }
+    function loadDhcpLanSettings() {
+        fetch('/services/api/dhcp-server/lan').then(r => r.json())
+            .then(json => { if (json.success) applyDhcpLanForm(json.settings); })
+            .catch(err => console.error('Error loading LAN DHCP settings:', err));
     }
-
-    // Load mappings when page loads
-    document.addEventListener('DOMContentLoaded', loadStaticMappings);
+    function saveDhcpLanSettings() {
+        const settings = serializeDhcpLanForm();
+        fetch('/services/api/dhcp-server/lan', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings })
+        }).then(r => r.json()).then(json => {
+            if (!json.success) { alert(json.error || 'Failed to save'); return; }
+            alert('LAN DHCP Server settings saved!');
+        }).catch(err => alert(err.message || String(err)));
+    }
+    async function loadStaticMappings() {
+        try {
+            const r = await fetch('/api/network/leases');
+            const d = await r.json();
+            const mappings = (d.data || []).filter(m => m.interface_type === 'lan');
+            const tbody = document.getElementById('static_mappings_body');
+            const emptyRow = document.getElementById('empty_row');
+            if (mappings.length > 0) {
+                emptyRow.style.display = 'none';
+                tbody.innerHTML = mappings.map(m => `
+                    <tr>
+                        <td>${m.ip_address}</td>
+                        <td>${m.hostname || ''}</td>
+                        <td><code>${m.mac_address}</code></td>
+                        <td>${m.description || ''}</td>
+                        <td><button onclick="deleteMapping(${m.id})" class="btn btn-sm btn-danger">Delete</button></td>
+                    </tr>`).join('');
+            } else {
+                emptyRow.style.display = 'table-row';
+            }
+        } catch (e) { console.error('Failed to load static mappings:', e); }
+    }
+    async function deleteMapping(id) {
+        if (!confirm('Are you sure you want to delete this mapping?')) return;
+        await fetch(`/api/network/leases/${id}`, { method: 'DELETE' });
+        loadStaticMappings();
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStaticMappings();
+        loadDhcpLanSettings();
+        document.getElementById('dhcpServerSaveBtnLan').addEventListener('click', saveDhcpLanSettings);
+    });
 </script>
 {% endblock %}

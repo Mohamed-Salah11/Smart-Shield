@@ -45,6 +45,7 @@
     </ul>
 
     <form method="POST" action="{{ url_for('system.advanced_firewall_nat') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Packet Processing Section -->
         <div class="ss-card">
@@ -57,7 +58,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">IP Do-Not-Fragment</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="ip_fragment" name="ip_fragment">
+                            <input type="checkbox" class="form-check-input" id="ip_fragment" name="ip_fragment" {{ 'checked' if config and config['ip_fragment'] else '' }}>
                             <label class="form-check-label" for="ip_fragment">Clear invalid DF bits instead of dropping packets</label>
                         </div>
                         <small class="text-muted">Allows communication with hosts that generate fragmented packets with DF bit set (e.g., Linux NFS).</small>
@@ -68,7 +69,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">IP Random ID</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="ip_random" name="ip_random">
+                            <input type="checkbox" class="form-check-input" id="ip_random" name="ip_random" {{ 'checked' if config and config['ip_random'] else '' }}>
                             <label class="form-check-label" for="ip_random">Insert a stronger ID into IP header</label>
                         </div>
                         <small class="text-muted">Replaces IP identification with random values to compensate for predictable OS values.</small>
@@ -79,10 +80,10 @@
                     <label for="firewall_optimization" class="col-sm-3 col-form-label fw-semibold">Optimization</label>
                     <div class="col-sm-9">
                         <select id="firewall_optimization" name="firewall_optimization" class="form-select" style="max-width: 300px;">
-                            <option value="normal" selected>Normal</option>
-                            <option value="high-latency">High-latency</option>
-                            <option value="aggressive">Aggressive</option>
-                            <option value="conservative">Conservative</option>
+                            <option value="normal" {{ 'selected' if not config or config['firewall_optimization'] == 'normal' else '' }}>Normal</option>
+                            <option value="high-latency" {{ 'selected' if config and config['firewall_optimization'] == 'high-latency' else '' }}>High-latency</option>
+                            <option value="aggressive" {{ 'selected' if config and config['firewall_optimization'] == 'aggressive' else '' }}>Aggressive</option>
+                            <option value="conservative" {{ 'selected' if config and config['firewall_optimization'] == 'conservative' else '' }}>Conservative</option>
                         </select>
                     </div>
                 </div>
@@ -91,7 +92,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Scrub</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_scrub" name="disable_scrub">
+                            <input type="checkbox" class="form-check-input" id="disable_scrub" name="disable_scrub" {{ 'checked' if config and config['disable_scrub'] else '' }}>
                             <label class="form-check-label" for="disable_scrub">Disable PF scrubbing (may interfere with NFS)</label>
                         </div>
                     </div>
@@ -101,8 +102,8 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Adaptive Timeouts</label>
                     <div class="col-sm-9">
                         <div class="d-flex gap-2 mb-2">
-                            <input type="number" id="adaptive_start" name="adaptive_start" class="form-control" style="max-width: 150px;" value="1134000" placeholder="Start">
-                            <input type="number" id="adaptive_end" name="adaptive_end" class="form-control" style="max-width: 150px;" value="2333332" placeholder="End">
+                            <input type="number" id="adaptive_start" name="adaptive_start" class="form-control" style="max-width: 150px;" value="{{ config['adaptive_start'] if config and config['adaptive_start'] else 1134000 }}" placeholder="Start">
+                            <input type="number" id="adaptive_end" name="adaptive_end" class="form-control" style="max-width: 150px;" value="{{ config['adaptive_end'] if config and config['adaptive_end'] else 2333332 }}" placeholder="End">
                         </div>
                         <small class="text-muted">Adaptive scaling begins when state entries exceed start value. Defaults: 60% and 120% of max states.</small>
                     </div>
@@ -111,7 +112,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_states" class="col-sm-3 col-form-label fw-semibold">Max States</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_states" name="firewall_max_states" class="form-control" style="max-width: 200px;" value="1990000">
+                        <input type="number" id="firewall_max_states" name="firewall_max_states" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_states'] if config and config['firewall_max_states'] else 1990000 }}">
                         <small class="text-muted">Maximum connections in firewall state table. Requires reboot.</small>
                     </div>
                 </div>
@@ -119,7 +120,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_table" class="col-sm-3 col-form-label fw-semibold">Max Table Entries</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_table" name="firewall_max_table" class="form-control" style="max-width: 200px;" value="400000">
+                        <input type="number" id="firewall_max_table" name="firewall_max_table" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_table'] if config and config['firewall_max_table'] else 400000 }}">
                         <small class="text-muted">Maximum table entries for aliases, sshlguard, snort, etc.</small>
                     </div>
                 </div>
@@ -127,7 +128,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_fragment" class="col-sm-3 col-form-label fw-semibold">Max Fragment Entries</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_fragment" name="firewall_max_fragment" class="form-control" style="max-width: 200px;" value="5000">
+                        <input type="number" id="firewall_max_fragment" name="firewall_max_fragment" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_fragment'] if config and config['firewall_max_fragment'] else 5000 }}">
                         <small class="text-muted">Maximum packet fragments for reassembly by scrub rules.</small>
                     </div>
                 </div>
@@ -152,7 +153,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">VPN IP Do-Not-Fragment</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="vpn_ip_fragment" name="vpn_ip_fragment">
+                            <input type="checkbox" class="form-check-input" id="vpn_ip_fragment" name="vpn_ip_fragment" {{ 'checked' if config and config['vpn_ip_fragment'] else '' }}>
                             <label class="form-check-label" for="vpn_ip_fragment">Clear invalid DF bits for VPN traffic</label>
                         </div>
                     </div>
@@ -162,7 +163,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">IP Fragment Reassemble</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="ip_fragment_reassemble" name="ip_fragment_reassemble">
+                            <input type="checkbox" class="form-check-input" id="ip_fragment_reassemble" name="ip_fragment_reassemble" {{ 'checked' if config and config['ip_fragment_reassemble'] else '' }}>
                             <label class="form-check-label" for="ip_fragment_reassemble">Reassemble IP fragments until complete packet</label>
                         </div>
                     </div>
@@ -172,7 +173,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Enable Maximum MSS</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="enable_mss" name="enable_mss">
+                            <input type="checkbox" class="form-check-input" id="enable_mss" name="enable_mss" {{ 'checked' if config and config['enable_mss'] else '' }}>
                             <label class="form-check-label" for="enable_mss">Enable MSS clamping on VPN traffic</label>
                         </div>
                     </div>
@@ -181,7 +182,7 @@
                 <div class="mb-3 row" id="max_mss_field" style="display: none;">
                     <label for="maximum_mss" class="col-sm-3 col-form-label fw-semibold">Maximum MSS</label>
                     <div class="col-sm-9">
-                        <input type="number" id="maximum_mss" name="maximum_mss" class="form-control" style="max-width: 200px;" value="1400">
+                        <input type="number" id="maximum_mss" name="maximum_mss" class="form-control" style="max-width: 200px;" value="{{ config['maximum_mss'] if config and config['maximum_mss'] else 1400 }}">
                         <small class="text-muted">Helps overcome PMTUD problems on IPsec VPN links. Default: 1400 bytes.</small>
                     </div>
                 </div>
@@ -199,7 +200,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Firewall</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_firewall" name="disable_firewall">
+                            <input type="checkbox" class="form-check-input" id="disable_firewall" name="disable_firewall" {{ 'checked' if config and config['disable_firewall'] else '' }}>
                             <label class="form-check-label" for="disable_firewall">Disable all packet filtering</label>
                         </div>
                         <small class="text-muted text-danger">Warning: Converts Smart Shield to routing-only and disables NAT!</small>
@@ -210,8 +211,8 @@
                     <label for="firewall_state_policy" class="col-sm-3 col-form-label fw-semibold">State Policy</label>
                     <div class="col-sm-9">
                         <select id="firewall_state_policy" name="firewall_state_policy" class="form-select" style="max-width: 300px;">
-                            <option value="interface_bound" selected>Interface Bound States</option>
-                            <option value="floating">Floating States</option>
+                            <option value="interface_bound" {{ 'selected' if not config or config['firewall_state_policy'] == 'interface_bound' else '' }}>Interface Bound States</option>
+                            <option value="floating" {{ 'selected' if config and config['firewall_state_policy'] == 'floating' else '' }}>Floating States</option>
                         </select>
                         <small class="text-muted">Interface Bound is more secure. Floating allows packets from any interface.</small>
                     </div>
@@ -221,7 +222,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Static Policy</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_static_policy" name="disable_static_policy">
+                            <input type="checkbox" class="form-check-input" id="disable_static_policy" name="disable_static_policy" {{ 'checked' if config and config['disable_static_policy'] else '' }}>
                             <label class="form-check-label" for="disable_static_policy">Don't automatically use floating states for IPsec rules</label>
                         </div>
                     </div>
@@ -231,7 +232,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Static Route Filtering</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="static_route_filtering" name="static_route_filtering">
+                            <input type="checkbox" class="form-check-input" id="static_route_filtering" name="static_route_filtering" {{ 'checked' if config and config['static_route_filtering'] else '' }}>
                             <label class="form-check-label" for="static_route_filtering">Bypass firewall rules for traffic on same interface</label>
                         </div>
                     </div>
@@ -241,7 +242,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Auto-added VPN Rules</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_auto_added_vpn" name="disable_auto_added_vpn">
+                            <input type="checkbox" class="form-check-input" id="disable_auto_added_vpn" name="disable_auto_added_vpn" {{ 'checked' if config and config['disable_auto_added_vpn'] else '' }}>
                             <label class="form-check-label" for="disable_auto_added_vpn">Disable auto-added VPN rules</label>
                         </div>
                     </div>
@@ -251,7 +252,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Reply-to</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_reply_to" name="disable_reply_to">
+                            <input type="checkbox" class="form-check-input" id="disable_reply_to" name="disable_reply_to" {{ 'checked' if config and config['disable_reply_to'] else '' }}>
                             <label class="form-check-label" for="disable_reply_to">Disable reply-to on WAN rules</label>
                         </div>
                     </div>
@@ -261,7 +262,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Disable Negate Rules</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="disable_negate_rules" name="disable_negate_rules">
+                            <input type="checkbox" class="form-check-input" id="disable_negate_rules" name="disable_negate_rules" {{ 'checked' if config and config['disable_negate_rules'] else '' }}>
                             <label class="form-check-label" for="disable_negate_rules">Disable Negate rule on policy routing rules</label>
                         </div>
                     </div>
@@ -271,7 +272,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Allow APIPA</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="allow_apipa" name="allow_apipa">
+                            <input type="checkbox" class="form-check-input" id="allow_apipa" name="allow_apipa" {{ 'checked' if config and config['allow_apipa'] else '' }}>
                             <label class="form-check-label" for="allow_apipa">Allow APIPA traffic</label>
                         </div>
                     </div>
@@ -280,7 +281,7 @@
                 <div class="mb-3 row">
                     <label for="aliases_hostnames_interval" class="col-sm-3 col-form-label fw-semibold">Alias Resolve Interval</label>
                     <div class="col-sm-9">
-                        <input type="number" id="aliases_hostnames_interval" name="aliases_hostnames_interval" class="form-control" style="max-width: 200px;" value="300">
+                        <input type="number" id="aliases_hostnames_interval" name="aliases_hostnames_interval" class="form-control" style="max-width: 200px;" value="{{ config['aliases_hostnames_interval'] if config and config['aliases_hostnames_interval'] else 300 }}">
                         <small class="text-muted">Interval in seconds to resolve hostnames in aliases. Default: 300s.</small>
                     </div>
                 </div>
@@ -289,7 +290,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Check Alias Certificates</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="check_certificate_aliases_urls" name="check_certificate_aliases_urls">
+                            <input type="checkbox" class="form-check-input" id="check_certificate_aliases_urls" name="check_certificate_aliases_urls" {{ 'checked' if config and config['check_certificate_aliases_urls'] else '' }}>
                             <label class="form-check-label" for="check_certificate_aliases_urls">Verify HTTPS certificates for alias URL downloads</label>
                         </div>
                     </div>
@@ -308,9 +309,9 @@
                     <label for="update_frequency" class="col-sm-3 col-form-label fw-semibold">Update Frequency</label>
                     <div class="col-sm-9">
                         <select id="update_frequency" name="update_frequency" class="form-select" style="max-width: 200px;">
-                            <option value="monthly" selected>Monthly</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="daily">Daily</option>
+                            <option value="monthly" {{ 'selected' if not config or config['update_frequency'] == 'monthly' else '' }}>Monthly</option>
+                            <option value="weekly" {{ 'selected' if config and config['update_frequency'] == 'weekly' else '' }}>Weekly</option>
+                            <option value="daily" {{ 'selected' if config and config['update_frequency'] == 'daily' else '' }}>Daily</option>
                         </select>
                         <small class="text-muted">Frequency of updating reserved/unassigned IP address lists.</small>
                     </div>
@@ -329,9 +330,9 @@
                     <label for="nat_reflection_mode" class="col-sm-3 col-form-label fw-semibold">NAT Reflection Mode</label>
                     <div class="col-sm-9">
                         <select id="nat_reflection_mode" name="nat_reflection_mode" class="form-select" style="max-width: 300px;">
-                            <option value="disabled" selected>Disabled</option>
-                            <option value="pure-nat">Pure NAT</option>
-                            <option value="nat-proxy">NAT + Proxy</option>
+                            <option value="disabled" {{ 'selected' if not config or config['nat_reflection_mode'] == 'disabled' else '' }}>Disabled</option>
+                            <option value="pure-nat" {{ 'selected' if config and config['nat_reflection_mode'] == 'pure-nat' else '' }}>Pure NAT</option>
+                            <option value="nat-proxy" {{ 'selected' if config and config['nat_reflection_mode'] == 'nat-proxy' else '' }}>NAT + Proxy</option>
                         </select>
                         <small class="text-muted">Pure NAT uses NAT rules; NAT + Proxy uses a helper program.</small>
                     </div>
@@ -340,7 +341,7 @@
                 <div class="mb-3 row">
                     <label for="reflection_timeout" class="col-sm-3 col-form-label fw-semibold">Reflection Timeout</label>
                     <div class="col-sm-9">
-                        <input type="number" id="reflection_timeout" name="reflection_timeout" class="form-control" style="max-width: 200px;" placeholder="2000">
+                        <input type="number" id="reflection_timeout" name="reflection_timeout" class="form-control" style="max-width: 200px;" placeholder="2000" value="{{ config['reflection_timeout'] if config and config['reflection_timeout'] else '' }}">
                         <small class="text-muted">Timeout in seconds. Only applies to NAT + Proxy mode.</small>
                     </div>
                 </div>
@@ -349,7 +350,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">NAT Reflection for 1:1</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="enable_nat_reflection" name="enable_nat_reflection">
+                            <input type="checkbox" class="form-check-input" id="enable_nat_reflection" name="enable_nat_reflection" {{ 'checked' if config and config['enable_nat_reflection'] else '' }}>
                             <label class="form-check-label" for="enable_nat_reflection">Enable NAT Reflection for 1:1 NAT</label>
                         </div>
                     </div>
@@ -359,7 +360,7 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Auto Outbound NAT</label>
                     <div class="col-sm-9">
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="enable_automatic_outbound" name="enable_automatic_outbound">
+                            <input type="checkbox" class="form-check-input" id="enable_automatic_outbound" name="enable_automatic_outbound" {{ 'checked' if config and config['enable_automatic_outbound'] else '' }}>
                             <label class="form-check-label" for="enable_automatic_outbound">Enable automatic outbound NAT for Reflection</label>
                         </div>
                     </div>
@@ -370,11 +371,11 @@
                     <div class="col-sm-9">
                         <div class="d-flex gap-4">
                             <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="tftp_proxy_wan" name="tftp_proxy_wan">
+                                <input type="checkbox" class="form-check-input" id="tftp_proxy_wan" name="tftp_proxy_wan" {{ 'checked' if config and config['tftp_proxy_wan'] else '' }}>
                                 <label class="form-check-label" for="tftp_proxy_wan">WAN</label>
                             </div>
                             <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="tftp_proxy_lan" name="tftp_proxy_lan">
+                                <input type="checkbox" class="form-check-input" id="tftp_proxy_lan" name="tftp_proxy_lan" {{ 'checked' if config and config['tftp_proxy_lan'] else '' }}>
                                 <label class="form-check-label" for="tftp_proxy_lan">LAN</label>
                             </div>
                         </div>
@@ -395,45 +396,45 @@
                     <div class="col-md-6">
                         <h6 class="fw-semibold mb-3">TCP Timeouts</h6>
                         <div class="row g-2 mb-2">
-                            <div class="col-6"><label class="form-label small">First</label><input type="number" name="tcp_first" class="form-control form-control-sm" placeholder="60"></div>
-                            <div class="col-6"><label class="form-label small">Opening</label><input type="number" name="tcp_opening" class="form-control form-control-sm" placeholder="30"></div>
+                            <div class="col-6"><label class="form-label small">First</label><input type="number" name="tcp_first" class="form-control form-control-sm" placeholder="60" value="{{ config['tcp_first'] if config and config['tcp_first'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">Opening</label><input type="number" name="tcp_opening" class="form-control form-control-sm" placeholder="30" value="{{ config['tcp_opening'] if config and config['tcp_opening'] else '' }}"></div>
                         </div>
                         <div class="row g-2 mb-2">
-                            <div class="col-6"><label class="form-label small">Established</label><input type="number" name="tcp_established" class="form-control form-control-sm" placeholder="86400"></div>
-                            <div class="col-6"><label class="form-label small">Closing</label><input type="number" name="tcp_closing" class="form-control form-control-sm" placeholder="900"></div>
+                            <div class="col-6"><label class="form-label small">Established</label><input type="number" name="tcp_established" class="form-control form-control-sm" placeholder="86400" value="{{ config['tcp_established'] if config and config['tcp_established'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">Closing</label><input type="number" name="tcp_closing" class="form-control form-control-sm" placeholder="900" value="{{ config['tcp_closing'] if config and config['tcp_closing'] else '' }}"></div>
                         </div>
                         <div class="row g-2 mb-3">
-                            <div class="col-6"><label class="form-label small">FIN Wait</label><input type="number" name="tcp_fin_wait" class="form-control form-control-sm" placeholder="45"></div>
-                            <div class="col-6"><label class="form-label small">Closed</label><input type="number" name="tcp_closed" class="form-control form-control-sm" placeholder="90"></div>
+                            <div class="col-6"><label class="form-label small">FIN Wait</label><input type="number" name="tcp_fin_wait" class="form-control form-control-sm" placeholder="45" value="{{ config['tcp_fin_wait'] if config and config['tcp_fin_wait'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">Closed</label><input type="number" name="tcp_closed" class="form-control form-control-sm" placeholder="90" value="{{ config['tcp_closed'] if config and config['tcp_closed'] else '' }}"></div>
                         </div>
 
                         <h6 class="fw-semibold mb-3">UDP Timeouts</h6>
                         <div class="row g-2 mb-3">
-                            <div class="col-4"><label class="form-label small">First</label><input type="number" name="udp_first" class="form-control form-control-sm" placeholder="60"></div>
-                            <div class="col-4"><label class="form-label small">Single</label><input type="number" name="udp_single" class="form-control form-control-sm" placeholder="30"></div>
-                            <div class="col-4"><label class="form-label small">Multiple</label><input type="number" name="udp_multiple" class="form-control form-control-sm" placeholder="60"></div>
+                            <div class="col-4"><label class="form-label small">First</label><input type="number" name="udp_first" class="form-control form-control-sm" placeholder="60" value="{{ config['udp_first'] if config and config['udp_first'] else '' }}"></div>
+                            <div class="col-4"><label class="form-label small">Single</label><input type="number" name="udp_single" class="form-control form-control-sm" placeholder="30" value="{{ config['udp_single'] if config and config['udp_single'] else '' }}"></div>
+                            <div class="col-4"><label class="form-label small">Multiple</label><input type="number" name="udp_multiple" class="form-control form-control-sm" placeholder="60" value="{{ config['udp_multiple'] if config and config['udp_multiple'] else '' }}"></div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <h6 class="fw-semibold mb-3">SCTP Timeouts</h6>
                         <div class="row g-2 mb-2">
-                            <div class="col-6"><label class="form-label small">First</label><input type="number" name="sctp_first" class="form-control form-control-sm" placeholder="120"></div>
-                            <div class="col-6"><label class="form-label small">Opening</label><input type="number" name="sctp_opening" class="form-control form-control-sm" placeholder="30"></div>
+                            <div class="col-6"><label class="form-label small">First</label><input type="number" name="sctp_first" class="form-control form-control-sm" placeholder="120" value="{{ config['sctp_first'] if config and config['sctp_first'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">Opening</label><input type="number" name="sctp_opening" class="form-control form-control-sm" placeholder="30" value="{{ config['sctp_opening'] if config and config['sctp_opening'] else '' }}"></div>
                         </div>
                         <div class="row g-2 mb-3">
-                            <div class="col-6"><label class="form-label small">Established</label><input type="number" name="sctp_established" class="form-control form-control-sm" placeholder="86400"></div>
-                            <div class="col-6"><label class="form-label small">Closing</label><input type="number" name="sctp_closing" class="form-control form-control-sm" placeholder="900"></div>
+                            <div class="col-6"><label class="form-label small">Established</label><input type="number" name="sctp_established" class="form-control form-control-sm" placeholder="86400" value="{{ config['sctp_established'] if config and config['sctp_established'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">Closing</label><input type="number" name="sctp_closing" class="form-control form-control-sm" placeholder="900" value="{{ config['sctp_closing'] if config and config['sctp_closing'] else '' }}"></div>
                         </div>
 
                         <h6 class="fw-semibold mb-3">ICMP & Other Timeouts</h6>
                         <div class="row g-2 mb-2">
-                            <div class="col-6"><label class="form-label small">ICMP First</label><input type="number" name="icmp_first" class="form-control form-control-sm" placeholder="20"></div>
-                            <div class="col-6"><label class="form-label small">ICMP Error</label><input type="number" name="icmp_error" class="form-control form-control-sm" placeholder="10"></div>
+                            <div class="col-6"><label class="form-label small">ICMP First</label><input type="number" name="icmp_first" class="form-control form-control-sm" placeholder="20" value="{{ config['icmp_first'] if config and config['icmp_first'] else '' }}"></div>
+                            <div class="col-6"><label class="form-label small">ICMP Error</label><input type="number" name="icmp_error" class="form-control form-control-sm" placeholder="10" value="{{ config['icmp_error'] if config and config['icmp_error'] else '' }}"></div>
                         </div>
                         <div class="row g-2 mb-3">
-                            <div class="col-4"><label class="form-label small">Other First</label><input type="number" name="other_first" class="form-control form-control-sm" placeholder="60"></div>
-                            <div class="col-4"><label class="form-label small">Other Single</label><input type="number" name="other_single" class="form-control form-control-sm" placeholder="30"></div>
-                            <div class="col-4"><label class="form-label small">Other Multiple</label><input type="number" name="other_multiple" class="form-control form-control-sm" placeholder="60"></div>
+                            <div class="col-4"><label class="form-label small">Other First</label><input type="number" name="other_first" class="form-control form-control-sm" placeholder="60" value="{{ config['other_first'] if config and config['other_first'] else '' }}"></div>
+                            <div class="col-4"><label class="form-label small">Other Single</label><input type="number" name="other_single" class="form-control form-control-sm" placeholder="30" value="{{ config['other_single'] if config and config['other_single'] else '' }}"></div>
+                            <div class="col-4"><label class="form-label small">Other Multiple</label><input type="number" name="other_multiple" class="form-control form-control-sm" placeholder="60" value="{{ config['other_multiple'] if config and config['other_multiple'] else '' }}"></div>
                         </div>
                     </div>
                 </div>

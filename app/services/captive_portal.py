@@ -527,7 +527,7 @@ def generate_pf_anchor(conn) -> str:
         f"rdr on {lan_iface} proto tcp from <authenticated_clients> to any port 53 -> {upstream_dns} port 53",
         "",
         "# Filter rules — authenticated clients pass all traffic",
-        f"pass in quick on {lan_iface} from <authenticated_clients> to any keep state",
+        f"pass in on {lan_iface} from <authenticated_clients> to any keep state",
         "# Portal itself is always reachable (needed for login page)",
         f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {portal_port} keep state",
     ]

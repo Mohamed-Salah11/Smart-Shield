@@ -19,6 +19,7 @@
   </ul>
 
   <form method="POST" action="{{ url_for('system.notifications') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- General Settings -->
     <div class="ss-card">
@@ -28,17 +29,17 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="certificate_expiration" name="certificate_expiration" checked><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="certificate_expiration" name="certificate_expiration" {{ 'checked' if settings.get('certificate_expiration', True) else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Certificate Expiry Notifications</p><p class="ss-toggle-desc">Daily check for expired and soon-to-expire CA and certificate entries</p></div>
         </div>
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="ignore_revoked" name="ignore_revoked"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="ignore_revoked" name="ignore_revoked" {{ 'checked' if settings.get('ignore_revoked') else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Ignore Revoked Certificates</p><p class="ss-toggle-desc">Skip expiry notifications for certificates that have been revoked</p></div>
         </div>
         <hr class="ss-divider">
         <div class="ss-field" style="max-width:220px;">
           <label class="ss-label">Certificate Expiration Threshold (days)</label>
-          <input type="number" id="certificate_expiration_threshold" name="certificate_expiration_threshold" class="form-control" value="27">
+          <input type="number" id="certificate_expiration_threshold" name="certificate_expiration_threshold" class="form-control" value="{{ settings.get('certificate_expiration_threshold', 27) }}">
           <p class="ss-hint">Notify when a certificate expires within this many days</p>
         </div>
       </div>
@@ -52,56 +53,56 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="disable_smtp" name="disable_smtp"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="disable_smtp" name="disable_smtp" {{ 'checked' if settings.get('disable_smtp') else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Disable SMTP Notifications</p></div>
         </div>
         <hr class="ss-divider">
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label">SMTP Server</label>
-            <input type="text" id="email_server" name="email_server" class="form-control" placeholder="mail.example.com">
+            <input type="text" id="email_server" name="email_server" class="form-control" placeholder="mail.example.com" value="{{ settings.get('email_server', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">SMTP Port</label>
-            <input type="number" id="smtp_port" name="smtp_port" class="form-control" placeholder="587" style="max-width:160px;">
+            <input type="number" id="smtp_port" name="smtp_port" class="form-control" placeholder="587" style="max-width:160px;" value="{{ settings.get('smtp_port', '') }}">
             <p class="ss-hint">Typically 25, 587 (STARTTLS), or 465 (SSL)</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">Connection Timeout (sec)</label>
-            <input type="number" id="connection_timeout" name="connection_timeout" class="form-control" placeholder="20" style="max-width:160px;">
+            <input type="number" id="connection_timeout" name="connection_timeout" class="form-control" placeholder="20" style="max-width:160px;" value="{{ settings.get('connection_timeout', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">Auth Mechanism</label>
             <select id="notification_email_auth_mechanism" name="notification_email_auth_mechanism" class="form-select">
-              <option value="PLAIN">PLAIN</option>
-              <option value="LOGIN">LOGIN</option>
-              <option value="CRAM-MD5">CRAM-MD5</option>
+              <option value="PLAIN" {{ 'selected' if settings.get('notification_email_auth_mechanism') == 'PLAIN' else '' }}>PLAIN</option>
+              <option value="LOGIN" {{ 'selected' if settings.get('notification_email_auth_mechanism') == 'LOGIN' else '' }}>LOGIN</option>
+              <option value="CRAM-MD5" {{ 'selected' if settings.get('notification_email_auth_mechanism') == 'CRAM-MD5' else '' }}>CRAM-MD5</option>
             </select>
           </div>
           <div class="ss-field">
             <label class="ss-label">From E-Mail Address</label>
-            <input type="email" id="from_email_address" name="from_email_address" class="form-control" placeholder="smartshield@example.com">
+            <input type="email" id="from_email_address" name="from_email_address" class="form-control" placeholder="smartshield@example.com" value="{{ settings.get('from_email_address', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">Notification Recipient</label>
-            <input type="email" id="notification_email_address" name="notification_email_address" class="form-control" placeholder="admin@example.com">
+            <input type="email" id="notification_email_address" name="notification_email_address" class="form-control" placeholder="admin@example.com" value="{{ settings.get('notification_email_address', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">SMTP Username (optional)</label>
-            <input type="text" id="notification_email_auth_username" name="notification_email_auth_username" class="form-control" placeholder="SMTP auth username">
+            <input type="text" id="notification_email_auth_username" name="notification_email_auth_username" class="form-control" placeholder="SMTP auth username" value="{{ settings.get('notification_email_auth_username', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">SMTP Password</label>
-            <input type="password" id="notification_email_auth_password" name="notification_email_auth_password" class="form-control" placeholder="SMTP auth password">
+            <input type="password" id="notification_email_auth_password" name="notification_email_auth_password" class="form-control" placeholder="SMTP auth password" value="{{ settings.get('notification_email_auth_password', '') }}">
           </div>
         </div>
         <hr class="ss-divider">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="secure_smtp_connection" name="secure_smtp_connection"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="secure_smtp_connection" name="secure_smtp_connection" {{ 'checked' if settings.get('secure_smtp_connection') else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable SMTP over SSL/TLS</p></div>
         </div>
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="validate_ssl_tls" name="validate_ssl_tls" checked><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="validate_ssl_tls" name="validate_ssl_tls" {{ 'checked' if settings.get('validate_ssl_tls', True) else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Validate SSL/TLS Certificate</p><p class="ss-toggle-desc">Reject if the server certificate does not match. Requires the server CA to be imported in Certificate Manager.</p></div>
         </div>
         <hr class="ss-divider">
@@ -120,11 +121,11 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="console_bell" name="console_bell" checked><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="console_bell" name="console_bell" {{ 'checked' if settings.get('console_bell', True) else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Console Bell</p><p class="ss-toggle-desc">Audible beep on emergency console messages (if device has a speaker)</p></div>
         </div>
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="startup_shutdown_sound" name="startup_shutdown_sound"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="startup_shutdown_sound" name="startup_shutdown_sound" {{ 'checked' if settings.get('startup_shutdown_sound') else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Disable Startup/Shutdown Sound</p><p class="ss-toggle-desc">Silence the startup and shutdown beeps on devices with a PC speaker</p></div>
         </div>
       </div>
@@ -138,18 +139,18 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_telegram" name="enable_telegram"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_telegram" name="enable_telegram" {{ 'checked' if settings.get('enable_telegram') else '' }}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable Telegram Notifications</p></div>
         </div>
         <hr class="ss-divider">
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label">Bot API Key</label>
-            <input type="text" id="api_key" name="api_key" class="form-control" placeholder="123456789:ABCdef...">
+            <input type="text" id="api_key" name="api_key" class="form-control" placeholder="123456789:ABCdef..." value="{{ settings.get('api_key', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">Chat ID</label>
-            <input type="text" id="chat_id" name="chat_id" class="form-control" placeholder="123456789 or @channel">
+            <input type="text" id="chat_id" name="chat_id" class="form-control" placeholder="123456789 or @channel" value="{{ settings.get('chat_id', '') }}">
           </div>
         </div>
         <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="test_telegram_settings">

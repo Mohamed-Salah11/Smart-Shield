@@ -77,7 +77,7 @@
               </label>
             </td>
             <td class="mono">{{ r.url_pattern }}</td>
-            <td><span class="badge-action badge-{{ r.action }}">{{ r.action }}</span></td>
+            <td><span class="badge-action badge-{{ r.action }}">{{ 'Redirect to block page' if r.action == 'block' else ('Allow whitelist only' if r.action == 'allow' else r.action) }}</span></td>
             <td><span class="badge-cat">{{ r.category }}</span></td>
             <td style="color:var(--muted);font-size:.78rem;">{{ r.description or '—' }}</td>
             <td>
@@ -116,8 +116,8 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
           <select id="f-action" class="form-select">
-            <option value="block">Block</option>
-            <option value="allow">Allow (whitelist override)</option>
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
         </div>
         <div class="mb-3">
@@ -158,8 +158,8 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
           <select id="e-action" class="form-select">
-            <option value="block">Block</option>
-            <option value="allow">Allow (whitelist override)</option>
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
         </div>
         <div class="mb-3">
@@ -277,7 +277,8 @@ async function submitEdit() {
       row.dataset.category = category;
       row.dataset.description = description;
       row.cells[1].textContent = r.rule.url_pattern || pattern;
-      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(action)}">${esc(action)}</span>`;
+      const actionLabel = action === 'block' ? 'Redirect to block page' : action === 'allow' ? 'Allow whitelist only' : action;
+      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(action)}">${esc(actionLabel)}</span>`;
       row.cells[3].innerHTML = `<span class="badge-cat">${esc(category)}</span>`;
       row.cells[4].textContent = description || '—';
     }
