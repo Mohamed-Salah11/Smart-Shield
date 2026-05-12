@@ -73,11 +73,11 @@ def startup_warnings() -> list:
 
     # ── Optional feature keys ──────────────────────────────────────────────
 
-    if not os.getenv("GOOGLE_API_KEY"):
+    if not os.getenv("GROQ_API_KEY"):
         warnings.append({
             "level":   "warning",
             "feature": "chatbot",
-            "message": "GOOGLE_API_KEY is not set — AI chatbot will be unavailable.",
+            "message": "GROQ_API_KEY is not set — AI chatbot will be unavailable.",
         })
 
     if not os.getenv("ABUSECH_AUTH_KEY"):

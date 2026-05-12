@@ -383,10 +383,24 @@
                         </div>
                     </div>
                     <div class="mb-3 row">
+                        <label for="pf_dst_port" class="col-sm-3 col-form-label fw-semibold">Destination Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="pf_dst_port" class="form-control" placeholder="e.g. 443 or 8080-8090">
+                            <small class="text-muted">Incoming port(s) to match on the WAN interface.</small>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
                         <label for="pf_redirect_ip" class="col-sm-3 col-form-label fw-semibold">Redirect Target IP</label>
                         <div class="col-sm-9">
                             <input type="text" id="pf_redirect_ip" class="form-control" placeholder="e.g., 192.168.1.100">
                             <small class="text-muted">Enter the internal IP address of the server.</small>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="pf_redirect_port" class="col-sm-3 col-form-label fw-semibold">Redirect Port</label>
+                        <div class="col-sm-9">
+                            <input type="text" id="pf_redirect_port" class="form-control" placeholder="e.g. 443">
+                            <small class="text-muted">Internal port on the redirect target (leave blank to match destination port).</small>
                         </div>
                     </div>
                     <div class="mb-3 row">
@@ -749,7 +763,9 @@
             src_address: document.getElementById('pf_src_address').value || '',
             dst_type: document.getElementById('pf_dst_type').value,
             dst_address: document.getElementById('pf_dst_address').value || '',
+            dst_port: document.getElementById('pf_dst_port').value || '',
             redirect_ip: document.getElementById('pf_redirect_ip').value || '',
+            redirect_port: document.getElementById('pf_redirect_port').value || '',
             description: document.getElementById('pf_description').value || 'New port forward rule',
             nat_reflection: document.getElementById('pf_nat_reflection').value,
             position: pfAddPosition
@@ -892,9 +908,9 @@
                         <td>${rule.src_address || '*'}</td>
                         <td>*</td>
                         <td>${rule.dst_address || 'WAN address'}</td>
-                        <td>*</td>
+                        <td>${rule.dst_port || '*'}</td>
                         <td>${rule.redirect_ip || ''}</td>
-                        <td>*</td>
+                        <td>${rule.redirect_port || '*'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
                             <button class="btn btn-sm btn-secondary" onclick="moveNatRule('pf', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
@@ -1020,7 +1036,9 @@
                 document.getElementById('pf_src_address').value        = rule.src_address   || '';
                 document.getElementById('pf_dst_type').value           = rule.dst_type      || 'wan_address';
                 document.getElementById('pf_dst_address').value        = rule.dst_address   || '';
+                document.getElementById('pf_dst_port').value           = rule.dst_port      || '';
                 document.getElementById('pf_redirect_ip').value        = rule.redirect_ip   || '';
+                document.getElementById('pf_redirect_port').value      = rule.redirect_port || '';
                 document.getElementById('pf_description').value        = rule.description   || '';
                 document.getElementById('pf_nat_reflection').value     = rule.nat_reflection || 'default';
                 new bootstrap.Modal(modal).show();

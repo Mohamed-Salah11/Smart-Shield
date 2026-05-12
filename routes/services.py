@@ -225,6 +225,7 @@ def get_dhcp_relay_settings():
 
 @services_bp.route("/api/dhcp-relay", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def save_dhcp_relay_settings():
     """Save DHCP Relay settings + upstream servers.
 
@@ -330,6 +331,7 @@ def api_get_dhcp_server_settings(iface):
 
 @services_bp.route("/api/dhcp-server/<string:iface>", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def api_save_dhcp_server_settings(iface):
     """Save DHCP server settings for an interface (wan/lan). Expects JSON: { settings: {...} }"""
     try:
@@ -1352,12 +1354,15 @@ def api_cp_get_settings():
     stored = json.loads(row["value_json"]) if row else {}
     from app.services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
     defaults = {
-        "portal_ip":          _default_portal_ip(conn),
-        "portal_port":        _CP_REDIRECT_PORT,
-        "http_redirect_port": 80,
-        "lan_interface":      "em1",
-        "allow_dns":          True,
-        "enabled":            False,
+        "portal_ip":                _default_portal_ip(conn),
+        "portal_port":              _CP_REDIRECT_PORT,
+        "http_redirect_port":       80,
+        "lan_interface":            "em1",
+        "allow_dns":                True,
+        "enabled":                  False,
+        "strict_mode":              False,
+        "session_duration_minutes": 60,
+        "upstream_dns":             "8.8.8.8",
     }
     settings = {**defaults, **stored}
     return jsonify({"ok": True, "settings": settings})
@@ -1373,7 +1378,7 @@ def api_cp_save_settings():
     allowed_keys = {
         "enabled", "lan_interface", "portal_ip", "portal_port",
         "http_redirect_port", "allow_dns", "radius_server", "radius_secret",
-        "whitelist_users",
+        "whitelist_users", "strict_mode", "session_duration_minutes", "upstream_dns",
     }
     settings = {k: v for k, v in data.items() if k in allowed_keys}
 

@@ -80,7 +80,27 @@ def generate_dns_filter_zones(conn) -> list:
             lines.append(f'    local-zone: "{fqdn}" redirect')
             lines.append(f'    local-data: "{fqdn} 5 A {redirect_ip}"')
         elif action == "allow":
-            lines.append(f'    local-zone: "{fqdn}" transparent')
+            # "Allow whitelist only" — block for everyone; whitelist_view overrides back to transparent.
+            if block_ip:
+                lines.append(f'    local-zone: "{fqdn}" redirect')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
+            else:
+                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+    return lines
+
+
+def generate_dns_whitelist_overrides(conn) -> list:
+    """
+    Return local-zone transparent overrides for 'allow whitelist only' DNS rules.
+    Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
+    """
+    rules = _rows(conn, "SELECT domain FROM filter_dns_rules WHERE action='allow' AND enabled=1")
+    lines = []
+    for rule in rules:
+        domain = _sanitize_domain(rule.get("domain") or "")
+        if not domain:
+            continue
+        lines.append(f'    local-zone: "{domain}." transparent')
     return lines
 
 
@@ -103,6 +123,10 @@ def add_dns_filter_rule(
     domain = _sanitize_domain(domain)
     if not domain:
         raise ValueError("Domain must not be empty.")
+    if action not in ("block", "allow", "redirect"):
+        raise ValueError("Action must be 'block', 'allow', or 'redirect'.")
+    if action == "redirect" and not redirect_ip:
+        raise ValueError("A redirect IP is required for 'redirect' action.")
     cur = conn.cursor()
     cur.execute(
         """
@@ -112,6 +136,8 @@ def add_dns_filter_rule(
         """,
         (domain, action, redirect_ip, category, description),
     )
+    if cur.rowcount == 0:
+        raise ValueError(f"A DNS block rule for '{domain}' already exists.")
     conn.commit()
     return cur.lastrowid
 
@@ -161,9 +187,15 @@ def hot_apply_dns_rule(conn, rule_id: int) -> None:
             if row["action"] == "redirect" and row["redirect_ip"]:
                 run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
                 run_privileged("unbound.local_data_a", domain=domain, ip=row["redirect_ip"])
-            else:
-                zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
-                run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+            elif row["action"] == "block":
+                block_ip = get_block_page_ip(conn)
+                if block_ip:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
+                    run_privileged("unbound.local_data_a", domain=domain, ip=block_ip)
+                else:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="always_nxdomain")
+            else:  # allow
+                run_privileged("unbound.local_zone", domain=domain, zone_type="transparent")
         else:
             try:
                 run_privileged("unbound.local_zone_remove", domain=domain)

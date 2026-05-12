@@ -125,13 +125,14 @@ def auth():
                 **context,
             )
 
-        # Load portal whitelist once for both auth paths
+        # Load portal settings once for whitelist, session duration, etc.
         _cp_row = conn.execute(
             "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
         ).fetchone()
         _cp_settings = json.loads(_cp_row["value_json"]) if _cp_row else {}
         _whitelist = {u.strip().lower() for u in (_cp_settings.get("whitelist_users") or [])}
         is_whitelisted = username.strip().lower() in _whitelist
+        _duration = int(_cp_settings.get("session_duration_minutes") or 60)
 
         # Try RADIUS first; fall back to local user table
         radius_result = authenticate_radius(conn, username, password)
@@ -139,6 +140,7 @@ def auth():
             result = authenticate_session(
                 conn, mac, ip, username=username,
                 is_superuser=is_whitelisted,
+                duration_minutes=_duration,
             )
         else:
             # Local user check — use correct column names from the users table
@@ -154,7 +156,8 @@ def auth():
                     **context,
                 )
             is_superuser = bool(row["is_superuser"]) or is_whitelisted
-            result = authenticate_session(conn, mac, ip, username=username, is_superuser=is_superuser)
+            result = authenticate_session(conn, mac, ip, username=username, is_superuser=is_superuser,
+                                          duration_minutes=_duration)
 
     if not result.get("ok"):
         # Decide which template to return to (block page or generic login page)

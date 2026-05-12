@@ -5,32 +5,67 @@
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">Bandwidth Monitor</h1>
-      <p class="ss-page-desc">Interface traffic graphs</p>
+      <p class="ss-page-desc">Real-time whole-network and per-interface traffic</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <span class="badge bg-success" id="live-badge">
+        <i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live
+      </span>
+      <button id="btn-pause" class="btn btn-sm btn-outline-secondary">
+        <i class="fa fa-pause me-1"></i>Pause
+      </button>
     </div>
   </div>
 
-  <div class="ss-card">
+  <!-- ── Whole-Network Summary ── -->
+  <div class="ss-card mb-4">
     <div class="ss-card-head">
-      <div class="ss-card-icon"><i class="fa-solid fa-wave-square"></i></div>
-      <div><div class="ss-card-title">Bandwidth</div></div>
-      <div class="ss-card-actions">
-        <span class="badge bg-success" id="live-badge">
-          <i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live
-        </span>
-        <button id="btn-pause" class="btn btn-sm btn-outline-secondary">
-          <i class="fa fa-pause me-1"></i>Pause
-        </button>
+      <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div>
+        <div class="ss-card-title">Whole-Network Totals</div>
+        <div class="ss-card-subtitle">Aggregated across all interfaces</div>
       </div>
     </div>
     <div class="ss-card-body">
-      <canvas id="trafficChart" style="width:100%;height:320px;"></canvas>
+      <div class="row g-3 text-center">
+        <div class="col-6 col-md-3">
+          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">RX Rate</div>
+          <div id="net-rx-rate" class="fw-bold mt-1" style="font-size:1.5rem;color:#3b82f6;">—</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">TX Rate</div>
+          <div id="net-tx-rate" class="fw-bold mt-1" style="font-size:1.5rem;color:#10b981;">—</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Total RX (since boot)</div>
+          <div id="net-rx-total" class="fw-bold mt-1" style="font-size:1.5rem;">—</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Total TX (since boot)</div>
+          <div id="net-tx-total" class="fw-bold mt-1" style="font-size:1.5rem;">—</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="ss-card mt-4">
+  <!-- ── Live Rate Chart ── -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-wave-square"></i></div>
+      <div><div class="ss-card-title">Network Throughput</div></div>
+    </div>
+    <div class="ss-card-body">
+      <div style="position:relative;height:300px;">
+        <canvas id="trafficChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Per-Interface Table ── -->
+  <div class="ss-card">
     <div class="ss-card-head">
       <div class="ss-card-icon"><i class="fa-solid fa-table-list"></i></div>
-      <div><div class="ss-card-title">Interface Summary</div></div>
+      <div><div class="ss-card-title">Interface Breakdown</div></div>
     </div>
     <div class="ss-card-body p-0">
       <div id="iface-summary">
@@ -42,10 +77,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 <script>
 (function () {
-  const MAX_POINTS = 60;
+  const MAX_POINTS  = 60;
   const INTERVAL_MS = 2000;
   const labels = [], rxData = [], txData = [];
   let lastStats = {}, paused = false, errorStreak = 0;
@@ -73,7 +108,7 @@
       ]
     },
     options: {
-      animation: false, responsive: true,
+      animation: false, responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#94a3b8', maxTicksLimit: 10 } },
@@ -87,6 +122,14 @@
     return parseFloat(((deltaBytes * (1000 / INTERVAL_MS)) / 1024).toFixed(1));
   }
 
+  function fmt(b) {
+    if (b == null) return '—';
+    return b >= 1073741824 ? (b/1073741824).toFixed(2)+' GB'
+         : b >= 1048576   ? (b/1048576).toFixed(1)+' MB'
+         : b >= 1024      ? (b/1024).toFixed(0)+' KB'
+         : b + ' B';
+  }
+
   function tick() {
     if (paused) return;
     fetch('/status/api/interface-stats')
@@ -96,54 +139,113 @@
         errorStreak = 0;
         setStale(false);
 
-        let totalRx = 0, totalTx = 0;
+        if (!d.on_freebsd || !d.stats.length) {
+          const msg = !d.on_freebsd
+            ? 'Live stats require FreeBSD — not available in this environment.'
+            : 'No network interfaces detected.';
+          document.getElementById('iface-summary').innerHTML =
+            `<div class="p-4 text-center text-muted"><i class="fa fa-info-circle me-2"></i>${msg}</div>`;
+          ['net-rx-rate','net-tx-rate','net-rx-total','net-tx-total'].forEach(id => {
+            document.getElementById(id).textContent = '—';
+          });
+          return;
+        }
+
+        // ── Compute per-interface deltas ──────────────────────────────────────
+        let netRxDelta = 0, netTxDelta = 0;
+        const rates = {};
         d.stats.forEach(s => {
           const prev = lastStats[s.name];
           if (prev) {
-            totalRx += Math.max(0, s.rx_bytes - prev.rx_bytes);
-            totalTx += Math.max(0, s.tx_bytes - prev.tx_bytes);
+            const rxDelta = Math.max(0, s.rx_bytes - prev.rx_bytes);
+            const txDelta = Math.max(0, s.tx_bytes - prev.tx_bytes);
+            netRxDelta += rxDelta;
+            netTxDelta += txDelta;
+            rates[s.name] = { rx: toKBs(rxDelta), tx: toKBs(txDelta) };
+          } else {
+            rates[s.name] = { rx: null, tx: null };
           }
           lastStats[s.name] = s;
         });
 
+        // ── Chart ─────────────────────────────────────────────────────────────
+        const netRxKBs = toKBs(netRxDelta);
+        const netTxKBs = toKBs(netTxDelta);
         labels.push(new Date().toLocaleTimeString());
-        rxData.push(toKBs(totalRx));
-        txData.push(toKBs(totalTx));
+        rxData.push(netRxKBs);
+        txData.push(netTxKBs);
         if (labels.length > MAX_POINTS) { labels.shift(); rxData.shift(); txData.shift(); }
         chart.update('none');
-        updateSummary(d.stats);
+
+        // ── Whole-network totals card ─────────────────────────────────────────
+        let sumRxBytes = 0, sumTxBytes = 0;
+        d.stats.forEach(s => { sumRxBytes += s.rx_bytes; sumTxBytes += s.tx_bytes; });
+        document.getElementById('net-rx-rate').textContent  = netRxKBs + ' KB/s';
+        document.getElementById('net-tx-rate').textContent  = netTxKBs + ' KB/s';
+        document.getElementById('net-rx-total').textContent = fmt(sumRxBytes);
+        document.getElementById('net-tx-total').textContent = fmt(sumTxBytes);
+
+        // ── Interface breakdown table ─────────────────────────────────────────
+        updateSummary(d.stats, rates, netRxKBs, netTxKBs,
+                      sumRxBytes, sumTxBytes);
       })
       .catch(() => { if (++errorStreak >= 2) setStale(true); });
   }
 
-  function fmt(b) {
-    return b >= 1073741824 ? (b/1073741824).toFixed(2)+' GB'
-         : b >= 1048576   ? (b/1048576).toFixed(1)+' MB'
-         : b >= 1024      ? (b/1024).toFixed(0)+' KB'
-         : b + ' B';
-  }
+  function updateSummary(stats, rates, netRxKBs, netTxKBs,
+                          sumRxBytes, sumTxBytes) {
+    let sumRxPkts = 0, sumTxPkts = 0, sumErrs = 0;
+    stats.forEach(s => {
+      sumRxPkts += s.rx_pkts;
+      sumTxPkts += s.tx_pkts;
+      sumErrs   += s.rx_errs + s.tx_errs;
+    });
 
-  function updateSummary(stats) {
-    if (!stats.length) {
-      document.getElementById('iface-summary').innerHTML = '<div class="p-3 text-muted text-center">No data.</div>';
-      return;
-    }
-    const rows = stats.map(s => `<tr>
-      <td><code>${s.name}</code></td>
-      <td class="text-end">${fmt(s.rx_bytes)}</td>
-      <td class="text-end">${fmt(s.tx_bytes)}</td>
-      <td class="text-end">${s.rx_pkts.toLocaleString()}</td>
-      <td class="text-end">${s.tx_pkts.toLocaleString()}</td>
-      <td class="text-end text-danger">${(s.rx_errs + s.tx_errs).toLocaleString()}</td>
-    </tr>`).join('');
+    const rows = stats.map(s => {
+      const r    = rates[s.name] || {};
+      const rxR  = r.rx != null ? r.rx + ' KB/s' : '—';
+      const txR  = r.tx != null ? r.tx + ' KB/s' : '—';
+      return `<tr>
+        <td><code>${s.name}</code></td>
+        <td class="text-end fw-semibold" style="color:#3b82f6;">${rxR}</td>
+        <td class="text-end fw-semibold" style="color:#10b981;">${txR}</td>
+        <td class="text-end">${fmt(s.rx_bytes)}</td>
+        <td class="text-end">${fmt(s.tx_bytes)}</td>
+        <td class="text-end">${s.rx_pkts.toLocaleString()}</td>
+        <td class="text-end">${s.tx_pkts.toLocaleString()}</td>
+        <td class="text-end text-danger">${(s.rx_errs + s.tx_errs).toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+
+    const totalRow = `<tr style="border-top:2px solid var(--border-color-soft,#334);font-weight:700;background:rgba(255,255,255,.02);">
+      <td>TOTAL</td>
+      <td class="text-end" style="color:#3b82f6;">${netRxKBs} KB/s</td>
+      <td class="text-end" style="color:#10b981;">${netTxKBs} KB/s</td>
+      <td class="text-end">${fmt(sumRxBytes)}</td>
+      <td class="text-end">${fmt(sumTxBytes)}</td>
+      <td class="text-end">${sumRxPkts.toLocaleString()}</td>
+      <td class="text-end">${sumTxPkts.toLocaleString()}</td>
+      <td class="text-end text-danger">${sumErrs.toLocaleString()}</td>
+    </tr>`;
+
     document.getElementById('iface-summary').innerHTML = `
-      <div class="table-responsive"><table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);"><tr>
-          <th>Interface</th><th class="text-end">RX Bytes</th><th class="text-end">TX Bytes</th>
-          <th class="text-end">RX Pkts</th><th class="text-end">TX Pkts</th><th class="text-end">Errors</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>`;
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" style="font-size:.85rem;">
+          <thead style="background:var(--border-color-soft,#1e293b);">
+            <tr>
+              <th>Interface</th>
+              <th class="text-end">RX Rate</th>
+              <th class="text-end">TX Rate</th>
+              <th class="text-end">RX Total</th>
+              <th class="text-end">TX Total</th>
+              <th class="text-end">RX Pkts</th>
+              <th class="text-end">TX Pkts</th>
+              <th class="text-end">Errors</th>
+            </tr>
+          </thead>
+          <tbody>${rows}${totalRow}</tbody>
+        </table>
+      </div>`;
   }
 
   setInterval(tick, INTERVAL_MS);
@@ -151,7 +253,9 @@
 
   document.getElementById('btn-pause').addEventListener('click', function () {
     paused = !paused;
-    this.innerHTML = paused ? '<i class="fa fa-play me-1"></i>Resume' : '<i class="fa fa-pause me-1"></i>Pause';
+    this.innerHTML = paused
+      ? '<i class="fa fa-play me-1"></i>Resume'
+      : '<i class="fa fa-pause me-1"></i>Pause';
     liveBadge.style.opacity = paused ? '0.4' : '1';
   });
 })();

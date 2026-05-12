@@ -204,83 +204,33 @@
 </div>
 
 <script>
-    function saveMapping() {
-        // Get form values
-        const mapping = {
-            mac_address: document.getElementById('mac_address').value,
-            client_identifier: document.getElementById('client_identifier').value,
-            ip_address: document.getElementById('ip_address').value,
-            static_arp: document.querySelector('input[type="checkbox"]').checked,
-            hostname: document.getElementById('hostname').value,
-            description: document.getElementById('description').value,
-            wins_servers: [
-                document.getElementById('wins_1').value,
-                document.querySelectorAll('input[placeholder="WINS Server 2"]')[0]?.value || ''
-            ].filter(v => v),
-            dns_servers: [
-                document.getElementById('dns_1').value,
-                ...Array.from(document.querySelectorAll('input[placeholder^="DNS Server"]')).map(el => el.value)
-            ].filter(v => v),
-            gateway: document.getElementById('gateway').value,
-            domain_name: document.getElementById('domain_name').value,
-            domain_search_list: document.getElementById('domain_search_list').value,
-            default_lease_time: document.getElementById('default_lease_time').value,
-            maximum_lease_time: document.getElementById('maximum_lease_time').value
-        };
-
-        // Validate required fields
-        if (!mapping.mac_address && !mapping.client_identifier) {
+    async function saveMapping() {
+        const mac = document.getElementById('mac_address').value.trim();
+        const ip  = document.getElementById('ip_address').value.trim();
+        if (!mac && !document.getElementById('client_identifier').value.trim()) {
             alert('Please enter either MAC Address or Client Identifier');
             return;
         }
-
-        if (!mapping.ip_address) {
+        if (!ip) {
             alert('Please enter an IP Address');
             return;
         }
-
-        // Get existing mappings
-        const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-        const editIndex = localStorage.getItem('edit_mapping_index');
-
-        if (editIndex !== null) {
-            // Update existing mapping
-            mappings[parseInt(editIndex)] = mapping;
-            localStorage.removeItem('edit_mapping_index');
-        } else {
-            // Add new mapping
-            mappings.push(mapping);
-        }
-
-        // Save to localStorage
-        localStorage.setItem('dhcp_static_mappings', JSON.stringify(mappings));
-
-        // Redirect back to DHCP Server page
-        alert('Static mapping saved successfully!');
-        window.location.href = '{{ url_for("services.dhcp_server") }}';
+        try {
+            const r = await fetch('/api/network/leases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    interface_type: 'wan',
+                    mac_address: mac,
+                    ip_address: ip,
+                    hostname: document.getElementById('hostname').value.trim(),
+                    description: document.getElementById('description').value.trim(),
+                }),
+            });
+            const d = await r.json();
+            if (d.status !== 'success') { alert(d.message || 'Failed to save'); return; }
+            window.location.href = '{{ url_for("services.dhcp_server") }}';
+        } catch (e) { alert(e.message || String(e)); }
     }
-
-    // Load existing mapping if editing
-    document.addEventListener('DOMContentLoaded', function() {
-        const editIndex = localStorage.getItem('edit_mapping_index');
-        if (editIndex !== null) {
-            const mappings = JSON.parse(localStorage.getItem('dhcp_static_mappings') || '[]');
-            const mapping = mappings[parseInt(editIndex)];
-
-            if (mapping) {
-                document.getElementById('mac_address').value = mapping.mac_address || '';
-                document.getElementById('client_identifier').value = mapping.client_identifier || '';
-                document.getElementById('ip_address').value = mapping.ip_address || '';
-                document.querySelector('input[type="checkbox"]').checked = mapping.static_arp || false;
-                document.getElementById('hostname').value = mapping.hostname || '';
-                document.getElementById('description').value = mapping.description || '';
-                document.getElementById('gateway').value = mapping.gateway || '';
-                document.getElementById('domain_name').value = mapping.domain_name || '';
-                document.getElementById('domain_search_list').value = mapping.domain_search_list || '';
-                document.getElementById('default_lease_time').value = mapping.default_lease_time || '';
-                document.getElementById('maximum_lease_time').value = mapping.maximum_lease_time || '';
-            }
-        }
-    });
 </script>
 {% endblock %}

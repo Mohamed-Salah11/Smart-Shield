@@ -222,6 +222,10 @@ def add_user():
     email = request.form.get("email")
     group = request.form.get("groups")
 
+    if not password or len(password) < 8:
+        flash("Password must be at least 8 characters.", "danger")
+        return redirect(url_for("users.user_manager"))
+
     profile_picture = None
     if "profile_picture" in request.files:
         file = request.files["profile_picture"]
@@ -377,6 +381,9 @@ def set_group_permissions(group_id):
 @users_bp.route("/delete/<int:user_id>", methods=["POST"])
 @superuser_required
 def delete_user(user_id):
+    if user_id == session.get("user_id"):
+        flash("You cannot delete your own account.", "danger")
+        return redirect(url_for("users.user_manager"))
     with db_cursor(commit=True) as (_, cur):
         cur.execute("SELECT COALESCE(is_superuser, 0) AS is_superuser FROM users WHERE id = ?", (user_id,))
         row = cur.fetchone()
@@ -451,6 +458,9 @@ def edit_user(user_id):
         profile_picture = current_user["profile_picture"] if current_user else None
 
         if new_password:
+            if len(new_password) < 8:
+                flash("Password must be at least 8 characters.", "danger")
+                return redirect(url_for("users.user_manager"))
             if not old_password:
                 flash("Current password is required to set a new password.", "danger")
                 return redirect(url_for("users.user_manager"))

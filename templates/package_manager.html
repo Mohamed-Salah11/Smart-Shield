@@ -6,14 +6,64 @@
     function showTab(index) {
         const tabs = document.querySelectorAll('.nav-pills .nav-link');
         const sections = document.querySelectorAll('.tab-section');
-        
-        tabs.forEach((tab, i) => {
-            tab.classList.toggle('active', i === index);
+        tabs.forEach((tab, i) => tab.classList.toggle('active', i === index));
+        sections.forEach((section, i) => { section.style.display = (i === index ? 'block' : 'none'); });
+    }
+
+    async function installPkg(btn) {
+        const pkg = btn.dataset.pkg;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Installing…';
+        try {
+            const r = await fetch('/system/api/packages/install', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ package: pkg }),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                btn.className = 'btn btn-secondary btn-sm';
+                btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Installed';
+            } else {
+                btn.disabled = false;
+                btn.className = 'btn btn-danger btn-sm';
+                btn.innerHTML = '<i class="fa-solid fa-xmark me-1"></i>Failed';
+                setTimeout(() => {
+                    btn.className = 'btn btn-success btn-sm';
+                    btn.innerHTML = '<i class="fa-solid fa-download me-1"></i>Install';
+                    btn.disabled = false;
+                }, 3000);
+            }
+        } catch (e) {
+            btn.disabled = false;
+            btn.className = 'btn btn-danger btn-sm';
+            btn.innerHTML = '<i class="fa-solid fa-xmark me-1"></i>Failed';
+            setTimeout(() => {
+                btn.className = 'btn btn-success btn-sm';
+                btn.innerHTML = '<i class="fa-solid fa-download me-1"></i>Install';
+                btn.disabled = false;
+            }, 3000);
+        }
+    }
+
+    function searchPkgs() {
+        const term = document.getElementById('pkg-search-input').value.trim().toLowerCase();
+        const scope = document.getElementById('pkg-search-scope').value;
+        document.querySelectorAll('#pkg-table-body tr').forEach(row => {
+            const name = (row.dataset.pkgName || '').toLowerCase();
+            const desc = (row.dataset.pkgDesc || '').toLowerCase();
+            let match = false;
+            if (!term) { match = true; }
+            else if (scope === 'Name only') { match = name.includes(term); }
+            else if (scope === 'Description only') { match = desc.includes(term); }
+            else { match = name.includes(term) || desc.includes(term); }
+            row.style.display = match ? '' : 'none';
         });
-        
-        sections.forEach((section, i) => {
-            section.style.display = (i === index ? 'block' : 'none');
-        });
+    }
+
+    function clearSearch() {
+        document.getElementById('pkg-search-input').value = '';
+        document.querySelectorAll('#pkg-table-body tr').forEach(row => { row.style.display = ''; });
     }
 </script>
 
@@ -65,20 +115,20 @@
                         <label class="col-form-label fw-semibold">Search term</label>
                     </div>
                     <div class="col-md-4">
-                        <input type="text" class="form-control" placeholder="Enter search string">
+                        <input type="text" id="pkg-search-input" class="form-control" placeholder="Enter search string" oninput="searchPkgs()">
                     </div>
                     <div class="col-auto">
-                        <select class="form-select">
+                        <select id="pkg-search-scope" class="form-select" onchange="searchPkgs()">
                             <option>Both</option>
                             <option>Name only</option>
                             <option>Description only</option>
                         </select>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary">
+                        <button class="btn btn-primary" onclick="searchPkgs()">
                             <i class="fa-solid fa-search me-1"></i>Search
                         </button>
-                        <button class="btn btn-outline-secondary">
+                        <button class="btn btn-outline-secondary" onclick="clearSearch()">
                             <i class="fa-solid fa-times me-1"></i>Clear
                         </button>
                     </div>
@@ -102,63 +152,63 @@
                                 <th style="width: 10%;">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr>
+                        <tbody id="pkg-table-body">
+                            <tr data-pkg-name="acme" data-pkg-desc="automated certificate management environment for letsencrypt.">
                                 <td><strong>acme</strong></td>
                                 <td><span class="badge bg-secondary">1.0</span></td>
                                 <td>Automated Certificate Management Environment for LetsEncrypt.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="acme" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-pkg-name="apcupsd" data-pkg-desc="control and log apc ups models and perform network-based shutdowns.">
                                 <td><strong>apcupsd</strong></td>
                                 <td><span class="badge bg-secondary">0.3.92_9</span></td>
                                 <td>Control and log APC UPS models and perform network-based shutdowns.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="apcupsd" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-pkg-name="arping" data-pkg-desc="broadcasts who-has arp packets and prints answers.">
                                 <td><strong>arping</strong></td>
                                 <td><span class="badge bg-secondary">1.2.2_6</span></td>
                                 <td>Broadcasts who-has ARP packets and prints answers.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="arping" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-pkg-name="bandwidthd" data-pkg-desc="tracks network usage and builds html graphs.">
                                 <td><strong>bandwidthd</strong></td>
                                 <td><span class="badge bg-secondary">2.0.1_9</span></td>
                                 <td>Tracks network usage and builds HTML graphs.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="bandwidthd" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-pkg-name="darkstat" data-pkg-desc="network statistics gatherer with a web interface.">
                                 <td><strong>darkstat</strong></td>
                                 <td><span class="badge bg-secondary">3.0.721</span></td>
                                 <td>Network statistics gatherer with a web interface.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="darkstat" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
                             </tr>
-                            <tr>
+                            <tr data-pkg-name="freeradius3" data-pkg-desc="freeradius authentication and accounting server.">
                                 <td><strong>freeradius3</strong></td>
                                 <td><span class="badge bg-secondary">3.0.25</span></td>
                                 <td>FreeRADIUS authentication and accounting server.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm">
+                                    <button class="btn btn-success btn-sm" data-pkg="freeradius3" onclick="installPkg(this)">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>

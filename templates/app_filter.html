@@ -96,7 +96,7 @@
               </label>
             </td>
             <td style="font-weight:600;">{{ r.app_name }}</td>
-            <td><span class="badge-action badge-{{ r.action }}">{{ r.action }}</span></td>
+            <td><span class="badge-action badge-{{ r.action }}">{{ 'Redirect to block page' if r.action == 'block' else ('Allow whitelist only' if r.action == 'allow' else r.action) }}</span></td>
             <td><span class="badge-cat">{{ r.category }}</span></td>
             <td class="text-center">
               <span class="{% if r.block_dns %}check-yes{% else %}check-no{% endif %}">
@@ -188,8 +188,8 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
           <select id="f-action" class="form-select">
-            <option value="block">Block</option>
-            <option value="allow">Allow</option>
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
         </div>
         <div class="row g-3">
@@ -252,8 +252,8 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Action</label>
           <select id="e-action" class="form-select">
-            <option value="block">Block</option>
-            <option value="allow">Allow</option>
+            <option value="block">Redirect to block page</option>
+            <option value="allow">Allow whitelist only</option>
           </select>
         </div>
         <div class="row g-3">
@@ -439,8 +439,11 @@ async function submitEdit() {
       row.dataset.blockDns = ru.block_dns;
       row.dataset.blockPorts = ru.block_ports;
       row.dataset.ports = ru.ports || '';
+      row.dataset.domains  = ru.domains  || '';
+      row.dataset.protocol = ru.protocol || 'tcp+udp';
       row.cells[1].textContent = ru.app_name;
-      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(ru.action)}">${esc(ru.action)}</span>`;
+      const actionLabel = ru.action === 'block' ? 'Redirect to block page' : ru.action === 'allow' ? 'Allow whitelist only' : ru.action;
+      row.cells[2].innerHTML = `<span class="badge-action badge-${esc(ru.action)}">${esc(actionLabel)}</span>`;
       row.cells[3].innerHTML = `<span class="badge-cat">${esc(ru.category)}</span>`;
       row.cells[4].innerHTML = `<span class="${ru.block_dns ? 'check-yes' : 'check-no'}">${ru.block_dns ? 'Yes' : 'No'}</span>`;
       row.cells[5].innerHTML = `<span class="${ru.block_ports ? 'check-yes' : 'check-no'}">${ru.block_ports ? 'Yes' : 'No'}</span>`;
