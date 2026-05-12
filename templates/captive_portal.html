@@ -216,6 +216,27 @@
             <p class="ss-toggle-desc">Permit DNS queries from unauthenticated guests (required for most devices to detect the captive portal)</p>
           </div>
         </div>
+        <div class="ss-toggle-row" style="margin-top:12px;">
+          <label class="ss-toggle">
+            <input type="checkbox" id="cp-strict"><span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Strict Mode</p>
+            <p class="ss-toggle-desc">Block ALL unauthenticated traffic except the portal login page and DHCP. In soft mode (default) unauthenticated clients have full internet access.</p>
+          </div>
+        </div>
+        <div class="ss-field-grid ss-field-grid-2" style="margin-top:16px;">
+          <div class="ss-field">
+            <label class="ss-label">Session Duration (minutes)</label>
+            <input type="number" id="cp-session-dur" class="form-control" placeholder="60" min="1">
+            <p class="ss-hint">How long portal sessions last before requiring re-authentication</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label">Upstream DNS</label>
+            <input type="text" id="cp-upstream-dns" class="form-control" placeholder="8.8.8.8">
+            <p class="ss-hint">DNS server authenticated clients use — bypasses Unbound content filtering</p>
+          </div>
+        </div>
         <hr class="ss-divider">
         <div class="ss-card-title" style="margin-bottom:14px;font-size:.85rem;">RADIUS Authentication (optional)</div>
         <div class="ss-field-grid ss-field-grid-2">
@@ -530,6 +551,9 @@ async function loadSettings() {
     document.getElementById('cp-port').value       = s.portal_port       || '';
     document.getElementById('cp-redir-port').value = s.http_redirect_port || '';
     document.getElementById('cp-dns').checked      = !!s.allow_dns;
+    document.getElementById('cp-strict').checked      = !!s.strict_mode;
+    document.getElementById('cp-session-dur').value   = s.session_duration_minutes || 60;
+    document.getElementById('cp-upstream-dns').value  = s.upstream_dns || '8.8.8.8';
     document.getElementById('cp-radius-server').value = s.radius_server  || '';
     // Never pre-fill the secret field
     _whitelistUsers = Array.isArray(s.whitelist_users) ? s.whitelist_users : [];
@@ -546,6 +570,9 @@ async function saveSettings() {
     portal_port:        parseInt(document.getElementById('cp-port').value) || 5000,
     http_redirect_port: parseInt(document.getElementById('cp-redir-port').value) || 80,
     allow_dns:          document.getElementById('cp-dns').checked,
+    strict_mode:              document.getElementById('cp-strict').checked,
+    session_duration_minutes: parseInt(document.getElementById('cp-session-dur').value) || 60,
+    upstream_dns:             document.getElementById('cp-upstream-dns').value.trim() || '8.8.8.8',
     radius_server:      document.getElementById('cp-radius-server').value.trim(),
     whitelist_users:    _whitelistUsers,
   };

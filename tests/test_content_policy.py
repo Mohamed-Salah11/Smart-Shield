@@ -127,8 +127,8 @@ def test_app_filter_pf_port_blocks_skip_authenticated_clients(conn):
     conn.commit()
 
     rules = generate_app_filter_pf_rules(conn)
-    assert "block quick proto tcp from !<authenticated_clients> to any port { 6881:6889 6969 }" in rules
-    assert "block quick proto udp from !<authenticated_clients> to any port { 6881:6889 6969 }" in rules
+    assert "block quick proto tcp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
+    assert "block quick proto udp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
     assert "from any to any port" not in rules
 
 

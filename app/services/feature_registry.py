@@ -304,7 +304,7 @@ _FEATURES: List[Feature] = [
     Feature(
         key="ai_chatbot",
         name="AI Chatbot",
-        description="Google Gemini-powered AI assistant",
+        description="Groq-powered AI assistant",
         required_commands=[],
         freebsd_only=False,
         category="services",
@@ -372,7 +372,7 @@ def _feature_mode(feature: Feature) -> str:
     # Special env-key checks
     if feature.key == "threat_intel" and not os.getenv("ABUSECH_AUTH_KEY", "").strip():
         return "degraded"
-    if feature.key == "ai_chatbot" and not os.getenv("GOOGLE_API_KEY", "").strip():
+    if feature.key == "ai_chatbot" and not os.getenv("GROQ_API_KEY", "").strip():
         return "unavailable"
 
     # Optional commands — if missing, feature is degraded not broken

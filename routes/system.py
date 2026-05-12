@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, request, session, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, session, jsonify, flash
 from app.database import get_db
 from app.auth_utils import login_required, superuser_required
 from app.audit_log import tail_events, log_event
@@ -1271,9 +1271,35 @@ def update_page():
 # NOTIFICATIONS
 # ----------------------------
 
+_NOTIF_BOOL_FIELDS = {
+    "certificate_expiration", "ignore_revoked", "disable_smtp",
+    "secure_smtp_connection", "validate_ssl_tls",
+    "console_bell", "startup_shutdown_sound", "enable_telegram",
+}
+
 @system_bp.route("/notifications", methods=["GET", "POST"])
 @login_required
 def notifications():
+    conn = get_db()
     if request.method == "POST":
+        data = {}
+        for key, value in request.form.items():
+            if key == "csrf_token":
+                continue
+            data[key] = value
+        for field in _NOTIF_BOOL_FIELDS:
+            data[field] = field in request.form
+        conn.execute(
+            "INSERT INTO service_state(key_name, value_json) VALUES('notification_settings', ?) "
+            "ON CONFLICT(key_name) DO UPDATE SET value_json=excluded.value_json, updated_at=CURRENT_TIMESTAMP",
+            (json.dumps(data),),
+        )
+        conn.commit()
+        flash("Notification settings saved.", "success")
         return redirect(url_for("system.notifications"))
-    return render_template("notifications.html")
+
+    row = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='notification_settings'"
+    ).fetchone()
+    settings = json.loads(row["value_json"]) if row else {}
+    return render_template("notifications.html", settings=settings)

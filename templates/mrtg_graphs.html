@@ -91,8 +91,12 @@ async function reinitMrtg() {
   const msg = document.getElementById('mrtg-reinit-msg');
   btn.disabled = true;
   msg.textContent = 'Running…';
+  const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
   try {
-    const r = await fetch('/status/api/mrtg/reinitialize', { method: 'POST' });
+    const r = await fetch('/status/api/mrtg/reinitialize', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken },
+    });
     const d = await r.json();
     msg.textContent = d.ok ? 'Done — reloading page…' : 'Error: ' + (d.message || 'failed');
     if (d.ok) setTimeout(() => location.reload(), 1200);

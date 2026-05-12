@@ -7,7 +7,40 @@ from app.api_auth import api_permission_required
 from app.validators import (
     validate_ip, validate_cidr, validate_protocol,
     validate_description, validate_name, collect_errors,
+    validate_port_list,
 )
+
+
+def _validate_rule(data: dict) -> str | None:
+    """Return the first validation error message, or None if all fields are valid."""
+    action = (data.get("action") or "").lower()
+    if action and action not in {"pass", "block", "reject"}:
+        return f"Invalid action: {action!r}"
+    try:
+        validate_protocol(data.get("protocol") or "")
+    except ValueError as exc:
+        return str(exc)
+    for field in ("source", "destination"):
+        val = (data.get(field) or "").strip()
+        if val and val.lower() != "any":
+            try:
+                validate_cidr(val) if "/" in val else validate_ip(val)
+            except ValueError as exc:
+                return f"Invalid {field}: {exc}"
+    for field in ("source_port", "dest_port", "dst_port", "redirect_port"):
+        val = (data.get(field) or "").strip()
+        if val:
+            try:
+                validate_port_list(val)
+            except ValueError as exc:
+                return f"Invalid {field}: {exc}"
+    desc = data.get("description") or ""
+    if desc:
+        try:
+            validate_description(desc)
+        except ValueError as exc:
+            return str(exc)
+    return None
 
 firewall_bp = Blueprint("firewall", __name__, url_prefix="/firewall")
 
@@ -57,9 +90,12 @@ def add_floating_rule():
     """Add a new floating rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         position = data.get('position', 'bottom')
         
         if position == 'top':
@@ -169,9 +205,12 @@ def update_floating_rule(rule_id):
     """Update a floating rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         cursor.execute("""
             UPDATE firewall_rules_floating
             SET action=?, disabled=?, interface=?, protocol=?, source=?, source_port=?,
@@ -239,11 +278,14 @@ def add_wan_rule():
     db = None
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         position = data.get('position', 'bottom')
-        
+
         if position == 'top':
             cursor.execute("UPDATE firewall_rules_wan SET rule_order = rule_order + 1")
             new_order = 1
@@ -337,9 +379,12 @@ def update_wan_rule(rule_id):
     """Update a WAN rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         cursor.execute("""
             UPDATE firewall_rules_wan
             SET action=?, disabled=?, protocol=?, source=?, source_port=?,
@@ -403,11 +448,14 @@ def add_lan_rule():
     """Add a new LAN rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         position = data.get('position', 'bottom')
-        
+
         if position == 'top':
             cursor.execute("UPDATE firewall_rules_lan SET rule_order = rule_order + 1")
             new_order = 1
@@ -505,9 +553,12 @@ def update_lan_rule(rule_id):
     """Update a LAN rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         cursor.execute("""
             UPDATE firewall_rules_lan
             SET action=?, disabled=?, interface=?, protocol=?, source=?, source_port=?,
@@ -565,8 +616,9 @@ def get_nat_pf():
         db = get_db()
         cursor = db.cursor()
         cursor.execute("""
-            SELECT id, disabled, interface, protocol, src_type, src_address, 
-                   dst_type, dst_address, redirect_ip, description, nat_reflection
+            SELECT id, disabled, interface, protocol, src_type, src_address,
+                   dst_type, dst_address, dst_port, redirect_ip, redirect_port,
+                   description, nat_reflection
             FROM nat_pf
             ORDER BY rule_order
         """)
@@ -582,23 +634,33 @@ def add_nat_pf():
     """Add a new port forward rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
+        redir_ip = (data.get("redirect_ip") or "").strip()
+        if redir_ip:
+            try:
+                validate_ip(redir_ip)
+            except ValueError as exc:
+                return jsonify({"success": False, "error": f"Invalid redirect IP: {exc}"}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         position = data.get('position', 'bottom')
-        
+
         if position == 'top':
             cursor.execute("UPDATE nat_pf SET rule_order = rule_order + 1")
             new_order = 1
         else:
             cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM nat_pf")
             new_order = cursor.fetchone()[0]
-        
+
         cursor.execute("""
-            INSERT INTO nat_pf 
-            (disabled, interface, protocol, src_type, src_address, dst_type, 
-             dst_address, redirect_ip, description, nat_reflection, rule_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO nat_pf
+            (disabled, interface, protocol, src_type, src_address, dst_type,
+             dst_address, dst_port, redirect_ip, redirect_port, description,
+             nat_reflection, rule_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('disabled', 0),
             data.get('interface', 'WAN'),
@@ -607,7 +669,9 @@ def add_nat_pf():
             data.get('src_address', ''),
             data.get('dst_type', 'wan_address'),
             data.get('dst_address', ''),
+            (data.get('dst_port') or '').strip(),
             data.get('redirect_ip', ''),
+            (data.get('redirect_port') or '').strip(),
             data.get('description', ''),
             data.get('nat_reflection', 'default'),
             new_order
@@ -667,7 +731,8 @@ def get_nat_pf_rule(rule_id):
         db = get_db()
         row = db.execute(
             "SELECT id, disabled, interface, protocol, src_type, src_address, "
-            "dst_type, dst_address, redirect_ip, description, nat_reflection "
+            "dst_type, dst_address, dst_port, redirect_ip, redirect_port, "
+            "description, nat_reflection "
             "FROM nat_pf WHERE id=?", (rule_id,)
         ).fetchone()
         if not row:
@@ -683,13 +748,23 @@ def update_nat_pf(rule_id):
     """Update a port forward rule"""
     try:
         data = request.get_json()
+        err = _validate_rule(data)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
+        redir_ip = (data.get("redirect_ip") or "").strip()
+        if redir_ip:
+            try:
+                validate_ip(redir_ip)
+            except ValueError as exc:
+                return jsonify({"success": False, "error": f"Invalid redirect IP: {exc}"}), 400
         db = get_db()
         cursor = db.cursor()
-        
+
         cursor.execute("""
-            UPDATE nat_pf 
-            SET disabled=?, interface=?, protocol=?, src_type=?, src_address=?, 
-                dst_type=?, dst_address=?, redirect_ip=?, description=?, nat_reflection=?
+            UPDATE nat_pf
+            SET disabled=?, interface=?, protocol=?, src_type=?, src_address=?,
+                dst_type=?, dst_address=?, dst_port=?, redirect_ip=?, redirect_port=?,
+                description=?, nat_reflection=?
             WHERE id=?
         """, (
             data.get('disabled'),
@@ -699,7 +774,9 @@ def update_nat_pf(rule_id):
             data.get('src_address'),
             data.get('dst_type'),
             data.get('dst_address'),
+            (data.get('dst_port') or '').strip(),
             data.get('redirect_ip'),
+            (data.get('redirect_port') or '').strip(),
             data.get('description'),
             data.get('nat_reflection'),
             rule_id

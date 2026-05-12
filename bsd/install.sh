@@ -246,8 +246,8 @@ SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
-# SmartShield AI chatbot — get a free key at https://aistudio.google.com
-GOOGLE_API_KEY=
+# SmartShield AI chatbot (Groq) — get a free key at https://console.groq.com/keys
+GROQ_API_KEY=
 EOF
         chmod 0600 "${ENV_FILE}"
         info "Admin account will be created on first run via the setup wizard."
@@ -273,19 +273,19 @@ if ! grep -q "^ABUSECH_AUTH_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
     fi
 fi
 
-# Prompt for GOOGLE_API_KEY (SmartShield AI chatbot — Gemini)
-if ! grep -q "^GOOGLE_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
-    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Gemini) ━━━${NC}\n"
-    printf "SmartShield includes an AI security assistant powered by Google Gemini.\n"
+# Prompt for GROQ_API_KEY (SmartShield AI chatbot — Groq)
+if ! grep -q "^GROQ_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
+    printf "\n${BOLD}━━━ SmartShield AI Chatbot (Groq) ━━━${NC}\n"
+    printf "SmartShield includes an AI security assistant powered by Groq (llama-3.3-70b).\n"
     printf "It can analyse logs, explain rules, and answer firewall questions.\n"
-    printf "Get a free API key at: https://aistudio.google.com\n"
-    printf "${YELLOW}[?]${NC} Enter your GOOGLE_API_KEY (press Enter to skip): "
-    read -r GOOGLE_KEY
-    if [ -n "${GOOGLE_KEY}" ]; then
-        sed -i '' "s|^GOOGLE_API_KEY=.*|GOOGLE_API_KEY=${GOOGLE_KEY}|" "${ENV_FILE}"
-        info "Google API key saved — SmartShield AI chatbot is enabled."
+    printf "Get a free API key at: https://console.groq.com/keys\n"
+    printf "${YELLOW}[?]${NC} Enter your GROQ_API_KEY (press Enter to skip): "
+    read -r GROQ_KEY
+    if [ -n "${GROQ_KEY}" ]; then
+        sed -i '' "s|^GROQ_API_KEY=.*|GROQ_API_KEY=${GROQ_KEY}|" "${ENV_FILE}"
+        info "Groq API key saved — SmartShield AI chatbot is enabled."
     else
-        warn "GOOGLE_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
+        warn "GROQ_API_KEY not set — AI chatbot disabled until you add it via Admin → Settings → SmartShield AI."
     fi
 fi
 
@@ -464,7 +464,7 @@ fi
 
 # Write a complete nginx.conf (replaces the default pkg stub).
 # server_name _ = catch-all (works for any IP or hostname on this appliance).
-# proxy_read_timeout 300s to accommodate Gemini API agentic loops.
+# proxy_read_timeout 300s to accommodate Groq AI agentic loops.
 cat > /usr/local/etc/nginx/nginx.conf << 'NGINXEOF'
 user www;
 worker_processes auto;

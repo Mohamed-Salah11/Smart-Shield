@@ -41,7 +41,7 @@ Markdown documentation.
 - [x] Network apply gated by `SMARTSHIELD_ENABLE_NETWORK_APPLY=1`
 - [x] Audit logging via `audit_log.py`
 - [x] Config versioning via `config_versions` table
-- [ ] Create `runtime_mode.py` helper exposing is_freebsd, network_apply_enabled, dry_run_enabled, current_mode()
+- [x] Create `runtime_mode.py` helper exposing is_freebsd, network_apply_enabled, dry_run_enabled, current_mode()
 - [ ] Global UI banner showing current mode (live / dry-run / development / degraded)
 - [ ] Every "applied" response must only emit after a real live apply succeeds
 - [ ] Dry-run responses must say "dry run" and include generated config diff
@@ -243,19 +243,23 @@ Markdown documentation.
 - [x] PF config generation from DB rules
 - [x] Alias tables
 - [x] NAT outbound
-- [x] Port forwards
+- [~] Port forwards — dst_type=wan_address now renders `to (iface)`; was silently using `to any`
 - [x] 1:1 NAT
-- [x] IPv6 firewall rules
+- [~] IPv6 firewall rules — icmpv6 now normalizes to icmp6 in _proto_line(); was invalid PF syntax
 - [x] Captive portal anchors
 - [x] Traffic shaper/limiter anchors
 - [x] Application filter rules
 - [x] Syntax check before reload
 - [x] Atomic write + rollback
-- [ ] Bogon blocking table
-- [ ] Anti-spoof rules
-- [ ] NAT reflection/hairpin NAT
+- [x] Bogon blocking table — implemented in _build_hardening_rules()
+- [x] Anti-spoof rules — antispoof quick for WAN and LAN in _build_hardening_rules()
+- [~] NAT reflection/hairpin NAT — global only; per-port-forward reflection not yet supported
 - [ ] Kill states on rule change (option)
 - [ ] pfsync/CARP integration for HA
+- [x] Fix: _proto_line() normalize tcp+udp → proto { tcp udp } and icmpv6 → proto icmp6
+- [x] Fix: _port_line() normalize comma-lists and dash-ranges to PF syntax
+- [x] Fix: Remove echoreq from hardening pass in (no quick) — user block-ping rules now work
+- [x] Fix: NAT port-forward dst_type=wan_address renders to (iface) not to any
 
 ---
 
