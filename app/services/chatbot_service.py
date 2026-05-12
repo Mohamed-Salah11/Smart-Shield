@@ -40,6 +40,12 @@ Agent capabilities (require user approval):
   UI handle the confirmation.
 - Use get_firewall_help when users ask how to configure, navigate, or find any section of
   this firewall's UI. Always prefer this tool over guessing at page names or menu paths.
+
+Content policy:
+- Filter rules have two actions: 'block' (Redirect to block page — blocks ALL clients) and
+  'allow' (Allow whitelist only — blocks non-whitelisted LAN devices, passes whitelisted ones).
+- Use get_tracked_hosts to see which devices are whitelisted and get_content_policy to inspect
+  active rules. Whitelisted devices are managed in Network → Devices.
 """
 
 # ---------------------------------------------------------------------------
@@ -137,6 +143,16 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "get_tracked_hosts",
+        "description": (
+            "Get all auto-discovered LAN devices tracked by Smart Shield (via ARP and DHCP). "
+            "Shows hostname, IP address, MAC address, first seen date, and whitelist status. "
+            "Use this when the user asks about connected devices, whitelisted devices, "
+            "or which devices can bypass 'Allow whitelist only' content policy rules."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    {
         "name": "get_ids_alerts",
         "description": (
             "Get recent IDS/IPS (Suricata) intrusion detection alerts. "
@@ -195,7 +211,7 @@ TOOLS = [
             "'where do I find Y', 'what does the VPN page do', or any navigation/how-to "
             "question about this appliance. "
             "Sections: dashboard, firewall, nat, dhcp, dhcpv6, dns, ids, vpn, "
-            "routing, content_policy, captive_portal, certificates, system, siem."
+            "routing, content_policy, devices, captive_portal, certificates, system, siem."
         ),
         "parameters": {
             "type": "object",
@@ -318,6 +334,8 @@ def _execute_tool(conn, name: str, args: dict) -> Any:
             return _tool_network_config(conn)
         if name == "get_dhcp_leases":
             return _tool_dhcp_leases(conn)
+        if name == "get_tracked_hosts":
+            return _tool_tracked_hosts(conn)
         if name == "get_ids_alerts":
             return _tool_ids_alerts(conn, args)
         if name == "get_content_policy":
@@ -397,6 +415,19 @@ def _tool_dhcp_leases(conn) -> dict:
     return {"count": len(leases), "leases": leases}
 
 
+def _tool_tracked_hosts(conn) -> dict:
+    hosts = [dict(r) for r in conn.execute(
+        "SELECT id, hostname, ip_address, mac_address, interface_type, "
+        "first_seen, last_seen, is_whitelisted FROM tracked_hosts ORDER BY first_seen DESC"
+    )]
+    whitelisted = [h for h in hosts if h.get("is_whitelisted")]
+    return {
+        "total": len(hosts),
+        "whitelisted_count": len(whitelisted),
+        "hosts": hosts,
+    }
+
+
 def _tool_ids_alerts(conn, args: dict) -> dict:
     limit = min(int(args.get("limit") or 20), 100)
     try:
@@ -420,7 +451,18 @@ def _tool_content_policy(conn) -> dict:
     app_rules = [dict(r) for r in conn.execute(
         "SELECT app_name, action, block_dns, block_ports, ports, category, enabled FROM filter_app_rules"
     )]
+    try:
+        whitelisted_count = conn.execute(
+            "SELECT COUNT(*) FROM tracked_hosts WHERE is_whitelisted=1"
+        ).fetchone()[0]
+    except Exception:
+        whitelisted_count = 0
     return {
+        "action_legend": {
+            "block": "Redirect to block page — blocks ALL clients regardless of whitelist",
+            "allow": "Allow whitelist only — blocks non-whitelisted clients, passes whitelisted devices",
+        },
+        "whitelisted_device_count": whitelisted_count,
         "dns_filter":  {"count": len(dns_rules), "rules": dns_rules},
         "web_filter":  {"count": len(web_rules), "rules": web_rules},
         "app_filter":  {"count": len(app_rules), "rules": app_rules},
@@ -651,15 +693,36 @@ _FIREWALL_GUIDE = {
     "content_policy": {
         "title": "Content Policy",
         "url": "/content-policy",
-        "description": "Three filtering layers: DNS Filter (block domains at DNS resolution), "
-                       "Web Filter (URL/keyword blocking via proxy), "
-                       "App Filter (block by application protocol — BitTorrent, Skype, etc.).",
+        "description": (
+            "Three filtering layers: DNS Filter (block domains at DNS resolution), "
+            "Web Filter (URL pattern blocking), App Filter (block by application ports/protocol). "
+            "Each rule has two actions: 'Redirect to block page' (blocks ALL clients) or "
+            "'Allow whitelist only' (blocks non-whitelisted LAN devices, passes whitelisted ones). "
+            "Whitelisted devices are managed in Network → Devices."
+        ),
         "common_tasks": [
-            "Block a website: DNS Filter → Add Rule, enter domain, action=Block, click Apply",
-            "Allow a specific domain through a category block: Add Rule with action=Allow "
-            "(allow rules take priority over block rules for the same domain)",
-            "Block a category of sites: Web Filter → Add, select category",
-            "Block BitTorrent: App Filter → Add, select protocol=bittorrent",
+            "Block a domain for everyone: DNS Filter → Add Rule, enter domain, "
+            "action='Redirect to block page', click Apply",
+            "Restrict a domain to trusted devices only: DNS Filter → Add Rule, "
+            "action='Allow whitelist only'; then mark those devices as whitelisted in Network → Devices",
+            "Block an app/port category: App Filter → Add, enter ports, action='Redirect to block page'",
+            "See which devices are whitelisted: Network → Devices — each row has a Whitelist toggle",
+        ],
+    },
+    "devices": {
+        "title": "Network Devices",
+        "url": "/api/network/devices",
+        "description": (
+            "Lists all auto-discovered LAN devices (hostname, IP, MAC address, first seen date). "
+            "Devices are captured when they join the network via ARP or DHCP. "
+            "Each device has a Whitelist toggle — whitelisted devices bypass 'Allow whitelist only' "
+            "content policy rules and can access those domains/apps."
+        ),
+        "common_tasks": [
+            "See all LAN devices: Network → Devices shows hostname, IP, MAC, and join date",
+            "Whitelist a device: toggle the Whitelist switch next to the device — takes effect immediately",
+            "Refresh device list: click Refresh to re-scan ARP table for newly joined devices",
+            "Find a device by IP or MAC: use the search box at the top of the table",
         ],
     },
     "captive_portal": {
