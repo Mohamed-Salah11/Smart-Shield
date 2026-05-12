@@ -82,7 +82,7 @@ def generate_web_filter_zones(conn) -> list:
         if action == "block":
             if block_ip:
                 lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
             else:
                 lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
         elif action == "allow":
@@ -117,6 +117,8 @@ def add_web_filter_rule(
         """,
         (domain, action, category, description),
     )
+    if cur.rowcount == 0:
+        raise ValueError(f"A web filter rule for '{domain}' already exists.")
     conn.commit()
     return cur.lastrowid
 
@@ -160,8 +162,15 @@ def hot_apply_web_rule(conn, rule_id: int) -> None:
             return
         domain = row["url_pattern"]
         if row["enabled"]:
-            zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
-            run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+            if row["action"] == "block":
+                block_ip = get_block_page_ip(conn)
+                if block_ip:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
+                    run_privileged("unbound.local_data_a", domain=domain, ip=block_ip)
+                else:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="always_nxdomain")
+            else:  # allow
+                run_privileged("unbound.local_zone", domain=domain, zone_type="transparent")
         else:
             try:
                 run_privileged("unbound.local_zone_remove", domain=domain)

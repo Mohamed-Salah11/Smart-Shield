@@ -76,9 +76,8 @@ class Config:
     # If blank, a key is auto-generated on first use and persisted to disk.
     MASTER_KEY: str = os.getenv("SMARTSHIELD_MASTER_KEY", "")
 
-    # ------------------------------------------------------ AI Chatbot (Google Gemini)
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    # Legacy — kept for potential future provider switching; not used by active chatbot.
+    # ------------------------------------------------------ AI Chatbot (Groq)
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
     # ---------------------------------------------- Threat intelligence (abuse.ch)

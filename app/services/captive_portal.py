@@ -41,7 +41,7 @@ from app.services.priv_helper import run_privileged
 _CP_ANCHOR_PATH   = "/etc/pf.captive_portal.conf"
 _CP_ANCHOR_NAME   = "captive_portal"
 _CP_REDIRECT_IP   = "127.0.0.1"
-_CP_REDIRECT_PORT = 5000  # matches gunicorn bind port in rc.d/smart_shield
+_CP_REDIRECT_PORT = 80    # nginx listens on LAN IP:80 and proxies to Flask
 _CP_HTTPS_PORT    = 5443  # HTTPS redirect listener for port-443 interception
 _CP_CERT_PATH     = "/etc/smart_shield_block.crt"
 _CP_KEY_PATH      = "/etc/smart_shield_block.key"
@@ -181,11 +181,11 @@ def get_active_sessions(conn) -> list:
 
 
 def expire_sessions(conn) -> int:
-    """Remove expired sessions from PF table and mark as logged out. Returns count."""
+    """Remove expired sessions from PF tables and mark as logged out. Returns count."""
     now  = _now_ts()
     rows = _rows(
         conn,
-        "SELECT id, ip_address FROM captive_sessions WHERE logged_out=0 AND expires_at <= ?",
+        "SELECT id, ip_address, is_superuser FROM captive_sessions WHERE logged_out=0 AND expires_at <= ?",
         (now,),
     )
     if not rows:
@@ -194,11 +194,14 @@ def expire_sessions(conn) -> int:
     for row in rows:
         if sys.platform.startswith("freebsd"):
             try:
-                from app.services.network_service import run_command
-                from app.services.priv_helper import run_privileged
                 run_privileged("pf.table_delete", table="authenticated_clients", ip=row["ip_address"])
             except Exception:
                 pass
+            if row.get("is_superuser"):
+                try:
+                    run_privileged("pf.table_delete", table="admin_bypass_clients", ip=row["ip_address"])
+                except Exception:
+                    pass
 
     ids = [r["id"] for r in rows]
     placeholders = ",".join("?" * len(ids))
@@ -265,17 +268,28 @@ def redeem_voucher(conn, code: str, mac: str, ip: str) -> dict:
         return {"ok": False, "message": "Voucher not found or already used."}
 
     voucher = rows[0]
+    # Stage the redemption — do NOT commit yet
     conn.execute(
         "UPDATE captive_vouchers SET redeemed=1, redeemed_at=CURRENT_TIMESTAMP WHERE id=?",
         (voucher["id"],),
     )
-    conn.commit()
-
-    return authenticate_session(
+    # Attempt session creation; authenticate_session manages its own DB state
+    result = authenticate_session(
         conn, mac, ip,
         username=f"voucher:{code}",
         duration_minutes=voucher["duration_minutes"],
     )
+    if not result.get("ok"):
+        # Undo the redemption mark so the voucher can be retried
+        conn.execute(
+            "UPDATE captive_vouchers SET redeemed=0, redeemed_at=NULL WHERE id=?",
+            (voucher["id"],),
+        )
+        conn.commit()
+        return result
+    # Authentication succeeded — commit the redemption mark
+    conn.commit()
+    return result
 
 
 # ---------------------------------------------------------------------------

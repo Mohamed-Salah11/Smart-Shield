@@ -1,11 +1,11 @@
 """
 chatbot_service.py
 ------------------
-SmartShield AI agent powered by Google Gemini with function calling.
+SmartShield AI agent powered by Groq with function calling.
 
 The agent can query live system data (firewall rules, logs, service health,
 DHCP leases, IDS alerts, content policy, VPN status) and search the web for
-security topics. It uses an agentic loop so Gemini can call multiple tools
+security topics. It uses an agentic loop so the model can call multiple tools
 before forming a final answer.
 """
 
@@ -43,28 +43,28 @@ Agent capabilities (require user approval):
 """
 
 # ---------------------------------------------------------------------------
-# Gemini key resolution (DB-first → env fallback)
+# Groq key resolution (DB-first → env fallback)
 # ---------------------------------------------------------------------------
 
-def _load_gemini_key(conn) -> str:
-    """Read Gemini API key from service_state (encrypted) then fall back to env var."""
+def _load_groq_key(conn) -> str:
+    """Read Groq API key from service_state (encrypted) then fall back to env var."""
     try:
         row = conn.execute(
             "SELECT value_json FROM service_state WHERE key_name='chatbot_settings'"
         ).fetchone()
         if row:
             settings = json.loads(row["value_json"])
-            encrypted = settings.get("gemini_api_key", "")
+            encrypted = settings.get("groq_api_key", "")
             if encrypted:
                 from app.secret_store import decrypt_secret
                 return decrypt_secret(encrypted)
     except Exception:
         pass
-    return os.environ.get("GOOGLE_API_KEY", "")
+    return os.environ.get("GROQ_API_KEY", "")
 
 
 # ---------------------------------------------------------------------------
-# Tool definitions (Gemini function-calling format)
+# Tool definitions (Groq/OpenAI function-calling format)
 # ---------------------------------------------------------------------------
 
 TOOLS = [
@@ -297,6 +297,9 @@ TOOLS = [
 
 # Tools that mutate system state — intercepted for user confirmation
 _WRITE_TOOLS = {"block_domain", "unblock_domain", "add_firewall_block_rule"}
+
+# Groq/OpenAI tool format wraps each schema in {"type": "function", "function": ...}
+_GROQ_TOOLS = [{"type": "function", "function": t} for t in TOOLS]
 
 
 # ---------------------------------------------------------------------------
@@ -690,7 +693,7 @@ _FIREWALL_GUIDE = {
                        "config backups/restore, SmartShield AI key, and scheduled tasks.",
         "common_tasks": [
             "Change admin password: System → General Setup → Admin Password section",
-            "Configure the AI chatbot: System → General Setup → SmartShield AI section, paste Gemini API key",
+            "Configure the AI chatbot: System → General Setup → SmartShield AI section, paste Groq API key",
             "Download config backup: System → Backup → Download",
             "Restore from backup: System → Backup → Restore, upload the backup file",
             "Enable SSH access: System → Advanced → Admin Access → Enable SSH",
@@ -877,121 +880,83 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Agentic chat loop (Google Gemini)
+# Agentic chat loop (Groq)
 # ---------------------------------------------------------------------------
 
 def process_chat(conn, messages: list, username: str) -> dict:
     """
-    Run the SmartShield AI agent loop using Google Gemini.
+    Run the SmartShield AI agent loop using Groq.
 
     Accepts `messages` in the format [{"role": "user"/"assistant", "content": str}].
     Returns {"ok": True, "reply": str, "messages": updated_list} or {"ok": False, "message": str}.
     """
-    api_key = _load_gemini_key(conn)
+    api_key = _load_groq_key(conn)
     if not api_key:
-        return {"ok": False, "message": "GOOGLE_API_KEY not configured. Add it via Admin → Settings → SmartShield AI."}
+        return {"ok": False, "message": "GROQ_API_KEY not configured. Add it via Admin → Settings → SmartShield AI."}
 
     try:
-        import google.generativeai as genai
+        from groq import Groq
     except ImportError:
-        return {"ok": False, "message": "Google Generative AI SDK not installed. Run: pip install google-generativeai"}
+        return {"ok": False, "message": "Groq SDK not installed. Run: pip install groq"}
 
-    genai.configure(api_key=api_key)
+    client = Groq(api_key=api_key)
 
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
-        system_instruction=SYSTEM_PROMPT,
-        tools=TOOLS,
-    )
+    # Build internal message chain: system prompt prepended to the full conversation history.
+    internal_messages: list = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
 
-    # Convert prior turns (everything except the last message) into Gemini history format.
-    # Gemini uses "model" for AI turns; list-content turns (tool results) are skipped
-    # because Gemini manages function-call/response pairs internally in the chat session.
-    gemini_history = []
-    for msg in messages[:-1]:
-        content = msg["content"]
-        if isinstance(content, list):
-            continue  # tool_result turns — not representable as plain history
-        role = "model" if msg["role"] == "assistant" else "user"
-        gemini_history.append({
-            "role": role,
-            "parts": [{"text": content if isinstance(content, str) else str(content)}],
-        })
-
-    chat = model.start_chat(history=gemini_history)
-
-    # The last entry in `messages` is always the new user turn.
-    last_content = messages[-1]["content"]
-    if isinstance(last_content, list):
-        # Flatten tool_result lists into plain text (edge case)
-        last_content = " ".join(
-            p.get("content", "") if isinstance(p, dict) else str(p)
-            for p in last_content
-        )
-
-    to_send = last_content
     max_iterations = 8
 
     for _ in range(max_iterations):
         try:
-            response = chat.send_message(to_send)
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=internal_messages,
+                tools=_GROQ_TOOLS,
+                tool_choice="auto",
+            )
         except Exception as exc:
-            return {"ok": False, "message": f"Gemini API error: {exc}"}
+            return {"ok": False, "message": f"Groq API error: {exc}"}
 
-        if not response.candidates:
-            return {"ok": False, "message": "Gemini returned an empty response (rate limit or safety filter)."}
-        parts = response.candidates[0].content.parts
+        msg = response.choices[0].message
 
-        # Collect parts that contain a real function call (name is non-empty)
-        fc_parts = [p for p in parts
-                    if hasattr(p, "function_call") and p.function_call and p.function_call.name]
-
-        if not fc_parts:
-            # No function calls — this is the final text response.
-            reply = "".join(p.text for p in parts if hasattr(p, "text"))
-            messages = messages + [{"role": "assistant", "content": reply}]
-            return {"ok": True, "reply": reply, "messages": messages}
+        if not msg.tool_calls:
+            # No tool calls — this is the final text response.
+            reply = msg.content or ""
+            updated = list(messages) + [{"role": "assistant", "content": reply}]
+            return {"ok": True, "reply": reply, "messages": updated}
 
         # Check if any call is a write action requiring user confirmation.
-        write_fc_part = next(
-            (p for p in fc_parts if p.function_call.name in _WRITE_TOOLS), None
+        write_call = next(
+            (tc for tc in msg.tool_calls if tc.function.name in _WRITE_TOOLS), None
         )
-        if write_fc_part:
-            fc   = write_fc_part.function_call
-            args = dict(fc.args)
-            summary, detail = _describe_pending_action(fc.name, args)
-            text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
+        if write_call:
+            args = json.loads(write_call.function.arguments)
+            summary, detail = _describe_pending_action(write_call.function.name, args)
             agent_text = (
-                text_parts[0] if text_parts
-                else f"I can {summary.lower()}. Please review the details below and approve or cancel."
+                f"I can {summary.lower()}. Please review the details below and approve or cancel."
             )
-            messages = messages + [{"role": "assistant", "content": agent_text}]
+            updated = list(messages) + [{"role": "assistant", "content": agent_text}]
             return {
                 "ok": True,
                 "reply": agent_text,
-                "messages": messages,
+                "messages": updated,
                 "pending_action": {
-                    "tool": fc.name,
-                    "args": args,
+                    "tool":    write_call.function.name,
+                    "args":    args,
                     "summary": summary,
-                    "detail": detail,
+                    "detail":  detail,
                 },
             }
 
-        # Execute all read-only tool calls and send results back to the model.
-        function_response_parts = []
-        for p in fc_parts:
-            fc     = p.function_call
-            result = _execute_tool(conn, fc.name, dict(fc.args))
-            function_response_parts.append(
-                genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name=fc.name,
-                        response={"result": json.dumps(result, default=str)},
-                    )
-                )
-            )
-
-        to_send = function_response_parts
+        # Execute all read-only tool calls and feed results back into the message chain.
+        internal_messages.append(msg)  # assistant turn that contains tool_calls
+        for tc in msg.tool_calls:
+            tool_args = json.loads(tc.function.arguments)
+            result    = _execute_tool(conn, tc.function.name, tool_args)
+            internal_messages.append({
+                "role":         "tool",
+                "tool_call_id": tc.id,
+                "content":      json.dumps(result, default=str),
+            })
 
     return {"ok": False, "message": "Agent loop ended without a final response. Please try again."}

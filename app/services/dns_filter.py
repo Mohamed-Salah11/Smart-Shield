@@ -112,6 +112,8 @@ def add_dns_filter_rule(
         """,
         (domain, action, redirect_ip, category, description),
     )
+    if cur.rowcount == 0:
+        raise ValueError(f"A DNS block rule for '{domain}' already exists.")
     conn.commit()
     return cur.lastrowid
 
@@ -161,9 +163,15 @@ def hot_apply_dns_rule(conn, rule_id: int) -> None:
             if row["action"] == "redirect" and row["redirect_ip"]:
                 run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
                 run_privileged("unbound.local_data_a", domain=domain, ip=row["redirect_ip"])
-            else:
-                zone_type = "transparent" if row["action"] == "allow" else "always_nxdomain"
-                run_privileged("unbound.local_zone", domain=domain, zone_type=zone_type)
+            elif row["action"] == "block":
+                block_ip = get_block_page_ip(conn)
+                if block_ip:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="redirect")
+                    run_privileged("unbound.local_data_a", domain=domain, ip=block_ip)
+                else:
+                    run_privileged("unbound.local_zone", domain=domain, zone_type="always_nxdomain")
+            else:  # allow
+                run_privileged("unbound.local_zone", domain=domain, zone_type="transparent")
         else:
             try:
                 run_privileged("unbound.local_zone_remove", domain=domain)
