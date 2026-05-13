@@ -423,6 +423,7 @@ if [ -x "${MRTG_BIN}" ]; then
     info "MRTG cron job installed: ${CRON_FILE}"
     # Pass 1: creates .log RRD files (non-zero exit on new files is expected)
     env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
+    sleep 5  # MRTG needs a time delta between runs to compute rates
     # Pass 2: reads .log files and generates initial PNG graph images
     env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     info "MRTG initialised — initial graphs generated in /var/db/smart-shield/mrtg"

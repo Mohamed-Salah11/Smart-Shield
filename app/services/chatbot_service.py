@@ -31,13 +31,15 @@ Guidelines:
 - Keep answers concise and actionable. Use bullet points for lists.
 - If a tool fails or returns an error, tell the user and suggest what to check manually.
 
-Agent capabilities (require user approval):
+Agent capabilities (require user confirmation before executing):
 - You can block or unblock domains via the DNS filter using block_domain / unblock_domain.
 - You can add firewall block rules using add_firewall_block_rule.
-- When a user asks you to block/allow something, call the appropriate tool directly — the
-  system will pause and show the user an approval card before any change is applied.
-- Do NOT ask the user "shall I proceed?" in text — just call the tool and let the approval
-  UI handle the confirmation.
+- When a user asks you to perform a write action (block a domain, add a rule, etc.):
+  1. Respond with a clear numbered list of EXACTLY what you will do, where, and what the effect will be.
+  2. End with "Shall I apply this?" and wait for the user to confirm.
+  3. ONLY after the user says yes (e.g. "yes", "do it", "go ahead") — call the tool.
+     The system will then show an approval card before the change is applied.
+  Do NOT call write tools without explicit user confirmation first.
 - Use get_firewall_help when users ask how to configure, navigate, or find any section of
   this firewall's UI. Always prefer this tool over guessing at page names or menu paths.
 
@@ -46,6 +48,11 @@ Content policy:
   'allow' (Allow whitelist only — blocks non-whitelisted LAN devices, passes whitelisted ones).
 - Use get_tracked_hosts to see which devices are whitelisted and get_content_policy to inspect
   active rules. Whitelisted devices are managed in Network → Devices.
+
+General conversation:
+- You are a helpful AI assistant as well as a firewall expert. For casual or off-topic questions
+  (greetings, general knowledge, time, date, math, etc.) respond naturally and helpfully without
+  using tools. Only use firewall tools when the question is specifically about THIS system's state.
 """
 
 # ---------------------------------------------------------------------------
@@ -808,7 +815,7 @@ def _describe_pending_action(tool: str, args: dict) -> tuple:
         return (
             f"Block {domain} in DNS filter",
             f"Add {domain} to the DNS block list (category: {cat}). "
-            f"All DNS queries for {domain} and its subdomains will return NXDOMAIN.",
+            f"All DNS queries for {domain} and its subdomains will be redirected to the Smart Shield block page.",
         )
     if tool == "unblock_domain":
         domain = args.get("domain", "unknown")
@@ -897,7 +904,9 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
             destination = args.get("destination", "any")
             protocol    = args.get("protocol", "any")
             dest_port   = args.get("dest_port", "")
-            direction   = args.get("direction", "any")
+            # Coerce: PF requires explicit proto when port filtering (no "any" + port)
+            if dest_port and protocol in ("any", ""):
+                protocol = "tcp"
 
             cursor = conn.cursor()
             cursor.execute("SELECT COALESCE(MAX(rule_order), 0) + 1 FROM firewall_rules_floating")
@@ -909,7 +918,8 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
                      destination, dest_port, gateway, queue, schedule, description, rule_order)
                 VALUES (?, 0, ?, ?, ?, '', ?, ?, '', '', '', ?, ?)
                 """,
-                ("block", direction, protocol, source, destination, dest_port, description, new_order),
+                # interface="" means any interface; direction is not a DB column
+                ("block", "", protocol, source, destination, dest_port, description, new_order),
             )
             conn.commit()
             if _dry:

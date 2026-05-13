@@ -70,6 +70,29 @@ from app.services.web_filter import (
 filters_bp = Blueprint("filters", __name__, url_prefix="/filters")
 
 
+def _auto_enable_captive_portal(conn) -> None:
+    """Auto-enable captive portal in DB if any content policy rule is enabled."""
+    import json as _json
+    has_rules = (
+        conn.execute("SELECT 1 FROM filter_dns_rules WHERE enabled=1 LIMIT 1").fetchone()
+        or conn.execute("SELECT 1 FROM filter_web_rules WHERE enabled=1 LIMIT 1").fetchone()
+        or conn.execute("SELECT 1 FROM filter_app_rules WHERE enabled=1 LIMIT 1").fetchone()
+    )
+    if not has_rules:
+        return
+    row = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+    ).fetchone()
+    settings = _json.loads(row["value_json"]) if row else {}
+    if not settings.get("enabled", False):
+        settings["enabled"] = True
+        conn.execute(
+            "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES (?, ?)",
+            ("captive_portal_settings", _json.dumps(settings)),
+        )
+        conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Separate pages per filter type
 # ---------------------------------------------------------------------------
@@ -225,8 +248,9 @@ def dns_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
-    # Always apply captive portal PF anchor — independent of Unbound reload status
+    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
     try:
+        _auto_enable_captive_portal(conn)
         from app.services.captive_portal import apply_captive_portal
         cp_result = apply_captive_portal(conn)
         result["captive_portal"] = cp_result.get("message", "")
@@ -335,8 +359,9 @@ def web_apply():
                 result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
         except Exception as exc:
             result["unbound_warning"] = str(exc)
-    # Always apply captive portal PF anchor — independent of Unbound reload status
+    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
     try:
+        _auto_enable_captive_portal(conn)
         from app.services.captive_portal import apply_captive_portal
         cp_result = apply_captive_portal(conn)
         result["captive_portal"] = cp_result.get("message", "")
@@ -487,8 +512,9 @@ def app_apply():
     conn = get_db()
     # apply_app_filter() handles Unbound + PF internally and returns proper ok status
     result = apply_app_filter(conn)
-    # Always apply captive portal PF anchor — independent of filter apply status
+    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
     try:
+        _auto_enable_captive_portal(conn)
         from app.services.captive_portal import apply_captive_portal
         cp_result = apply_captive_portal(conn)
         result["captive_portal"] = cp_result.get("message", "")
