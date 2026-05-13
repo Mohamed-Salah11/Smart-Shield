@@ -124,6 +124,7 @@
         <input type="hidden" name="policy" value="{{ policy|default('') }}">
         <input type="hidden" name="domain" value="{{ domain|default('') }}">
         <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
+        <input type="hidden" name="back_template" value="{{ back_template|default('login') }}">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" autocomplete="username" required placeholder="your username">
         <label for="password">Password</label>
@@ -140,6 +141,7 @@
         <input type="hidden" name="policy" value="{{ policy|default('') }}">
         <input type="hidden" name="domain" value="{{ domain|default('') }}">
         <input type="hidden" name="orig_url" value="{{ orig_url|default('') }}">
+        <input type="hidden" name="back_template" value="{{ back_template|default('login') }}">
         <label for="voucher_code">Voucher Code</label>
         <input type="text" id="voucher_code" name="voucher_code" placeholder="e.g. AB12CD34" autocomplete="off"
                style="text-transform:uppercase; letter-spacing:.1em;">

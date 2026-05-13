@@ -70,10 +70,114 @@ def _save_offset(key: str, value: int):
 
 
 # ---------------------------------------------------------------------------
+# LAN interface / subnet auto-detection
+# ---------------------------------------------------------------------------
+
+_lan_info_cache: dict = {}
+
+
+def _get_lan_info() -> dict:
+    """Return LAN interface name, IP, and subnet from lan_config DB.
+    Falls back to em1 / 192.168.1.0/24 if not configured.
+    Cached for 5 minutes to avoid repeated DB hits per poll cycle.
+    """
+    import ipaddress
+    cache = _lan_info_cache
+    if cache.get("_ts") and (time.time() - cache["_ts"]) < 300:
+        return cache
+
+    defaults = {
+        "iface":  "em1",
+        "ip":     "192.168.1.1",
+        "subnet": "192.168.1.0/24",
+        "_ts":    time.time(),
+    }
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT assigned_port, ip_address, subnet_bits FROM lan_config LIMIT 1"
+        ).fetchone()
+        if row and (row["assigned_port"] or "").strip():
+            iface  = row["assigned_port"].strip()
+            lan_ip = (row["ip_address"] or "192.168.1.1").strip()
+            bits   = int(row["subnet_bits"] or 24)
+            net    = str(ipaddress.ip_interface(f"{lan_ip}/{bits}").network)
+            cache.update({"iface": iface, "ip": lan_ip,
+                          "subnet": net, "_ts": time.time()})
+            return cache
+    except Exception:
+        pass
+    cache.update(defaults)
+    return cache
+
+
+def _is_lan_ip(ip: str) -> bool:
+    """Return True if *ip* belongs to the configured LAN subnet."""
+    import ipaddress
+    try:
+        lan = _get_lan_info()
+        return ipaddress.ip_address(ip) in ipaddress.ip_network(lan["subnet"])
+    except Exception:
+        return False
+
+
+def _lookup_tracked_host(ip: str) -> dict:
+    """Return hostname + MAC from tracked_hosts for *ip*. Returns {} on miss."""
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT hostname, mac_address FROM tracked_hosts WHERE ip_address=? LIMIT 1",
+            (ip,),
+        ).fetchone()
+        return dict(row) if row else {}
+    except Exception:
+        return {}
+
+
+# ---------------------------------------------------------------------------
+# Port → service / severity mapping
+# ---------------------------------------------------------------------------
+
+_PORT_MAP: dict = {
+    22:    ("SSH",        "medium"),
+    23:    ("Telnet",     "high"),
+    3389:  ("RDP",        "high"),
+    5900:  ("VNC",        "high"),
+    1194:  ("OpenVPN",    "medium"),
+    500:   ("IPSec-IKE",  "medium"),
+    4500:  ("IPSec-NAT",  "medium"),
+    1701:  ("L2TP",       "medium"),
+    21:    ("FTP",        "medium"),
+    20:    ("FTP-Data",   "low"),
+    25:    ("SMTP",       "low"),
+    587:   ("SMTP-TLS",   "low"),
+    110:   ("POP3",       "low"),
+    143:   ("IMAP",       "low"),
+    3306:  ("MySQL",      "high"),
+    5432:  ("PostgreSQL", "high"),
+    27017: ("MongoDB",    "high"),
+    6379:  ("Redis",      "high"),
+    1433:  ("MSSQL",      "high"),
+    445:   ("SMB",        "high"),
+    139:   ("NetBIOS",    "high"),
+    135:   ("RPC",        "medium"),
+    53:    ("DNS",        "info"),
+    80:    ("HTTP",       "info"),
+    443:   ("HTTPS",      "info"),
+    8080:  ("HTTP-Alt",   "info"),
+    8443:  ("HTTPS-Alt",  "info"),
+}
+
+# IDS severity: Suricata integer 1–4 → string
+_IDS_SEV = {1: "critical", 2: "high", 3: "medium", 4: "low"}
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _log(category: str, action: str, remote_addr: str = "", details: dict = None):
+def _log(category: str, action: str, remote_addr: str = "",
+         details: dict = None, severity: str = "info"):
     """Write one SIEM event to the audit log. Never raises."""
     try:
         from app.audit_log import log_event
@@ -83,6 +187,7 @@ def _log(category: str, action: str, remote_addr: str = "", details: dict = None
             username="siem",
             remote_addr=remote_addr,
             details=details or {},
+            severity=severity,
         )
     except Exception:
         pass
@@ -147,19 +252,25 @@ def _collect_ids_alerts(state: dict):
         if evt.get("event_type") != "alert":
             continue
 
-        alert = evt.get("alert", {})
+        alert  = evt.get("alert", {})
         src_ip = evt.get("src_ip", "")
+        sev    = _IDS_SEV.get(int(alert.get("severity") or 4), "low")
 
-        _log("ids", "ids_alert", remote_addr=src_ip, details={
+        # Enrich with hostname if src is a LAN device
+        host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
+
+        _log("ids", "ids_alert", remote_addr=src_ip, severity=sev, details={
             "src_ip":    src_ip,
             "src_port":  evt.get("src_port"),
             "dest_ip":   evt.get("dest_ip", ""),
             "dest_port": evt.get("dest_port"),
             "proto":     evt.get("proto", ""),
             "signature": alert.get("signature", ""),
-            "severity":  alert.get("severity"),
+            "severity":  sev,
             "category":  alert.get("category", ""),
             "action":    alert.get("action", ""),
+            "hostname":  host.get("hostname", ""),
+            "mac":       host.get("mac_address", ""),
         })
 
 
@@ -333,13 +444,14 @@ def _collect_pf_connections(state: dict):
         import subprocess
         result = subprocess.run(
             ["pfctl", "-s", "states"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10,
         )
         output = result.stdout or ""
     except Exception:
         return
 
-    current: set = set()
+    lan        = _get_lan_info()
+    current:  set = set()
     previous: set = state.get("pf_seen", set())
 
     for line in output.splitlines():
@@ -347,20 +459,50 @@ def _collect_pf_connections(state: dict):
         if not m:
             continue
         proto, src_ip, src_port, dst_ip, dst_port = (
-            m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+            m.group(1), m.group(2), m.group(3), m.group(4), m.group(5),
         )
+
+        # Only track connections originating from LAN devices
+        if not _is_lan_ip(src_ip):
+            continue
+
         key = (proto, src_ip, src_port, dst_ip, dst_port)
         current.add(key)
 
-        # Only log connections that weren't in the previous cycle
         if key not in previous:
-            _log("connection", "pf_new_conn", remote_addr=src_ip, details={
-                "proto":    proto,
-                "src_ip":   src_ip,
-                "src_port": int(src_port),
-                "dst_ip":   dst_ip,
-                "dst_port": int(dst_port),
-            })
+            try:
+                dport_int = int(dst_port)
+            except ValueError:
+                dport_int = 0
+            service, sev = _PORT_MAP.get(dport_int, ("", "info"))
+            host = _lookup_tracked_host(src_ip)
+            details = {
+                "proto":      proto,
+                "src_ip":     src_ip,
+                "src_port":   int(src_port),
+                "dst_ip":     dst_ip,
+                "dst_port":   dport_int,
+                "service":    service,
+                "hostname":   host.get("hostname", ""),
+                "mac":        host.get("mac_address", ""),
+                "interface":  lan["iface"],
+                "lan_subnet": lan["subnet"],
+            }
+            _log("connection", "pf_new_conn", remote_addr=src_ip,
+                 severity=sev, details=details)
+
+            # Raise a separate security alert for insecure/dangerous protocols
+            if dport_int in (23, 21, 5900, 139):  # Telnet, FTP, VNC, NetBIOS
+                _log("security", "insecure_protocol_detected",
+                     remote_addr=src_ip, severity="high",
+                     details={
+                         "protocol":  service or str(dport_int),
+                         "src":       f"{src_ip}:{src_port}",
+                         "dst":       f"{dst_ip}:{dst_port}",
+                         "hostname":  host.get("hostname", ""),
+                         "mac":       host.get("mac_address", ""),
+                         "interface": lan["iface"],
+                     })
 
     state["pf_seen"] = current
 

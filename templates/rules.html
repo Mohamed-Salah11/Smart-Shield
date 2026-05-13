@@ -195,7 +195,8 @@
                     <div class="mb-3 row">
                         <label for="floating_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
-                            <select id="floating_protocol" class="form-select">
+                            <select id="floating_protocol" class="form-select"
+                                    onchange="_syncPortFields('floating_protocol','floating_source_port','floating_dest_port')">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -304,7 +305,8 @@
                     <div class="mb-3 row">
                         <label for="wan_rule_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
-                            <select id="wan_rule_protocol" class="form-select">
+                            <select id="wan_rule_protocol" class="form-select"
+                                    onchange="_syncPortFields('wan_rule_protocol','wan_source_port','wan_dest_port')">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -403,7 +405,8 @@
                     <div class="mb-3 row">
                         <label for="lan_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
-                            <select id="lan_protocol" class="form-select">
+                            <select id="lan_protocol" class="form-select"
+                                    onchange="_syncPortFields('lan_protocol','lan_source_port','lan_dest_port')">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -887,6 +890,7 @@
                 document.getElementById('floating_disabled').checked     = !!rule.disabled;
                 document.getElementById('floating_interface').value      = rule.interface   || '';
                 document.getElementById('floating_protocol').value       = rule.protocol    || 'any';
+                _syncPortFields('floating_protocol','floating_source_port','floating_dest_port');
                 document.getElementById('floating_source').value         = rule.source      || '';
                 document.getElementById('floating_source_port').value    = rule.source_port || '';
                 document.getElementById('floating_destination').value    = rule.destination || '';
@@ -903,6 +907,7 @@
                 document.getElementById('wan_rule_action').value    = rule.action      || 'pass';
                 document.getElementById('wan_rule_disabled').checked = !!rule.disabled;
                 document.getElementById('wan_rule_protocol').value  = rule.protocol    || 'any';
+                _syncPortFields('wan_rule_protocol','wan_source_port','wan_dest_port');
                 document.getElementById('wan_source').value         = rule.source      || '';
                 document.getElementById('wan_source_port').value    = rule.source_port || '';
                 document.getElementById('wan_destination').value    = rule.destination || '';
@@ -917,6 +922,7 @@
                 document.getElementById('lan_disabled').checked     = !!rule.disabled;
                 document.getElementById('lan_interface').value      = rule.interface   || '';
                 document.getElementById('lan_protocol').value       = rule.protocol    || 'any';
+                _syncPortFields('lan_protocol','lan_source_port','lan_dest_port');
                 document.getElementById('lan_source').value         = rule.source      || '';
                 document.getElementById('lan_source_port').value    = rule.source_port || '';
                 document.getElementById('lan_destination').value    = rule.destination || '';
@@ -927,6 +933,19 @@
         } catch (e) {
             alert('Failed to load rule for editing.');
         }
+    }
+
+    // Disable / clear port inputs for protocols that carry no L4 ports.
+    function _syncPortFields(protoId, srcPortId, dstPortId) {
+        const noPort = ['icmp','icmpv6','esp','ah','gre'].includes(
+            document.getElementById(protoId).value
+        );
+        [srcPortId, dstPortId].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.disabled = noPort;
+            if (noPort) el.value = '';
+        });
     }
 
     // Load all rules on page load

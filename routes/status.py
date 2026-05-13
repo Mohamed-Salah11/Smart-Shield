@@ -267,27 +267,36 @@ def traffic_graph():
 @login_required
 def api_logs():
     """
-    Polling endpoint for the live log monitor.
+    Polling endpoint for the SIEM log monitor.
 
     Query params
     ------------
     since      ISO-8601 timestamp — return only events after this time.
-               Omit or pass "" to get the most recent `limit` events.
     limit      Max events to return (default 100, max 500).
-    categories Comma-separated list e.g. "session,system". Omit for all.
-    search     Free-text filter applied against action, username, IP, details.
+    categories Comma-separated list e.g. "session,system,ids". Omit for all.
+    severities Comma-separated severity filter e.g. "critical,high". Omit for all.
+    search     Free-text filter against action, username, IP, details.
+    start_ts   ISO-8601 lower bound (time-range mode).
+    end_ts     ISO-8601 upper bound (time-range mode).
     """
-    since      = request.args.get("since", "").strip()
+    since      = request.args.get("since",      "").strip()
+    start_ts   = request.args.get("start_ts",   "").strip()
+    end_ts     = request.args.get("end_ts",     "").strip()
     limit      = min(int(request.args.get("limit", 100) or 100), 500)
     cats_raw   = request.args.get("categories", "").strip()
-    search     = request.args.get("search", "").lower().strip()
+    sevs_raw   = request.args.get("severities", "").strip()
+    search     = request.args.get("search",     "").lower().strip()
 
     categories = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else None
+    severities = [s.strip() for s in sevs_raw.split(",") if s.strip()] if sevs_raw else None
 
     events = tail_events_since(
         after_ts=since,
-        limit=limit * 3,          # over-fetch so search filter has room
+        limit=limit * 3,
         categories=categories,
+        severities=severities,
+        start_ts=start_ts,
+        end_ts=end_ts,
     )
 
     if search:
@@ -297,12 +306,13 @@ def api_logs():
                 e.get("username", ""),
                 e.get("remote_addr", ""),
                 e.get("category", ""),
+                e.get("severity", ""),
                 _json.dumps(e.get("details") or {}),
             ]).lower()
             return search in haystack
         events = [e for e in events if _matches(e)]
 
-    events = events[:limit]
+    events    = events[:limit]
     latest_ts = events[0]["timestamp"] if events else since
 
     return jsonify({
@@ -316,8 +326,56 @@ def api_logs():
 @status_bp.route("/api/logs/stats")
 @login_required
 def api_logs_stats():
-    """Per-category event counts for the stats bar."""
+    """Per-category event counts + critical/high totals for the SIEM header."""
     return jsonify(log_stats())
+
+
+@status_bp.route("/api/logs/export")
+@login_required
+def api_logs_export():
+    """
+    Server-side bulk export of the audit log.
+    Respects same category/severity/time-range filters as /api/logs.
+    Returns full filtered log as a downloadable JSON file.
+    """
+    import datetime as _dt
+    cats_raw   = request.args.get("categories", "").strip()
+    sevs_raw   = request.args.get("severities", "").strip()
+    start_ts   = request.args.get("start_ts",   "").strip()
+    end_ts     = request.args.get("end_ts",     "").strip()
+    search     = request.args.get("search",     "").lower().strip()
+
+    categories = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else None
+    severities = [s.strip() for s in sevs_raw.split(",") if s.strip()] if sevs_raw else None
+
+    events = tail_events_since(
+        limit=0,                   # 0 = no limit
+        categories=categories,
+        severities=severities,
+        start_ts=start_ts,
+        end_ts=end_ts,
+    )
+
+    if search:
+        events = [
+            e for e in events
+            if search in " ".join([
+                e.get("action", ""), e.get("username", ""),
+                e.get("remote_addr", ""), e.get("category", ""),
+                _json.dumps(e.get("details") or {}),
+            ]).lower()
+        ]
+
+    date_str  = _dt.date.today().isoformat()
+    filename  = f"smart-shield-siem-{date_str}.json"
+    body      = _json.dumps(events, indent=2, ensure_ascii=True)
+
+    from flask import Response
+    return Response(
+        body,
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ══════════════════════════════════════════════════
@@ -746,8 +804,9 @@ def api_health_interfaces():
 @login_required
 def mrtg_graphs():
     """MRTG historical bandwidth graphs page."""
-    import sys
+    import sys, time
     from app.database import get_db
+    from app.services.mrtg_writer import get_mrtg_status
     conn = get_db()
     wan_row = conn.execute("SELECT assigned_port, description FROM wan_config LIMIT 1").fetchone()
     lan_row = conn.execute("SELECT assigned_port, description FROM lan_config LIMIT 1").fetchone()
@@ -766,14 +825,20 @@ def mrtg_graphs():
                 "description": (row["description"] or "").strip(),
             })
 
+    # Fall back to em0/em1 when DB has no interface assignments yet —
+    # matches the bootstrap config written by install.sh and _discover_interfaces().
+    if not interfaces:
+        for name, label in [("em0", "WAN"), ("em1", "LAN")]:
+            interfaces.append({"name": name, "label": label, "description": ""})
+
     iface_names = [i["name"] for i in interfaces]
-    import time
     return render_template(
         "mrtg_graphs.html",
         interfaces=interfaces,
         iface_names=iface_names,
         on_freebsd=sys.platform.startswith("freebsd"),
         now_ts=int(time.time()),
+        mrtg_status=get_mrtg_status(),
     )
 
 
