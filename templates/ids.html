@@ -264,17 +264,6 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
           <div class="mb-3 row align-items-center">
-            <label class="col-sm-3 col-form-label fw-semibold">Enable IDS/IPS</label>
-            <div class="col-sm-9">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="enabled" id="cfgEnabled"
-                       {% if cfg.enabled %}checked{% endif %}>
-                <label class="form-check-label" for="cfgEnabled">Active on startup</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">Mode</label>
             <div class="col-sm-9">
               <select name="mode" class="form-select" style="max-width:300px;">
@@ -580,13 +569,25 @@ document.getElementById('btnToggle').addEventListener('click', async function() 
   const newEnabled = curEnabled ? false : true;
   const btn = this;
   btn.disabled = true;
+
   const res = await apiFetch('{{ url_for("ids.ids_toggle") }}', {
     method: 'POST',
     body: JSON.stringify({enabled: newEnabled}),
   }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
+
   btn.disabled = false;
-  if (res.ok) location.reload();
-  else alert('Error: ' + (res.message || 'Unknown error'));
+
+  if (!res.ok) {
+    // Show inline error banner so the user can see what failed after reload
+    const msg = res.message || 'Unknown error';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'alert alert-danger alert-dismissible mt-2';
+    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + msg +
+      ' <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>';
+    document.querySelector('.ss-page-header').after(errDiv);
+  }
+  // Always reload so the UI reflects the actual DB state (Fix for stale-page bug)
+  location.reload();
 });
 
 /* ── Refresh status ── */

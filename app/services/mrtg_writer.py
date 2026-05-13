@@ -11,16 +11,28 @@ Public API
 ----------
 generate_mrtg_conf(conn)  -> str    # mrtg.cfg content
 apply_mrtg(conn)          -> dict   # {"ok": bool, "message": str}
+get_mrtg_status()         -> dict   # availability + diagnostics
 """
 
 import os
 import sys
+import time
 
 _MRTG_CONF_PATH  = "/usr/local/etc/mrtg/mrtg.cfg"
 _MRTG_WORK_DIR   = "/var/db/smart-shield/mrtg"
 _PROBE_SCRIPT    = "/usr/local/sbin/mrtg-probe.sh"
 _MRTG_LOCK_FILE  = "/var/run/smart-shield/mrtg.lock"
+_CRON_FILE       = "/etc/cron.d/smart-shield-mrtg"
+_CRON_LINE       = (
+    "*/5 * * * * root env LANG=C "
+    "/usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg "
+    f"--lock-file {_MRTG_LOCK_FILE} 2>/dev/null\n"
+)
 
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 def _iface_name(row: dict, key: str = "assigned_port") -> str:
     return (row.get(key) or "").strip()
@@ -58,6 +70,51 @@ def _discover_interfaces(conn) -> list:
         pass
     return ifaces or ["em0", "em1"]
 
+
+def _ensure_run_dir() -> None:
+    """/var/run is tmpfs on FreeBSD — cleared on every reboot. Create on demand."""
+    run_dir = os.path.dirname(_MRTG_LOCK_FILE)
+    os.makedirs(run_dir, exist_ok=True)
+
+
+def _is_stale_lock() -> bool:
+    """True when lock file is older than 10 minutes (process that held it is gone)."""
+    if not os.path.exists(_MRTG_LOCK_FILE):
+        return False
+    return (time.time() - os.path.getmtime(_MRTG_LOCK_FILE)) > 600
+
+
+def _clear_stale_lock() -> bool:
+    """Remove lock file if stale. Returns True when a stale lock was removed."""
+    if not _is_stale_lock():
+        return False
+    try:
+        os.remove(_MRTG_LOCK_FILE)
+        return True
+    except OSError:
+        return False
+
+
+def _workdir_writable() -> bool:
+    return os.access(_MRTG_WORK_DIR, os.W_OK)
+
+
+def _ensure_cron_job() -> bool:
+    """Write /etc/cron.d/smart-shield-mrtg if missing. Returns True when installed."""
+    if os.path.exists(_CRON_FILE):
+        return False
+    try:
+        with open(_CRON_FILE, "w") as fh:
+            fh.write(_CRON_LINE)
+        os.chmod(_CRON_FILE, 0o644)
+        return True
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Config generation
+# ---------------------------------------------------------------------------
 
 def generate_mrtg_conf(conn) -> str:
     """Build a complete mrtg.cfg from dynamically discovered interfaces.
@@ -142,8 +199,13 @@ def generate_mrtg_conf(conn) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Apply
+# ---------------------------------------------------------------------------
+
 def apply_mrtg(conn) -> dict:
-    """Write mrtg.cfg and do a first-run to initialise the log files."""
+    """Write mrtg.cfg, initialise log files, generate first PNG graphs, and
+    ensure the cron job is in place so graphs keep updating every 5 minutes."""
     conf = generate_mrtg_conf(conn)
 
     snmp = _get_snmp_settings(conn)
@@ -178,6 +240,16 @@ def apply_mrtg(conn) -> dict:
         return {"ok": False, "rolled_back": False,
                 "message": f"Cannot write {_MRTG_CONF_PATH}: {exc}"}
 
+    # Guarantee the lock-file directory exists (/var/run is tmpfs, cleared on reboot)
+    try:
+        _ensure_run_dir()
+    except Exception as exc:
+        return {"ok": False, "rolled_back": False,
+                "message": f"Cannot create lock-file directory: {exc}"}
+
+    # Remove any stale lock left by a crashed MRTG process before the two-pass init
+    stale_removed = _clear_stale_lock()
+
     # Run MRTG twice:
     #   Pass 1: creates .log RRD files (exits non-zero because files are new — that is normal)
     #   Pass 2: reads the .log files and generates initial PNG graph images
@@ -185,7 +257,6 @@ def apply_mrtg(conn) -> dict:
         import subprocess
         _cmd = ["/usr/local/bin/mrtg", _MRTG_CONF_PATH,
                 "--lock-file", _MRTG_LOCK_FILE, "--log-level", "0"]
-        import time
         for i in range(2):
             subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
             if i == 0:
@@ -199,8 +270,18 @@ def apply_mrtg(conn) -> dict:
         return {"ok": False, "rolled_back": rb.get("ok", False),
                 "message": f"MRTG first-run failed: {exc}"}
 
-    result = {"ok": True, "rolled_back": False,
-              "message": f"MRTG config written to {_MRTG_CONF_PATH} and initialised."}
+    # Ensure the cron job exists so graphs keep updating every 5 minutes.
+    # This repairs the common case where install.sh ran before the MRTG package
+    # was installed and the cron file was therefore never created.
+    cron_installed = _ensure_cron_job()
+
+    result = {
+        "ok": True,
+        "rolled_back": False,
+        "message": f"MRTG config written to {_MRTG_CONF_PATH} and initialised.",
+        "stale_lock_removed": stale_removed,
+        "cron_installed": cron_installed,
+    }
     if not snmp_active:
         result["snmp_note"] = (
             "SNMP not enabled — using mrtg-probe.sh fallback. "
@@ -215,21 +296,38 @@ def apply_mrtg(conn) -> dict:
 
 def get_mrtg_status() -> dict:
     """
-    Return MRTG availability status.
+    Return MRTG availability status and diagnostics.
 
     MRTG is cron-driven (not a persistent daemon), so we report whether the
-    binary is installed and when the config/graphs were last updated.
-    Returns {"available": bool, "state": str, "last_run": str|None, "message": str}.
+    binary is installed and provide specific diagnostic flags so the UI can
+    show actionable guidance instead of a generic "no graphs yet" message.
+
+    Returns {
+        "available": bool,
+        "state": str,
+        "last_run": str|None,
+        "graphs_ok": bool,
+        "graph_count": int,
+        "cron_installed": bool,
+        "stale_lock": bool,
+        "workdir_ok": bool,
+        "message": str,
+    }
     """
     import shutil
 
     mrtg_bin = "/usr/local/bin/mrtg"
     if not os.path.exists(mrtg_bin) and not shutil.which("mrtg"):
         return {
-            "available": False,
-            "state":     "unavailable",
-            "last_run":  None,
-            "message":   "mrtg binary not found — install net-mgmt/mrtg.",
+            "available":      False,
+            "state":          "unavailable",
+            "last_run":       None,
+            "graphs_ok":      False,
+            "graph_count":    0,
+            "cron_installed": os.path.exists(_CRON_FILE),
+            "stale_lock":     _is_stale_lock(),
+            "workdir_ok":     False,
+            "message":        "mrtg binary not found — install net-mgmt/mrtg.",
         }
 
     # Check when the mrtg.cfg was last written (proxy for last successful apply)
@@ -242,16 +340,24 @@ def get_mrtg_status() -> dict:
         except Exception:
             pass
 
-    # Check whether graph files exist (proxy for successful cron execution)
-    graphs_exist = any(
-        fname.endswith(".png")
-        for fname in (os.listdir(_MRTG_WORK_DIR) if os.path.isdir(_MRTG_WORK_DIR) else [])
-    )
+    # Count PNG graph files (proxy for successful cron execution)
+    graph_files = []
+    if os.path.isdir(_MRTG_WORK_DIR):
+        try:
+            graph_files = [f for f in os.listdir(_MRTG_WORK_DIR) if f.endswith(".png")]
+        except OSError:
+            pass
+
+    workdir_ok = os.path.isdir(_MRTG_WORK_DIR) and _workdir_writable()
 
     return {
-        "available": True,
-        "state":     "cron",
-        "last_run":  last_run,
-        "graphs_ok": graphs_exist,
-        "message":   "MRTG runs via cron — not a persistent service.",
+        "available":      True,
+        "state":          "cron",
+        "last_run":       last_run,
+        "graphs_ok":      len(graph_files) > 0,
+        "graph_count":    len(graph_files),
+        "cron_installed": os.path.exists(_CRON_FILE),
+        "stale_lock":     _is_stale_lock(),
+        "workdir_ok":     workdir_ok,
+        "message":        "MRTG runs via cron — not a persistent service.",
     }

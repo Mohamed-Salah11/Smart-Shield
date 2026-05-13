@@ -10,9 +10,9 @@
 IFACE="${1:-em0}"
 
 # Prefer the link-layer row (<Link#N>) for most accurate byte counters
-LINE=$(netstat -ibn | awk -v iface="$IFACE" '$1 == iface && $3 ~ /^<[Ll]ink/ { print; exit }')
+LINE=$(/usr/bin/netstat -ibn | awk -v iface="$IFACE" '$1 == iface && $3 ~ /^<[Ll]ink/ { print; exit }')
 # Fallback: accept the first matching row for this interface
-[ -z "$LINE" ] && LINE=$(netstat -ibn | awk -v iface="$IFACE" '$1 == iface { print; exit }')
+[ -z "$LINE" ] && LINE=$(/usr/bin/netstat -ibn | awk -v iface="$IFACE" '$1 == iface { print; exit }')
 
 if [ -z "$LINE" ]; then
     echo "0"

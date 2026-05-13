@@ -230,6 +230,9 @@
       <span class="lm-cat active" data-cat="" onclick="setCat(this)">All Events</span>
       <span class="lm-cat" data-cat="connection"   onclick="setCat(this)">Network Traffic</span>
       <span class="lm-cat" data-cat="security,ids" onclick="setCat(this)">Security Alerts</span>
+      <span class="lm-cat" data-cat="system,connection"
+            data-actions="firewall_rule_added,firewall_rule_deleted,firewall_rule_updated,pf_reload,pf_rollback,pf_new_conn"
+            onclick="setCat(this)">Firewall</span>
       <span class="lm-cat" data-cat="system"       onclick="setCat(this)">Config Changes</span>
       <span class="lm-cat" data-cat="session"      onclick="setCat(this)">Sessions</span>
     </div>
@@ -246,7 +249,7 @@
       <div class="lm-live-dot active" id="liveDot"></div>
       <span class="lm-live-label" id="liveLabel">Live</span>
       <select class="form-select form-select-sm" style="width:80px;font-size:.78rem;"
-              onchange="setInterval(+this.value)">
+              onchange="setPollInterval(+this.value)">
         <option value="2000">2s</option>
         <option value="5000" selected>5s</option>
         <option value="10000">10s</option>
@@ -341,16 +344,17 @@ const EXPORT_URL = "{{ url_for('status.api_logs_export') }}";
 const MAX_ROWS   = 1000;
 
 /* ── State ── */
-let latestTs     = "";
-let allRows      = [];
-let activeCat    = "";        // category filter
-let activeSev    = "";        // severity filter
-let activeRange  = "live";    // time-range: live|1h|6h|24h|7d
-let searchText   = "";
-let pollTimer    = null;
-let pollInterval = 5000;
-let autoScroll   = true;
-let paused       = false;
+let latestTs      = "";
+let allRows       = [];
+let activeCat     = "";        // category filter
+let activeActions = "";        // action-level filter (used by Firewall pill)
+let activeSev     = "";        // severity filter
+let activeRange   = "live";    // time-range: live|1h|6h|24h|7d
+let searchText    = "";
+let pollTimer     = null;
+let pollInterval  = 5000;
+let autoScroll    = true;
+let paused        = false;
 
 /* ── DOM ── */
 const scroll    = document.getElementById("logScroll");
@@ -435,9 +439,9 @@ function buildDetail(e) {
     case 'ids_alert':
       return `<span style="color:#c084fc">${esc(d.signature||'Unknown sig')}</span> · ${esc(d.src_ip)}:${esc(d.src_port||'?')} → ${esc(d.dest_ip)}:${esc(d.dest_port||'?')}`;
     case 'brute_force_detected':
-      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} failed logins in ${esc(d.window_seconds||'?')}s`;
+      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} failed logins in ${esc(d.window_minutes||'?')} min`;
     case 'ids_flood_detected':
-      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} IDS hits in ${esc(d.window_seconds||'?')}s`;
+      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} IDS hits in ${esc(d.window_minutes||'?')} min`;
     case 'dhcp_lease_assigned':
       return `<span class="lm-hi">${esc(d.hostname||'unknown')}</span> @ ${esc(d.ip||e.remote_addr)} (${esc(d.mac||'?')})`;
     case 'dns_query':
@@ -449,8 +453,14 @@ function buildDetail(e) {
       const desc = d.description || d.desc || '';
       return `${esc(d.action||'?')} ${esc(d.protocol||'any')} ${esc(d.source||'any')} → ${esc(d.destination||'any')}${d.dest_port?':'+esc(d.dest_port):''} ${desc?'('+esc(desc)+')':''}`;
     }
-    case 'pf_reload': case 'pf_rollback':
-      return d.ok===false ? `<span style="color:#f87171">FAILED</span> ${esc(d.message||'')}` : 'OK';
+    case 'pf_reload':
+      return d.ok === false
+        ? `<span style="color:#f87171">FAILED</span> ${esc(d.message||'')}`
+        : `<span style="color:#4ade80">OK</span>${d.rule_count ? ' · ' + esc(d.rule_count) + ' rules' : ''}`;
+    case 'pf_rollback':
+      return d.ok === false
+        ? `<span style="color:#f87171">FAILED — ${esc(d.message||'')}</span>`
+        : `<span style="color:#fb923c">Rolled back</span> ${esc(d.message||'')}`;
     case 'diagnostic_cmd':
       return `${esc(d.command||'?')}${d.interface?' on '+esc(d.interface):''}${d.filter?' filter: '+esc(d.filter):''}`;
     default: {
@@ -536,9 +546,10 @@ function prependRows(events) {
 function buildPollURL() {
   const params = new URLSearchParams();
   params.set('limit', '200');
-  if (activeCat)  params.set('categories', activeCat);
-  if (activeSev)  params.set('severities', activeSev);
-  if (searchText) params.set('search', searchText);
+  if (activeCat)     params.set('categories', activeCat);
+  if (activeSev)     params.set('severities', activeSev);
+  if (activeActions) params.set('actions',    activeActions);
+  if (searchText)    params.set('search',     searchText);
 
   if (activeRange === 'live') {
     if (latestTs) params.set('since', latestTs);
@@ -585,7 +596,7 @@ function startPoll() {
   }
 }
 
-function setInterval_(ms) {
+function setPollInterval(ms) {
   pollInterval = ms;
   if (ms === 0) {
     if (pollTimer) clearInterval(pollTimer);
@@ -598,16 +609,15 @@ function setInterval_(ms) {
     startPoll();
   }
 }
-// alias
-function setInterval(ms) { setInterval_(ms); }
 
 /* ── Filter handlers ── */
 function setCat(el) {
   document.querySelectorAll('.lm-cat').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
-  activeCat  = el.dataset.cat;
-  latestTs   = '';
-  allRows    = [];
+  activeCat     = el.dataset.cat;
+  activeActions = el.dataset.actions || '';
+  latestTs      = '';
+  allRows       = [];
   clearViewport();
   startPoll();
 }
@@ -654,7 +664,7 @@ function clearViewport() {
 }
 
 function clearView() {
-  allRows = []; latestTs = '';
+  allRows = []; latestTs = ''; activeActions = '';
   clearViewport();
   startPoll();
 }
@@ -669,7 +679,7 @@ async function pollStats() {
     setVal('cnt-high',     d._high     || 0);
     setVal('cnt-total',    d._total    || 0);
     setVal('st-connection', (d.connection||0));
-    setVal('st-security',   (d.security||0)+(d.ids||0));
+    setVal('st-security',   d.security||0);
     setVal('st-ids',        d.ids||0);
     setVal('st-system',     d.system||0);
     setVal('st-session',    d.session||0);
@@ -715,19 +725,10 @@ scroll.addEventListener('scroll', () => {
   }
 });
 
-/* ── Fetch LAN interface from network status ── */
-(async () => {
-  try {
-    const r = await fetch('/status/api/interface-stats');
-    const d = await r.json();
-    // Show the first non-loopback interface as the LAN iface hint
-    const ifaces = (d.interfaces || []).filter(i => i.name && !i.name.startsWith('lo'));
-    const el = document.getElementById('siem-lan-iface');
-    if (el && ifaces.length) el.textContent = ifaces.map(i=>i.name).join(' / ');
-  } catch(_) {
-    const el = document.getElementById('siem-lan-iface');
-    if (el) el.textContent = 'em1';
-  }
+/* ── Set LAN interface name (injected server-side from lan_config) ── */
+(function () {
+  const el = document.getElementById('siem-lan-iface');
+  if (el) el.textContent = {{ lan_iface | tojson }};
 })();
 
 /* ── Boot ── */
