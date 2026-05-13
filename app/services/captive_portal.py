@@ -163,6 +163,13 @@ def logout_session(conn, session_id: int) -> dict:
             except Exception:
                 pass
 
+    # Re-apply DNS filter so this client is redirected by content policy again
+    try:
+        from app.services.dns_filter import apply_dns_filter
+        apply_dns_filter(conn)
+    except Exception:
+        pass
+
     return {"ok": True, "message": f"Session {session_id} logged out."}
 
 
@@ -209,6 +216,14 @@ def expire_sessions(conn) -> int:
         f"UPDATE captive_sessions SET logged_out=1 WHERE id IN ({placeholders})", ids
     )
     conn.commit()
+
+    # Re-apply DNS filter so expired clients are subject to content policy again
+    try:
+        from app.services.dns_filter import apply_dns_filter
+        apply_dns_filter(conn)
+    except Exception:
+        pass
+
     return len(rows)
 
 

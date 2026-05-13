@@ -3,89 +3,101 @@
 {% block head %}
 <style>
 /* ═══════════════════════════════════════════════════
-   LIVE LOG MONITOR
+   SMART-SHIELD SIEM
 ═══════════════════════════════════════════════════ */
+
+/* ── SIEM Header ── */
+.siem-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+}
+.siem-title-block { display: flex; align-items: center; gap: 12px; }
+.siem-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: var(--text-color); }
+.siem-sub   { font-size: .78rem; color: var(--muted); margin-top: 1px; }
+.siem-threat-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.siem-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 6px;
+  font-size: .75rem; font-weight: 700; letter-spacing: .04em;
+}
+.siem-badge-crit { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+.siem-badge-high { background: rgba(249,115,22,.15); color: #fb923c; border: 1px solid rgba(249,115,22,.3); }
+.siem-badge-total { background: rgba(148,163,184,.1); color: var(--muted); border: 1px solid var(--border-color); }
 
 /* ── Toolbar ── */
 .lm-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 14px;
-  background: var(--panel);
-  border: 1px solid var(--border-color);
-  border-radius: 10px 10px 0 0;
-  border-bottom: none;
+  background: var(--panel); border: 1px solid var(--border-color);
+  border-radius: 10px 10px 0 0; border-bottom: none;
 }
 .lm-search {
-  flex: 1;
-  min-width: 180px;
-  max-width: 320px;
-  height: 34px;
+  flex: 1; min-width: 180px; max-width: 300px; height: 34px;
   padding: 0 12px 0 34px;
-  border: 1px solid var(--border-color);
-  border-radius: 7px;
+  border: 1px solid var(--border-color); border-radius: 7px;
   background: var(--border-color-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
-  color: var(--text-color);
-  font-size: .875rem;
-  font-family: inherit;
+  color: var(--text-color); font-size: .875rem; font-family: inherit;
   transition: border-color .15s, box-shadow .15s;
 }
-.lm-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background-color: var(--panel); }
+.lm-search:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); background-color:var(--panel); }
 
-/* Category filter pills */
+/* Category pills */
 .lm-cats { display: flex; gap: 5px; flex-wrap: wrap; }
 .lm-cat {
-  padding: 3px 10px;
-  border-radius: 99px;
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  cursor: pointer;
-  border: 1px solid var(--border-color);
-  background: var(--border-color-soft);
-  color: var(--secondary);
-  transition: background .12s, color .12s, border-color .12s;
-  user-select: none;
+  padding: 3px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--border-color-soft);
+  color: var(--secondary); transition: all .12s; user-select: none;
 }
-.lm-cat:hover           { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
-.lm-cat.active          { background: var(--primary); color: #fff; border-color: var(--primary); }
-.lm-cat[data-cat="session"].active   { background: #3b82f6; border-color: #3b82f6; }
-.lm-cat[data-cat="system"].active    { background: #f59e0b; border-color: #f59e0b; }
-.lm-cat[data-cat="security"].active  { background: #ef4444; border-color: #ef4444; }
-.lm-cat[data-cat="browsing"].active  { background: #64748b; border-color: #64748b; }
-.lm-cat[data-cat="ids"].active        { background: #8b5cf6; border-color: #8b5cf6; }
-.lm-cat[data-cat="connection"].active { background: #0ea5e9; border-color: #0ea5e9; }
+.lm-cat:hover { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.lm-cat.active { background: var(--primary); color:#fff; border-color:var(--primary); }
+.lm-cat[data-cat="session"].active    { background:#3b82f6; border-color:#3b82f6; }
+.lm-cat[data-cat="system"].active     { background:#f59e0b; border-color:#f59e0b; }
+.lm-cat[data-cat="security,ids"].active { background:#ef4444; border-color:#ef4444; }
+.lm-cat[data-cat="connection"].active { background:#0ea5e9; border-color:#0ea5e9; }
+
+/* Severity pills */
+.lm-sevs { display: flex; gap: 5px; flex-wrap: wrap; }
+.lm-sev {
+  padding: 2px 9px; border-radius: 99px; font-size: .68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--border-color-soft);
+  color: var(--muted); transition: all .12s; user-select: none;
+}
+.lm-sev:hover { border-color: currentColor; }
+.lm-sev.active[data-sev="critical"] { background:#ef4444; color:#fff; border-color:#ef4444; }
+.lm-sev.active[data-sev="high"]     { background:#f97316; color:#fff; border-color:#f97316; }
+.lm-sev.active[data-sev="medium"]   { background:#eab308; color:#000; border-color:#eab308; }
+.lm-sev.active[data-sev="low"]      { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+.lm-sev.active[data-sev=""]         { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+/* Time-range tabs */
+.lm-time { display: flex; gap: 4px; }
+.lm-tr {
+  padding: 3px 9px; border-radius: 6px; font-size: .72rem; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border-color); background: transparent;
+  color: var(--muted); transition: all .12s;
+}
+.lm-tr:hover { border-color: var(--primary); color: var(--primary); }
+.lm-tr.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
 
 /* Right controls */
 .lm-controls { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
 .lm-live-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 2px rgba(16,185,129,.2);
-  flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,.2); flex-shrink: 0;
 }
-.lm-live-dot.paused  { background: var(--muted); box-shadow: none; }
-.lm-live-dot.active  { animation: lm-pulse 1.8s ease-in-out infinite; }
-@keyframes lm-pulse  { 0%,100%{box-shadow:0 0 0 2px rgba(16,185,129,.2)} 50%{box-shadow:0 0 0 5px rgba(16,185,129,.06)} }
-
+.lm-live-dot.paused { background: var(--muted); box-shadow: none; }
+.lm-live-dot.active { animation: lm-pulse 1.8s ease-in-out infinite; }
+@keyframes lm-pulse { 0%,100%{box-shadow:0 0 0 2px rgba(16,185,129,.2)} 50%{box-shadow:0 0 0 5px rgba(16,185,129,.06)} }
 .lm-live-label { font-size: .78rem; font-weight: 600; color: var(--muted); }
 
 /* ── Stats bar ── */
 .lm-stats {
-  display: flex;
-  gap: 0;
-  background: var(--panel);
-  border: 1px solid var(--border-color);
-  border-top: none;
-  border-bottom: none;
-  padding: 6px 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: flex; gap: 16px;
+  background: var(--panel); border: 1px solid var(--border-color);
+  border-top: none; border-bottom: none;
+  padding: 6px 14px; align-items: center; flex-wrap: wrap;
 }
 .lm-stat-item { display: flex; align-items: center; gap: 5px; font-size: .78rem; }
 .lm-stat-dot  { width: 7px; height: 7px; border-radius: 50%; }
@@ -94,18 +106,13 @@
 
 /* ── Log viewport ── */
 .lm-viewport {
-  background: #0a0e1a;
-  border: 1px solid var(--border-color);
-  border-radius: 0 0 10px 10px;
-  overflow: hidden;
-  position: relative;
+  background: #0a0e1a; border: 1px solid var(--border-color);
+  border-radius: 0 0 10px 10px; overflow: hidden; position: relative;
 }
 .lm-scroll {
-  height: 580px;
-  overflow-y: auto;
-  font-family: ui-monospace, 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: .8rem;
-  line-height: 1.55;
+  height: 580px; overflow-y: auto;
+  font-family: ui-monospace,'JetBrains Mono','Fira Code',monospace;
+  font-size: .8rem; line-height: 1.55;
 }
 .lm-scroll::-webkit-scrollbar       { width: 6px; }
 .lm-scroll::-webkit-scrollbar-track { background: #0a0e1a; }
@@ -114,261 +121,245 @@
 /* ── Log rows ── */
 .lm-row {
   display: grid;
-  grid-template-columns: 158px 80px 160px 110px 120px 1fr;
-  gap: 0;
-  padding: 4px 14px;
+  grid-template-columns: 152px 76px 70px 155px 105px 110px 1fr;
+  gap: 0; padding: 4px 14px;
   border-bottom: 1px solid rgba(255,255,255,.03);
-  align-items: baseline;
-  cursor: pointer;
-  transition: background .1s;
+  align-items: baseline; cursor: pointer; transition: background .1s;
 }
-.lm-row:hover     { background: rgba(255,255,255,.04); }
-.lm-row.lm-new    { animation: lm-slide-in .25s ease; }
-@keyframes lm-slide-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+.lm-row:hover  { background: rgba(255,255,255,.04); }
+.lm-row.lm-new { animation: lm-slide-in .25s ease; }
+@keyframes lm-slide-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
-/* Row type accents */
-.lm-row.cat-session  { border-left: 2px solid #3b82f6; }
-.lm-row.cat-system   { border-left: 2px solid #f59e0b; }
-.lm-row.cat-security { border-left: 2px solid #ef4444; background: rgba(239,68,68,.04); }
-.lm-row.cat-browsing { border-left: 2px solid #334155; }
-.lm-row.cat-ids        { border-left: 2px solid #8b5cf6; background: rgba(139,92,246,.04); }
-.lm-row.cat-connection { border-left: 2px solid #0ea5e9; }
+/* Severity-driven row highlights */
+.lm-row.sev-critical { border-left: 3px solid #ef4444; background: rgba(239,68,68,.06); }
+.lm-row.sev-high     { border-left: 3px solid #f97316; background: rgba(249,115,22,.04); }
+.lm-row.sev-medium   { border-left: 2px solid #eab308; }
+.lm-row.sev-low      { border-left: 2px solid #3b82f6; }
+.lm-row.sev-info     { border-left: 2px solid #1e3a5f; }
 
 /* Columns */
-.lm-ts   { color: #475569; font-size: .75rem; padding-right: 8px; white-space: nowrap; }
-.lm-cat-col {
-  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  padding-right: 8px; white-space: nowrap;
-}
-.cat-col-session  { color: #3b82f6; }
-.cat-col-system   { color: #f59e0b; }
-.cat-col-security { color: #ef4444; }
-.cat-col-browsing { color: #64748b; }
-.cat-col-ids        { color: #8b5cf6; }
-.cat-col-connection { color: #0ea5e9; }
-.cat-col-default  { color: #94a3b8; }
+.lm-ts       { color:#475569; font-size:.75rem; padding-right:8px; white-space:nowrap; }
+.lm-sev-col  { padding-right:6px; white-space:nowrap; }
+.lm-cat-col  { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding-right:6px; white-space:nowrap; }
+.lm-action   { color:#e2e8f0; font-weight:600; padding-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lm-user     { color:#93c5fd; padding-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lm-ip       { color:#94a3b8; padding-right:8px; font-size:.75rem; white-space:nowrap; }
+.lm-detail   { color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lm-detail .lm-hi { color:#cbd5e1; }
 
-.lm-action { color: #e2e8f0; font-weight: 600; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lm-user   { color: #93c5fd; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lm-ip     { color: #94a3b8; padding-right: 8px; font-size: .75rem; }
-.lm-detail { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lm-detail .lm-hi { color: #cbd5e1; }
+/* Category colours */
+.cat-col-session    { color:#3b82f6; }
+.cat-col-system     { color:#f59e0b; }
+.cat-col-security   { color:#ef4444; }
+.cat-col-ids        { color:#8b5cf6; }
+.cat-col-connection { color:#0ea5e9; }
+.cat-col-default    { color:#94a3b8; }
+
+/* Severity badge */
+.sev-badge {
+  display:inline-block; padding:1px 5px; border-radius:4px; font-size:.62rem;
+  font-weight:800; letter-spacing:.05em; text-transform:uppercase; vertical-align:middle;
+}
+.sev-critical { background:#ef4444; color:#fff; }
+.sev-high     { background:#f97316; color:#fff; }
+.sev-medium   { background:#eab308; color:#000; }
+.sev-low      { background:#3b82f6; color:#fff; }
+.sev-info     { background:#1e3a5f; color:#94a3b8; }
 
 /* Expanded detail panel */
 .lm-expanded {
-  display: none;
-  padding: 8px 14px 10px 14px;
-  background: rgba(255,255,255,.025);
-  border-bottom: 1px solid rgba(255,255,255,.05);
+  display:none; padding:8px 14px 10px 14px;
+  background:rgba(255,255,255,.025);
+  border-bottom:1px solid rgba(255,255,255,.05);
 }
 .lm-expanded pre {
-  margin: 0;
-  color: #94a3b8;
-  font-size: .77rem;
-  background: transparent;
-  border: none;
-  padding: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin:0; color:#94a3b8; font-size:.77rem; background:transparent;
+  border:none; padding:0; white-space:pre-wrap; word-break:break-word;
 }
-.lm-row.open + .lm-expanded { display: block; }
+.lm-row.open + .lm-expanded { display:block; }
 
 /* Empty state */
-.lm-empty {
-  padding: 60px 0;
-  text-align: center;
-  color: #475569;
-  font-size: .85rem;
-}
-.lm-empty i { font-size: 2.5rem; margin-bottom: 12px; display: block; opacity: .4; }
+.lm-empty { padding:60px 0; text-align:center; color:#475569; font-size:.85rem; }
+.lm-empty i { font-size:2.5rem; margin-bottom:12px; display:block; opacity:.4; }
 
 /* Pause overlay */
 .lm-pause-overlay {
-  position: absolute;
-  top: 10px; right: 14px;
-  background: rgba(15,23,41,.85);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 8px;
-  padding: 5px 12px;
-  font-size: .75rem;
-  font-weight: 600;
-  color: #f59e0b;
-  display: none;
-  pointer-events: none;
+  position:absolute; top:10px; right:14px;
+  background:rgba(15,23,41,.85); border:1px solid rgba(255,255,255,.1);
+  border-radius:8px; padding:5px 12px; font-size:.75rem; font-weight:600;
+  color:#f59e0b; display:none; pointer-events:none;
 }
-.lm-viewport.paused .lm-pause-overlay { display: block; }
+.lm-viewport.paused .lm-pause-overlay { display:block; }
 
-/* ── Action quick-filter row ── */
-.lm-actions {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  padding: 6px 14px;
-  background: var(--panel);
-  border: 1px solid var(--border-color);
-  border-top: none;
-  border-bottom: none;
-  align-items: center;
+/* Footer bar */
+.lm-foot {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 14px; background:var(--panel);
+  border:1px solid var(--border-color); border-top:none;
+  border-radius:0 0 10px 10px; font-size:.78rem; color:var(--muted);
 }
-.lm-act {
-  padding: 2px 9px;
-  border-radius: 99px;
-  font-size: .68rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--muted);
-  transition: background .12s, color .12s, border-color .12s;
-  user-select: none;
-}
-.lm-act:hover  { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
-.lm-act.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-/* ── Light mode overrides ── */
-:root:not([data-theme="dark"]) .lm-viewport  { background: #0f172a; }
-:root:not([data-theme="dark"]) .lm-scroll::-webkit-scrollbar-track { background: #0f172a; }
-:root:not([data-theme="dark"]) .lm-bar       { background: var(--panel); }
-:root:not([data-theme="dark"]) .lm-stats     { background: var(--panel); }
 </style>
 {% endblock %}
 
 {% block main %}
-<div style="width:100%;max-width:none;">
+<div class="container-fluid px-3">
 
-  <div class="ss-page-header">
-    <div>
-      <h1 class="ss-page-title">Live Log Monitor</h1>
-      <p class="ss-page-desc">Real-time event stream — auto-polls every 5 s. Click any row to expand details.</p>
+  <!-- SIEM Header -->
+  <div class="siem-header mb-3">
+    <div class="siem-title-block">
+      <i class="fa-solid fa-shield-halved fa-xl text-primary"></i>
+      <div>
+        <div class="siem-brand">Smart-Shield SIEM</div>
+        <div class="siem-sub">Security Information and Event Management · LAN: <code id="siem-lan-iface">—</code></div>
+      </div>
     </div>
-    <div class="d-flex gap-2 align-items-center flex-wrap">
-      <select id="refreshRate" class="form-select form-select-sm" style="width:auto;">
-        <option value="2000">2s refresh</option>
-        <option value="5000" selected>5s refresh</option>
-        <option value="10000">10s refresh</option>
-        <option value="30000">30s refresh</option>
-        <option value="0">Paused</option>
-      </select>
-      <button class="btn btn-sm btn-secondary" id="btnExport"><i class="fa-solid fa-download"></i> Export</button>
-      <button class="btn btn-sm btn-outline-danger" id="btnClear"><i class="fa-solid fa-trash-can"></i> Clear View</button>
+    <div class="siem-threat-bar">
+      <span class="siem-badge siem-badge-crit"><i class="fa-solid fa-circle me-1" style="font-size:.55rem;"></i><span id="cnt-critical">0</span> Critical</span>
+      <span class="siem-badge siem-badge-high"><i class="fa-solid fa-circle me-1" style="font-size:.55rem;"></i><span id="cnt-high">0</span> High</span>
+      <span class="siem-badge siem-badge-total"><span id="cnt-total">0</span> Total events</span>
     </div>
   </div>
 
-  <!-- Toolbar -->
+  <!-- Toolbar row 1: search + category + time-range + controls -->
   <div class="lm-bar">
-    <input type="text" class="lm-search" id="searchInput" placeholder="Search action, user, IP, details…">
+    <input class="lm-search" id="searchInput" type="search"
+           placeholder="Search hostname, IP, signature, action…"
+           oninput="onSearch(this.value)">
 
-    <div class="lm-cats" id="catFilters">
-      <span class="lm-cat active" data-cat="">All</span>
-      <span class="lm-cat" data-cat="session">Session</span>
-      <span class="lm-cat" data-cat="system">System</span>
-      <span class="lm-cat" data-cat="security">Security</span>
-      <span class="lm-cat" data-cat="browsing">Browsing</span>
-      <span class="lm-cat" data-cat="ids">IDS/IPS</span>
-      <span class="lm-cat" data-cat="connection">Connections</span>
+    <div class="lm-cats">
+      <span class="lm-cat active" data-cat="" onclick="setCat(this)">All Events</span>
+      <span class="lm-cat" data-cat="connection"   onclick="setCat(this)">Network Traffic</span>
+      <span class="lm-cat" data-cat="security,ids" onclick="setCat(this)">Security Alerts</span>
+      <span class="lm-cat" data-cat="system"       onclick="setCat(this)">Config Changes</span>
+      <span class="lm-cat" data-cat="session"      onclick="setCat(this)">Sessions</span>
+    </div>
+
+    <div class="lm-time">
+      <span class="lm-tr active" data-range="live"  onclick="setRange(this)">Live</span>
+      <span class="lm-tr"        data-range="1h"    onclick="setRange(this)">1h</span>
+      <span class="lm-tr"        data-range="6h"    onclick="setRange(this)">6h</span>
+      <span class="lm-tr"        data-range="24h"   onclick="setRange(this)">24h</span>
+      <span class="lm-tr"        data-range="7d"    onclick="setRange(this)">7d</span>
     </div>
 
     <div class="lm-controls">
       <div class="lm-live-dot active" id="liveDot"></div>
       <span class="lm-live-label" id="liveLabel">Live</span>
-      <span class="text-muted" style="font-size:.75rem;" id="lastPoll"></span>
+      <select class="form-select form-select-sm" style="width:80px;font-size:.78rem;"
+              onchange="setInterval(+this.value)">
+        <option value="2000">2s</option>
+        <option value="5000" selected>5s</option>
+        <option value="10000">10s</option>
+        <option value="30000">30s</option>
+        <option value="0">Pause</option>
+      </select>
     </div>
   </div>
 
-  <!-- Action quick-filter row -->
-  <div class="lm-actions" id="actionFilters">
-    <span style="font-size:.68rem;color:var(--muted);font-weight:600;padding-right:4px;">Action:</span>
-    <span class="lm-act active" data-actions="">All Actions</span>
-    <span class="lm-act" data-actions="page_view">Pages Visited</span>
-    <span class="lm-act" data-actions="api_change|pf_reload|dhcp_apply|dns_apply|firewall_apply|mrtg_apply|captive_portal_apply|apply_all_policies|ids_config_save|ids_toggle|dns_filter_apply|web_filter_apply|app_filter_apply">Config Changes</span>
-    <span class="lm-act" data-actions="login_success|login_failed|logout|captive_portal_logout">Auth Events</span>
-    <span class="lm-act" data-actions="ids_alert|brute_force_detected|ids_flood_detected">Alerts</span>
-    <span class="lm-act" data-actions="dhcp_lease_assigned|dns_query|pf_new_conn">LAN Activity</span>
+  <!-- Toolbar row 2: severity filter -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;padding:7px 14px;background:var(--panel);border:1px solid var(--border-color);border-top:none;border-bottom:none;align-items:center;">
+    <span style="font-size:.72rem;font-weight:600;color:var(--muted);margin-right:2px;">SEVERITY</span>
+    <div class="lm-sevs">
+      <span class="lm-sev active" data-sev=""         onclick="setSev(this)">All</span>
+      <span class="lm-sev"        data-sev="critical"  onclick="setSev(this)">● Critical</span>
+      <span class="lm-sev"        data-sev="high"      onclick="setSev(this)">● High</span>
+      <span class="lm-sev"        data-sev="medium"    onclick="setSev(this)">● Medium</span>
+      <span class="lm-sev"        data-sev="low"       onclick="setSev(this)">● Low</span>
+    </div>
+    <span id="lastPoll" style="font-size:.72rem;color:var(--muted);margin-left:auto;"></span>
   </div>
 
   <!-- Stats bar -->
-  <div class="lm-stats" id="statsBar">
+  <div class="lm-stats">
     <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#3b82f6;"></div>
-      <span class="lm-stat-val" id="sc-session">—</span>
-      <span class="lm-stat-lbl">Session</span>
+      <span class="lm-stat-dot" style="background:#0ea5e9;"></span>
+      <span class="lm-stat-val" id="st-connection">0</span>
+      <span class="lm-stat-lbl">Network</span>
     </div>
     <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#f59e0b;"></div>
-      <span class="lm-stat-val" id="sc-system">—</span>
-      <span class="lm-stat-lbl">System</span>
-    </div>
-    <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#ef4444;"></div>
-      <span class="lm-stat-val" id="sc-security">—</span>
+      <span class="lm-stat-dot" style="background:#ef4444;"></span>
+      <span class="lm-stat-val" id="st-security">0</span>
       <span class="lm-stat-lbl">Security</span>
     </div>
     <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#64748b;"></div>
-      <span class="lm-stat-val" id="sc-browsing">—</span>
-      <span class="lm-stat-lbl">Browsing</span>
+      <span class="lm-stat-dot" style="background:#8b5cf6;"></span>
+      <span class="lm-stat-val" id="st-ids">0</span>
+      <span class="lm-stat-lbl">IDS/IPS</span>
     </div>
     <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#8b5cf6;"></div>
-      <span class="lm-stat-val" id="sc-ids">—</span>
-      <span class="lm-stat-lbl">IDS</span>
+      <span class="lm-stat-dot" style="background:#f59e0b;"></span>
+      <span class="lm-stat-val" id="st-system">0</span>
+      <span class="lm-stat-lbl">Config</span>
     </div>
     <div class="lm-stat-item">
-      <div class="lm-stat-dot" style="background:#0ea5e9;"></div>
-      <span class="lm-stat-val" id="sc-connection">—</span>
-      <span class="lm-stat-lbl">Connections</span>
+      <span class="lm-stat-dot" style="background:#3b82f6;"></span>
+      <span class="lm-stat-val" id="st-session">0</span>
+      <span class="lm-stat-lbl">Sessions</span>
     </div>
-    <div class="lm-stat-item" style="margin-left:auto;">
-      <span class="lm-stat-val" id="sc-total">—</span>
-      <span class="lm-stat-lbl">Total events</span>
-    </div>
+    <span id="rowCountLabel" style="font-size:.72rem;color:var(--muted);margin-left:auto;"></span>
   </div>
 
   <!-- Log viewport -->
   <div class="lm-viewport" id="viewport">
-    <div class="lm-pause-overlay"><i class="fa-solid fa-pause me-1"></i>Auto-scroll paused</div>
+    <div class="lm-pause-overlay">⏸ Auto-scroll paused — scroll to top to resume</div>
     <div class="lm-scroll" id="logScroll">
-      <div class="lm-empty" id="emptyState">
-        <i class="fa-solid fa-hourglass-half"></i>
-        Waiting for events…
+      <!-- Column header -->
+      <div class="lm-row" style="position:sticky;top:0;z-index:2;background:#0d1220;cursor:default;border-bottom:1px solid rgba(255,255,255,.08);">
+        <span class="lm-ts"     style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Timestamp</span>
+        <span class="lm-sev-col"  style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Sev</span>
+        <span class="lm-cat-col"  style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Cat</span>
+        <span class="lm-action"   style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Event</span>
+        <span class="lm-user"     style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Device / User</span>
+        <span class="lm-ip"       style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">IP Address</span>
+        <span class="lm-detail"   style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Details</span>
+      </div>
+      <div id="emptyState" class="lm-empty">
+        <i class="fa-solid fa-satellite-dish"></i>
+        Waiting for events… SIEM collectors run on FreeBSD.
       </div>
     </div>
   </div>
 
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:0 2px;">
-    <span class="text-muted" style="font-size:.75rem;" id="rowCountLabel">0 events shown</span>
-    <a href="{{ url_for('status.system_logs', tab='sessions') }}" class="text-muted"
-       style="font-size:.75rem;">← Legacy static view</a>
+  <!-- Footer bar -->
+  <div class="lm-foot">
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearView()">
+      <i class="fa-solid fa-trash-can me-1"></i>Clear view
+    </button>
+    <button class="btn btn-sm btn-outline-primary" onclick="exportLogs()">
+      <i class="fa-solid fa-file-arrow-down me-1"></i>Export
+    </button>
+    <span id="exportMsg" style="color:var(--muted);"></span>
+    <span style="margin-left:auto;color:var(--muted);" id="rowCountFoot"></span>
   </div>
 
-</div>
+</div><!-- /container -->
 
 <script>
-(() => {
-/* ── Config ── */
-const POLL_URL  = "{{ url_for('status.api_logs') }}";
-const STATS_URL = "{{ url_for('status.api_logs_stats') }}";
-const MAX_ROWS  = 1000;       // DOM row limit to prevent memory bloat
+const POLL_URL   = "{{ url_for('status.api_logs') }}";
+const STATS_URL  = "{{ url_for('status.api_logs_stats') }}";
+const EXPORT_URL = "{{ url_for('status.api_logs_export') }}";
+const MAX_ROWS   = 1000;
 
 /* ── State ── */
-let latestTs     = "";        // ISO timestamp of newest fetched event
-let allRows      = [];        // full buffer (newest first)
-let activeFilter = "";        // category filter "" = all
-let actionFilter = new Set(); // action filter — empty = show all actions
-let searchText   = "";        // live search string
+let latestTs     = "";
+let allRows      = [];
+let activeCat    = "";        // category filter
+let activeSev    = "";        // severity filter
+let activeRange  = "live";    // time-range: live|1h|6h|24h|7d
+let searchText   = "";
 let pollTimer    = null;
 let pollInterval = 5000;
 let autoScroll   = true;
-let paused       = false;     // auto-scroll paused because user scrolled up
+let paused       = false;
 
 /* ── DOM ── */
-const scroll     = document.getElementById("logScroll");
-const viewport   = document.getElementById("viewport");
-const empty      = document.getElementById("emptyState");
-const liveDot    = document.getElementById("liveDot");
-const liveLabel  = document.getElementById("liveLabel");
-const lastPoll   = document.getElementById("lastPoll");
-const rowLabel   = document.getElementById("rowCountLabel");
+const scroll    = document.getElementById("logScroll");
+const viewport  = document.getElementById("viewport");
+const empty     = document.getElementById("emptyState");
+const liveDot   = document.getElementById("liveDot");
+const liveLabel = document.getElementById("liveLabel");
+const lastPoll  = document.getElementById("lastPoll");
+const rowLabel  = document.getElementById("rowCountLabel");
 
 /* ── Helpers ── */
 const esc = s => String(s??'')
@@ -378,352 +369,370 @@ const fmtTs = ts => (ts||'').replace('T',' ').slice(0,19);
 
 const catClass = c => ({
   session:'cat-col-session', system:'cat-col-system',
-  security:'cat-col-security', browsing:'cat-col-browsing',
-  ids:'cat-col-ids', connection:'cat-col-connection',
+  security:'cat-col-security', ids:'cat-col-ids',
+  connection:'cat-col-connection',
 }[c] || 'cat-col-default');
 
-const rowClass = c => ({
-  session:'cat-session', system:'cat-system',
-  security:'cat-security', browsing:'cat-browsing',
-  ids:'cat-ids', connection:'cat-connection',
-}[c] || '');
+const catLabel = c => ({
+  session:'SESSION', system:'SYSTEM', security:'SECURITY',
+  ids:'IDS/IPS', connection:'NETWORK', browsing:'ADMIN',
+}[c] || (c||'').toUpperCase());
 
-const actionMatch = e =>
-  actionFilter.size === 0 || actionFilter.has(e.action || '');
-
-/* ── Display helpers ── */
 const ACTION_LABELS = {
-  pf_new_conn:           'New Connection',
-  pf_blocked:            'Blocked',
-  ids_alert:             'IDS Alert',
-  ids_flood_detected:    'IDS Flood Detected',
-  login_success:         'Login',
-  login_failed:          'Failed Login',
-  logout:                'Logout',
-  captive_portal_logout: 'Portal Logout',
-  pf_reload:             'PF Reload',
-  pf_rule_change:        'Firewall Rule Changed',
-  dhcp_lease_assigned:   'DHCP Lease Assigned',
-  dhcp_lease_expired:    'DHCP Lease Expired',
-  gateway_state_change:  'Gateway State Change',
-  config_change:         'Config Changed',
-  backup_created:        'Backup Created',
-  brute_force_detected:  'Brute Force Detected',
-  ssh_attempt:           'SSH Attempt',
-  port_scan_detected:    'Port Scan',
-  dns_blocked:           'DNS Blocked',
-  dns_allowed:           'DNS Allowed',
-  dns_query:             'DNS Query',
-  siem_start:            'SIEM Started',
-  page_view:             'Page View',
-  api_change:            'API Change',
-  dhcp_apply:            'DHCP Applied',
-  dns_apply:             'DNS Applied',
-  firewall_apply:        'Firewall Applied',
-  mrtg_apply:            'MRTG Applied',
-  ids_config_save:       'IDS Config Saved',
-  ids_toggle:            'IDS Toggled',
-  dns_filter_apply:      'DNS Filter Applied',
-  web_filter_apply:      'Web Filter Applied',
-  app_filter_apply:      'App Filter Applied',
-  captive_portal_apply:  'Portal Applied',
-  apply_all_policies:    'All Policies Applied',
-  db_migration:          'DB Migration',
+  pf_new_conn:                  'New Connection',
+  pf_blocked:                   'Blocked',
+  ids_alert:                    'IDS Alert',
+  ids_flood_detected:           'IDS Flood',
+  insecure_protocol_detected:   'Insecure Protocol',
+  brute_force_detected:         'Brute Force',
+  login_success:                'Login',
+  login_failed:                 'Failed Login',
+  logout:                       'Logout',
+  reauth_success:               'Re-auth OK',
+  reauth_failed:                'Re-auth Failed',
+  login_blocked_user_lockout:   'Account Locked',
+  captive_portal_login_success: 'Portal Auth',
+  captive_portal_login_failed:  'Portal Auth Fail',
+  captive_portal_logout:        'Portal Logout',
+  dhcp_lease_assigned:          'DHCP Lease',
+  dhcp_lease_expired:           'DHCP Expired',
+  dns_query:                    'DNS Query',
+  pf_reload:                    'PF Reload',
+  pf_rollback:                  'PF Rollback',
+  firewall_rule_added:          'Rule Added',
+  firewall_rule_deleted:        'Rule Deleted',
+  firewall_rule_updated:        'Rule Updated',
+  dhcp_apply:                   'DHCP Applied',
+  dns_apply:                    'DNS Applied',
+  dns_filter_apply:             'DNS Filter Applied',
+  web_filter_apply:             'Web Filter Applied',
+  ids_config_save:              'IDS Config Saved',
+  ids_toggle:                   'IDS Toggled',
+  captive_portal_apply:         'Portal Applied',
+  mrtg_apply:                   'MRTG Applied',
+  api_change:                   'Config Change',
+  page_view:                    'Page View',
+  diagnostic_cmd:               'Diagnostic Cmd',
+  db_migration:                 'DB Migration',
+  factory_reset:                'Factory Reset',
+  system_reboot:                'System Reboot',
 };
 const actionLabel = a =>
-  ACTION_LABELS[a] || (a||'—').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  ACTION_LABELS[a] || (a||'—').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 
-const SEVERITY_BADGE = {
-  1: '<span class="badge bg-danger ms-1" style="font-size:.6rem;vertical-align:middle;">CRIT</span>',
-  2: '<span class="badge bg-warning text-dark ms-1" style="font-size:.6rem;vertical-align:middle;">HIGH</span>',
-  3: '<span class="badge bg-secondary ms-1" style="font-size:.6rem;vertical-align:middle;">MED</span>',
-};
-function severityBadge(cat, det) {
-  if ((cat === 'ids' || cat === 'security') && det && det.severity)
-    return SEVERITY_BADGE[det.severity] || '';
-  if (cat === 'security' && det && (det.action === 'brute_force_detected' || cat === 'security' && det.severity === 1))
-    return SEVERITY_BADGE[1];
-  return '';
-}
-
-function fmtStatusCode(code) {
-  const n = parseInt(code);
-  const cls = n >= 500 ? 'text-danger fw-bold'
-            : n >= 400 ? 'text-warning fw-bold'
-            : n >= 200 ? 'text-success'
-            : '';
-  return cls ? `<span class="${cls}">${code}</span>` : String(code);
-}
-
-const detailSummary = e => {
+/* Build a rich one-line detail summary per event */
+function buildDetail(e) {
   const d = e.details || {};
-  if (d.reason)     return esc(d.reason);
-  if (d.activity)   return `<span class="lm-hi">${esc(d.activity)}</span>`;
-  if (d.method && d.path) return `<span class="lm-hi">${esc(d.method)}</span> ${esc(d.path)}` +
-                             (d.status_code ? ` ${fmtStatusCode(d.status_code)}` : '') +
-                             (d.latency_ms  ? ` <span style="color:#475569;">${d.latency_ms}ms</span>` : '');
-  const keys = Object.keys(d);
-  if (keys.length) return esc(keys.slice(0,4).map(k=>`${k}=${JSON.stringify(d[k])}`).join(' '));
-  return '';
-};
-
-/* ── Build a single row ── */
-function makeRow(e, isNew) {
-  const wrapper = document.createElement('div');
-
-  const row = document.createElement('div');
-  row.className = `lm-row ${rowClass(e.category)} ${isNew ? 'lm-new' : ''}`;
-  row.dataset.ts  = e.timestamp || '';
-  row.dataset.cat = e.category  || '';
-  row.dataset.raw = JSON.stringify(e);
-
-  row.innerHTML = `
-    <span class="lm-ts">${esc(fmtTs(e.timestamp))}</span>
-    <span class="lm-cat-col ${catClass(e.category)}">${esc(e.category||'?')}</span>
-    <span class="lm-action">${esc(actionLabel(e.action||''))}${severityBadge(e.category, e.details||{})}</span>
-    <span class="lm-user">${esc(e.username||'—')}</span>
-    <span class="lm-ip">${esc(e.remote_addr||'—')}</span>
-    <span class="lm-detail">${detailSummary(e)}</span>
-  `;
-
-  const detail = document.createElement('div');
-  detail.className = 'lm-expanded';
-  detail.innerHTML = `<pre>${esc(JSON.stringify(e, null, 2))}</pre>`;
-
-  row.addEventListener('click', () => {
-    row.classList.toggle('open');
-  });
-
-  wrapper.appendChild(row);
-  wrapper.appendChild(detail);
-  return wrapper;
-}
-
-/* ── Render: filter + rebuild visible rows ── */
-function renderVisible() {
-  const visible = allRows.filter(e => {
-    if (activeFilter && e.category !== activeFilter) return false;
-    if (!actionMatch(e)) return false;
-    if (searchText) {
-      const hay = [e.action,e.username,e.remote_addr,e.category,
-                   JSON.stringify(e.details||{})].join(' ').toLowerCase();
-      if (!hay.includes(searchText)) return false;
+  switch (e.action) {
+    case 'pf_new_conn': {
+      const host = d.hostname ? `<span class="lm-hi">${esc(d.hostname)}</span> ` : '';
+      const svc  = d.service  ? ` <span style="color:#7dd3fc">[${esc(d.service)}]</span>` : '';
+      const iface = d.interface ? `<span style="color:#475569">[${esc(d.interface)}]</span> ` : '';
+      return `${iface}${host}(${esc(d.src_ip||e.remote_addr)}) → ${esc(d.dst_ip)}:${esc(d.dst_port)}${svc}`;
     }
-    return true;
-  });
-
-  scroll.innerHTML = '';
-  if (!visible.length) {
-    scroll.appendChild(empty);
-    empty.style.display = '';
-  } else {
-    empty.style.display = 'none';
-    visible.forEach(e => scroll.appendChild(makeRow(e, false)));
+    case 'insecure_protocol_detected':
+      return `<span style="color:#f87171">⚠ ${esc(d.protocol||'?')}</span> from <span class="lm-hi">${esc(d.hostname||d.src)}</span> to ${esc(d.dst)}`;
+    case 'ids_alert':
+      return `<span style="color:#c084fc">${esc(d.signature||'Unknown sig')}</span> · ${esc(d.src_ip)}:${esc(d.src_port||'?')} → ${esc(d.dest_ip)}:${esc(d.dest_port||'?')}`;
+    case 'brute_force_detected':
+      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} failed logins in ${esc(d.window_seconds||'?')}s`;
+    case 'ids_flood_detected':
+      return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} IDS hits in ${esc(d.window_seconds||'?')}s`;
+    case 'dhcp_lease_assigned':
+      return `<span class="lm-hi">${esc(d.hostname||'unknown')}</span> @ ${esc(d.ip||e.remote_addr)} (${esc(d.mac||'?')})`;
+    case 'dns_query':
+      return `${esc(e.remote_addr)} queried <span class="lm-hi">${esc(d.query||d.name||'?')}</span> ${d.blocked?'<span style="color:#f87171">BLOCKED</span>':''}`;
+    case 'login_success': case 'login_failed':
+    case 'captive_portal_login_success': case 'captive_portal_login_failed':
+      return `${esc(d.username||e.username||'?')} from ${esc(e.remote_addr||'?')}${d.mac?' ('+esc(d.mac)+')':''}`;
+    case 'firewall_rule_added': case 'firewall_rule_deleted': case 'firewall_rule_updated': {
+      const desc = d.description || d.desc || '';
+      return `${esc(d.action||'?')} ${esc(d.protocol||'any')} ${esc(d.source||'any')} → ${esc(d.destination||'any')}${d.dest_port?':'+esc(d.dest_port):''} ${desc?'('+esc(desc)+')':''}`;
+    }
+    case 'pf_reload': case 'pf_rollback':
+      return d.ok===false ? `<span style="color:#f87171">FAILED</span> ${esc(d.message||'')}` : 'OK';
+    case 'diagnostic_cmd':
+      return `${esc(d.command||'?')}${d.interface?' on '+esc(d.interface):''}${d.filter?' filter: '+esc(d.filter):''}`;
+    default: {
+      const parts = Object.entries(d)
+        .filter(([k])=>!['view_args','user_agent','referrer'].includes(k))
+        .slice(0,4)
+        .map(([k,v])=>`${k}=${typeof v==='object'?JSON.stringify(v):v}`);
+      return parts.join(' · ') || '—';
+    }
   }
-
-  rowLabel.textContent = `${visible.length.toLocaleString()} event${visible.length!==1?'s':''} shown`;
-  if (autoScroll && !paused) scroll.scrollTop = 0; // newest at top
 }
 
-/* ── Prepend new events (already newest-first from API) ── */
-function prependEvents(events) {
+/* Severity badge HTML */
+function sevBadge(sev) {
+  const s = (sev||'info').toLowerCase();
+  return `<span class="sev-badge sev-${s}">${s.slice(0,4).toUpperCase()}</span>`;
+}
+
+/* Render one log row + hidden expand panel */
+function renderRow(e, isNew) {
+  const sev  = (e.severity || 'info').toLowerCase();
+  const ts   = fmtTs(e.timestamp);
+  const cat  = e.category || '';
+  const act  = e.action   || '';
+  const user = e.username === 'siem' ? '' : esc(e.username || '');
+  const ip   = esc(e.remote_addr || '');
+  const det  = buildDetail(e);
+
+  const rowEl = document.createElement('div');
+  rowEl.className = `lm-row sev-${sev}${isNew?' lm-new':''}`;
+  rowEl.innerHTML =
+    `<span class="lm-ts">${ts}</span>` +
+    `<span class="lm-sev-col">${sevBadge(sev)}</span>` +
+    `<span class="lm-cat-col ${catClass(cat)}">${catLabel(cat)}</span>` +
+    `<span class="lm-action">${esc(actionLabel(act))}</span>` +
+    `<span class="lm-user">${user}</span>` +
+    `<span class="lm-ip">${ip}</span>` +
+    `<span class="lm-detail">${det}</span>`;
+
+  const expEl = document.createElement('div');
+  expEl.className = 'lm-expanded';
+  expEl.innerHTML = `<pre>${esc(JSON.stringify(e, null, 2))}</pre>`;
+
+  rowEl.addEventListener('click', () => {
+    rowEl.classList.toggle('open');
+  });
+
+  return [rowEl, expEl];
+}
+
+/* Prepend rows into the log viewport */
+function prependRows(events) {
   if (!events.length) return;
-
-  events.forEach(e => allRows.unshift(e));
-
-  // Trim buffer
-  if (allRows.length > MAX_ROWS) allRows.splice(MAX_ROWS);
-
-  // Update latestTs
-  if (events[0] && events[0].timestamp > latestTs) {
-    latestTs = events[0].timestamp;
-  }
-
-  // Rebuild DOM only when not doing a full reload
-  const matches = events.filter(e => {
-    if (activeFilter && e.category !== activeFilter) return false;
-    if (!actionMatch(e)) return false;
-    if (searchText) {
-      const hay = [e.action,e.username,e.remote_addr,e.category,
-                   JSON.stringify(e.details||{})].join(' ').toLowerCase();
-      return hay.includes(searchText);
-    }
-    return true;
-  });
-
-  if (!matches.length) return;
-
-  // Remove empty state
-  const emptyEl = scroll.querySelector('.lm-empty');
-  if (emptyEl) emptyEl.remove();
-
-  // Insert at top
   const frag = document.createDocumentFragment();
-  matches.forEach(e => frag.appendChild(makeRow(e, true)));
-  scroll.prepend(frag);
-
-  // Trim DOM rows
-  const rows = scroll.querySelectorAll('.lm-row');
-  if (rows.length > MAX_ROWS) {
-    for (let i = MAX_ROWS; i < rows.length; i++) {
-      rows[i].closest('div')?.remove();
-    }
+  for (const e of events) {
+    const [r, x] = renderRow(e, true);
+    frag.appendChild(r);
+    frag.appendChild(x);
   }
 
-  rowLabel.textContent = `${Math.min(allRows.length, MAX_ROWS).toLocaleString()} events shown`;
-  if (!paused) scroll.scrollTop = 0;
-}
+  const firstRow = scroll.children[1]; // [0] is header
+  if (firstRow) scroll.insertBefore(frag, firstRow);
+  else scroll.appendChild(frag);
 
-/* ── Poll ── */
-async function poll() {
-  liveDot.classList.remove('active');
-  try {
-    const cat   = activeFilter ? `&categories=${encodeURIComponent(activeFilter)}` : '';
-    const srch  = searchText   ? `&search=${encodeURIComponent(searchText)}` : '';
-    const since = latestTs     ? `&since=${encodeURIComponent(latestTs)}` : '';
+  empty.style.display = 'none';
 
-    const res  = await fetch(`${POLL_URL}?limit=200${since}${cat}${srch}`, {cache:'no-store'});
-    const body = await res.json();
+  // Trim excess rows
+  while (allRows.length > MAX_ROWS) allRows.pop();
+  const rowEls = scroll.querySelectorAll('.lm-row:not(:first-child)');
+  while (rowEls.length > MAX_ROWS * 2) {
+    const last = scroll.lastElementChild;
+    if (last && last !== empty) scroll.removeChild(last);
+    else break;
+  }
 
-    if (body.ok && body.events?.length) {
-      prependEvents(body.events);
-    }
-    if (body.latest_ts) latestTs = body.latest_ts;
-
-    lastPoll.textContent = `updated ${new Date().toLocaleTimeString()}`;
-    liveDot.classList.add('active');
-    liveDot.style.background = '#10b981';
-  } catch(err) {
-    liveDot.style.background = '#ef4444';
-    lastPoll.textContent = 'poll failed';
+  if (rowLabel) {
+    rowLabel.textContent = `${allRows.length.toLocaleString()} events`;
+    document.getElementById('rowCountFoot').textContent = rowLabel.textContent;
   }
 }
 
-/* ── Stats poll (every 15s) ── */
-async function pollStats() {
-  try {
-    const body = await fetch(STATS_URL, {cache:'no-store'}).then(r=>r.json());
-    document.getElementById('sc-session').textContent  = (body.session  || 0).toLocaleString();
-    document.getElementById('sc-system').textContent   = (body.system   || 0).toLocaleString();
-    document.getElementById('sc-security').textContent = (body.security || 0).toLocaleString();
-    document.getElementById('sc-browsing').textContent = (body.browsing || 0).toLocaleString();
-    document.getElementById('sc-ids').textContent        = (body.ids        || 0).toLocaleString();
-    document.getElementById('sc-connection').textContent = (body.connection || 0).toLocaleString();
-    document.getElementById('sc-total').textContent    = (body._total   || 0).toLocaleString();
-  } catch(_) {}
-}
+/* ── Polling ── */
+function buildPollURL() {
+  const params = new URLSearchParams();
+  params.set('limit', '200');
+  if (activeCat)  params.set('categories', activeCat);
+  if (activeSev)  params.set('severities', activeSev);
+  if (searchText) params.set('search', searchText);
 
-/* ── Auto-scroll pause detection ── */
-scroll.addEventListener('scroll', () => {
-  // If user scrolled down (away from top), pause
-  const atTop = scroll.scrollTop < 80;
-  if (!atTop && !paused) {
-    paused = true;
-    viewport.classList.add('paused');
-    liveDot.classList.add('paused');
-    liveLabel.textContent = 'Paused';
-  } else if (atTop && paused) {
-    paused = false;
-    viewport.classList.remove('paused');
-    liveDot.classList.remove('paused');
-    liveLabel.textContent = 'Live';
-  }
-});
-
-/* ── Category filter ── */
-document.querySelectorAll('.lm-cat').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.lm-cat').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    activeFilter = btn.dataset.cat;
-    // Full re-render from buffer
-    latestTs = '';           // reset so next poll fetches everything for this filter
-    allRows  = [];
-    scroll.innerHTML = '';
-    scroll.appendChild(empty);
-    empty.style.display = '';
-    poll();
-  });
-});
-
-/* ── Action filter ── */
-document.querySelectorAll('.lm-act').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.lm-act').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const raw = btn.dataset.actions || '';
-    actionFilter = raw ? new Set(raw.split('|')) : new Set();
-    latestTs = '';
-    allRows  = [];
-    scroll.innerHTML = '';
-    scroll.appendChild(empty);
-    empty.style.display = '';
-    poll();
-  });
-});
-
-/* ── Search ── */
-let searchTimer;
-document.getElementById('searchInput').addEventListener('input', function() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    searchText = this.value.toLowerCase().trim();
-    latestTs = '';
-    allRows  = [];
-    scroll.innerHTML = '';
-    scroll.appendChild(empty);
-    empty.style.display = '';
-    poll();
-  }, 400);
-});
-
-/* ── Refresh rate ── */
-document.getElementById('refreshRate').addEventListener('change', function() {
-  pollInterval = parseInt(this.value);
-  startPoller();
-  if (pollInterval === 0) {
-    liveDot.classList.add('paused');
-    liveLabel.textContent = 'Paused';
+  if (activeRange === 'live') {
+    if (latestTs) params.set('since', latestTs);
   } else {
-    liveDot.classList.remove('paused');
-    liveLabel.textContent = 'Live';
+    const mins = {'1h':60,'6h':360,'24h':1440,'7d':10080}[activeRange] || 60;
+    const start = new Date(Date.now() - mins * 60000).toISOString();
+    params.set('start_ts', start);
   }
-});
+  return POLL_URL + '?' + params.toString();
+}
 
-function startPoller() {
+async function poll() {
+  try {
+    liveDot.classList.add('active');
+    const r  = await fetch(buildPollURL());
+    const d  = await r.json();
+    liveDot.classList.remove('active');
+
+    if (!d.ok) return;
+    const events = d.events || [];
+    if (events.length) {
+      allRows = events.concat(allRows).slice(0, MAX_ROWS);
+      prependRows(events);
+      if (d.latest_ts) latestTs = d.latest_ts;
+    }
+
+    const now = new Date().toLocaleTimeString();
+    if (lastPoll) lastPoll.textContent = `Last poll: ${now}`;
+    liveLabel.textContent = 'Live';
+    liveDot.style.background = '#10b981';
+    liveDot.classList.remove('paused');
+  } catch (err) {
+    liveDot.classList.remove('active');
+    liveDot.style.background = '#ef4444';
+    liveLabel.textContent = 'Error';
+  }
+}
+
+function startPoll() {
   if (pollTimer) clearInterval(pollTimer);
   if (pollInterval > 0) {
+    poll();
     pollTimer = setInterval(poll, pollInterval);
   }
 }
 
+function setInterval_(ms) {
+  pollInterval = ms;
+  if (ms === 0) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    liveLabel.textContent = 'Paused';
+    liveDot.classList.add('paused');
+  } else {
+    liveLabel.textContent = 'Live';
+    liveDot.classList.remove('paused');
+    startPoll();
+  }
+}
+// alias
+function setInterval(ms) { setInterval_(ms); }
+
+/* ── Filter handlers ── */
+function setCat(el) {
+  document.querySelectorAll('.lm-cat').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  activeCat  = el.dataset.cat;
+  latestTs   = '';
+  allRows    = [];
+  clearViewport();
+  startPoll();
+}
+
+function setSev(el) {
+  document.querySelectorAll('.lm-sev').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  activeSev  = el.dataset.sev;
+  latestTs   = '';
+  allRows    = [];
+  clearViewport();
+  startPoll();
+}
+
+function setRange(el) {
+  document.querySelectorAll('.lm-tr').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  activeRange = el.dataset.range;
+  latestTs    = '';
+  allRows     = [];
+  clearViewport();
+  if (activeRange !== 'live') {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    liveLabel.textContent = 'Snapshot';
+  }
+  poll();
+}
+
+let _searchTimer = null;
+function onSearch(val) {
+  searchText = val.toLowerCase().trim();
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    latestTs = ''; allRows = []; clearViewport(); poll();
+  }, 400);
+}
+
+function clearViewport() {
+  const rows = scroll.querySelectorAll('.lm-row:not(:first-child), .lm-expanded');
+  rows.forEach(r => r.remove());
+  empty.style.display = 'block';
+  if (rowLabel) rowLabel.textContent = '';
+}
+
+function clearView() {
+  allRows = []; latestTs = '';
+  clearViewport();
+  startPoll();
+}
+
+/* ── Stats polling ── */
+async function pollStats() {
+  try {
+    const r = await fetch(STATS_URL);
+    const d = await r.json();
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v||0).toLocaleString(); };
+    setVal('cnt-critical', d._critical || 0);
+    setVal('cnt-high',     d._high     || 0);
+    setVal('cnt-total',    d._total    || 0);
+    setVal('st-connection', (d.connection||0));
+    setVal('st-security',   (d.security||0)+(d.ids||0));
+    setVal('st-ids',        d.ids||0);
+    setVal('st-system',     d.system||0);
+    setVal('st-session',    d.session||0);
+  } catch(_) {}
+}
+
 /* ── Export ── */
-document.getElementById('btnExport').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(allRows, null, 2)], {type:'application/json'});
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: `smart-shield-logs-${new Date().toISOString().slice(0,10)}.json`,
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
+async function exportLogs() {
+  const msg = document.getElementById('exportMsg');
+  msg.textContent = 'Preparing export…';
+  const params = new URLSearchParams();
+  if (activeCat)  params.set('categories', activeCat);
+  if (activeSev)  params.set('severities', activeSev);
+  if (searchText) params.set('search', searchText);
+  if (activeRange !== 'live') {
+    const mins = {'1h':60,'6h':360,'24h':1440,'7d':10080}[activeRange] || 60;
+    params.set('start_ts', new Date(Date.now() - mins*60000).toISOString());
+  }
+  try {
+    const r = await fetch(EXPORT_URL + '?' + params.toString());
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `smart-shield-siem-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    msg.textContent = 'Downloaded.';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch(e) {
+    msg.textContent = 'Export failed.';
+  }
+}
+
+/* ── Auto-scroll pause on user scroll ── */
+scroll.addEventListener('scroll', () => {
+  if (scroll.scrollTop > 80) {
+    paused = true; viewport.classList.add('paused');
+    liveLabel.textContent = 'Paused ↕';
+  } else {
+    paused = false; viewport.classList.remove('paused');
+    liveLabel.textContent = 'Live';
+  }
 });
 
-/* ── Clear view ── */
-document.getElementById('btnClear').addEventListener('click', () => {
-  allRows = [];
-  latestTs = '';
-  scroll.innerHTML = '';
-  scroll.appendChild(empty);
-  empty.style.display = '';
-  rowLabel.textContent = '0 events shown';
-});
-
-/* ── Init ── */
-poll();
-startPoller();
-pollStats();
-setInterval(pollStats, 15000);
-
+/* ── Fetch LAN interface from network status ── */
+(async () => {
+  try {
+    const r = await fetch('/status/api/interface-stats');
+    const d = await r.json();
+    // Show the first non-loopback interface as the LAN iface hint
+    const ifaces = (d.interfaces || []).filter(i => i.name && !i.name.startsWith('lo'));
+    const el = document.getElementById('siem-lan-iface');
+    if (el && ifaces.length) el.textContent = ifaces.map(i=>i.name).join(' / ');
+  } catch(_) {
+    const el = document.getElementById('siem-lan-iface');
+    if (el) el.textContent = 'em1';
+  }
 })();
+
+/* ── Boot ── */
+startPoll();
+window.setInterval(pollStats, 15000);
+pollStats();
 </script>
 {% endblock %}

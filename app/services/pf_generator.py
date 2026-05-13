@@ -57,6 +57,20 @@ def _proto_line(proto: Optional[str]) -> str:
     return f"proto {p} "
 
 
+def _pf_action(action: str) -> str:
+    """Translate a DB action value to the correct PF keyword.
+    'reject' maps to 'block return' (drop + ICMP unreachable / TCP RST).
+    """
+    a = (action or "pass").lower()
+    if a == "reject":
+        return "block return"
+    return a if a in {"pass", "block"} else "pass"
+
+
+# Protocols that carry no L4 ports — port filtering is invalid for these.
+_PORTLESS_PROTOS = frozenset({"icmp", "icmpv6", "ipv6-icmp", "esp", "ah", "gre"})
+
+
 def _port_line(port: Optional[str], prefix="port ") -> str:
     import re as _re
     p = (port or "").strip()
@@ -236,14 +250,23 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         sport  = _port_line(r.get("source_port"))
         dst    = _addr(r.get("destination"))
         dport  = _port_line(r.get("dest_port"))
-        action = (r.get("action") or "pass").lower()
+        pf_act = _pf_action(r.get("action"))
         ipart  = f"on {iface} " if iface else ""
         desc   = (r.get("description") or "").strip()
         sched  = (r.get("schedule") or "").strip()
         lbl    = _label(r.get("id", 0), desc)
+        # Protocols with no L4 ports — strip any port that slipped through
+        if (r.get("protocol") or "").strip().lower() in _PORTLESS_PROTOS:
+            sport = ""
+            dport = ""
+        # PF: port filtering requires an explicit protocol (not "any")
+        if (dport or sport) and not proto:
+            proto = "proto tcp "
+        # PF: keep state is only valid for pass rules
+        state_part = " keep state" if pf_act == "pass" else ""
         if desc:
             lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
-        lines.append(f"{action} quick {ipart}{proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
+        lines.append(f"{pf_act} quick {ipart}{proto}from {src} {sport}to {dst} {dport}{lbl}{state_part}")
 
     # WAN
     raw_wan = _rows(
@@ -256,13 +279,19 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         sport  = _port_line(r.get("source_port"))
         dst    = _addr(r.get("destination"))
         dport  = _port_line(r.get("dest_port"))
-        action = (r.get("action") or "pass").lower()
+        pf_act = _pf_action(r.get("action"))
         desc   = (r.get("description") or "").strip()
         sched  = (r.get("schedule") or "").strip()
         lbl    = _label(r.get("id", 0), desc)
+        if (r.get("protocol") or "").strip().lower() in _PORTLESS_PROTOS:
+            sport = ""
+            dport = ""
+        if (dport or sport) and not proto:
+            proto = "proto tcp "
+        state_part = " keep state" if pf_act == "pass" else ""
         if desc:
             lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
-        lines.append(f"{action} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
+        lines.append(f"{pf_act} in on {wan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl}{state_part}")
 
     # LAN
     raw_lan = _rows(
@@ -275,13 +304,19 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
         sport  = _port_line(r.get("source_port"))
         dst    = _addr(r.get("destination"))
         dport  = _port_line(r.get("dest_port"))
-        action = (r.get("action") or "pass").lower()
+        pf_act = _pf_action(r.get("action"))
         desc   = (r.get("description") or "").strip()
         sched  = (r.get("schedule") or "").strip()
         lbl    = _label(r.get("id", 0), desc)
+        if (r.get("protocol") or "").strip().lower() in _PORTLESS_PROTOS:
+            sport = ""
+            dport = ""
+        if (dport or sport) and not proto:
+            proto = "proto tcp "
+        state_part = " keep state" if pf_act == "pass" else ""
         if desc:
             lines.append(f"# {desc}" + (f" [schedule: {sched}]" if sched else ""))
-        lines.append(f"{action} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl} keep state")
+        lines.append(f"{pf_act} in on {lan_iface} {proto}from {src} {sport}to {dst} {dport}{lbl}{state_part}")
 
     lines.append("")
     return "\n".join(lines)
