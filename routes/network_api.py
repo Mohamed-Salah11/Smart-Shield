@@ -387,6 +387,21 @@ def _refresh_tracked_hosts(cur):
                 },
             )
 
+    # Enrich hostnames from active DHCP leases (client-announced hostnames).
+    # get_live_leases() reads /var/db/dhcpd/dhcpd.leases and returns [] on non-FreeBSD.
+    try:
+        from app.services.dhcp_writer import get_live_leases
+        _lease_map = {
+            l["ip_address"]: l["hostname"]
+            for l in get_live_leases()
+            if l.get("hostname") and l.get("ip_address")
+        }
+        for host in hosts.values():
+            if not host.get("hostname") and host.get("ip_address") in _lease_map:
+                host["hostname"] = _lease_map[host["ip_address"]]
+    except Exception:
+        pass
+
     wan_rules = _fetch_active_firewall_rules(cur, "WAN")
     lan_rules = _fetch_active_firewall_rules(cur, "LAN")
 

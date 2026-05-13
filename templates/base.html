@@ -82,6 +82,9 @@
                     <li><a class="dropdown-item" href="{{ url_for('diagnostics.backup_restore', tab='restore') }}">
                         <i class="fa-solid fa-upload me-2 text-muted"></i>Restore Config
                     </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="refreshFirewall(event)">
+                        <i class="fa-solid fa-shield-halved me-2 text-muted"></i>Refresh Firewall
+                    </a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="{{ url_for('system.logout') }}">
                         <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Sign Out
@@ -815,5 +818,14 @@
 })();
 </script>
 {% endif %}
+<script>
+function refreshFirewall(e) {
+    e.preventDefault();
+    fetch('/firewall/api/apply', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => alert(d.ok ? '✓ Firewall refreshed successfully.' : '✗ ' + (d.message || 'Refresh failed.')))
+        .catch(() => alert('✗ Network error refreshing firewall.'));
+}
+</script>
 </body>
 </html>

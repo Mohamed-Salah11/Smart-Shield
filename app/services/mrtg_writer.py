@@ -185,8 +185,11 @@ def apply_mrtg(conn) -> dict:
         import subprocess
         _cmd = ["/usr/local/bin/mrtg", _MRTG_CONF_PATH,
                 "--lock-file", _MRTG_LOCK_FILE, "--log-level", "0"]
-        for _ in range(2):
+        import time
+        for i in range(2):
             subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
+            if i == 0:
+                time.sleep(5)  # MRTG needs a time delta between runs to compute rates
     except FileNotFoundError:
         rb = rollback_config(_MRTG_CONF_PATH)
         return {"ok": False, "rolled_back": rb.get("ok", False),

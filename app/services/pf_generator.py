@@ -226,6 +226,11 @@ def _build_firewall_rules(conn, wan_iface: str, lan_iface: str) -> str:
     )
     for r in filter_rules_by_schedule(conn, raw_floating):
         iface  = (r.get("interface") or "").strip()
+        # Normalize symbolic labels stored by the UI to real interface names
+        if iface.upper() == "WAN":
+            iface = wan_iface
+        elif iface.upper() == "LAN":
+            iface = lan_iface
         proto  = _proto_line(r.get("protocol"))
         src    = _addr(r.get("source"))
         sport  = _port_line(r.get("source_port"))

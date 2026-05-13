@@ -8,6 +8,11 @@
             <h1 class="ss-page-title">Firewall Rules</h1>
             <p class="ss-page-desc">Floating, WAN and LAN packet filter rules</p>
         </div>
+        <div>
+            <button class="btn btn-primary" onclick="applyFirewall()" id="applyFirewallBtn">
+                <i class="fa-solid fa-shield-halved me-1"></i>Apply Firewall
+            </button>
+        </div>
     </div>
 
     <!-- Tabs Navigation -->
@@ -44,6 +49,7 @@
                         <thead>
                             <tr>
                                 <th>Select</th>
+                                <th>Action</th>
                                 <th>Enabled</th>
                                 <th>Interface</th>
                                 <th>Protocol</th>
@@ -129,6 +135,7 @@
                         <thead>
                             <tr>
                                 <th>Select</th>
+                                <th>Action</th>
                                 <th>Interface</th>
                                 <th>Protocol</th>
                                 <th>Source</th>
@@ -746,8 +753,9 @@
                     row.dataset.ruleId = rule.id;
                     row.innerHTML = `
                         <td><input type="checkbox"></td>
+                        <td><span class="badge bg-${rule.action === 'block' ? 'danger' : rule.action === 'reject' ? 'warning' : 'success'}">${rule.action || 'pass'}</span></td>
                         <td>${rule.disabled ? '✗' : '✓'}</td>
-                        <td>${rule.interface || 'WAN'}</td>
+                        <td>${rule.interface || 'any'}</td>
                         <td>${rule.protocol || 'any'}</td>
                         <td>${rule.source || 'any'}</td>
                         <td>${rule.source_port || '*'}</td>
@@ -819,6 +827,7 @@
                     row.dataset.ruleId = rule.id;
                     row.innerHTML = `
                         <td><input type="checkbox"></td>
+                        <td><span class="badge bg-${rule.action === 'block' ? 'danger' : rule.action === 'reject' ? 'warning' : 'success'}">${rule.action || 'pass'}</span></td>
                         <td>${rule.interface || 'LAN'}</td>
                         <td>${rule.protocol || 'any'}</td>
                         <td>${rule.source || 'any'}</td>
@@ -924,5 +933,21 @@
     loadFloatingRules();
     loadWanRules();
     loadLanRules();
+
+    async function applyFirewall() {
+        const btn = document.getElementById('applyFirewallBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Applying…';
+        try {
+            const r = await fetch('/firewall/api/apply', { method: 'POST' });
+            const data = await r.json();
+            alert(data.ok ? '✓ Firewall applied successfully.' : '✗ ' + (data.message || 'Apply failed.'));
+        } catch (e) {
+            alert('✗ Network error applying firewall.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-shield-halved me-1"></i>Apply Firewall';
+        }
+    }
 </script>
 {% endblock %}
