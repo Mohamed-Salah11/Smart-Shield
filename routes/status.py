@@ -177,22 +177,24 @@ def api_interface_stats():
                 parts = line.split()
                 # Filter to link-layer rows only (<Link#N>) to avoid duplicate
                 # entries per interface (netstat outputs one row per address family).
-                # FreeBSD netstat -ibn columns:
-                #   Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
-                #   [0]  [1] [2]     [3]     [4]   [5]   [6]    [7]   [8]   [9]   [10]
+                # FreeBSD 12+ added Idrop column between Ierrs and Ibytes:
+                #   Old: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll  (11 cols)
+                #   New: Name Mtu Network Address Ipkts Ierrs Idrop  Ibytes Opkts Oerrs Obytes Coll  (12 cols)
                 if len(parts) >= 10 and re.match(r"<Link#\d+>", parts[2], re.IGNORECASE):
                     if parts[0].rstrip("0123456789").lower() in _VIRTUAL_IFACE_PREFIXES:
                         continue
                     try:
+                        # FreeBSD 12+: Idrop shifts Ibytes/Opkts/Oerrs/Obytes each by 1
+                        off = 1 if len(parts) >= 12 else 0
                         stats.append({
                             "name":     parts[0],
                             "mtu":      parts[1],
                             "rx_pkts":  int(parts[4]),
                             "rx_errs":  int(parts[5]),
-                            "rx_bytes": int(parts[6]),
-                            "tx_pkts":  int(parts[7]),
-                            "tx_errs":  int(parts[8]),
-                            "tx_bytes": int(parts[9]),
+                            "rx_bytes": int(parts[6 + off]),
+                            "tx_pkts":  int(parts[7 + off]),
+                            "tx_errs":  int(parts[8 + off]),
+                            "tx_bytes": int(parts[9 + off]),
                         })
                     except (ValueError, IndexError):
                         pass

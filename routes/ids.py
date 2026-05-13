@@ -40,6 +40,15 @@ def ids_index():
     cfg  = _cfg(conn)
     rulesets = _rulesets(conn)
 
+    # Inject display-time WAN interface fallback so the status banner is never blank.
+    # Empty string in DB means "auto (WAN)" — show the actual WAN interface name.
+    if not cfg.get("interface"):
+        wan_row = conn.execute(
+            "SELECT assigned_port FROM wan_config LIMIT 1"
+        ).fetchone()
+        cfg = dict(cfg)
+        cfg["interface"] = (wan_row["assigned_port"] if wan_row else None) or "em0"
+
     # Live status (non-blocking; returns quickly on non-FreeBSD)
     from app.services.ids_writer import get_ids_status
     status = get_ids_status()

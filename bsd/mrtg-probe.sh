@@ -22,11 +22,17 @@ if [ -z "$LINE" ]; then
     exit 0
 fi
 
-# netstat -ibn columns on FreeBSD:
-#  Name  Mtu   Network  Address  Ipkts  Ierrs  Ibytes  Opkts  Oerrs  Obytes  Coll
-#  [0]   [1]   [2]      [3]      [4]    [5]    [6]     [7]    [8]    [9]     [10]
-IN=$(echo  "$LINE" | awk '{print $7}')
-OUT=$(echo "$LINE" | awk '{print $10}')
+# FreeBSD 12+ added Idrop column, shifting Ibytes and Obytes by 1:
+#  Old (≤11): Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll  (11 fields)
+#  New (12+): Name Mtu Network Address Ipkts Ierrs Idrop  Ibytes Opkts Oerrs Obytes Coll (12 fields)
+FIELD_COUNT=$(echo "$LINE" | awk '{print NF}')
+if [ "$FIELD_COUNT" -ge 12 ]; then
+    IN=$(echo  "$LINE" | awk '{print $8}')
+    OUT=$(echo "$LINE" | awk '{print $11}')
+else
+    IN=$(echo  "$LINE" | awk '{print $7}')
+    OUT=$(echo "$LINE" | awk '{print $10}')
+fi
 
 echo "${IN:-0}"
 echo "${OUT:-0}"
