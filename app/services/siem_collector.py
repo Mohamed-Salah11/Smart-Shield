@@ -329,18 +329,23 @@ def _collect_dhcp_events(state: dict):
         seen.add(key)
         _log("connection", "dhcp_lease_assigned", remote_addr=lease["ip"], details=lease)
 
-        # Update tracked_hosts as a side-effect
+        # Update tracked_hosts as a side-effect.
+        # The unique index is on (interface_type, ip_address) — not just ip_address.
         try:
             from app.database import get_db
             db = get_db()
             db.execute(
                 """
-                INSERT INTO tracked_hosts (ip_address, mac_address, hostname,
-                    interface_type, discovered_via, first_seen, last_seen)
+                INSERT INTO tracked_hosts
+                    (ip_address, mac_address, hostname,
+                     interface_type, discovered_via, first_seen, last_seen)
                 VALUES (?, ?, ?, 'LAN', 'dhcp', datetime('now'), datetime('now'))
-                ON CONFLICT(ip_address) DO UPDATE SET
-                    last_seen=datetime('now'),
-                    hostname=excluded.hostname
+                ON CONFLICT(interface_type, ip_address) DO UPDATE SET
+                    last_seen   = datetime('now'),
+                    mac_address = excluded.mac_address,
+                    hostname    = CASE WHEN excluded.hostname != ''
+                                       THEN excluded.hostname
+                                       ELSE tracked_hosts.hostname END
                 """,
                 (lease["ip"], lease["mac"], lease["hostname"] or ""),
             )
@@ -354,18 +359,35 @@ def _collect_dhcp_events(state: dict):
 # ---------------------------------------------------------------------------
 
 def _run_dns_collector(state: dict):
+    _refresh_blocked_domains(state)          # initial load at startup
+    _refresh_counter = 0
     while True:
         try:
             _collect_dns_queries(state)
         except Exception:
             pass
+        _refresh_counter += 1
+        if _refresh_counter >= 20:           # every 20 × 15s = 5 minutes
+            try:
+                _refresh_blocked_domains(state)
+            except Exception:
+                pass
+            _refresh_counter = 0
         time.sleep(15)
 
 
-# Unbound query log format:
-# [timestamp] unbound[pid:tid] info: 192.168.1.5 A example.com. NOERROR 0.001234
+# Unbound query log format varies by version:
+#   Old: info: 192.168.1.5 A example.com. NOERROR 0.001234
+#   New: info: 192.168.1.5#12345 A example.com. IN NOERROR 0.001234
+# group1=client_ip  group2=first-word  group3=second-word  group4=rcode-or-class
+# _collect_dns_queries determines name vs qtype from the captured groups.
 _UNBOUND_QUERY_RE = re.compile(
-    r'info:\s+([\d.:a-fA-F]+)\s+(\w+)\s+([\w.\-]+?\.?)\s+(\w+)'
+    r'info:\s+'
+    r'([\d.a-fA-F:]+)(?:#\d+)?'    # group1: client_ip (strip optional #port)
+    r'\s+([\w.\-]+\.?)'             # group2: first token (qtype or query_name)
+    r'\s+([\w.\-]+\.?)'             # group3: second token
+    r'(?:\s+\w+)?'                  # optional third token (class IN, or another field)
+    r'\s+(\w+)'                     # group4: rcode (NOERROR, NXDOMAIN, SERVFAIL…)
 )
 
 
@@ -386,10 +408,17 @@ def _collect_dns_queries(state: dict):
         if not m:
             continue
 
-        client_ip   = m.group(1)
-        qtype       = m.group(2)
-        query_name  = m.group(3).rstrip(".")
-        response    = m.group(4)
+        client_ip = m.group(1)
+        g2, g3    = m.group(2), m.group(3)
+        response  = m.group(4)
+
+        # Determine which token is the qtype vs the query name.
+        # Qtypes are short all-uppercase words (A, AAAA, MX, TXT, PTR, NS…).
+        # Query names contain dots and mixed case.
+        if re.match(r'^[A-Z]{1,10}$', g2):
+            qtype, query_name = g2, g3.rstrip(".")
+        else:
+            query_name, qtype = g2.rstrip("."), g3
 
         is_blocked = query_name in blocked or response in ("NXDOMAIN", "SERVFAIL")
 
@@ -553,11 +582,13 @@ def _detect_anomalies(state: dict):
             key = f"brute_force:{ip}"
             if key not in alerted:
                 alerted[key] = now_ts
-                _log("security", "brute_force_detected", remote_addr=ip, details={
-                    "count":          count,
-                    "window_minutes": 5,
-                    "target":         "admin login",
-                })
+                _log("security", "brute_force_detected", remote_addr=ip,
+                     severity="high",
+                     details={
+                         "count":          count,
+                         "window_minutes": 5,
+                         "target":         "admin login",
+                     })
 
     # ── IDS flood: >10 ids_alert from same src_ip in 5 min ──
     ids_counts: dict = {}
@@ -586,11 +617,13 @@ def _detect_anomalies(state: dict):
                 sigs = ids_sigs.get(src, [])
                 if sigs:
                     top_sig = max(set(sigs), key=sigs.count)
-                _log("security", "ids_flood_detected", remote_addr=src, details={
-                    "count":          count,
-                    "window_minutes": 5,
-                    "top_signature":  top_sig,
-                })
+                _log("security", "ids_flood_detected", remote_addr=src,
+                     severity="high",
+                     details={
+                         "count":          count,
+                         "window_minutes": 5,
+                         "top_signature":  top_sig,
+                     })
 
 
 # ---------------------------------------------------------------------------
@@ -614,12 +647,6 @@ def start_siem_collectors():
         "pf_seen":     set(),
         "alerted":     {},
     }
-
-    # Pre-load blocked domains for DNS collector
-    try:
-        _refresh_blocked_domains(shared_state)
-    except Exception:
-        pass
 
     collectors = [
         ("siem-ids",       _run_ids_collector,      shared_state),

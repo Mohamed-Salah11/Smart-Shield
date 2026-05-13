@@ -10,6 +10,11 @@ status_bp = Blueprint("status", __name__, url_prefix="/status")
 # VPN tunnel interfaces (tun*, gif*, gre*) are kept — they carry real user traffic.
 _VIRTUAL_IFACE_PREFIXES = frozenset(("lo", "pflog", "enc"))
 
+# Actions excluded from the SIEM live feed unconditionally.
+# page_view is admin GUI navigation — useful for access auditing but not for
+# security monitoring. Export still includes everything.
+_SIEM_EXCLUDED_ACTIONS = frozenset({"page_view"})
+
 
 # --------------------------------------------------
 # STATUS MAIN PAGE
@@ -225,28 +230,11 @@ def queues():
 @status_bp.route("/system-logs")
 @login_required
 def system_logs():
-    active_tab = (request.args.get("tab") or "system").lower()
-    if active_tab not in {"system", "sessions", "security", "browsing"}:
-        active_tab = "system"
-
-    all_events = tail_events(limit=300)
-    session_events = [e for e in all_events if e.get("category") == "session"]
-    system_events = [e for e in all_events if e.get("category") == "system"]
-    browsing_events = [e for e in all_events if e.get("category") == "browsing"]
-    security_events = [
-        e for e in all_events
-        if e.get("category") == "security"
-        or (e.get("category") == "session" and e.get("action") == "login_failed")
-    ]
-
-    return render_template(
-        "system_logs.html",
-        active_tab=active_tab,
-        system_events=system_events[:150],
-        session_events=session_events[:150],
-        browsing_events=browsing_events[:150],
-        security_events=security_events[:150],
-    )
+    from app.database import get_db
+    conn = get_db()
+    row = conn.execute("SELECT assigned_port FROM lan_config LIMIT 1").fetchone()
+    lan_iface = (row["assigned_port"] or "em1").strip() if row else "em1"
+    return render_template("system_logs.html", lan_iface=lan_iface)
 
 
 # --------------------------------------------------
@@ -282,13 +270,18 @@ def api_logs():
     since      = request.args.get("since",      "").strip()
     start_ts   = request.args.get("start_ts",   "").strip()
     end_ts     = request.args.get("end_ts",     "").strip()
-    limit      = min(int(request.args.get("limit", 100) or 100), 500)
-    cats_raw   = request.args.get("categories", "").strip()
-    sevs_raw   = request.args.get("severities", "").strip()
-    search     = request.args.get("search",     "").lower().strip()
+    try:
+        limit = min(int(request.args.get("limit", 100) or 100), 500)
+    except (ValueError, TypeError):
+        limit = 100
+    cats_raw    = request.args.get("categories", "").strip()
+    sevs_raw    = request.args.get("severities", "").strip()
+    actions_raw = request.args.get("actions",    "").strip()
+    search      = request.args.get("search",     "").lower().strip()
 
-    categories = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else None
-    severities = [s.strip() for s in sevs_raw.split(",") if s.strip()] if sevs_raw else None
+    categories    = [c.strip() for c in cats_raw.split(",")    if c.strip()] if cats_raw    else None
+    severities    = [s.strip() for s in sevs_raw.split(",")    if s.strip()] if sevs_raw    else None
+    action_filter = {a.strip() for a in actions_raw.split(",") if a.strip()} if actions_raw else None
 
     events = tail_events_since(
         after_ts=since,
@@ -298,6 +291,14 @@ def api_logs():
         start_ts=start_ts,
         end_ts=end_ts,
     )
+
+    # Exclude page_view and other non-security noise from the live SIEM feed.
+    # (Export endpoint still returns the full unfiltered log.)
+    events = [e for e in events if e.get("action") not in _SIEM_EXCLUDED_ACTIONS]
+
+    # Action-level filter (used by the Firewall category pill).
+    if action_filter:
+        events = [e for e in events if e.get("action") in action_filter]
 
     if search:
         def _matches(e):

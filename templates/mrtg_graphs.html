@@ -23,17 +23,43 @@
 
   <!-- MRTG status bar -->
   <div class="d-flex align-items-center flex-wrap gap-3 mb-3 px-1" style="font-size:.82rem;">
-    {% if mrtg_status.available %}
-      {% if mrtg_status.graphs_ok %}
-      <span class="text-success fw-semibold"><i class="fa-solid fa-circle-check me-1"></i>Graphs available</span>
-      {% else %}
-      <span class="text-warning fw-semibold"><i class="fa-solid fa-hourglass-half me-1"></i>No graphs yet — click Reinitialize MRTG to prime the first run</span>
+    {% if not mrtg_status.available %}
+      {# Binary not installed — show single error and nothing else #}
+      <span class="text-danger fw-semibold"><i class="fa-solid fa-circle-xmark me-1"></i>{{ mrtg_status.message }}</span>
+    {% else %}
+      {# Binary present — show one badge per problem so the user knows exactly what to fix #}
+
+      {% if mrtg_status.stale_lock %}
+      <span class="text-danger fw-semibold">
+        <i class="fa-solid fa-lock me-1"></i>Stale lock file detected — click <strong>Reinitialize MRTG</strong> to clear it
+      </span>
       {% endif %}
+
+      {% if not mrtg_status.cron_installed %}
+      <span class="text-warning fw-semibold">
+        <i class="fa-solid fa-clock me-1"></i>Cron job missing — click <strong>Regenerate Config</strong> to install it
+      </span>
+      {% endif %}
+
+      {% if not mrtg_status.workdir_ok %}
+      <span class="text-danger fw-semibold">
+        <i class="fa-solid fa-folder-open me-1"></i>Graph directory missing or not writable
+      </span>
+      {% endif %}
+
+      {% if mrtg_status.graphs_ok %}
+      <span class="text-success fw-semibold">
+        <i class="fa-solid fa-circle-check me-1"></i>Graphs available ({{ mrtg_status.graph_count }} files)
+      </span>
+      {% elif mrtg_status.cron_installed and not mrtg_status.stale_lock and mrtg_status.workdir_ok %}
+      <span class="text-warning fw-semibold">
+        <i class="fa-solid fa-hourglass-half me-1"></i>No graphs yet — waiting for first cron run (&#8804;&nbsp;5&nbsp;min)
+      </span>
+      {% endif %}
+
       {% if mrtg_status.last_run %}
       <span class="text-muted">Last config write: <code>{{ mrtg_status.last_run[:19] }}</code></span>
       {% endif %}
-    {% else %}
-      <span class="text-danger fw-semibold"><i class="fa-solid fa-circle-xmark me-1"></i>{{ mrtg_status.message }}</span>
     {% endif %}
     <span id="mrtg-countdown" class="ms-auto text-muted"></span>
   </div>
