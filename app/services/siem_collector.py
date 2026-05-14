@@ -70,10 +70,114 @@ def _save_offset(key: str, value: int):
 
 
 # ---------------------------------------------------------------------------
+# LAN interface / subnet auto-detection
+# ---------------------------------------------------------------------------
+
+_lan_info_cache: dict = {}
+
+
+def _get_lan_info() -> dict:
+    """Return LAN interface name, IP, and subnet from lan_config DB.
+    Falls back to em1 / 192.168.1.0/24 if not configured.
+    Cached for 5 minutes to avoid repeated DB hits per poll cycle.
+    """
+    import ipaddress
+    cache = _lan_info_cache
+    if cache.get("_ts") and (time.time() - cache["_ts"]) < 300:
+        return cache
+
+    defaults = {
+        "iface":  "em1",
+        "ip":     "192.168.1.1",
+        "subnet": "192.168.1.0/24",
+        "_ts":    time.time(),
+    }
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT assigned_port, ip_address, subnet_bits FROM lan_config LIMIT 1"
+        ).fetchone()
+        if row and (row["assigned_port"] or "").strip():
+            iface  = row["assigned_port"].strip()
+            lan_ip = (row["ip_address"] or "192.168.1.1").strip()
+            bits   = int(row["subnet_bits"] or 24)
+            net    = str(ipaddress.ip_interface(f"{lan_ip}/{bits}").network)
+            cache.update({"iface": iface, "ip": lan_ip,
+                          "subnet": net, "_ts": time.time()})
+            return cache
+    except Exception:
+        pass
+    cache.update(defaults)
+    return cache
+
+
+def _is_lan_ip(ip: str) -> bool:
+    """Return True if *ip* belongs to the configured LAN subnet."""
+    import ipaddress
+    try:
+        lan = _get_lan_info()
+        return ipaddress.ip_address(ip) in ipaddress.ip_network(lan["subnet"])
+    except Exception:
+        return False
+
+
+def _lookup_tracked_host(ip: str) -> dict:
+    """Return hostname + MAC from tracked_hosts for *ip*. Returns {} on miss."""
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT hostname, mac_address FROM tracked_hosts WHERE ip_address=? LIMIT 1",
+            (ip,),
+        ).fetchone()
+        return dict(row) if row else {}
+    except Exception:
+        return {}
+
+
+# ---------------------------------------------------------------------------
+# Port → service / severity mapping
+# ---------------------------------------------------------------------------
+
+_PORT_MAP: dict = {
+    22:    ("SSH",        "medium"),
+    23:    ("Telnet",     "high"),
+    3389:  ("RDP",        "high"),
+    5900:  ("VNC",        "high"),
+    1194:  ("OpenVPN",    "medium"),
+    500:   ("IPSec-IKE",  "medium"),
+    4500:  ("IPSec-NAT",  "medium"),
+    1701:  ("L2TP",       "medium"),
+    21:    ("FTP",        "medium"),
+    20:    ("FTP-Data",   "low"),
+    25:    ("SMTP",       "low"),
+    587:   ("SMTP-TLS",   "low"),
+    110:   ("POP3",       "low"),
+    143:   ("IMAP",       "low"),
+    3306:  ("MySQL",      "high"),
+    5432:  ("PostgreSQL", "high"),
+    27017: ("MongoDB",    "high"),
+    6379:  ("Redis",      "high"),
+    1433:  ("MSSQL",      "high"),
+    445:   ("SMB",        "high"),
+    139:   ("NetBIOS",    "high"),
+    135:   ("RPC",        "medium"),
+    53:    ("DNS",        "info"),
+    80:    ("HTTP",       "info"),
+    443:   ("HTTPS",      "info"),
+    8080:  ("HTTP-Alt",   "info"),
+    8443:  ("HTTPS-Alt",  "info"),
+}
+
+# IDS severity: Suricata integer 1–4 → string
+_IDS_SEV = {1: "critical", 2: "high", 3: "medium", 4: "low"}
+
+
+# ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _log(category: str, action: str, remote_addr: str = "", details: dict = None):
+def _log(category: str, action: str, remote_addr: str = "",
+         details: dict = None, severity: str = "info"):
     """Write one SIEM event to the audit log. Never raises."""
     try:
         from app.audit_log import log_event
@@ -83,6 +187,7 @@ def _log(category: str, action: str, remote_addr: str = "", details: dict = None
             username="siem",
             remote_addr=remote_addr,
             details=details or {},
+            severity=severity,
         )
     except Exception:
         pass
@@ -147,19 +252,25 @@ def _collect_ids_alerts(state: dict):
         if evt.get("event_type") != "alert":
             continue
 
-        alert = evt.get("alert", {})
+        alert  = evt.get("alert", {})
         src_ip = evt.get("src_ip", "")
+        sev    = _IDS_SEV.get(int(alert.get("severity") or 4), "low")
 
-        _log("ids", "ids_alert", remote_addr=src_ip, details={
+        # Enrich with hostname if src is a LAN device
+        host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
+
+        _log("ids", "ids_alert", remote_addr=src_ip, severity=sev, details={
             "src_ip":    src_ip,
             "src_port":  evt.get("src_port"),
             "dest_ip":   evt.get("dest_ip", ""),
             "dest_port": evt.get("dest_port"),
             "proto":     evt.get("proto", ""),
             "signature": alert.get("signature", ""),
-            "severity":  alert.get("severity"),
+            "severity":  sev,
             "category":  alert.get("category", ""),
             "action":    alert.get("action", ""),
+            "hostname":  host.get("hostname", ""),
+            "mac":       host.get("mac_address", ""),
         })
 
 
@@ -218,18 +329,23 @@ def _collect_dhcp_events(state: dict):
         seen.add(key)
         _log("connection", "dhcp_lease_assigned", remote_addr=lease["ip"], details=lease)
 
-        # Update tracked_hosts as a side-effect
+        # Update tracked_hosts as a side-effect.
+        # The unique index is on (interface_type, ip_address) — not just ip_address.
         try:
             from app.database import get_db
             db = get_db()
             db.execute(
                 """
-                INSERT INTO tracked_hosts (ip_address, mac_address, hostname,
-                    interface_type, discovered_via, first_seen, last_seen)
+                INSERT INTO tracked_hosts
+                    (ip_address, mac_address, hostname,
+                     interface_type, discovered_via, first_seen, last_seen)
                 VALUES (?, ?, ?, 'LAN', 'dhcp', datetime('now'), datetime('now'))
-                ON CONFLICT(ip_address) DO UPDATE SET
-                    last_seen=datetime('now'),
-                    hostname=excluded.hostname
+                ON CONFLICT(interface_type, ip_address) DO UPDATE SET
+                    last_seen   = datetime('now'),
+                    mac_address = excluded.mac_address,
+                    hostname    = CASE WHEN excluded.hostname != ''
+                                       THEN excluded.hostname
+                                       ELSE tracked_hosts.hostname END
                 """,
                 (lease["ip"], lease["mac"], lease["hostname"] or ""),
             )
@@ -243,18 +359,35 @@ def _collect_dhcp_events(state: dict):
 # ---------------------------------------------------------------------------
 
 def _run_dns_collector(state: dict):
+    _refresh_blocked_domains(state)          # initial load at startup
+    _refresh_counter = 0
     while True:
         try:
             _collect_dns_queries(state)
         except Exception:
             pass
+        _refresh_counter += 1
+        if _refresh_counter >= 20:           # every 20 × 15s = 5 minutes
+            try:
+                _refresh_blocked_domains(state)
+            except Exception:
+                pass
+            _refresh_counter = 0
         time.sleep(15)
 
 
-# Unbound query log format:
-# [timestamp] unbound[pid:tid] info: 192.168.1.5 A example.com. NOERROR 0.001234
+# Unbound query log format varies by version:
+#   Old: info: 192.168.1.5 A example.com. NOERROR 0.001234
+#   New: info: 192.168.1.5#12345 A example.com. IN NOERROR 0.001234
+# group1=client_ip  group2=first-word  group3=second-word  group4=rcode-or-class
+# _collect_dns_queries determines name vs qtype from the captured groups.
 _UNBOUND_QUERY_RE = re.compile(
-    r'info:\s+([\d.:a-fA-F]+)\s+(\w+)\s+([\w.\-]+?\.?)\s+(\w+)'
+    r'info:\s+'
+    r'([\d.a-fA-F:]+)(?:#\d+)?'    # group1: client_ip (strip optional #port)
+    r'\s+([\w.\-]+\.?)'             # group2: first token (qtype or query_name)
+    r'\s+([\w.\-]+\.?)'             # group3: second token
+    r'(?:\s+\w+)?'                  # optional third token (class IN, or another field)
+    r'\s+(\w+)'                     # group4: rcode (NOERROR, NXDOMAIN, SERVFAIL…)
 )
 
 
@@ -275,10 +408,17 @@ def _collect_dns_queries(state: dict):
         if not m:
             continue
 
-        client_ip   = m.group(1)
-        qtype       = m.group(2)
-        query_name  = m.group(3).rstrip(".")
-        response    = m.group(4)
+        client_ip = m.group(1)
+        g2, g3    = m.group(2), m.group(3)
+        response  = m.group(4)
+
+        # Determine which token is the qtype vs the query name.
+        # Qtypes are short all-uppercase words (A, AAAA, MX, TXT, PTR, NS…).
+        # Query names contain dots and mixed case.
+        if re.match(r'^[A-Z]{1,10}$', g2):
+            qtype, query_name = g2, g3.rstrip(".")
+        else:
+            query_name, qtype = g2.rstrip("."), g3
 
         is_blocked = query_name in blocked or response in ("NXDOMAIN", "SERVFAIL")
 
@@ -333,13 +473,14 @@ def _collect_pf_connections(state: dict):
         import subprocess
         result = subprocess.run(
             ["pfctl", "-s", "states"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=10,
         )
         output = result.stdout or ""
     except Exception:
         return
 
-    current: set = set()
+    lan        = _get_lan_info()
+    current:  set = set()
     previous: set = state.get("pf_seen", set())
 
     for line in output.splitlines():
@@ -347,20 +488,50 @@ def _collect_pf_connections(state: dict):
         if not m:
             continue
         proto, src_ip, src_port, dst_ip, dst_port = (
-            m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+            m.group(1), m.group(2), m.group(3), m.group(4), m.group(5),
         )
+
+        # Only track connections originating from LAN devices
+        if not _is_lan_ip(src_ip):
+            continue
+
         key = (proto, src_ip, src_port, dst_ip, dst_port)
         current.add(key)
 
-        # Only log connections that weren't in the previous cycle
         if key not in previous:
-            _log("connection", "pf_new_conn", remote_addr=src_ip, details={
-                "proto":    proto,
-                "src_ip":   src_ip,
-                "src_port": int(src_port),
-                "dst_ip":   dst_ip,
-                "dst_port": int(dst_port),
-            })
+            try:
+                dport_int = int(dst_port)
+            except ValueError:
+                dport_int = 0
+            service, sev = _PORT_MAP.get(dport_int, ("", "info"))
+            host = _lookup_tracked_host(src_ip)
+            details = {
+                "proto":      proto,
+                "src_ip":     src_ip,
+                "src_port":   int(src_port),
+                "dst_ip":     dst_ip,
+                "dst_port":   dport_int,
+                "service":    service,
+                "hostname":   host.get("hostname", ""),
+                "mac":        host.get("mac_address", ""),
+                "interface":  lan["iface"],
+                "lan_subnet": lan["subnet"],
+            }
+            _log("connection", "pf_new_conn", remote_addr=src_ip,
+                 severity=sev, details=details)
+
+            # Raise a separate security alert for insecure/dangerous protocols
+            if dport_int in (23, 21, 5900, 139):  # Telnet, FTP, VNC, NetBIOS
+                _log("security", "insecure_protocol_detected",
+                     remote_addr=src_ip, severity="high",
+                     details={
+                         "protocol":  service or str(dport_int),
+                         "src":       f"{src_ip}:{src_port}",
+                         "dst":       f"{dst_ip}:{dst_port}",
+                         "hostname":  host.get("hostname", ""),
+                         "mac":       host.get("mac_address", ""),
+                         "interface": lan["iface"],
+                     })
 
     state["pf_seen"] = current
 
@@ -411,11 +582,13 @@ def _detect_anomalies(state: dict):
             key = f"brute_force:{ip}"
             if key not in alerted:
                 alerted[key] = now_ts
-                _log("security", "brute_force_detected", remote_addr=ip, details={
-                    "count":          count,
-                    "window_minutes": 5,
-                    "target":         "admin login",
-                })
+                _log("security", "brute_force_detected", remote_addr=ip,
+                     severity="high",
+                     details={
+                         "count":          count,
+                         "window_minutes": 5,
+                         "target":         "admin login",
+                     })
 
     # ── IDS flood: >10 ids_alert from same src_ip in 5 min ──
     ids_counts: dict = {}
@@ -444,11 +617,13 @@ def _detect_anomalies(state: dict):
                 sigs = ids_sigs.get(src, [])
                 if sigs:
                     top_sig = max(set(sigs), key=sigs.count)
-                _log("security", "ids_flood_detected", remote_addr=src, details={
-                    "count":          count,
-                    "window_minutes": 5,
-                    "top_signature":  top_sig,
-                })
+                _log("security", "ids_flood_detected", remote_addr=src,
+                     severity="high",
+                     details={
+                         "count":          count,
+                         "window_minutes": 5,
+                         "top_signature":  top_sig,
+                     })
 
 
 # ---------------------------------------------------------------------------
@@ -472,12 +647,6 @@ def start_siem_collectors():
         "pf_seen":     set(),
         "alerted":     {},
     }
-
-    # Pre-load blocked domains for DNS collector
-    try:
-        _refresh_blocked_domains(shared_state)
-    except Exception:
-        pass
 
     collectors = [
         ("siem-ids",       _run_ids_collector,      shared_state),

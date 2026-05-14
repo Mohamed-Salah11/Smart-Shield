@@ -68,9 +68,10 @@ def _policy_context(source) -> dict:
     if policy != "content":
         policy = ""
     return {
-        "policy": policy,
-        "domain": (source.get("domain") or "").strip().lower(),
-        "orig_url": (source.get("url") or source.get("orig_url") or "").strip(),
+        "policy":        policy,
+        "domain":        (source.get("domain")        or "").strip().lower(),
+        "orig_url":      (source.get("url") or source.get("orig_url") or "").strip(),
+        "back_template": (source.get("back_template") or "login"),
     }
 
 
@@ -160,7 +161,13 @@ def auth():
                                           duration_minutes=_duration)
 
     if not result.get("ok"):
-        # Decide which template to return to (block page or generic login page)
+        from app.audit_log import log_event as _log_event
+        _log_event(
+            category="security", action="captive_portal_login_failed",
+            remote_addr=ip, severity="medium",
+            details={"auth_type": auth_type, "mac": mac,
+                     "reason": result.get("message", "Authentication failed")},
+        )
         back_template = request.form.get("back_template", "login")
         if back_template == "block":
             return render_template(
@@ -174,6 +181,13 @@ def auth():
             **context,
         )
 
+    from app.audit_log import log_event as _log_event
+    _log_event(
+        category="session", action="captive_portal_login_success",
+        remote_addr=ip, severity="info",
+        details={"auth_type": auth_type, "mac": mac,
+                 "username": (request.form.get("username") or f"voucher:{request.form.get('voucher_code','?')}")},
+    )
     session["portal_authenticated"] = True
     session["content_filter_authenticated"] = True
     session["portal_ip"] = ip
@@ -219,12 +233,17 @@ def block():
                 if not orig_url:
                     orig_url = request.url
 
-    # Already authenticated — let the user through
+    # When DNS redirects without passing the original URL, reconstruct from domain
+    if not orig_url and domain:
+        orig_url = f"http://{domain}"
+
     context = {"policy": "content", "domain": domain, "orig_url": orig_url}
     if session.get("content_filter_authenticated") or session.get("portal_authenticated"):
         return render_template("portal/success.html", **context)
 
-    return redirect(url_for("portal.login", policy="content", domain=domain, url=orig_url))
+    # Render the block page directly so users see the "Proceed to Login" button.
+    # (Previously this redirected to /portal/, losing the block-page context.)
+    return render_template("portal/block.html", authenticated=False, **context)
 
 
 @portal_bp.route("/logout", methods=["GET", "POST"])

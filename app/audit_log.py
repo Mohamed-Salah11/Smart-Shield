@@ -20,24 +20,26 @@ def _ensure_parent_dir(path: str):
         os.makedirs(parent_dir, exist_ok=True)
 
 
-def log_event(category: str, action: str, username=None, remote_addr=None, details=None):
+def log_event(category: str, action: str, username=None, remote_addr=None,
+              details=None, severity: str = "info"):
+    """Append one audit event to the log file. Never raises."""
     try:
         path = _audit_log_path()
         _ensure_parent_dir(path)
 
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "category": category,
-            "action": action,
-            "username": username or "anonymous",
+            "timestamp":   datetime.now(timezone.utc).isoformat(),
+            "severity":    severity,
+            "category":    category,
+            "action":      action,
+            "username":    username or "anonymous",
             "remote_addr": remote_addr or "",
-            "details": details or {},
+            "details":     details or {},
         }
 
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=True) + "\n")
     except OSError:
-        # Never block the app flow if logging path permissions are missing.
         return False
     return True
 
@@ -70,17 +72,26 @@ def tail_events(limit=200, category=None):
     return list(reversed(events[-limit:]))
 
 
-def tail_events_since(after_ts: str = "", limit: int = 200, categories=None) -> list:
+def tail_events_since(after_ts: str = "", limit: int = 200,
+                      categories=None, severities=None,
+                      start_ts: str = "", end_ts: str = "") -> list:
     """
     Return events whose timestamp is strictly greater than `after_ts`.
     Results are ordered newest-first.  Pass after_ts="" to get the most
     recent `limit` events across all time.
+
+    Optional filters:
+      categories  — list of category strings to include
+      severities  — list of severity strings to include ("critical","high",...)
+      start_ts    — ISO-8601 lower bound (inclusive)
+      end_ts      — ISO-8601 upper bound (inclusive)
     """
     path = _audit_log_path()
     if not os.path.exists(path):
         return []
 
     cat_set = set(categories) if categories else None
+    sev_set = set(severities) if severities else None
     events = []
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -92,9 +103,16 @@ def tail_events_since(after_ts: str = "", limit: int = 200, categories=None) -> 
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if after_ts and entry.get("timestamp", "") <= after_ts:
+                ts = entry.get("timestamp", "")
+                if after_ts and ts <= after_ts:
+                    continue
+                if start_ts and ts < start_ts:
+                    continue
+                if end_ts and ts > end_ts:
                     continue
                 if cat_set and entry.get("category") not in cat_set:
+                    continue
+                if sev_set and entry.get("severity", "info") not in sev_set:
                     continue
                 events.append(entry)
     except OSError:
@@ -109,11 +127,13 @@ def tail_events_since(after_ts: str = "", limit: int = 200, categories=None) -> 
 def log_stats() -> dict:
     """
     Return per-category event counts for the entire log file.
-    Also includes a special 'login_failed' key for security dashboards.
+    Also includes special keys: _total, _login_failed, _critical, _high.
     """
     path = _audit_log_path()
     stats: dict = {}
     failed_logins = 0
+    critical = 0
+    high = 0
     total = 0
     if not os.path.exists(path):
         return stats
@@ -132,8 +152,15 @@ def log_stats() -> dict:
                 total += 1
                 if entry.get("action") == "login_failed":
                     failed_logins += 1
+                sev = entry.get("severity", "info")
+                if sev == "critical":
+                    critical += 1
+                elif sev == "high":
+                    high += 1
     except OSError:
         pass
-    stats["_total"] = total
+    stats["_total"]        = total
     stats["_login_failed"] = failed_logins
+    stats["_critical"]     = critical
+    stats["_high"]         = high
     return stats

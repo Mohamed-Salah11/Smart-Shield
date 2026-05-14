@@ -524,11 +524,21 @@ def get_ids_status(conn=None) -> dict:
 # Enable / disable
 # ---------------------------------------------------------------------------
 
+def _write_enabled(conn, enabled: bool) -> None:
+    """Persist the IDS enabled state to the DB. Called only after the service
+    action succeeds so the DB always reflects what is actually running."""
+    conn.execute(
+        "UPDATE ids_config SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+        (1 if enabled else 0,),
+    )
+    conn.commit()
+
+
 def toggle_ids(conn, enabled: bool) -> dict:
     """
     Enable or disable Suricata.
-    When enabling in IPS mode, additional safety checks are performed.
-    Validates YAML via ``suricata -T`` before applying on FreeBSD.
+    DB is updated AFTER the service action succeeds so enabled state in the DB
+    always matches whether Suricata is actually running.
     """
     cfg = _cfg(conn)
     mode = (cfg.get("mode") or "ids").lower()
@@ -536,39 +546,38 @@ def toggle_ids(conn, enabled: bool) -> dict:
     # IPS mode safety gate
     if enabled and mode == "ips":
         safety_warnings = validate_ips_safety(conn)
-        # The first warning is always present — it's informational.
-        # Only treat it as a hard error if the interface is also missing.
         hard_errors = [w for w in safety_warnings if "requires" in w.lower()]
         if hard_errors:
             return {"ok": False, "rolled_back": False, "message": " | ".join(hard_errors)}
 
-    # Update DB
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE ids_config SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
-        (1 if enabled else 0,),
-    )
-    conn.commit()
-
+    # Non-FreeBSD: update DB directly (no service to manage)
     if not sys.platform.startswith("freebsd"):
+        _write_enabled(conn, enabled)
         return {"ok": True, "rolled_back": False,
                 "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
 
     if enabled:
         ips_mode = (mode == "ips")
-        conf_text  = generate_suricata_yaml(conn)
-        ok, err    = validate_suricata_yaml(conf_text)
+
+        # Validate and write config BEFORE touching the service or the DB
+        conf_text = generate_suricata_yaml(conn)
+        ok, err   = validate_suricata_yaml(conf_text)
         if not ok:
             return {"ok": False, "rolled_back": False,
                     "message": f"Suricata YAML validation failed: {err}"}
         write_result = write_suricata_config(conn)
         if not write_result["ok"]:
             return {**write_result, "rolled_back": False}
+
+        # Start the service
         sysrc_set("suricata_enable", "YES")
         r = service_action(_SERVICE_NAME, "restart")
         if not r["ok"]:
+            # Service failed — revert rc.conf and config file; leave DB as disabled
+            sysrc_set("suricata_enable", "NO")
             from app.services.config_file_utils import rollback_config
             rb = rollback_config(_SURICATA_CONF_PATH)
+
             # IPS→IDS safe fallback
             if ips_mode:
                 ids_conf = generate_suricata_yaml(conn, force_ids_mode=True)
@@ -577,8 +586,10 @@ def toggle_ids(conn, enabled: bool) -> dict:
                     try:
                         from app.services.config_file_utils import atomic_write
                         atomic_write(_SURICATA_CONF_PATH, ids_conf, mode=0o644)
+                        sysrc_set("suricata_enable", "YES")
                         r2 = service_action(_SERVICE_NAME, "restart")
                         if r2["ok"]:
+                            _write_enabled(conn, True)   # ← DB updated only on success
                             return {
                                 **r2,
                                 "rolled_back": False,
@@ -587,13 +598,21 @@ def toggle_ids(conn, enabled: bool) -> dict:
                             }
                     except Exception:
                         pass
+                sysrc_set("suricata_enable", "NO")
+
             return {"ok": False, "rolled_back": rb.get("ok", False),
                     "message": r.get("message", "restart failed"),
                     "rollback_message": rb.get("message", "")}
+
+        # Service started successfully — NOW persist enabled=1
+        _write_enabled(conn, True)
         return {**r, "rolled_back": False}
+
     else:
+        # Disabling: stop the service, then update DB (stop failures are non-fatal)
         sysrc_set("suricata_enable", "NO")
         r = service_action(_SERVICE_NAME, "stop")
+        _write_enabled(conn, False)
         return {**r, "rolled_back": False}
 
 
