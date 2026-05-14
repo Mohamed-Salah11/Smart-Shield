@@ -40,6 +40,18 @@ def _validate_rule(data: dict) -> str | None:
             validate_description(desc)
         except ValueError as exc:
             return str(exc)
+    # PF constraint: port filtering requires an explicit protocol
+    proto_val = (data.get("protocol") or "").strip().lower()
+    has_port  = bool(
+        (data.get("dest_port") or "").strip() or
+        (data.get("source_port") or "").strip()
+    )
+    if has_port and proto_val in ("", "any", "all"):
+        return "Port filtering requires an explicit protocol (e.g. tcp, udp, tcp/udp)"
+    # PF constraint: ICMP and other portless protocols cannot use port filtering
+    _portless = {"icmp", "icmpv6", "ipv6-icmp", "esp", "ah", "gre"}
+    if has_port and proto_val in _portless:
+        return f"Protocol '{proto_val}' does not support port filtering — remove the port values"
     return None
 
 firewall_bp = Blueprint("firewall", __name__, url_prefix="/firewall")
@@ -129,7 +141,23 @@ def add_floating_rule():
         ))
         
         db.commit()
-        return jsonify({"success": True, "id": cursor.lastrowid})
+        new_id = cursor.lastrowid
+        from app.audit_log import log_event
+        log_event(
+            category="system", action="firewall_rule_added", severity="medium",
+            username=session.get("username"), remote_addr=request.remote_addr,
+            details={
+                "rule_type":   "floating",
+                "rule_id":     new_id,
+                "action":      data.get("action", "pass"),
+                "protocol":    data.get("protocol", "any"),
+                "source":      data.get("source", "any"),
+                "destination": data.get("destination", "any"),
+                "dest_port":   data.get("dest_port", ""),
+                "description": data.get("description", ""),
+            },
+        )
+        return jsonify({"success": True, "id": new_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -245,8 +273,19 @@ def delete_floating_rule(rule_id):
     try:
         db = get_db()
         cursor = db.cursor()
+        row = cursor.execute(
+            "SELECT action, protocol, source, destination, dest_port, description FROM firewall_rules_floating WHERE id=?",
+            (rule_id,)
+        ).fetchone()
         cursor.execute("DELETE FROM firewall_rules_floating WHERE id=?", (rule_id,))
         db.commit()
+        from app.audit_log import log_event
+        log_event(
+            category="system", action="firewall_rule_deleted", severity="medium",
+            username=session.get("username"), remote_addr=request.remote_addr,
+            details={"rule_type": "floating", "rule_id": rule_id,
+                     **(dict(row) if row else {})},
+        )
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -412,12 +451,22 @@ def update_wan_rule(rule_id):
 @api_permission_required("api.firewall.edit")
 def delete_wan_rule(rule_id):
     """Delete a WAN rule"""
-    db = None
     try:
         db = get_db()
         cursor = db.cursor()
+        row = cursor.execute(
+            "SELECT action, protocol, source, destination, dest_port, description FROM firewall_rules_wan WHERE id=?",
+            (rule_id,)
+        ).fetchone()
         cursor.execute("DELETE FROM firewall_rules_wan WHERE id=?", (rule_id,))
         db.commit()
+        from app.audit_log import log_event
+        log_event(
+            category="system", action="firewall_rule_deleted", severity="medium",
+            username=session.get("username"), remote_addr=request.remote_addr,
+            details={"rule_type": "wan", "rule_id": rule_id,
+                     **(dict(row) if row else {})},
+        )
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -590,8 +639,19 @@ def delete_lan_rule(rule_id):
     try:
         db = get_db()
         cursor = db.cursor()
+        row = cursor.execute(
+            "SELECT action, protocol, source, destination, dest_port, description FROM firewall_rules_lan WHERE id=?",
+            (rule_id,)
+        ).fetchone()
         cursor.execute("DELETE FROM firewall_rules_lan WHERE id=?", (rule_id,))
         db.commit()
+        from app.audit_log import log_event
+        log_event(
+            category="system", action="firewall_rule_deleted", severity="medium",
+            username=session.get("username"), remote_addr=request.remote_addr,
+            details={"rule_type": "lan", "rule_id": rule_id,
+                     **(dict(row) if row else {})},
+        )
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

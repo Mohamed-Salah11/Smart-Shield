@@ -31,17 +31,29 @@ Guidelines:
 - Keep answers concise and actionable. Use bullet points for lists.
 - If a tool fails or returns an error, tell the user and suggest what to check manually.
 
-Agent capabilities (require user confirmation before executing):
+Agent capabilities:
 - You can block or unblock domains via the DNS filter using block_domain / unblock_domain.
 - You can add firewall block rules using add_firewall_block_rule.
-- When a user asks you to perform a write action (block a domain, add a rule, etc.):
-  1. Respond with a clear numbered list of EXACTLY what you will do, where, and what the effect will be.
-  2. End with "Shall I apply this?" and wait for the user to confirm.
-  3. ONLY after the user says yes (e.g. "yes", "do it", "go ahead") — call the tool.
+
+How-to questions (IMPORTANT):
+- For ANY question containing "how to", "steps to", "guide me", "show me how", "how do I",
+  "what are the steps", "walk me through", or similar phrasing:
+  Call get_firewall_help for the most relevant section and return the manual UI steps.
+  NEVER call write tools (block_domain, unblock_domain, add_firewall_block_rule) for how-to
+  questions. Answer with the steps only.
+
+When asked to PERFORM an action (block a domain, add a rule, unblock something, etc.):
+  1. Call get_firewall_help for the relevant section to retrieve the manual UI steps.
+  2. Present those steps as a clear numbered list tailored to the specific request
+     (e.g. substitute the actual domain name, port, or IP into the steps).
+  3. End with exactly: "Would you like me to apply this for you automatically?"
+  4. ONLY after the user replies with explicit confirmation (yes, do it, go ahead, apply,
+     sure, please, ok, yeah, confirm) — call the write tool.
      The system will then show an approval card before the change is applied.
-  Do NOT call write tools without explicit user confirmation first.
-- Use get_firewall_help when users ask how to configure, navigate, or find any section of
-  this firewall's UI. Always prefer this tool over guessing at page names or menu paths.
+  NEVER call a write tool on the first request. Always give manual steps + ask first.
+
+- Use get_app_structure when asked what features, pages, or sections SmartShield has,
+  or when the user asks "what can you do" / "what does this system have".
 
 Content policy:
 - Filter rules have two actions: 'block' (Redirect to block page — blocks ALL clients) and
@@ -231,6 +243,16 @@ TOOLS = [
             "required": ["section"],
         },
     },
+    {
+        "name": "get_app_structure",
+        "description": (
+            "Get the full list of pages, features, and sections available in this SmartShield "
+            "installation. Use when the user asks what this system can do, what pages/sections "
+            "exist, or what features are available. Returns all registered URL routes and a "
+            "summary of each guide section."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
     # ── Write / action tools (require user confirmation) ──────────────────
     {
         "name": "block_domain",
@@ -353,6 +375,8 @@ def _execute_tool(conn, name: str, args: dict) -> Any:
             return _tool_search_web(args.get("query", ""), conn=conn)
         if name == "get_firewall_help":
             return _tool_firewall_help(args)
+        if name == "get_app_structure":
+            return _tool_app_structure()
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         return {"error": str(exc)}
@@ -790,16 +814,116 @@ _FIREWALL_GUIDE = {
 def _tool_firewall_help(args: dict) -> dict:
     """Return UI guidance for a Smart Shield section by fuzzy name match."""
     section = (args.get("section") or "").lower().strip()
+
+    # Pass 1: exact key / substring match
     for key, data in _FIREWALL_GUIDE.items():
         if key == section or key in section or section in key:
             return {"section": key, "found": True, **data}
+
+    # Pass 2: keyword search across description and common_tasks text
+    if section:
+        words = set(section.split())
+        best_key, best_score = None, 0
+        for key, data in _FIREWALL_GUIDE.items():
+            haystack = (
+                data.get("description", "") + " " +
+                " ".join(data.get("common_tasks", [])) + " " +
+                data.get("title", "")
+            ).lower()
+            score = sum(1 for w in words if w in haystack)
+            if score > best_score:
+                best_key, best_score = key, score
+        if best_score > 0 and best_key:
+            return {"section": best_key, "found": True, **_FIREWALL_GUIDE[best_key]}
+
+    # Pass 3: return ALL guide sections so the model always has enough context
     return {
         "found": False,
-        "message": f"No guide found for '{section}'. Available sections:",
-        "sections": [
-            {"key": k, "title": v["title"], "url": v["url"]}
+        "message": (
+            f"No single section matched '{section}'. "
+            "Full guide returned — pick the most relevant section(s)."
+        ),
+        "all_sections": {
+            k: {"title": v["title"], "url": v["url"],
+                "description": v["description"],
+                "common_tasks": v.get("common_tasks", [])}
             for k, v in _FIREWALL_GUIDE.items()
-        ],
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Manual-steps helpers (Fix 1 & 2)
+# ---------------------------------------------------------------------------
+
+def _format_manual_offer(tool: str, args: dict, help_data: dict) -> str:
+    """
+    Build the "here's how to do it manually + offer" message shown before the
+    approval card.  Returns a markdown-formatted string.
+    """
+    # Intro line tailored per write tool
+    if tool == "block_domain":
+        domain = args.get("domain", "the domain")
+        intro = f"Here's how to block **{domain}** manually through the UI:"
+    elif tool == "unblock_domain":
+        domain = args.get("domain", "the domain")
+        intro = f"Here's how to unblock **{domain}** manually through the UI:"
+    elif tool == "add_firewall_block_rule":
+        desc = args.get("description") or "this traffic"
+        intro = f"Here's how to add a firewall block rule for **{desc}** manually:"
+    else:
+        intro = "Here's how to do this manually:"
+
+    # Build numbered step list from the guide's common_tasks
+    tasks = help_data.get("common_tasks", [])
+    if not tasks and "all_sections" in help_data:
+        # Fallback: pick best-matching section from the full dump
+        for sec_data in help_data["all_sections"].values():
+            if sec_data.get("common_tasks"):
+                tasks = sec_data["common_tasks"]
+                break
+
+    if tasks:
+        steps = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(tasks))
+        url   = help_data.get("url", "")
+        url_hint = f"\n\n*(Navigate to: **{url}**)*" if url else ""
+        body  = steps + url_hint
+    else:
+        body = "Go to the relevant section in the SmartShield UI and follow the on-screen options."
+
+    return f"{intro}\n\n{body}\n\n**Would you like me to apply this for you automatically?**"
+
+
+def _tool_app_structure() -> dict:
+    """Return all registered page routes grouped by blueprint/section."""
+    try:
+        from flask import current_app
+        pages = []
+        for rule in current_app.url_map.iter_rules():
+            url = rule.rule
+            # Skip static files and internal API-only sub-paths
+            if "/static/" in url or "/<" in url:
+                continue
+            methods = sorted(m for m in rule.methods if m not in ("HEAD", "OPTIONS"))
+            if "GET" in methods:
+                pages.append({"url": url, "endpoint": rule.endpoint})
+        pages.sort(key=lambda x: x["url"])
+    except Exception as exc:
+        pages = [{"error": str(exc)}]
+
+    guide_sections = [
+        {
+            "key":         k,
+            "title":       v["title"],
+            "url":         v["url"],
+            "description": v["description"],
+        }
+        for k, v in _FIREWALL_GUIDE.items()
+    ]
+    return {
+        "route_count":    len(pages),
+        "routes":         pages,
+        "guide_sections": guide_sections,
     }
 
 
@@ -988,7 +1112,21 @@ def process_chat(conn, messages: list, username: str) -> dict:
                 tool_choice="auto",
             )
         except Exception as exc:
-            return {"ok": False, "message": f"Groq API error: {exc}"}
+            # Llama sometimes generates malformed XML-style function calls.
+            # Retry once without tools so the model falls back to plain text.
+            exc_str = str(exc)
+            if "tool_use_failed" in exc_str or (
+                "400" in exc_str and "function" in exc_str.lower()
+            ):
+                try:
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=internal_messages,
+                    )
+                except Exception as exc2:
+                    return {"ok": False, "message": f"Groq API error: {exc2}"}
+            else:
+                return {"ok": False, "message": f"Groq API error: {exc}"}
 
         msg = response.choices[0].message
 
@@ -1004,22 +1142,57 @@ def process_chat(conn, messages: list, username: str) -> dict:
         )
         if write_call:
             args = json.loads(write_call.function.arguments)
-            summary, detail = _describe_pending_action(write_call.function.name, args)
-            agent_text = (
-                f"I can {summary.lower()}. Please review the details below and approve or cancel."
-            )
-            updated = list(messages) + [{"role": "assistant", "content": agent_text}]
-            return {
-                "ok": True,
-                "reply": agent_text,
-                "messages": updated,
-                "pending_action": {
-                    "tool":    write_call.function.name,
-                    "args":    args,
-                    "summary": summary,
-                    "detail":  detail,
-                },
+
+            # Determine whether the user has already seen manual steps and confirmed.
+            last_user_msg = next(
+                (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
+            ).lower()
+            last_asst_msg = next(
+                (m["content"] for m in reversed(messages) if m["role"] == "assistant"), ""
+            ).lower()
+
+            already_offered = any(phrase in last_asst_msg for phrase in [
+                "would you like me to apply",
+                "would you like me to do this",
+                "apply this for you automatically",
+                "do this for you automatically",
+            ])
+            _confirmation_kw = {
+                "yes", "yep", "yeah", "sure", "ok", "okay", "do it", "go ahead",
+                "please do", "apply it", "apply", "go for it", "confirm", "please",
             }
+            user_confirmed = any(kw in last_user_msg for kw in _confirmation_kw)
+
+            if already_offered and user_confirmed:
+                # User confirmed after seeing manual steps → show approval card
+                summary, detail = _describe_pending_action(write_call.function.name, args)
+                agent_text = (
+                    f"I can {summary.lower()}. Please review the details below and approve or cancel."
+                )
+                updated = list(messages) + [{"role": "assistant", "content": agent_text}]
+                return {
+                    "ok": True,
+                    "reply": agent_text,
+                    "messages": updated,
+                    "pending_action": {
+                        "tool":    write_call.function.name,
+                        "args":    args,
+                        "summary": summary,
+                        "detail":  detail,
+                    },
+                }
+            else:
+                # First mention → give manual steps and ask if user wants AI to apply
+                _section_map = {
+                    "block_domain":           "content_policy",
+                    "unblock_domain":         "content_policy",
+                    "add_firewall_block_rule": "firewall",
+                }
+                section   = _section_map.get(write_call.function.name, "firewall")
+                help_data = _tool_firewall_help({"section": section})
+                reply     = _format_manual_offer(write_call.function.name, args, help_data)
+                updated   = list(messages) + [{"role": "assistant", "content": reply}]
+                return {"ok": True, "reply": reply, "messages": updated}
 
         # Execute all read-only tool calls and feed results back into the message chain.
         internal_messages.append(msg)  # assistant turn that contains tool_calls

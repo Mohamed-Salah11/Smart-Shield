@@ -76,37 +76,41 @@ def ids_save():
     conn = get_db()
     cur  = conn.cursor()
 
-    enabled      = 1 if request.form.get("enabled") else 0
-    mode         = request.form.get("mode", "ids")
-    interface    = request.form.get("interface", "")
-    home_net     = request.form.get("home_net", "192.168.0.0/16").strip()
-    ext_net      = request.form.get("external_net", "!$HOME_NET").strip()
-    eve_json     = 1 if request.form.get("eve_json_enabled") else 0
-    fast_log     = 1 if request.form.get("fast_log_enabled") else 0
-    block_list   = 1 if request.form.get("block_list_enabled") else 0
-    max_pending  = int(request.form.get("max_pending_packets") or 1024)
+    # Read current enabled state from DB — the config form does NOT own the
+    # enabled column (that belongs exclusively to the toggle API).
+    row             = conn.execute("SELECT enabled FROM ids_config WHERE id=1").fetchone()
+    current_enabled = (row["enabled"] if row else 0)
+
+    mode        = request.form.get("mode", "ids")
+    interface   = request.form.get("interface", "")
+    home_net    = request.form.get("home_net", "192.168.0.0/16").strip()
+    ext_net     = request.form.get("external_net", "!$HOME_NET").strip()
+    eve_json    = 1 if request.form.get("eve_json_enabled") else 0
+    fast_log    = 1 if request.form.get("fast_log_enabled") else 0
+    block_list  = 1 if request.form.get("block_list_enabled") else 0
+    max_pending = int(request.form.get("max_pending_packets") or 1024)
 
     if mode not in ("ids", "ips"):
         mode = "ids"
 
     cur.execute("""
         UPDATE ids_config SET
-            enabled=?, mode=?, interface=?, home_net=?, external_net=?,
+            mode=?, interface=?, home_net=?, external_net=?,
             eve_json_enabled=?, fast_log_enabled=?, block_list_enabled=?,
             max_pending_packets=?, updated_at=CURRENT_TIMESTAMP
         WHERE id=1
-    """, (enabled, mode, interface, home_net, ext_net, eve_json, fast_log, block_list, max_pending))
+    """, (mode, interface, home_net, ext_net, eve_json, fast_log, block_list, max_pending))
     conn.commit()
 
     log_event(
         category="system", action="ids_config_save",
         username=session.get("username"),
         remote_addr=request.remote_addr,
-        details={"mode": mode, "interface": interface, "enabled": enabled},
+        details={"mode": mode, "interface": interface, "enabled": current_enabled},
     )
 
-    # If enabled, apply immediately
-    if enabled:
+    # Regenerate Suricata config if IDS is currently enabled so new settings take effect
+    if current_enabled:
         from app.services.ids_writer import write_suricata_config
         write_suricata_config(conn)
 

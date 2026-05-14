@@ -414,13 +414,17 @@ MRTGEOF
     info "Bootstrap MRTG config written: ${MRTG_CONF}"
 fi
 
+# Install cron job unconditionally — the entry uses the full binary path with
+# 2>/dev/null, so it silently does nothing when the package is absent.
+# This prevents the common failure where the cron was never created because
+# install.sh ran before the net-mgmt/mrtg package was installed.
+CRON_FILE="/etc/cron.d/smart-shield-mrtg"
+CRON_LINE="*/5 * * * * root env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
+printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
+chmod 0644 "${CRON_FILE}"
+info "MRTG cron job installed: ${CRON_FILE}"
+
 if [ -x "${MRTG_BIN}" ]; then
-    # Install cron job only when MRTG binary exists
-    CRON_FILE="/etc/cron.d/smart-shield-mrtg"
-    CRON_LINE="*/5 * * * * root env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --lock-file /var/run/smart-shield/mrtg.lock 2>/dev/null"
-    printf '%s\n' "${CRON_LINE}" > "${CRON_FILE}"
-    chmod 0644 "${CRON_FILE}"
-    info "MRTG cron job installed: ${CRON_FILE}"
     # Pass 1: creates .log RRD files (non-zero exit on new files is expected)
     env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     sleep 5  # MRTG needs a time delta between runs to compute rates
@@ -428,7 +432,7 @@ if [ -x "${MRTG_BIN}" ]; then
     env LANG=C "${MRTG_BIN}" "${MRTG_CONF}" --lock-file "${MRTG_LOCK}" --log-level 0 2>/dev/null || true
     info "MRTG initialised — initial graphs generated in /var/db/smart-shield/mrtg"
 else
-    warn "MRTG binary not found at ${MRTG_BIN} — ensure net-mgmt/mrtg is installed"
+    warn "MRTG binary not found at ${MRTG_BIN} — cron job installed; graphs will appear once net-mgmt/mrtg is installed"
 fi
 
 # ── Nginx TLS reverse proxy ────────────────────────────────────────────────────

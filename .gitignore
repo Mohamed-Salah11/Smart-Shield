@@ -105,12 +105,13 @@ nohup.out
 # ── Claude Code project state (not needed on FreeBSD deployment) ──
 .claude/
 
-# ── Non-professional / working markdown notes ────────────────
+# ── Non-professional / working notes ─────────────────────────
 Testing.md
 TODO_FULL_LIVE_APPLIANCE.md
+docs/
+paper.bib
 
 # ── Local / generated project artifacts ──────────────────────
-=0.9.0
 edits.txt
 paths.txt
 project steps.txt

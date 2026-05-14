@@ -21,6 +21,49 @@
     </div>
   </div>
 
+  <!-- MRTG status bar -->
+  <div class="d-flex align-items-center flex-wrap gap-3 mb-3 px-1" style="font-size:.82rem;">
+    {% if not mrtg_status.available %}
+      {# Binary not installed — show single error and nothing else #}
+      <span class="text-danger fw-semibold"><i class="fa-solid fa-circle-xmark me-1"></i>{{ mrtg_status.message }}</span>
+    {% else %}
+      {# Binary present — show one badge per problem so the user knows exactly what to fix #}
+
+      {% if mrtg_status.stale_lock %}
+      <span class="text-danger fw-semibold">
+        <i class="fa-solid fa-lock me-1"></i>Stale lock file detected — click <strong>Reinitialize MRTG</strong> to clear it
+      </span>
+      {% endif %}
+
+      {% if not mrtg_status.cron_installed %}
+      <span class="text-warning fw-semibold">
+        <i class="fa-solid fa-clock me-1"></i>Cron job missing — click <strong>Regenerate Config</strong> to install it
+      </span>
+      {% endif %}
+
+      {% if not mrtg_status.workdir_ok %}
+      <span class="text-danger fw-semibold">
+        <i class="fa-solid fa-folder-open me-1"></i>Graph directory missing or not writable
+      </span>
+      {% endif %}
+
+      {% if mrtg_status.graphs_ok %}
+      <span class="text-success fw-semibold">
+        <i class="fa-solid fa-circle-check me-1"></i>Graphs available ({{ mrtg_status.graph_count }} files)
+      </span>
+      {% elif mrtg_status.cron_installed and not mrtg_status.stale_lock and mrtg_status.workdir_ok %}
+      <span class="text-warning fw-semibold">
+        <i class="fa-solid fa-hourglass-half me-1"></i>No graphs yet — waiting for first cron run (&#8804;&nbsp;5&nbsp;min)
+      </span>
+      {% endif %}
+
+      {% if mrtg_status.last_run %}
+      <span class="text-muted">Last config write: <code>{{ mrtg_status.last_run[:19] }}</code></span>
+      {% endif %}
+    {% endif %}
+    <span id="mrtg-countdown" class="ms-auto text-muted"></span>
+  </div>
+
   <!-- Period tabs -->
   <ul class="nav nav-tabs mb-4" id="mrtg-tabs">
     <li class="nav-item">
@@ -44,13 +87,6 @@
   </div>
   {% endif %}
 
-  {% if not interfaces %}
-  <div class="alert alert-warning">
-    <i class="fa-solid fa-triangle-exclamation me-2"></i>
-    No interfaces configured. Complete the setup wizard to configure WAN and LAN interfaces.
-  </div>
-  {% endif %}
-
   {% for iface in interfaces %}
   <div class="ss-card mb-4">
     <div class="ss-card-head">
@@ -63,19 +99,20 @@
       </div>
     </div>
     <div class="ss-card-body text-center" id="card-{{ iface.name }}">
-      <!-- Graph image — src is swapped by switchPeriod() -->
+      <!-- Image starts hidden; shown by onload, stays hidden by onerror -->
       <img
         id="img-{{ iface.name }}"
         src="/status/mrtg/image/{{ iface.name }}.png?{{ now_ts }}"
         alt="{{ iface.label }} daily traffic graph"
-        style="max-width:100%;border-radius:6px;"
+        style="max-width:100%;border-radius:6px;display:none;"
         onerror="this.style.display='none'; document.getElementById('nodata-{{ iface.name }}').style.display='block';"
-        onload="this.style.display=''; document.getElementById('nodata-{{ iface.name }}').style.display='none';"
+        onload="this.style.display='block'; document.getElementById('nodata-{{ iface.name }}').style.display='none';"
       >
-      <div id="nodata-{{ iface.name }}" style="display:none;padding:40px;color:var(--muted);">
+      <!-- Placeholder shown by default until onload fires -->
+      <div id="nodata-{{ iface.name }}" style="display:block;padding:40px;color:var(--muted);">
         <i class="fa-solid fa-hourglass-half fa-2x mb-3 d-block"></i>
         Graph not yet available. MRTG runs every 5 minutes — check back shortly.<br>
-        <small class="mt-2 d-block">If this persists, click <strong>Regenerate Config</strong> above and ensure the MRTG cron job is installed.</small>
+        <small class="mt-2 d-block">If this persists, click <strong>Reinitialize MRTG</strong> above, then wait for the next cron tick.</small>
       </div>
     </div>
   </div>
@@ -86,6 +123,45 @@
 const interfaces = {{ iface_names | tojson }};
 let currentPeriod = 'day';
 
+/* ── countdown to next MRTG cron run (*/5 * * * *) ─────────────────── */
+function _nextMrtgMs() {
+  const now        = new Date();
+  const ms         = now.getSeconds() * 1000 + now.getMilliseconds();
+  const minInCycle = now.getMinutes() % 5;
+  const msLeft     = (5 - minInCycle) * 60000 - ms;
+  return msLeft <= 0 ? msLeft + 300000 : msLeft;
+}
+
+function _reloadImages() {
+  interfaces.forEach(function(name) {
+    const img    = document.getElementById('img-' + name);
+    const nodata = document.getElementById('nodata-' + name);
+    if (!img) return;
+    // Reset to loading state; onload/onerror will update visibility
+    img.style.display = 'none';
+    if (nodata) nodata.style.display = 'block';
+    const sfx = {day: '', week: '-w', month: '-m', year: '-y'};
+    img.src = '/status/mrtg/image/' + name + (sfx[currentPeriod] || '') + '.png?' + Date.now();
+  });
+}
+
+function _updateCountdown() {
+  const el = document.getElementById('mrtg-countdown');
+  if (!el) return;
+  const ms = _nextMrtgMs();
+  if (ms < 1000) {
+    _reloadImages();
+  }
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  el.textContent = 'Next graph update in ' + m + ':' + String(s).padStart(2, '0');
+}
+
+setInterval(_updateCountdown, 1000);
+_updateCountdown();
+
+/* ── reinitialize ────────────────────────────────────────────────────── */
 async function reinitMrtg() {
   const btn = document.getElementById('btn-mrtg-reinit');
   const msg = document.getElementById('mrtg-reinit-msg');
@@ -98,28 +174,28 @@ async function reinitMrtg() {
       headers: { 'X-CSRF-Token': csrfToken },
     });
     const d = await r.json();
-    msg.textContent = d.ok ? 'Done — reloading page…' : 'Error: ' + (d.message || 'failed');
-    if (d.ok) setTimeout(() => location.reload(), 1200);
+    msg.textContent = d.ok ? 'Done — reloading images…' : 'Error: ' + (d.message || 'failed');
+    if (d.ok) setTimeout(function() { _reloadImages(); msg.textContent = ''; }, 1500);
   } catch(e) { msg.textContent = 'Network error'; }
   btn.disabled = false;
 }
 
+/* ── period switch ───────────────────────────────────────────────────── */
 function switchPeriod(evt, period) {
   evt.preventDefault();
   currentPeriod = period;
 
-  // Update tab active state
-  document.querySelectorAll('#mrtg-tabs .nav-link').forEach(a => {
+  document.querySelectorAll('#mrtg-tabs .nav-link').forEach(function(a) {
     a.classList.toggle('active', a.dataset.period === period);
   });
 
-  // Update each interface image src
-  interfaces.forEach(name => {
-    const img = document.getElementById('img-' + name);
+  interfaces.forEach(function(name) {
+    const img    = document.getElementById('img-' + name);
     const nodata = document.getElementById('nodata-' + name);
     if (!img) return;
-    img.style.display = '';
-    if (nodata) nodata.style.display = 'none';
+    // Reset to loading state before swapping src
+    img.style.display = 'none';
+    if (nodata) nodata.style.display = 'block';
     const sfx = {day: '', week: '-w', month: '-m', year: '-y'};
     img.src = '/status/mrtg/image/' + name + (sfx[period] || '') + '.png?' + Date.now();
   });
