@@ -5,7 +5,7 @@
 <div class="container">
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">About Smart Shield</h1>
+      <h1 class="ss-page-title">About SmartShield</h1>
       <p class="ss-page-desc">Software license and version information</p>
     </div>
   </div>
@@ -17,15 +17,15 @@
     </div>
     <div class="ss-card-body">
       <h5>Copyright and Trademark Notices.</h5>
-      <p>Copyright &copy; 2026 Smart Shield Project. All Rights Reserved.</p>
+      <p>Copyright &copy; 2026 SmartShield Project. All Rights Reserved.</p>
       <p>All logos, text, and content in this interface, including underlying HTML code, designs, and graphics, are protected under United States and international copyright and trademark laws and treaties, and may not be used or reproduced without prior written permission of their respective owners.</p>
 
-      <p>"Smart Shield" is used here to represent the product branding in this project. "Smart Shield" replaces references to the original product name for this UI. All trademarks shown herein are owned by the respective companies or persons indicated.</p>
+      <p>"SmartShield" is used here to represent the product branding in this project. "SmartShield" replaces references to the original product name for this UI. All trademarks shown herein are owned by the respective companies or persons indicated.</p>
 
-      <p>Smart Shield software is open source and distributed under the Apache 2.0 license.</p>
+      <p>SmartShield software is open source and distributed under the Apache 2.0 license.</p>
 
       <h5 class="mt-3">Limited Warranty and Liability</h5>
-      <p>Smart Shield is provided "as is" without warranty of any kind, including but not limited to the implied warranties of merchantability and fitness for a particular purpose. The project maintainers shall not be liable for errors contained herein or for any direct, indirect, special, incidental, or consequential damages in connection with the furnishing, performance, or use of any software, information, or material.</p>
+      <p>SmartShield is provided "as is" without warranty of any kind, including but not limited to the implied warranties of merchantability and fitness for a particular purpose. The project maintainers shall not be liable for errors contained herein or for any direct, indirect, special, incidental, or consequential damages in connection with the furnishing, performance, or use of any software, information, or material.</p>
 
       <h5 class="mt-3">Restricted Rights Legend.</h5>
       <p>No part of this project's proprietary information or materials may be published, distributed, reproduced, publicly displayed, used to create derivative works, or translated to another language without prior written consent from the applicable rights holder. The information contained herein is subject to change without notice.</p>
@@ -37,6 +37,7 @@
       <p>A Prohibited Party includes: a party in a U.S. embargoed country or country the United States has named as a supporter of international terrorism; a party involved in proliferation; a party identified by the U.S. Government as a Denied Party; a party named on the U.S. Government's Enemies List; a party prohibited from participation in export or re-export transactions by a U.S. Government General Order; a party listed by the U.S. Government's Office of Foreign Assets Control as ineligible to participate in transactions subject to U.S. jurisdiction; or any party that Licensee knows or has reason to know has violated or plans to violate U.S. or foreign export laws or regulations.</p>
 
       <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="text-end mt-3">
           <button type="submit" class="btn btn-success">Accept</button>
         </div>

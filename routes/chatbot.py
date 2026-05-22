@@ -34,7 +34,9 @@ def api_chat():
 
     from app.services.chatbot_service import process_chat
     conn   = get_db()
-    result = process_chat(conn, messages, session.get("username", ""))
+    result = process_chat(
+        conn, messages, session.get("username", ""), session.get("user_id")
+    )
 
     log_event(
         category="system",
@@ -131,9 +133,21 @@ def api_approve_action():
     if not approved:
         return jsonify({"ok": True, "reply": "Action cancelled."})
 
-    from app.services.chatbot_service import execute_approved_action
+    from app.services.chatbot_service import execute_approved_action, _SOC_WRITE_TOOLS
+    tool = action.get("tool", "")
+
+    # Firewall/DNS write actions require an administrator. SOC actions are
+    # instead gated by the user's SOC tier inside execute_approved_action.
+    if tool not in _SOC_WRITE_TOOLS and not session.get("is_superuser"):
+        return jsonify({
+            "ok": False,
+            "message": "Insufficient permissions. Only administrators can execute AI firewall actions."
+        }), 403
+
     conn   = get_db()
-    result = execute_approved_action(conn, action, session.get("username", ""))
+    result = execute_approved_action(
+        conn, action, session.get("username", ""), session.get("user_id")
+    )
 
     log_event(
         category="system",

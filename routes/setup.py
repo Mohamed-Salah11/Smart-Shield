@@ -22,9 +22,11 @@ configured from the browser before any users exist.  Once complete, all
 import json
 import os
 import ipaddress
+from hmac import compare_digest
 
 from flask import (
     Blueprint,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -35,6 +37,14 @@ from flask import (
 
 from app.database import get_db
 from app.validators import validate_interface_name
+
+
+# Path to the one-time setup claim token written on first boot by the BSD
+# rc.d script and printed to the local console. Overridable for dev/testing.
+SETUP_CLAIM_TOKEN_PATH = os.getenv(
+    "SMARTSHIELD_SETUP_CLAIM_TOKEN_PATH",
+    "/var/db/smartshield/setup_claim_token",
+)
 
 
 def _port_payload_from_nics(nics):
@@ -96,6 +106,9 @@ def _mark_setup_complete(conn):
         """
     )
     conn.commit()
+    # The one-time claim token is now spent — remove it so it cannot be
+    # replayed to re-enter the wizard.
+    _clear_claim_token()
 
 
 def _get_saved_setup_ports(conn):
@@ -126,10 +139,152 @@ def _wizard_guard():
                     return None  # Admins can always re-run setup
         except Exception:
             pass
-        from flask import flash as _flash
-        _flash("Setup has already been completed.", "info")
+        flash("Setup has already been completed.", "info")
         return redirect(url_for("system.dashboard"))
     return None
+
+
+# ---------------------------------------------------------------------------
+# First-boot access control
+#
+# The wizard is unauthenticated by necessity (no users exist on a fresh
+# install), so it is gated three ways before the first admin is created:
+#   1. An authenticated superuser may always (re-)run setup.
+#   2. Once an admin exists, unauthenticated setup is refused (login required).
+#   3. On a fresh install the request must come from a LAN/loopback source AND
+#      present the one-time claim token printed on the local console.
+# A session that successfully claims (or runs on a token-less dev host) is
+# trusted for the remainder of the wizard, including after step 3 creates the
+# admin account.
+# ---------------------------------------------------------------------------
+
+def _read_claim_token() -> str | None:
+    try:
+        with open(SETUP_CLAIM_TOKEN_PATH, "r", encoding="utf-8") as fh:
+            token = fh.read().strip()
+            return token or None
+    except OSError:
+        return None
+
+
+def _clear_claim_token() -> None:
+    try:
+        os.remove(SETUP_CLAIM_TOKEN_PATH)
+    except OSError:
+        pass
+    # Drop a sentinel so the boot-time token generator does not re-create the
+    # claim token after setup has been completed.
+    try:
+        sentinel = os.path.join(os.path.dirname(SETUP_CLAIM_TOKEN_PATH), ".setup_claimed")
+        with open(sentinel, "w", encoding="utf-8") as fh:
+            fh.write("1\n")
+    except OSError:
+        pass
+
+
+def _admin_exists() -> bool:
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE COALESCE(is_superuser, 0) = 1"
+        ).fetchone()
+        return (row["c"] if row else 0) > 0
+    except Exception:
+        return False
+
+
+def _is_authenticated_superuser() -> bool:
+    user_id = session.get("user_id")
+    if not user_id:
+        return False
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT is_superuser FROM users WHERE id=?", (user_id,)).fetchone()
+        return bool(row and row["is_superuser"])
+    except Exception:
+        return False
+
+
+def _request_is_lan() -> bool:
+    """True when the request source is loopback or RFC1918/ULA (LAN). Used to
+    keep the unauthenticated first-boot wizard off the WAN."""
+    remote = request.remote_addr or ""
+    try:
+        ip = ipaddress.ip_address(remote)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_private or ip.is_link_local
+
+
+@setup_bp.before_request
+def _enforce_setup_access():
+    # The claim-token entry endpoints must stay reachable so the operator can
+    # submit the token; they perform their own validation.
+    if request.endpoint in {"setup.claim_form", "setup.claim_submit"}:
+        return None
+
+    # Superusers may always re-run setup (e.g. to reassign interfaces).
+    if _is_authenticated_superuser():
+        return None
+
+    # A session that already claimed the install is trusted through the rest
+    # of the wizard (including after step 3 creates the admin).
+    if session.get("setup_session_authorized"):
+        return None
+
+    # Once an admin exists, unauthenticated setup is not allowed.
+    if _admin_exists():
+        if request.path.startswith("/setup/api/"):
+            return jsonify({"ok": False, "message": "Administrator login required."}), 403
+        flash("Setup requires an administrator login.", "warning")
+        return redirect(url_for("auth.login"))
+
+    # Fresh install: must be on LAN/loopback.
+    if not _request_is_lan():
+        if request.path.startswith("/setup/api/"):
+            return jsonify({"ok": False, "message": "Setup is only available from the local network."}), 403
+        return render_template("setup/not_authorized.html"), 403
+
+    # Fresh install: require the console claim token if one was provisioned.
+    token = _read_claim_token()
+    if token:
+        if request.path.startswith("/setup/api/"):
+            return jsonify({"ok": False, "message": "Setup claim token required.", "claim_required": True}), 401
+        return redirect(url_for("setup.claim_form"))
+
+    # No token file present (dev/lab host) — allow, and trust this session.
+    session["setup_session_authorized"] = True
+    return None
+
+
+@setup_bp.route("/claim", methods=["GET"])
+def claim_form():
+    if _is_setup_complete() or _admin_exists():
+        return redirect(url_for("auth.login"))
+    if not _request_is_lan():
+        return render_template("setup/not_authorized.html"), 403
+    return render_template("setup/claim.html")
+
+
+@setup_bp.route("/api/claim", methods=["POST"])
+def claim_submit():
+    if _is_setup_complete() or _admin_exists():
+        return jsonify({"ok": False, "message": "Setup is no longer available."}), 403
+    if not _request_is_lan():
+        return jsonify({"ok": False, "message": "Setup is only available from the local network."}), 403
+
+    expected = _read_claim_token()
+    if not expected:
+        # No token configured — token-less dev/lab host. Authorize directly.
+        session["setup_session_authorized"] = True
+        return jsonify({"ok": True})
+
+    data = request.get_json(silent=True) or {}
+    provided = (data.get("token") or "").strip()
+    if provided and compare_digest(provided, expected):
+        session["setup_session_authorized"] = True
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "message": "Invalid setup claim token."}), 403
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +354,27 @@ def api_step1_save():
         validate_interface_name(lan_port, allow_empty=False)
     except ValueError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
+
+    # Phase 5.3: cross-check the submitted port names against actual host
+    # interfaces. The form normally only offers detected NICs, but the JSON
+    # endpoint can be hit directly — refuse names ifconfig does not know.
+    try:
+        from app.services.network_service import list_physical_nics
+        available = {(n.get("name") or "").strip() for n in list_physical_nics()}
+        # Empty set means detection failed (dev host) — skip the cross-check
+        # in that case rather than blocking install on unrelated NIC errors.
+        if available:
+            for label, port in [("WAN", wan_port), ("LAN", lan_port)]:
+                if port not in available:
+                    return jsonify({
+                        "ok": False,
+                        "message": (
+                            f"{label} interface {port!r} not detected on this host. "
+                            f"Available: {sorted(available)}"
+                        ),
+                    }), 400
+    except Exception:
+        pass  # detection failure is non-fatal — fall through to save
 
     conn = get_db()
     for itype, port in [("WAN", wan_port), ("LAN", lan_port)]:
@@ -389,10 +565,13 @@ def api_step3_save():
     password = (data.get("password") or "").strip()
     confirm  = (data.get("confirm")  or "").strip()
 
-    if len(password) < 8:
-        return jsonify({"ok": False, "message": "Password must be at least 8 characters."}), 400
     if password != confirm:
         return jsonify({"ok": False, "message": "Passwords do not match."}), 400
+
+    from app.password_policy import validate_password
+    errs = validate_password(password, username=username)
+    if errs:
+        return jsonify({"ok": False, "message": " ".join(errs)}), 400
 
     from werkzeug.security import generate_password_hash
     pw_hash = generate_password_hash(password)
@@ -406,13 +585,26 @@ def api_step3_save():
             "UPDATE users SET password=? WHERE username=?",
             (pw_hash, username),
         )
+        audit_action = "setup_admin_password_reset"
     else:
         conn.execute(
             "INSERT INTO users (username, password, is_superuser) VALUES (?, ?, 1)",
             (username, pw_hash),
         )
+        audit_action = "setup_admin_created"
     conn.commit()
     session["setup_admin_username"] = username
+    try:
+        from app.audit_log import log_event
+        log_event(
+            category="security",
+            action=audit_action,
+            username=username,
+            remote_addr=request.remote_addr or "",
+            details={"is_superuser": True},
+        )
+    except Exception:
+        pass
     return jsonify({"ok": True, "message": f"Admin account '{username}' updated."})
 
 
@@ -481,7 +673,17 @@ def api_step4_apply():
     except Exception as exc:
         results.append({"step": "mrtg", "ok": False, "details": str(exc)})
 
-    # Only require the three network steps; MRTG is optional and must not block completion
+    # End-to-end verification: are the things the admin actually needs working
+    # (LAN IP applied, default route present, forwarding on, PF enabled, NAT
+    # rule loaded, DNS+nginx listening) live on the appliance? Reports
+    # actionable warnings without blocking wizard completion — the admin can
+    # still finish, then fix issues from the dashboard.
+    verification = _wizard_verify(conn)
+    results.append({"step": "verify", "ok": verification.get("ok", False),
+                    "details": verification})
+
+    # Only require the three network steps; MRTG + verify are advisory and
+    # must not block wizard completion.
     _REQUIRED = {"rc_conf", "interfaces", "services"}
     overall_ok = all(r.get("ok", False) for r in results if r.get("step") in _REQUIRED)
     if overall_ok:
@@ -494,6 +696,110 @@ def api_step4_apply():
         "results": results,
         "redirect": url_for("system.dashboard") if overall_ok else None,
     })
+
+
+def _wizard_verify(conn) -> dict:
+    """End-to-end smoke check after Step 4 apply.
+
+    Returns a dict of named boolean checks plus a top-level ``ok`` and human
+    summary. Tolerates non-FreeBSD (everything reports skipped=True there).
+    """
+    import sys as _sys
+    out = {
+        "lan_ip_ok": False, "default_route_ok": False, "forwarding_ok": False,
+        "pf_enabled": False, "nat_present": False,
+        "unbound_listening": False, "nginx_listening": False,
+        "messages": [],
+    }
+    if not _sys.platform.startswith("freebsd"):
+        out["ok"] = True
+        out["skipped"] = True
+        out["messages"].append("Non-FreeBSD — verification skipped.")
+        return out
+
+    from app.services.network_service import run_command
+
+    lan_rows = conn.execute("SELECT assigned_port, ipv4_address FROM lan_config WHERE id=1").fetchall()
+    lan_iface = (lan_rows[0]["assigned_port"] if lan_rows else "") or ""
+    lan_cidr  = (lan_rows[0]["ipv4_address"]  if lan_rows else "") or ""
+    expected_ip = ""
+    if lan_cidr and "/" in lan_cidr:
+        try:
+            import ipaddress as _ip
+            expected_ip = str(_ip.ip_interface(lan_cidr).ip)
+        except ValueError:
+            pass
+
+    # LAN IP actually configured on the interface?
+    if lan_iface and expected_ip:
+        try:
+            r = run_command(["ifconfig", lan_iface], check=False, timeout_seconds=5)
+            out["lan_ip_ok"] = expected_ip in (r.stdout or "")
+            if not out["lan_ip_ok"]:
+                out["messages"].append(f"LAN IP {expected_ip} not visible on {lan_iface}.")
+        except Exception as exc:
+            out["messages"].append(f"ifconfig failed: {exc}")
+
+    # Default route present?
+    try:
+        r = run_command(["netstat", "-rn", "-f", "inet"], check=False, timeout_seconds=5)
+        for line in (r.stdout or "").splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "default":
+                out["default_route_ok"] = True
+                break
+        if not out["default_route_ok"]:
+            out["messages"].append("No default route present.")
+    except Exception as exc:
+        out["messages"].append(f"netstat failed: {exc}")
+
+    # ip forwarding sysctl
+    try:
+        r = run_command(["sysctl", "-n", "net.inet.ip.forwarding"], check=False, timeout_seconds=3)
+        out["forwarding_ok"] = (r.stdout or "").strip() == "1"
+        if not out["forwarding_ok"]:
+            out["messages"].append("net.inet.ip.forwarding != 1 — LAN clients won't route.")
+    except Exception:
+        pass
+
+    # PF enabled + NAT rule loaded
+    try:
+        r = run_command(["pfctl", "-s", "info"], check=False, timeout_seconds=5)
+        out["pf_enabled"] = "Status: Enabled" in (r.stdout or "")
+        if not out["pf_enabled"]:
+            out["messages"].append("PF is not enabled.")
+    except Exception:
+        pass
+    try:
+        r = run_command(["pfctl", "-sn"], check=False, timeout_seconds=5)
+        out["nat_present"] = "nat " in (r.stdout or "") or "nat-anchor" in (r.stdout or "")
+        if not out["nat_present"]:
+            out["messages"].append("No NAT rule loaded in PF — LAN clients won't reach WAN.")
+    except Exception:
+        pass
+
+    # Unbound and nginx listeners
+    try:
+        r = run_command(["sockstat", "-4", "-l"], check=False, timeout_seconds=5)
+        stdout = r.stdout or ""
+        out["unbound_listening"] = any(":53 " in ln or ":53\t" in ln for ln in stdout.splitlines())
+        if not out["unbound_listening"]:
+            out["messages"].append("Unbound is not listening on :53.")
+        out["nginx_listening"] = any(":80 " in ln or ":443 " in ln or ":80\t" in ln or ":443\t" in ln
+                                     for ln in stdout.splitlines())
+        if not out["nginx_listening"]:
+            out["messages"].append("Nginx is not listening on :80/:443.")
+    except Exception:
+        pass
+
+    # Overall: anything advisory enough that the wizard should still complete —
+    # but report ok=True only when every check passes.
+    out["ok"] = all([
+        out["lan_ip_ok"], out["default_route_ok"], out["forwarding_ok"],
+        out["pf_enabled"], out["nat_present"],
+        out["unbound_listening"], out["nginx_listening"],
+    ])
+    return out
 
 
 @setup_bp.route("/complete")

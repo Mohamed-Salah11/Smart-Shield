@@ -8,10 +8,31 @@
 # This file grants that user the ability to run specific system commands as
 # root WITHOUT a password, via the priv_helper module.
 #
+# Defense-in-depth architecture
+# -----------------------------
+# Every entry below mirrors exactly one action template in
+# app/services/priv_helper.py. The web app never invokes sudo directly — it
+# calls run_privileged("pf.reload", config_path=...) and priv_helper
+# applies a per-action Python validator (regex + set membership) BEFORE
+# sudo is ever reached. The sudoers wildcards (`*`) below are intentionally
+# narrower than priv_helper's validators where the FreeBSD sudo grammar
+# allows (e.g. explicit PF table names) and intentionally broader where
+# the validator does set-membership checks that sudo's `*` can't express
+# (e.g. _KNOWN_SERVICES, _val_iface_name). Read priv_helper.py before
+# changing any wildcard here — narrowing one might break a valid action,
+# widening one breaks the defense-in-depth.
+#
+# `smartshieldctl` (bsd/sbin/smartshieldctl) is the OPERATOR console CLI
+# for humans on the appliance, NOT the web-app's privileged path, so it
+# does NOT appear in this file. Keep it that way: that script intentionally
+# exposes `shell` and `factory-reset` verbs that must never be reachable
+# by the service user.
+#
 # SECURITY NOTES
 # --------------
 # * Do NOT add shell, text editors, or interpreters to this list.
 # * Do NOT add wildcards that allow arbitrary file paths outside safe dirs.
+# * Do NOT add `smartshieldctl` here.
 # * Review this file whenever a new privileged operation is added to the app.
 # * Run `visudo -c` after any edit to verify syntax.
 # =============================================================================
@@ -28,15 +49,57 @@ smartshield ALL=(root) NOPASSWD: /sbin/pfctl -e
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -d
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -F rules
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -a captive_portal -f /etc/pf.captive_portal.conf
+# Per-table rules mirror priv_helper._ALLOWED_PF_TABLES. Add a new table here
+# only after adding it to that set; otherwise non-root deployments will see
+# the action fail loudly instead of silently bypassing the allowlist.
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T add *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T delete *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t authenticated_clients -T replace -f *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T add *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T delete *
 smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T flush
-smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T replace -f *
-smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T expire *
-smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t * -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t admin_bypass_clients -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t device_whitelist -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t access_whitelist -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t policy_exemption -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_ids_blocks -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t ss_threat_intel -T replace -f *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T add *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T delete *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T flush
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T show
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T expire *
+smartshield ALL=(root) NOPASSWD: /sbin/pfctl -t soc_blocklist -T replace -f *
 
 # ── Services ─────────────────────────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd start
@@ -113,3 +176,86 @@ smartshield ALL=(root) NOPASSWD: /usr/local/sbin/unbound-control local_data_remo
 # ── Dummynet (traffic limiters) ───────────────────────────────────────────────
 smartshield ALL=(root) NOPASSWD: /sbin/dnctl -q flush
 smartshield ALL=(root) NOPASSWD: /sbin/dnctl pipe * config *
+
+# ── Service: status / reload / onerestart (mirror priv_helper._val_service_action) ──
+# priv_helper allows {start,stop,restart,reload,status,onerestart} for every name
+# in _KNOWN_SERVICES; service_manager.service_status() calls service_action(..,"status").
+# The per-service blocks above grant start/stop/restart (+ some reload); these
+# lines complete the allowed set so the non-root model isn't missing actions.
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service isc-dhcpd status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service unbound onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service openvpn onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service strongswan onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service suricata onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ntpd onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service miniupnpd onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service igmpproxy onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service ddclient onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service kea-dhcp6 onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service rtadvd onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service bsnmpd onerestart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service mpd5 onerestart
+
+# ── nginx (TLS reverse proxy) — used by nginx_writer / soc_portal_writer ──────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service nginx start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service nginx stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service nginx restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service nginx reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service nginx status
+
+# ── pf / pflog (in _KNOWN_SERVICES; status used by service_manager) ───────────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pf start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pf stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pf restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pf reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pf status
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pflog start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pflog stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pflog restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service pflog status
+
+# ── smart_shield (the app's own rc.d service) ─────────────────────────────────
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service smart_shield start
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service smart_shield stop
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service smart_shield restart
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service smart_shield reload
+smartshield ALL=(root) NOPASSWD: /usr/sbin/service smart_shield status
+
+# ── Kernel modules (priv_helper "kldload") — NARROW allowlist ─────────────────
+# priv_helper's validator is broad (_val_safe_pkg_name); sudo can be tighter, so
+# only the modules Smart Shield actually loads are permitted here.
+smartshield ALL=(root) NOPASSWD: /sbin/kldload netmap
+smartshield ALL=(root) NOPASSWD: /sbin/kldload dummynet
+smartshield ALL=(root) NOPASSWD: /sbin/kldload carp
+smartshield ALL=(root) NOPASSWD: /sbin/kldload pfsync
+smartshield ALL=(root) NOPASSWD: /sbin/kldload pf
+smartshield ALL=(root) NOPASSWD: /sbin/kldload pflog
+
+# ── Package management: intentionally NOT granted via sudo ────────────────────
+# priv_helper defines pkg.install / pkg.delete, but granting `pkg install/delete`
+# to the service user would let a web-app compromise install arbitrary software.
+# Package management is therefore root-runtime-only: those actions work when
+# Smart Shield runs as root (the default), and are unavailable under the
+# unprivileged sudo model by design. Do NOT add `/usr/sbin/pkg install|delete`.

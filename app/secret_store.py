@@ -32,7 +32,14 @@ _MASTER_KEY_ENV = "SMARTSHIELD_MASTER_KEY"
 
 def _master_key_path() -> str:
     if sys.platform.startswith("freebsd"):
-        return "/usr/local/etc/smart-shield/master.key"
+        # Phase 11 dual-path: prefer the legacy `smart-shield` dir if it already
+        # contains the key (existing installs); otherwise use the new
+        # `smartshield` location. This makes the rename transparent.
+        old = "/usr/local/etc/smart-shield/master.key"
+        new = "/usr/local/etc/smartshield/master.key"
+        if os.path.exists(old) and not os.path.exists(new):
+            return old
+        return new
     local = os.getenv("LOCALAPPDATA") or os.path.expanduser("~")
     return os.path.join(local, "SmartShield", "master.key")
 
@@ -73,6 +80,18 @@ def _load_master_key() -> bytes:
     except OSError:
         pass
     return raw
+
+
+def has_master_key() -> bool:
+    """
+    Return True if a master key is already available — either via the
+    ``SMARTSHIELD_MASTER_KEY`` environment variable or a persisted key file.
+
+    This does not load or generate a key; it is safe for health/status checks.
+    """
+    if os.getenv(_MASTER_KEY_ENV, "").strip():
+        return True
+    return os.path.exists(_master_key_path())
 
 
 def encrypt_secret(plaintext: str) -> str:

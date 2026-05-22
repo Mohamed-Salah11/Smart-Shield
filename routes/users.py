@@ -222,8 +222,10 @@ def add_user():
     email = request.form.get("email")
     group = request.form.get("groups")
 
-    if not password or len(password) < 8:
-        flash("Password must be at least 8 characters.", "danger")
+    from app.password_policy import validate_password
+    pw_errors = validate_password(password, username=username) if password else ["Password is required."]
+    if pw_errors:
+        flash(" ".join(pw_errors), "danger")
         return redirect(url_for("users.user_manager"))
 
     profile_picture = None
@@ -254,6 +256,10 @@ def add_user():
                     (user_id, group_row["id"]),
                 )
 
+    from app.audit_log import log_event
+    log_event(category="security", action="user_created", severity="medium",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"new_user": username, "user_id": user_id, "group": group or ""})
     return redirect(url_for("users.user_manager"))
 
 
@@ -280,6 +286,11 @@ def add_group():
                     (group_id, endpoint),
                 )
 
+    if inserted:
+        from app.audit_log import log_event
+        log_event(category="security", action="group_created", severity="medium",
+                  username=session.get("username"), remote_addr=request.remote_addr,
+                  details={"group": group_name})
     return _redirect_back()
 
 
@@ -304,9 +315,16 @@ def edit_group(group_id):
 @superuser_required
 def delete_group(group_id):
     with db_cursor(commit=True) as (_, cur):
+        cur.execute("SELECT name FROM groups WHERE id = ?", (group_id,))
+        _grow = cur.fetchone()
+        group_name = _grow["name"] if _grow else str(group_id)
         cur.execute("DELETE FROM user_groups WHERE group_id = ?", (group_id,))
         cur.execute("DELETE FROM groups WHERE id = ?", (group_id,))
 
+    from app.audit_log import log_event
+    log_event(category="security", action="group_deleted", severity="medium",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"group": group_name, "group_id": group_id})
     return _redirect_back("users.group_manager")
 
 
@@ -390,8 +408,16 @@ def delete_user(user_id):
         if row and row["is_superuser"]:
             return _redirect_back("users.user_manager")
 
+        cur.execute("SELECT username FROM users WHERE id=?", (user_id,))
+        _urow = cur.fetchone()
+        deleted_name = _urow["username"] if _urow else str(user_id)
         cur.execute("DELETE FROM user_groups WHERE user_id=?", (user_id,))
         cur.execute("DELETE FROM users WHERE id=?", (user_id,))
+
+    from app.audit_log import log_event
+    log_event(category="security", action="user_deleted", severity="medium",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"deleted_user": deleted_name, "user_id": user_id})
     return redirect(url_for("users.user_manager"))
 
 
@@ -431,6 +457,10 @@ def change_password(user_id):
             (generate_password_hash(new_password), user_id),
         )
 
+    from app.audit_log import log_event
+    log_event(category="security", action="user_password_changed", severity="medium",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"target_user_id": user_id})
     flash("Password updated successfully.", "success")
     return redirect(url_for("users.user_manager"))
 
@@ -458,8 +488,10 @@ def edit_user(user_id):
         profile_picture = current_user["profile_picture"] if current_user else None
 
         if new_password:
-            if len(new_password) < 8:
-                flash("Password must be at least 8 characters.", "danger")
+            from app.password_policy import validate_password
+            pw_errors = validate_password(new_password, username=username)
+            if pw_errors:
+                flash(" ".join(pw_errors), "danger")
                 return redirect(url_for("users.user_manager"))
             if not old_password:
                 flash("Current password is required to set a new password.", "danger")

@@ -19,14 +19,14 @@
       <div class="ss-card-icon"><i class="fa-solid fa-chart-line"></i></div>
       <div><div class="ss-card-title">Interface Statistics</div><div class="ss-card-subtitle">Auto-refreshes every 10 seconds</div></div>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="ext-df74e8d8">
       <div id="iface-table-wrap">
         {% if on_freebsd %}
-        <div style="padding:28px;text-align:center;color:var(--muted);">
+        <div class="ext-9a8ecc5f">
           <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading statistics…
         </div>
         {% else %}
-        <div style="padding:28px;text-align:center;color:var(--muted);">
+        <div class="ext-9a8ecc5f">
           Live statistics only available on FreeBSD.
         </div>
         {% endif %}
@@ -41,7 +41,7 @@
       <div class="ss-card-icon"><i class="fa-solid fa-ethernet"></i></div>
       <div><div class="ss-card-title">Configured Interfaces</div></div>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="ext-df74e8d8">
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead>
@@ -66,7 +66,7 @@
 </div>
 
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 function renderIfaceTable(stats) {
   if (!stats || !stats.length) {
     document.getElementById('iface-table-wrap').innerHTML =

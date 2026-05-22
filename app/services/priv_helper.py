@@ -45,14 +45,32 @@ from app.services.network_service import (
 
 
 import shutil as _shutil
-_SUDO_BIN = _shutil.which("sudo") or "/usr/local/bin/sudo"
+
+
+def _resolve_sudo() -> str:
+    """
+    Return the path to a usable sudo binary, or "" when sudo isn't available.
+
+    Phase 5.3: stop hardcoding /usr/local/bin/sudo. On root-runtime Smart Shield
+    deployments sudo isn't required at all (the service runs as root); on hybrid
+    or dev setups, sudo could live at /usr/bin/sudo (Linux), /usr/local/bin/sudo
+    (FreeBSD), or be missing entirely.
+    """
+    return _shutil.which("sudo") or ""
 
 
 def _maybe_sudo(cmd: List[str]) -> List[str]:
-    """Return cmd unchanged when root (uid 0); otherwise prepend sudo -n."""
+    """Return cmd unchanged when root (uid 0) OR when sudo is unavailable;
+    otherwise prepend the discovered sudo path + -n."""
     if os.getuid() == 0:
         return cmd
-    return [_SUDO_BIN, "-n"] + cmd
+    sudo = _resolve_sudo()
+    if not sudo:
+        # No sudo on PATH and we're not root — let the underlying command fail
+        # rather than crashing here with a hardcoded /usr/local/bin/sudo that
+        # may not exist (e.g., on minimal Linux dev containers).
+        return cmd
+    return [sudo, "-n"] + cmd
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +91,10 @@ _KNOWN_CONFIG_DIRS = {
     "/usr/local/etc/kea",
     "/usr/local/etc/miniupnpd",
     "/usr/local/etc/ddclient.conf",
+    # Both legacy and canonical state dirs are allowed during the smart-shield
+    # → smartshield migration; install.sh keeps a symlink pointing one to the
+    # other so writes land in the same place either way.
+    "/var/db/smartshield",
     "/var/db/smart-shield",
 }
 
@@ -94,10 +116,33 @@ def _val_anchor_name(v: str) -> str:
     return v
 
 
+_ALLOWED_PF_TABLES = {
+    "authenticated_clients",
+    "admin_bypass_clients",
+    "device_whitelist",
+    # Phase 3.2 split: access_whitelist (captive bypass) + policy_exemption
+    # (content/DNS/app bypass via Unbound view). See app/database.py for
+    # the matching is_whitelisted / is_policy_exempt columns on tracked_hosts.
+    "access_whitelist",
+    "policy_exemption",
+    "ss_ids_blocks",
+    "ss_threat_intel",
+    "soc_blocklist",
+}
+
+
 def _val_table_name(v: str) -> str:
+    """Validate a PF table name against a fixed allowlist.
+
+    Even though only privileged code paths call this helper, regex-only checks
+    historically let unknown table names through. The allowlist makes the
+    blast radius explicit: any new table must be added here intentionally.
+    """
     v = str(v).strip()
     if not _SAFE_NAME_RE.match(v):
         raise ValueError(f"Invalid PF table name: {v!r}")
+    if v not in _ALLOWED_PF_TABLES:
+        raise ValueError(f"PF table not in allowlist: {v!r}")
     return v
 
 
@@ -415,8 +460,11 @@ def is_privileged_available() -> bool:
         return False
     if os.getuid() == 0:
         return True
+    sudo = _resolve_sudo()
+    if not sudo:
+        return False
     try:
-        r = run_command(["/usr/local/bin/sudo", "-n", "-l"], check=False, timeout_seconds=3)
+        r = run_command([sudo, "-n", "-l"], check=False, timeout_seconds=3)
         return r.returncode == 0
     except Exception:
         return False

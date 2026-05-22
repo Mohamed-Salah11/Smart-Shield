@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 
 def _default_upload_dir() -> str:
     if sys.platform.startswith("freebsd"):
-        return "/var/db/smart-shield/uploads/profile_pictures"
+        from app.config import _ss_dir
+        return os.path.join(_ss_dir("/var/db"), "uploads", "profile_pictures")
     return "static/uploads/profile_pictures"
 
 

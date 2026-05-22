@@ -16,9 +16,9 @@ Non-superusers need the exact permission string (or a wildcard like
 
 from functools import wraps
 
-from flask import jsonify, session
+from flask import g, jsonify, session
 
-from app.auth_utils import _load_user_profile
+from app.auth_utils import _load_user_profile, login_required
 
 
 def api_permission_required(permission: str):
@@ -82,6 +82,65 @@ def api_permission_required(permission: str):
 
 
 # ---------------------------------------------------------------------------
+# Browser vs machine API decorators (Phase 11 boundary tightening)
+#
+# Existing mutating routes can keep stacking ``@login_required`` +
+# ``@api_permission_required(...)``. New routes should pick one of these two
+# wrappers so the auth model — browser session or machine token/HMAC — is
+# legible at the call site and so the route security lint
+# (``tools/security_lint_routes.py``) can verify it.
+# ---------------------------------------------------------------------------
+
+def browser_api_required(permission: str):
+    """
+    Browser-session JSON API: ``@login_required`` + ``@api_permission_required``.
+
+    Stamps ``g.requires_csrf = True`` so any downstream introspection can
+    confirm browser-CSRF expectation. The CSRF guard runs in ``before_request``
+    and already enforces tokens for browser sessions — this flag is for
+    auditing/lint, not runtime gating.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        @login_required
+        @api_permission_required(permission)
+        def wrapper(*args, **kwargs):
+            g.requires_csrf = True
+            return view_func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def machine_api_required(scope: str):
+    """
+    Machine-to-machine JSON API: requires a valid API token carrying ``scope``.
+
+    Delegates to ``require_api_scope`` in :mod:`app.api_tokens` so token
+    validation stays single-sourced. On success the wrapped handler runs with
+    ``g.api_token_authenticated = True`` and ``g.requires_csrf = False`` — the
+    CSRF guard treats this as a machine call and skips the session check.
+    """
+    def decorator(view_func):
+        from app.api_tokens import require_api_scope
+
+        @wraps(view_func)
+        def inner(*args, **kwargs):
+            g.api_token_authenticated = True
+            g.requires_csrf = False
+            return view_func(*args, **kwargs)
+
+        guarded = require_api_scope(scope)(inner)
+        # Mark the registered view function so the CSRF before_request guard can
+        # recognise this as a machine-token endpoint *statically* — before the
+        # route body (which sets g.api_token_authenticated) ever runs. Without
+        # this, the CSRF guard would run first, see no token flag, and reject
+        # the tokenized machine call for lacking a browser CSRF token.
+        guarded._is_machine_api = True
+        return guarded
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Catalog of API permission strings (used by the group manager UI)
 # ---------------------------------------------------------------------------
 
@@ -97,4 +156,14 @@ API_PERMISSION_CATALOG = [
     # IDS / IPS
     ("api.system.edit", "System", "/services/api/*", "Run config backup, restore, and system service actions"),
     ("api.ids.edit",        "IDS/IPS",   "/ids/api/*",      "Toggle IDS, manage rulesets, trigger rule updates"),
+    # SOC Portal — two distinct boundaries (Phase 6.2):
+    #   api.soc.control = SmartShield Core admin manages the SOC Portal SERVICE
+    #                     (enable/disable, port, TLS, restart, tier assignment).
+    #   api.soc.manage  = SOC analyst WORK inside the SOC Portal
+    #                     (cases, alerts, investigations, recommendations).
+    ("api.soc.control", "SOC Portal", "/system/soc-portal-*", "Manage the SOC Portal service, access and runtime settings"),
+    ("api.soc.manage",  "SOC Portal", "/soc-portal/api/*",    "SOC analyst case / alert / recommendation work inside the portal"),
+    # Logging — read/export for the dedicated firewall log + future DNS/IDS views
+    ("api.logs.read",   "Logging",    "/firewall/logs/api/*", "Read firewall/DNS/IDS logs and stats"),
+    ("api.logs.export", "Logging",    "/firewall/logs/api/export", "Export firewall log rows as CSV"),
 ]

@@ -1,6 +1,23 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<h1>Welcome to Command Prompt</h1>
-<p>Placeholder for Command Prompt diagnostics.</p>
+<div class="ss-page-head">
+  <h1>Appliance Console</h1>
+</div>
+<div class="ss-card">
+  <div class="ss-card-body">
+    <p>
+      The live appliance console is opened from the floating <strong>Console</strong>
+      button in the top-right navbar. It appears only for superusers, and only
+      after a superuser enables it in
+      <a href="{{ url_for('system.admin_access') }}">System &rarr; Admin Access &rarr; Console Options</a>.
+    </p>
+    <p class="ext-6c1d8f32">
+      Every command typed in the console is recorded in the appliance audit log,
+      with passwords, tokens, and private keys redacted automatically. A live
+      session requires a recent password re-authentication plus a single-use
+      signed WebSocket ticket — see the Manual for details.
+    </p>
+  </div>
+</div>
 {% endblock %}

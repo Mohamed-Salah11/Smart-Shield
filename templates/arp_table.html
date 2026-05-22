@@ -28,7 +28,7 @@
             <div><div class="ss-card-title">Discovered Hosts</div></div>
             <div class="ss-card-actions"><span id="hostCountBadge" class="badge bg-light text-dark">0 hosts</span></div>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="ext-df74e8d8">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
                     <thead>
@@ -86,7 +86,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     const hostsTbody = document.getElementById('hostsTbody');
     const webActivityTbody = document.getElementById('webActivityTbody');
     const hostStatusBanner = document.getElementById('hostStatusBanner');

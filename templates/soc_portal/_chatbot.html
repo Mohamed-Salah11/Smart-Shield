@@ -1,0 +1,245 @@
+<!-- ── SmartShield AI — SOC investigation assistant ──────────────────────── -->
+<style nonce="{{ csp_nonce() }}">
+#ss-chat-fab{position:fixed;bottom:24px;right:24px;z-index:8888;width:52px;height:52px;
+  border-radius:50%;background:var(--soc-primary);color:#fff;display:flex;align-items:center;
+  justify-content:center;font-size:1.25rem;cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,0,0,.45);transition:transform .2s;border:none;}
+#ss-chat-fab:hover{transform:scale(1.1);}
+#ss-chat-panel{position:fixed;bottom:84px;right:24px;z-index:8889;width:390px;
+  height:530px;border-radius:14px;background:var(--soc-panel);
+  border:1px solid var(--soc-border);box-shadow:0 8px 36px rgba(0,0,0,.55);
+  display:flex;flex-direction:column;overflow:hidden;}
+#ss-chat-panel.d-none{display:none!important;}
+#ss-chat-header{padding:12px 14px;background:var(--soc-primary);color:#fff;
+  display:flex;justify-content:space-between;align-items:center;
+  font-weight:700;font-size:.86rem;gap:8px;flex-shrink:0;}
+#ss-chat-header .hdr-btns button{background:none;border:none;color:#fff;
+  cursor:pointer;padding:3px 7px;font-size:.88rem;opacity:.8;border-radius:4px;}
+#ss-chat-header .hdr-btns button:hover{opacity:1;background:rgba(255,255,255,.15);}
+#ss-chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;
+  flex-direction:column;gap:10px;font-size:.84rem;}
+.ss-cm{max-width:90%;padding:9px 13px;border-radius:10px;line-height:1.55;word-break:break-word;}
+.ss-cm.u{align-self:flex-end;background:var(--soc-primary);color:#fff;border-radius:10px 10px 2px 10px;}
+.ss-cm.b{align-self:flex-start;background:var(--soc-card);color:var(--soc-text);
+  border:1px solid var(--soc-border);border-radius:10px 10px 10px 2px;}
+.ss-cm.s{align-self:center;font-size:.74rem;color:var(--soc-muted);font-style:italic;}
+.ss-thinking{align-self:flex-start;color:var(--soc-muted);font-size:.79rem;font-style:italic;padding:4px 2px;}
+#ss-chat-footer{padding:10px;border-top:1px solid var(--soc-border);
+  display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+#ss-chat-input{flex:1;border:1px solid var(--soc-border);border-radius:8px;
+  padding:8px 10px;font-size:.83rem;background:var(--soc-bg);color:var(--soc-text);
+  resize:none;line-height:1.4;font-family:inherit;}
+#ss-chat-input:focus{outline:none;border-color:var(--soc-primary);}
+#ss-chat-send{width:38px;height:38px;border-radius:8px;background:var(--soc-primary);
+  color:#fff;border:none;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:.95rem;flex-shrink:0;}
+#ss-chat-send:disabled{opacity:.5;cursor:not-allowed;}
+/* ── Pending-action approval card ── */
+.ss-action-card{align-self:stretch;border:1px solid var(--soc-primary);border-radius:10px;
+  padding:12px 14px;background:var(--soc-bg);font-size:.82rem;}
+.ss-action-summary{font-weight:700;margin-bottom:5px;color:var(--soc-primary);font-size:.84rem;}
+.ss-action-detail{color:var(--soc-muted);margin-bottom:10px;font-size:.78rem;line-height:1.5;}
+.ss-action-btns{display:flex;gap:8px;}
+.ss-action-approve{background:var(--soc-success);color:#fff;border:none;border-radius:6px;
+  padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;}
+.ss-action-cancel{background:var(--soc-danger);color:#fff;border:none;border-radius:6px;
+  padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;}
+.ss-action-status{font-size:.78rem;color:var(--soc-muted);font-style:italic;}
+#ss-chat-panel.ss-minimized #ss-chat-messages,
+#ss-chat-panel.ss-minimized #ss-chat-footer{display:none!important;}
+#ss-chat-panel.ss-minimized{height:auto!important;border-radius:10px;}
+</style>
+
+<button id="ss-chat-fab" data-action="h_74fe667dd2" title="SmartShield AI — SOC Assistant">
+  <i class="fa-solid fa-robot"></i>
+</button>
+
+<div id="ss-chat-panel" class="d-none">
+  <div id="ss-chat-header">
+    <span><i class="fa-solid fa-robot me-1"></i> SmartShield AI — SOC Assistant</span>
+    <div class="hdr-btns">
+      <button data-action="h_1b030b2595" title="New conversation"><i class="fa-solid fa-rotate"></i></button>
+      <button data-action="h_9535634d8e" title="Minimize"><i class="fa-solid fa-minus"></i></button>
+      <button data-action="h_5cf27d0a9b" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+  <div id="ss-chat-messages"></div>
+  <div id="ss-chat-footer">
+    <textarea id="ss-chat-input" rows="2"
+      placeholder="Ask about alerts, cases, logs, IOCs, threats…"
+      data-action-keydown="h_bf9b98e135"></textarea>
+    <button id="ss-chat-send" data-action="h_2830ee1e39">
+      <i class="fa-solid fa-paper-plane"></i>
+    </button>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function(){
+  let _open = false;
+  let _minimized = false;
+  let _msgs = [];   // message history in OpenAI format
+
+  function _esc(t) {
+    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function _addMsg(text, cls) {
+    const el = document.createElement('div');
+    el.className = 'ss-cm ' + cls;
+    el.innerHTML = _esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    const box = document.getElementById('ss-chat-messages');
+    box.appendChild(el);
+    el.scrollIntoView({behavior:'smooth', block:'end'});
+    return el;
+  }
+
+  function _addActionCard(action) {
+    const card = document.createElement('div');
+    card.className = 'ss-action-card';
+    card.dataset.action = JSON.stringify(action);
+    card.innerHTML =
+      '<div class="ss-action-summary"><i class="fa-solid fa-shield-halved"></i> ' + _esc(action.summary) + '</div>' +
+      '<div class="ss-action-detail">' + _esc(action.detail) + '</div>' +
+      '<div class="ss-action-btns">' +
+        '<button class="ss-action-approve" data-action="h_da8d188278"><i class="fa-solid fa-check"></i> Approve</button>' +
+        '<button class="ss-action-cancel"  data-action="h_2c498503a6"><i class="fa-solid fa-xmark"></i> Cancel</button>' +
+      '</div>';
+    const box = document.getElementById('ss-chat-messages');
+    box.appendChild(card);
+    card.scrollIntoView({behavior:'smooth', block:'end'});
+  }
+
+  window.ssChatApprove = async function(btn) {
+    const card   = btn.closest('.ss-action-card');
+    const action = JSON.parse(card.dataset.action);
+    card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status">Applying…</span>';
+    try {
+      const res = await fetch('/soc-portal/api/approve_action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: action, approved: true}),
+      });
+      let data;
+      try { data = await res.json(); }
+      catch(_) { data = {ok: false, reply: 'Server returned a non-JSON response (status ' + res.status + ').'}; }
+      card.remove();
+      if (data.ok) {
+        _msgs.push({role: 'assistant', content: data.reply});
+        _addMsg(data.reply, 'b');
+      } else {
+        _addMsg('⚠ ' + (data.reply || data.message || 'Action failed.'), 's');
+      }
+    } catch(e) {
+      card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status ext-c9e34862">Error: ' + _esc(e.message) + '</span>';
+    }
+  };
+
+  window.ssChatCancel = function(btn) {
+    const card = btn.closest('.ss-action-card');
+    card.remove();
+    _addMsg('Action cancelled.', 's');
+    _msgs.push({role: 'user', content: 'I changed my mind — please cancel that action.'});
+  };
+
+  window.ssChatToggle = function() {
+    if (_minimized) {
+      _minimized = false;
+      document.getElementById('ss-chat-panel').classList.remove('ss-minimized');
+      document.getElementById('ss-chat-input').focus();
+      return;
+    }
+    _open = !_open;
+    document.getElementById('ss-chat-panel').classList.toggle('d-none', !_open);
+    if (_open && _msgs.length === 0) {
+      _addMsg("Hi! I'm SmartShield AI. I can help you investigate alerts, cases, logs and threat intel — just ask. I can also open, note, escalate or close cases within your SOC tier.", 'b');
+    }
+    if (_open) document.getElementById('ss-chat-input').focus();
+  };
+
+  window.ssChatMinimize = function() {
+    _minimized = !_minimized;
+    document.getElementById('ss-chat-panel').classList.toggle('ss-minimized', _minimized);
+  };
+
+  window.ssChatClear = function() {
+    _msgs = [];
+    document.getElementById('ss-chat-messages').innerHTML = '';
+    _addMsg("Conversation cleared. How can I help with your investigation?", 'b');
+  };
+
+  window.ssChatSend = async function() {
+    const inp  = document.getElementById('ss-chat-input');
+    const text = (inp.value || '').trim();
+    if (!text) return;
+    inp.value = '';
+
+    _addMsg(text, 'u');
+    _msgs.push({role:'user', content: text});
+
+    const box = document.getElementById('ss-chat-messages');
+    const thinking = document.createElement('div');
+    thinking.className = 'ss-thinking';
+    thinking.textContent = 'SmartShield AI is thinking…';
+    box.appendChild(thinking);
+    thinking.scrollIntoView({behavior:'smooth', block:'end'});
+
+    const sendBtn = document.getElementById('ss-chat-send');
+    sendBtn.disabled = true;
+
+    try {
+      const res = await fetch('/soc-portal/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({messages: _msgs}),
+      });
+      thinking.remove();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch(_) {
+        if (res.status === 401 || res.redirected) {
+          _addMsg('⚠ SOC session expired. Please refresh the page and log in again.', 's');
+        } else {
+          _addMsg('⚠ Server error (HTTP ' + res.status + '). Please try again.', 's');
+        }
+        return;
+      }
+
+      if (data.ok) {
+        _msgs = data.messages;
+        _addMsg(data.reply, 'b');
+        if (data.pending_action) {
+          _addActionCard(data.pending_action);
+        }
+      } else {
+        _addMsg('⚠ ' + (data.message || 'Unknown error'), 's');
+      }
+    } catch(e) {
+      thinking.remove();
+      _addMsg('⚠ Could not reach the server. Check your connection and try again.', 's');
+    } finally {
+      sendBtn.disabled = false;
+      inp.focus();
+    }
+  };
+})();
+</script>
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_74fe667dd2'] = function (event, el) { ssChatToggle() };
+  R['h_1b030b2595'] = function (event, el) { ssChatClear() };
+  R['h_9535634d8e'] = function (event, el) { ssChatMinimize() };
+  R['h_5cf27d0a9b'] = function (event, el) { ssChatToggle() };
+  R['h_bf9b98e135'] = function (event, el) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ssChatSend();} };
+  R['h_2830ee1e39'] = function (event, el) { ssChatSend() };
+  R['h_da8d188278'] = function (event, el) { ssChatApprove(this) };
+  R['h_2c498503a6'] = function (event, el) { ssChatCancel(this) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

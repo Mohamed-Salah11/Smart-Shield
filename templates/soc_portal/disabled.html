@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOC Portal — Unavailable</title>
+  <link rel="stylesheet" href="{{ static_v('vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+  <link href="{{ static_v('vendor/inter/inter.css') }}" rel="stylesheet">
+  <style nonce="{{ csp_nonce() }}">
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0f1e;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wrap { text-align: center; max-width: 420px; padding: 2rem; }
+    .icon { font-size: 3.5rem; color: #ef4444; opacity: .65; margin-bottom: 1rem; }
+    h2 { font-weight: 800; color: #4dd9cd; margin-bottom: .5rem; }
+    p  { color: #94a3b8; margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon"><i class="fa-solid fa-shield-halved"></i></div>
+    <h2>SOC Portal Unavailable</h2>
+    <p>The SOC Team Portal has not been enabled by the system administrator.<br>
+       Contact your admin to configure the portal under <strong>System → SOC Portal Settings</strong>.</p>
+    <a class="ext-6f264a3d" href="{{ url_for('auth.login') }}">
+      <i class="fa-solid fa-arrow-left me-1"></i> Go to Admin Login
+    </a>
+  </div>
+</body>
+</html>

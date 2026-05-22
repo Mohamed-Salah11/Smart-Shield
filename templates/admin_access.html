@@ -18,6 +18,7 @@
   </ul>
 
   <form method="POST" action="{{ url_for('system.admin_access') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- Web Configurator -->
     <div class="ss-card">
@@ -31,11 +32,11 @@
             <label class="ss-label">Protocol</label>
             <div class="d-flex gap-4 pt-1">
               <div class="form-check">
-                <input type="radio" class="form-check-input" id="http" name="protocol" value="http" onchange="toggleProtocolFields()" {{ 'checked' if config and config.protocol == 'http' else '' }}>
+                <input type="radio" class="form-check-input" id="http" name="protocol" value="http" data-action-change="h_f39ba83f1c" {{ 'checked' if config and config.protocol == 'http' else '' }}>
                 <label class="form-check-label" for="http">HTTP</label>
               </div>
               <div class="form-check">
-                <input type="radio" class="form-check-input" id="https" name="protocol" value="https" onchange="toggleProtocolFields()" {{ 'checked' if not config or config.protocol != 'http' else '' }}>
+                <input type="radio" class="form-check-input" id="https" name="protocol" value="https" data-action-change="h_a9ed3f3365" {{ 'checked' if not config or config.protocol != 'http' else '' }}>
                 <label class="form-check-label" for="https">HTTPS (SSL/TLS)</label>
               </div>
             </div>
@@ -49,12 +50,12 @@
           </div>
           <div class="ss-field">
             <label class="ss-label">TCP Port</label>
-            <input type="number" id="tcp_port" name="tcp_port" class="form-control" placeholder="Default: 80 / 443" value="{{ config.tcp_port if config and config.tcp_port else '' }}" style="max-width:160px;">
+            <input type="number" id="tcp_port" name="tcp_port" class="form-control ext-844e0595" placeholder="Default: 80 / 443" value="{{ config.tcp_port if config and config.tcp_port else '' }}">
             <p class="ss-hint">Override default port — takes effect after save</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">Max Processes</label>
-            <input type="number" id="max_processes" name="max_processes" class="form-control" value="{{ config.max_processes if config else 2 }}" style="max-width:160px;">
+            <input type="number" id="max_processes" name="max_processes" class="form-control ext-844e0595" value="{{ config.max_processes if config else 2 }}">
             <p class="ss-hint">Concurrent admin sessions (default: 2)</p>
           </div>
           <div class="ss-field">
@@ -130,11 +131,11 @@
           </div>
           <div class="ss-field">
             <label class="ss-label">SSH Port</label>
-            <input type="number" name="ssh_port" class="form-control" value="22" style="max-width:160px;">
+            <input type="number" name="ssh_port" class="form-control ext-844e0595" value="22">
             <p class="ss-hint">Default: 22</p>
           </div>
         </div>
-        <div class="ss-toggle-row" style="margin-top:0;">
+        <div class="ss-toggle-row ext-53896af7">
           <label class="ss-toggle"><input type="checkbox" name="ssh_agent_forwarding"><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable SSH Agent Forwarding</p></div>
         </div>
@@ -169,7 +170,7 @@
         <div class="ss-field">
           <label class="ss-label">Pass List (bypass login protection)</label>
           <div id="pass-list-container" class="mb-2"></div>
-          <button type="button" class="btn btn-success btn-sm" onclick="addPassList()">
+          <button type="button" class="btn btn-success btn-sm" data-action="h_0853756401">
             <i class="fa-solid fa-plus me-1"></i>Add Address
           </button>
           <p class="ss-hint">Addresses in this list bypass brute-force checking</p>
@@ -192,7 +193,7 @@
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label">Serial Speed</label>
-            <select name="serial_speed" class="form-select" style="max-width:200px;">
+            <select name="serial_speed" class="form-select ext-3831ac5f">
               <option value="115200" selected>115200</option>
               <option value="57600">57600</option>
               <option value="38400">38400</option>
@@ -202,7 +203,7 @@
           </div>
           <div class="ss-field">
             <label class="ss-label">Primary Console</label>
-            <select name="primary_console" class="form-select" style="max-width:200px;">
+            <select name="primary_console" class="form-select ext-3831ac5f">
               <option value="video">Video Console</option>
               <option value="serial">Serial Console</option>
             </select>
@@ -219,8 +220,23 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" name="console_menu"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" name="console_menu"
+            {% if config and config['console_menu'] %}checked{% endif %}><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Password-protect Console Menu</p></div>
+        </div>
+        <div class="ss-toggle-row">
+          <label class="ss-toggle"><input type="checkbox" name="terminal_enabled"
+            {% if config and config['terminal_enabled'] %}checked{% endif %}><span class="ss-toggle-slider"></span></label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable web Appliance Console</p>
+            <p class="ss-toggle-hint">
+              Off by default. When on, superusers can open the floating
+              Console widget — which spawns a live root shell. Every command
+              is audited (with secrets redacted) and the session requires a
+              recent password re-authentication plus a single-use signed
+              WebSocket ticket.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -234,7 +250,7 @@
   </form>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 let passListCounter = 0;
 
 function addPassList() {
@@ -244,12 +260,12 @@ function addPassList() {
   div.className = 'd-flex align-items-center gap-2 mb-2';
   div.id = 'pass-list-' + passListCounter;
   div.innerHTML = `
-    <input type="text" name="pass_list_address[]" class="form-control" placeholder="Address" style="max-width:220px;">
+    <input type="text" name="pass_list_address[]" class="form-control ext-ac5a4114" placeholder="Address">
     <span class="text-muted">/</span>
-    <select name="pass_list_cidr[]" class="form-select" style="max-width:100px;">
+    <select name="pass_list_cidr[]" class="form-select ext-ff65788c">
       ${[128,127,126,125,124,123,122,121,120].map(v=>`<option>${v}</option>`).join('')}
     </select>
-    <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('pass-list-${passListCounter}').remove()"><i class="fa-solid fa-trash"></i></button>`;
+    <button type="button" class="btn btn-danger btn-sm" data-action="h_11a7d98be2"><i class="fa-solid fa-trash"></i></button>`;
   container.appendChild(div);
 }
 
@@ -264,3 +280,16 @@ function toggleProtocolFields() {
 document.addEventListener('DOMContentLoaded', toggleProtocolFields);
 </script>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_f39ba83f1c'] = function (event, el) { toggleProtocolFields() };
+  R['h_a9ed3f3365'] = function (event, el) { toggleProtocolFields() };
+  R['h_0853756401'] = function (event, el) { addPassList() };
+  R['h_11a7d98be2'] = function (event, el) { document.getElementById('pass-list-${passListCounter}').remove() };
+})();
+</script>
+<!-- /inline-handlers:auto -->

@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 /* ═══════════════════════════════════════════
-   PRO DASHBOARD — Smart Shield
+   PRO DASHBOARD — SmartShield
 ═══════════════════════════════════════════ */
 
 /* ── Toolbar ── */
@@ -156,16 +156,16 @@
 {% endblock %}
 
 {% block main %}
-<div style="width:100%;max-width:none;">
+<div class="ext-16352fdf">
 
   <!-- Toolbar -->
   <div class="db-bar">
     <div class="db-bar-left">
-      <h1 class="db-title">Dashboard</h1>
+      <h1 class="db-title">Command Center</h1>
     </div>
     <div class="db-bar-right">
       <span class="db-clock" id="dbClock">--:--:-- UTC</span>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;color:var(--secondary);cursor:pointer;">
+      <label class="ext-0a190a27">
         <div class="form-check form-switch m-0">
           <input class="form-check-input" type="checkbox" id="dbAutoRefresh" role="switch">
         </div>
@@ -181,8 +181,8 @@
   <!-- Identity Banner -->
   <div class="db-banner" data-wid="banner">
     <div class="db-banner-pulse"></div>
-    <div style="flex:1;min-width:0;">
-      <div class="db-banner-hostname" id="dbHostname">Smart Shield</div>
+    <div class="ext-89bd09bd">
+      <div class="db-banner-hostname" id="dbHostname">SmartShield</div>
       <div class="db-banner-meta">
         <span class="db-meta-item">Timezone: <strong id="dbTimezone">—</strong></span>
         <span class="db-meta-item">Theme: <strong id="dbTheme">—</strong></span>
@@ -194,35 +194,35 @@
 
   <!-- KPI Strip -->
   <div class="db-kpi-strip">
-    <div class="db-kpi" data-wid="kpi_rules" style="--kpi-accent:#2563eb;">
+    <div class="db-kpi ext-bcebb746" data-wid="kpi_rules">
       <div>
         <div class="db-kpi-val" id="kpiRules">—</div>
         <div class="db-kpi-label">Firewall Rules</div>
         <div class="db-kpi-note" id="kpiRulesNote">WAN · LAN · Floating</div>
       </div>
     </div>
-    <div class="db-kpi" data-wid="kpi_vpn" style="--kpi-accent:#0891b2;">
+    <div class="db-kpi ext-7077eea4" data-wid="kpi_vpn">
       <div>
         <div class="db-kpi-val" id="kpiVpn">—</div>
         <div class="db-kpi-label">VPN Servers</div>
         <div class="db-kpi-note" id="kpiVpnNote">OpenVPN configured</div>
       </div>
     </div>
-    <div class="db-kpi" data-wid="kpi_users" style="--kpi-accent:#10b981;">
+    <div class="db-kpi ext-aa34fe95" data-wid="kpi_users">
       <div>
         <div class="db-kpi-val" id="kpiUsers">—</div>
         <div class="db-kpi-label">Users &amp; Groups</div>
         <div class="db-kpi-note" id="kpiUsersNote">Accounts · Groups</div>
       </div>
     </div>
-    <div class="db-kpi" data-wid="kpi_security" style="--kpi-accent:#7c3aed;">
+    <div class="db-kpi ext-32d1a209" data-wid="kpi_security">
       <div>
         <div class="db-kpi-val" id="kpiSecurity">—</div>
         <div class="db-kpi-label">Security Rules</div>
         <div class="db-kpi-note">DNS · Web · App filters</div>
       </div>
     </div>
-    <div class="db-kpi" data-wid="kpi_auth" style="--kpi-accent:#f59e0b;">
+    <div class="db-kpi ext-a4a8f1b3" data-wid="kpi_auth">
       <div>
         <div class="db-kpi-val" id="kpiAuth">—</div>
         <div class="db-kpi-label">Auth Events</div>
@@ -439,6 +439,27 @@
       </div>
     </div>
 
+    <!-- SOC Portal Service — service-status card only; no SOC work data (separation Rule 2) -->
+    <div class="db-card" data-wid="socportal">
+      <div class="db-card-head">
+        <span class="db-card-title">SOC Portal Service</span>
+        <div class="db-card-actions">
+          <button class="db-icon-btn" data-wa="collapse">▲</button>
+          <button class="db-icon-btn" data-wa="hide">✕</button>
+        </div>
+      </div>
+      <div class="db-card-body">
+        <div class="db-info-grid">
+          <div class="db-info-row"><div class="db-info-lbl">Status</div><div class="db-info-val" id="socStatus">—</div></div>
+          <div class="db-info-row"><div class="db-info-lbl">Port</div><div class="db-info-val" id="socPort">—</div></div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('system.soc_portal_settings') }}" class="btn btn-sm btn-secondary">SOC Portal Control</a>
+          <a id="socOpenBtn" href="/soc-portal/login" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Open Portal</a>
+        </div>
+      </div>
+    </div>
+
     <!-- Quick Navigation -->
     <div class="db-card db-col-full" data-wid="quicknav">
       <div class="db-card-head">
@@ -501,12 +522,12 @@
     <div class="db-card db-col-full" data-wid="events">
       <div class="db-card-head">
         <span class="db-card-title">
-          <span id="evDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,.2);margin-right:6px;animation:dbpulse 2.5s ease-in-out infinite;vertical-align:middle;"></span>
+          <span class="ext-86cc4a31" id="evDot"></span>
           Live Event Stream
         </span>
-        <div class="db-card-actions" style="gap:8px;">
-          <span id="evNewCount" style="display:none;padding:1px 7px;border-radius:99px;font-size:.68rem;font-weight:700;background:rgba(59,130,246,.15);color:#93c5fd;"></span>
-          <a href="{{ url_for('status.system_logs') }}" style="color:var(--muted);font-size:.72rem;font-weight:600;text-decoration:none;padding:2px 6px;border-radius:4px;">Monitor ↗</a>
+        <div class="db-card-actions ext-304cd5c4">
+          <span class="ext-681d9f31" id="evNewCount"></span>
+          <a class="ext-c147a454" href="{{ url_for('status.system_logs') }}">Monitor ↗</a>
           <button class="db-icon-btn" data-wa="collapse">▲</button>
           <button class="db-icon-btn" data-wa="hide">✕</button>
         </div>
@@ -532,18 +553,18 @@
         <h5 class="modal-title fw-bold">Widget Manager</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body p-0 d-flex" style="min-height:460px;">
+      <div class="modal-body p-0 d-flex ext-fc6438e2">
 
         <!-- Category sidebar -->
         <div class="wp-cats">
-          <button class="wp-cat-btn active" onclick="wpShowCat('all',this)">All Widgets</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('network',this)">Network</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('firewall',this)">Firewall</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('vpn',this)">VPN</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('services',this)">Services</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('security',this)">Security</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('system',this)">System</button>
-          <button class="wp-cat-btn" onclick="wpShowCat('overview',this)">Overview</button>
+          <button class="wp-cat-btn active" data-action="h_b54ee843ad">All Widgets</button>
+          <button class="wp-cat-btn" data-action="h_00b7a5e71e">Network</button>
+          <button class="wp-cat-btn" data-action="h_3988fa7dc5">Firewall</button>
+          <button class="wp-cat-btn" data-action="h_bbd1069d3e">VPN</button>
+          <button class="wp-cat-btn" data-action="h_c40d6c4a6a">Services</button>
+          <button class="wp-cat-btn" data-action="h_f85006fa8c">Security</button>
+          <button class="wp-cat-btn" data-action="h_e55dbc36b1">System</button>
+          <button class="wp-cat-btn" data-action="h_4c7083f7e3">Overview</button>
         </div>
 
         <!-- Widget list -->
@@ -552,16 +573,16 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-sm btn-outline-secondary" onclick="wpSelectAll()">Enable All</button>
-        <button class="btn btn-sm btn-outline-danger" onclick="wpSelectNone()">Disable All</button>
+        <button class="btn btn-sm btn-outline-secondary" data-action="h_e4b33e190e">Enable All</button>
+        <button class="btn btn-sm btn-outline-danger" data-action="h_9ee8ba35e8">Disable All</button>
         <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-<script>
+<script src="{{ static_v('vendor/sortablejs/Sortable.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
 (() => {
 const P   = {{ dashboard_payload | tojson }};
 const API = "{{ url_for('system.dashboard_data') }}";
@@ -617,7 +638,7 @@ const render=p=>{
   const oc=p.object_counts||{}, ss=p.session_summary||{};
 
   /* Banner */
-  txt('dbHostname',p.hostname||'Smart Shield');
+  txt('dbHostname',p.hostname||'SmartShield');
   txt('dbTimezone',p.timezone||'—');
   txt('dbTheme',p.theme||'—');
   txt('dbUpdated',fmt(p.generated_at));
@@ -684,11 +705,19 @@ const render=p=>{
   /* System */
   txt('siHost',p.hostname||'—');txt('siTz',p.timezone||'—');txt('siUpd',fmt(p.generated_at));
 
+  /* SOC Portal service status — service card only, never SOC work data */
+  const soc=p.soc_portal||{};
+  const socEl=$('socStatus');
+  if(socEl){socEl.textContent=soc.enabled?'Enabled':'Disabled';}
+  txt('socPort',soc.port||8443);
+  const socOpen=$('socOpenBtn');
+  if(socOpen)socOpen.style.display=soc.enabled?'':'none';
+
   /* Sessions */
   const tb=$('tblSessions');
   const rows=p.recent_session_events||[];
   if(!rows.length){tb.innerHTML='<tr><td colspan="5" class="td-empty">No session records yet.</td></tr>';}
-  else tb.innerHTML=rows.map(r=>`<tr><td class="td-t">${esc(fmt(r.timestamp))}</td><td><strong style="font-size:.82rem;">${esc(r.username||'—')}</strong></td><td>${actBadge(r.action)}</td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td style="font-size:.82rem;">${esc(r.details?.reason||'—')}</td></tr>`).join('');
+  else tb.innerHTML=rows.map(r=>`<tr><td class="td-t">${esc(fmt(r.timestamp))}</td><td><strong class="ext-0de4e77b">${esc(r.username||'—')}</strong></td><td>${actBadge(r.action)}</td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td class="ext-0de4e77b">${esc(r.details?.reason||'—')}</td></tr>`).join('');
 };
 
 /* ── Refresh ── */
@@ -722,6 +751,7 @@ const ALL_WIDS=[
   {id:'security_profiles', cat:'security', label:'Security Profiles', desc:'DNS, Web and App filter rule counts'},
   {id:'ids',          cat:'security',  label:'IDS / IPS',              desc:'Suricata status, mode and interface'},
   {id:'sysinfo',      cat:'system',    label:'System Info',            desc:'Hostname, timezone and config update time'},
+  {id:'socportal',    cat:'system',    label:'SOC Portal Service',     desc:'SOC Portal service status and quick access (no SOC work data)'},
   {id:'quicknav',     cat:'overview',  label:'Quick Navigation',       desc:'One-click access to all project pages'},
   {id:'sessions',     cat:'overview',  label:'Recent Sessions',        desc:'Latest login/logout audit events'},
   {id:'events',       cat:'overview',  label:'Live Event Stream',      desc:'Real-time audit log with 5-second polling'},
@@ -786,8 +816,8 @@ const renderWpPanel=(cat)=>{
   const h=getHid();
   const items=cat==='all'?ALL_WIDS:ALL_WIDS.filter(w=>w.cat===cat);
   panel.innerHTML=items.map(w=>`
-    <div class="wp-item" onclick="wpToggle('${w.id}',this)">
-      <input type="checkbox" class="form-check-input" id="wp-${w.id}" ${h.has(w.id)?'':'checked'} onclick="event.stopPropagation();wpToggle('${w.id}',this.closest('.wp-item'))">
+    <div class="wp-item" data-action="h_1291445301">
+      <input type="checkbox" class="form-check-input" id="wp-${w.id}" ${h.has(w.id)?'':'checked'} data-action="h_9397384e89">
       <div class="wp-item-info">
         <div class="wp-item-name">${esc(w.label)}</div>
         <div class="wp-item-desc">${esc(w.desc)}</div>
@@ -817,14 +847,16 @@ document.getElementById('wpModal')?.addEventListener('show.bs.modal',()=>renderW
 
 /* ── Live event stream ── */
 let evLatestTs='',evNewCount=0;
-const evMakeRow=(r,animate)=>`<tr style="${animate?'animation:dbEvSlide .25s ease':''}"><td class="td-t">${esc(fmt(r.timestamp))}</td><td>${catBadge(r.category)}</td><td>${actBadge(r.action)}</td><td><strong style="font-size:.81rem;">${esc(r.username||'—')}</strong></td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td style="font-size:.81rem;">${detail(r)}</td></tr>`;
+const evMakeRow=(r,animate)=>`<tr class="ext-82079ad6"><td class="td-t">${esc(fmt(r.timestamp))}</td><td>${catBadge(r.category)}</td><td>${actBadge(r.action)}</td><td><strong class="ext-6869d900">${esc(r.username||'—')}</strong></td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td class="ext-6869d900">${detail(r)}</td></tr>`;
 
 const evPoll=async(initial=false)=>{
   const tb=$('tblEvents');if(!tb)return;
   try{
     const since=(evLatestTs&&!initial)?`&since=${encodeURIComponent(evLatestTs)}`:'';
     const limit=initial?40:50;
-    const res=await fetch(`${EV_API}?limit=${limit}${since}`,{cache:'no-store'});
+    // Firewall dashboard is SmartShield Core-only — hide_soc=1 keeps SOC team
+    // activity out of the live event stream.
+    const res=await fetch(`${EV_API}?limit=${limit}${since}&hide_soc=1`,{cache:'no-store'});
     const body=await res.json();
     const events=body.events||[];
     if(!events.length)return;
@@ -882,3 +914,24 @@ evPoll(true);setInterval(()=>evPoll(false),5000);
 })();
 </script>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_b54ee843ad'] = function (event, el) { wpShowCat('all',this) };
+  R['h_00b7a5e71e'] = function (event, el) { wpShowCat('network',this) };
+  R['h_3988fa7dc5'] = function (event, el) { wpShowCat('firewall',this) };
+  R['h_bbd1069d3e'] = function (event, el) { wpShowCat('vpn',this) };
+  R['h_c40d6c4a6a'] = function (event, el) { wpShowCat('services',this) };
+  R['h_f85006fa8c'] = function (event, el) { wpShowCat('security',this) };
+  R['h_e55dbc36b1'] = function (event, el) { wpShowCat('system',this) };
+  R['h_4c7083f7e3'] = function (event, el) { wpShowCat('overview',this) };
+  R['h_e4b33e190e'] = function (event, el) { wpSelectAll() };
+  R['h_9ee8ba35e8'] = function (event, el) { wpSelectNone() };
+  R['h_1291445301'] = function (event, el) { wpToggle('${w.id}',this) };
+  R['h_9397384e89'] = function (event, el) { event.stopPropagation();wpToggle('${w.id}',this.closest('.wp-item')) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

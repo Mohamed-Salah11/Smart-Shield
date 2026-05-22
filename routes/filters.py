@@ -35,10 +35,11 @@ GET  /filters/api/signatures           → JSON list of built-in signatures
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
+from app.api_auth import api_permission_required
 from app.audit_log import log_event
 from app.auth_utils import login_required
 from app.database import get_db
-from app.validators import validate_ip
+from app.validators import normalize_ports, validate_ip
 from app.services.app_filter import (
     APP_SIGNATURES,
     add_app_filter_rule,
@@ -70,29 +71,6 @@ from app.services.web_filter import (
 filters_bp = Blueprint("filters", __name__, url_prefix="/filters")
 
 
-def _auto_enable_captive_portal(conn) -> None:
-    """Auto-enable captive portal in DB if any content policy rule is enabled."""
-    import json as _json
-    has_rules = (
-        conn.execute("SELECT 1 FROM filter_dns_rules WHERE enabled=1 LIMIT 1").fetchone()
-        or conn.execute("SELECT 1 FROM filter_web_rules WHERE enabled=1 LIMIT 1").fetchone()
-        or conn.execute("SELECT 1 FROM filter_app_rules WHERE enabled=1 LIMIT 1").fetchone()
-    )
-    if not has_rules:
-        return
-    row = conn.execute(
-        "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
-    ).fetchone()
-    settings = _json.loads(row["value_json"]) if row else {}
-    if not settings.get("enabled", False):
-        settings["enabled"] = True
-        conn.execute(
-            "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES (?, ?)",
-            ("captive_portal_settings", _json.dumps(settings)),
-        )
-        conn.commit()
-
-
 # ---------------------------------------------------------------------------
 # Separate pages per filter type
 # ---------------------------------------------------------------------------
@@ -102,6 +80,49 @@ def _auto_enable_captive_portal(conn) -> None:
 def filters_index():
     from flask import redirect
     return redirect(url_for("filters.dns_filter_page"))
+
+
+@filters_bp.route("/api/content-policy/mode", methods=["GET"])
+@login_required
+def api_content_policy_mode_get():
+    from app.services.content_policy import CONTENT_POLICY_MODES, get_content_policy_mode
+    return jsonify({
+        "ok": True,
+        "mode": get_content_policy_mode(get_db()),
+        "modes": list(CONTENT_POLICY_MODES),
+    })
+
+
+@filters_bp.route("/api/content-policy/mode", methods=["POST"])
+@login_required
+@api_permission_required("api.network.edit")
+def api_content_policy_mode_set():
+    import json as _json
+    from app.services.content_policy import CONTENT_POLICY_MODES
+    data = request.get_json(force=True) or {}
+    mode = (data.get("mode") or "").strip().lower()
+    if mode not in CONTENT_POLICY_MODES:
+        return jsonify({"ok": False, "message": "Invalid mode."}), 400
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='content_policy_settings'"
+    ).fetchone()
+    cfg = _json.loads(row["value_json"]) if row else {}
+    cfg["mode"] = mode
+    conn.execute(
+        "INSERT INTO service_state (key_name, value_json, updated_at) "
+        "VALUES ('content_policy_settings', ?, CURRENT_TIMESTAMP) "
+        "ON CONFLICT(key_name) DO UPDATE SET value_json=excluded.value_json, "
+        "updated_at=CURRENT_TIMESTAMP",
+        (_json.dumps(cfg),),
+    )
+    conn.commit()
+    log_event(
+        category="system", action="content_policy_mode_set",
+        username=session.get("username"), remote_addr=request.remote_addr,
+        details={"mode": mode},
+    )
+    return jsonify({"ok": True, "mode": mode})
 
 
 @filters_bp.route("/dns")
@@ -150,6 +171,7 @@ def app_filter_page():
 
 @filters_bp.route("/dns/add", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def dns_add():
     data = request.get_json(force=True) or {}
     domain = (data.get("domain") or "").strip()
@@ -180,6 +202,7 @@ def dns_add():
 
 @filters_bp.route("/dns/<int:rule_id>/toggle", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def dns_toggle(rule_id):
     data = request.get_json(force=True) or {}
     enabled = bool(data.get("enabled", True))
@@ -190,6 +213,7 @@ def dns_toggle(rule_id):
 
 @filters_bp.route("/dns/<int:rule_id>/edit", methods=["PUT"])
 @login_required
+@api_permission_required("api.network.edit")
 def dns_edit(rule_id):
     data = request.get_json(force=True) or {}
     domain = (data.get("domain") or "").strip()
@@ -222,6 +246,7 @@ def dns_edit(rule_id):
 
 @filters_bp.route("/dns/<int:rule_id>/delete", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def dns_delete(rule_id):
     conn = get_db()
     delete_dns_filter_rule(conn, rule_id)
@@ -235,29 +260,32 @@ def dns_delete(rule_id):
 
 @filters_bp.route("/dns/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def dns_apply():
     conn = get_db()
+    # apply_dns_filter() already regenerates unbound.conf and reloads Unbound
+    # (see dns_filter.apply_dns_filter → apply_unbound). Do NOT call
+    # apply_unbound() again here — duplicate reloads spam the audit log and
+    # complicate rollback.
     result = apply_dns_filter(conn)
-    if result.get("ok"):
-        try:
-            from app.services.dns_writer import apply_unbound
-            unbound_result = apply_unbound(conn)
-            result["unbound"] = unbound_result.get("message", "")
-            if not unbound_result.get("ok"):
-                result["ok"] = False
-                result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
-        except Exception as exc:
-            result["unbound_warning"] = str(exc)
-    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
+    # Re-apply captive portal anchor only if the admin has already explicitly
+    # enabled it. Content-policy apply must NOT auto-enable captive portal —
+    # the two features are independent.
     try:
-        _auto_enable_captive_portal(conn)
-        from app.services.captive_portal import apply_captive_portal
-        cp_result = apply_captive_portal(conn)
-        result["captive_portal"] = cp_result.get("message", "")
+        import json as _cp_json
+        _cp_row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        _cp_cfg = _cp_json.loads(_cp_row["value_json"]) if _cp_row else {}
+        if _cp_cfg.get("enabled", False):
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
     except Exception as exc:
         result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="dns_filter_apply",
+        severity="high" if not result.get("ok") else "info",
         username=session.get("username"), remote_addr=request.remote_addr,
         details=result,
     )
@@ -270,6 +298,7 @@ def dns_apply():
 
 @filters_bp.route("/web/add", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def web_add():
     data = request.get_json(force=True) or {}
     url_pattern = (data.get("url_pattern") or "").strip()
@@ -299,6 +328,7 @@ def web_add():
 
 @filters_bp.route("/web/<int:rule_id>/toggle", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def web_toggle(rule_id):
     data = request.get_json(force=True) or {}
     enabled = bool(data.get("enabled", True))
@@ -309,6 +339,7 @@ def web_toggle(rule_id):
 
 @filters_bp.route("/web/<int:rule_id>/edit", methods=["PUT"])
 @login_required
+@api_permission_required("api.network.edit")
 def web_edit(rule_id):
     data = request.get_json(force=True) or {}
     url_pattern = (data.get("url_pattern") or "").strip()
@@ -333,6 +364,7 @@ def web_edit(rule_id):
 
 @filters_bp.route("/web/<int:rule_id>/delete", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def web_delete(rule_id):
     conn = get_db()
     delete_web_filter_rule(conn, rule_id)
@@ -346,29 +378,30 @@ def web_delete(rule_id):
 
 @filters_bp.route("/web/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def web_apply():
     conn = get_db()
+    # apply_web_filter() delegates to apply_unbound() internally — calling it
+    # again here would reload Unbound twice per click.
     result = apply_web_filter(conn)
-    if result.get("ok"):
-        try:
-            from app.services.dns_writer import apply_unbound
-            unbound_result = apply_unbound(conn)
-            result["unbound"] = unbound_result.get("message", "")
-            if not unbound_result.get("ok"):
-                result["ok"] = False
-                result["message"] = result.get("message", "") + " | Unbound: " + unbound_result.get("message", "")
-        except Exception as exc:
-            result["unbound_warning"] = str(exc)
-    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
+    # Re-apply captive portal anchor only if the admin has already explicitly
+    # enabled it. Content-policy apply must NOT auto-enable captive portal —
+    # the two features are independent.
     try:
-        _auto_enable_captive_portal(conn)
-        from app.services.captive_portal import apply_captive_portal
-        cp_result = apply_captive_portal(conn)
-        result["captive_portal"] = cp_result.get("message", "")
+        import json as _cp_json
+        _cp_row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        _cp_cfg = _cp_json.loads(_cp_row["value_json"]) if _cp_row else {}
+        if _cp_cfg.get("enabled", False):
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
     except Exception as exc:
         result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="web_filter_apply",
+        severity="high" if not result.get("ok") else "info",
         username=session.get("username"), remote_addr=request.remote_addr,
         details=result,
     )
@@ -381,11 +414,20 @@ def web_apply():
 
 @filters_bp.route("/app/add", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_add():
     data = request.get_json(force=True) or {}
     app_name = (data.get("app_name") or "").strip()
     if not app_name:
         return jsonify({"ok": False, "message": "Application name is required."}), 400
+
+    try:
+        # normalize_ports converts hyphen ranges to PF-canonical colons and
+        # rejects shell/PF metacharacters before the value ever reaches the
+        # rule generator.
+        ports = normalize_ports(data.get("ports") or "", allow_empty=True)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
 
     try:
         conn = get_db()
@@ -395,7 +437,7 @@ def app_add():
             action=(data.get("action") or "block").lower(),
             block_dns=bool(data.get("block_dns", True)),
             block_ports=bool(data.get("block_ports", False)),
-            ports=(data.get("ports") or "").strip(),
+            ports=ports,
             protocol=(data.get("protocol") or "tcp+udp"),
             domains=(data.get("domains") or "").strip(),
             category=(data.get("category") or "custom").strip(),
@@ -423,6 +465,7 @@ def app_add():
 
 @filters_bp.route("/app/add-signature", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_add_signature():
     data = request.get_json(force=True) or {}
     sig_key = (data.get("sig_key") or "").strip().lower()
@@ -453,6 +496,7 @@ def app_add_signature():
 
 @filters_bp.route("/app/<int:rule_id>/toggle", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_toggle(rule_id):
     data = request.get_json(force=True) or {}
     enabled = bool(data.get("enabled", True))
@@ -463,11 +507,16 @@ def app_toggle(rule_id):
 
 @filters_bp.route("/app/<int:rule_id>/edit", methods=["PUT"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_edit(rule_id):
     data = request.get_json(force=True) or {}
     app_name = (data.get("app_name") or "").strip()
     if not app_name:
         return jsonify({"ok": False, "message": "Application name is required."}), 400
+    try:
+        ports = normalize_ports(data.get("ports") or "", allow_empty=True)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
     try:
         conn = get_db()
         update_app_filter_rule(
@@ -476,7 +525,7 @@ def app_edit(rule_id):
             action=(data.get("action") or "block").lower(),
             block_dns=bool(data.get("block_dns", True)),
             block_ports=bool(data.get("block_ports", False)),
-            ports=(data.get("ports") or "").strip(),
+            ports=ports,
             protocol=(data.get("protocol") or "tcp+udp"),
             domains=(data.get("domains") or "").strip(),
             category=(data.get("category") or "custom").strip(),
@@ -495,6 +544,7 @@ def app_edit(rule_id):
 
 @filters_bp.route("/app/<int:rule_id>/delete", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_delete(rule_id):
     conn = get_db()
     delete_app_filter_rule(conn, rule_id)
@@ -508,20 +558,29 @@ def app_delete(rule_id):
 
 @filters_bp.route("/app/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def app_apply():
     conn = get_db()
     # apply_app_filter() handles Unbound + PF internally and returns proper ok status
     result = apply_app_filter(conn)
-    # Auto-enable captive portal if content policy rules exist, then apply PF anchor
+    # Re-apply captive portal anchor only if the admin has already explicitly
+    # enabled it. Content-policy apply must NOT auto-enable captive portal —
+    # the two features are independent.
     try:
-        _auto_enable_captive_portal(conn)
-        from app.services.captive_portal import apply_captive_portal
-        cp_result = apply_captive_portal(conn)
-        result["captive_portal"] = cp_result.get("message", "")
+        import json as _cp_json
+        _cp_row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        _cp_cfg = _cp_json.loads(_cp_row["value_json"]) if _cp_row else {}
+        if _cp_cfg.get("enabled", False):
+            from app.services.captive_portal import apply_captive_portal
+            cp_result = apply_captive_portal(conn)
+            result["captive_portal"] = cp_result.get("message", "")
     except Exception as exc:
         result["captive_portal_warning"] = str(exc)
     log_event(
         category="system", action="app_filter_apply",
+        severity="high" if not result.get("ok") else "info",
         username=session.get("username"), remote_addr=request.remote_addr,
         details=result,
     )
@@ -572,6 +631,98 @@ def api_preview():
     return jsonify({"ok": True, **result})
 
 
+@filters_bp.route("/api/runtime/policy-status")
+@login_required
+def api_runtime_policy_status():
+    """Single endpoint the dashboard polls for live DNS / content-policy state.
+
+    Surfaces what's actually running right now so an operator can tell at a
+    glance whether their last apply landed: Unbound up/down, active mode,
+    rule counts per filter, DoH-block flag, whitelist-only flag, and the
+    most recent apply error (from the audit log) when present.
+    """
+    import json as _json
+    import sys
+    from app.services.content_policy import (
+        CONTENT_POLICY_MODES,
+        DOH_PROVIDER_DOMAINS,
+        get_content_policy_mode,
+    )
+
+    conn = get_db()
+    out: dict = {"ok": True}
+
+    # Unbound liveness — only meaningful on FreeBSD.
+    if sys.platform.startswith("freebsd"):
+        try:
+            from app.services.priv_helper import run_privileged
+            r = run_privileged("service.status", service="unbound")
+            out["unbound_running"] = bool(r and r.get("ok"))
+        except Exception as exc:
+            out["unbound_running"] = False
+            out["unbound_error"]   = str(exc)
+    else:
+        out["unbound_running"] = None  # not applicable off-FreeBSD
+
+    # Current mode + per-filter rule counts.
+    try:
+        out["mode"]       = get_content_policy_mode(conn)
+        out["modes"]      = list(CONTENT_POLICY_MODES)
+    except Exception as exc:
+        out["mode"] = ""
+        out["mode_error"] = str(exc)
+
+    def _count(table: str, where: str = "enabled = 1") -> int:
+        try:
+            row = conn.execute(f"SELECT COUNT(*) AS c FROM {table} WHERE {where}").fetchone()
+            return int(row["c"]) if row else 0
+        except Exception:
+            return 0
+
+    out["counts"] = {
+        "dns_rules": _count("filter_dns_rules"),
+        "web_rules": _count("filter_web_rules"),
+        "app_rules": _count("filter_app_rules"),
+    }
+
+    # DoH block flag from the content_policy_settings JSON blob.
+    try:
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='content_policy_settings'"
+        ).fetchone()
+        cfg = _json.loads(row["value_json"]) if row else {}
+    except Exception:
+        cfg = {}
+    out["doh_blocked"]       = bool(cfg.get("block_known_doh"))
+    out["doh_provider_count"] = len(DOH_PROVIDER_DOMAINS)
+    out["whitelist_only"]    = out.get("mode") == "whitelist_only"
+
+    # Most recent apply event (success or failure) — picks up either filter.
+    try:
+        row = conn.execute(
+            "SELECT created_at, action, severity, details_json "
+            "FROM audit_log "
+            "WHERE action IN ('dns_filter_apply','web_filter_apply','app_filter_apply') "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row:
+            out["last_apply"] = {
+                "at":       row["created_at"],
+                "action":   row["action"],
+                "severity": row["severity"],
+            }
+            try:
+                d = _json.loads(row["details_json"] or "{}")
+                if not d.get("ok", True):
+                    out["last_apply_error"] = d.get("message", "")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return jsonify(out)
+
+
 @filters_bp.route("/api/export/<filter_type>")
 @login_required
 def api_export(filter_type: str):
@@ -591,6 +742,7 @@ def api_export(filter_type: str):
 
 @filters_bp.route("/api/import/<filter_type>", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def api_import(filter_type: str):
     """
     Bulk-import a newline-separated list of domains/URLs.

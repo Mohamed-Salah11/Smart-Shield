@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""
+Idempotent migration of inline event handlers (onclick=..., onchange=..., etc.)
+in templates/ for strict-CSP compatibility.
+
+Per template:
+
+  1. Find every attribute matching ``on<event>="<body>"`` (and single-quoted form).
+  2. Replace with a ``data-action-<event>="<deterministic-id>"`` attribute (or
+     just ``data-action`` for click handlers, which the delegator falls back
+     to when no event-specific key is set).
+  3. Append a single ``<script nonce="{{ csp_nonce() }}">`` registration block
+     at the end of the template that wires every handler:
+
+         SSActions['<id>'] = function (event, el) { /* original body */ };
+
+  The handler body is kept verbatim, so any Jinja-interpolated values inside
+  (``{{ thing }}``) still render at request time. The id is deterministic
+  (sha8 of template path + body) so re-running the script is a no-op for
+  already-migrated content.
+"""
+from __future__ import annotations
+
+import hashlib
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = ROOT / "templates"
+
+RAW_RE = re.compile(r"({%\s*raw\s*%}.*?{%\s*endraw\s*%}|{#.*?#})", re.DOTALL)
+INLINE_HANDLERS_MARKER_OPEN = "<!-- inline-handlers:auto -->"
+INLINE_HANDLERS_MARKER_CLOSE = "<!-- /inline-handlers:auto -->"
+
+# Recognized DOM events we will migrate. Anything else stays inline (rare).
+EVENTS = (
+    "click", "change", "submit", "input", "focus", "blur",
+    "keydown", "keyup", "keypress", "mouseover", "mouseout",
+    "dblclick", "contextmenu", "mousedown", "mouseup",
+)
+# Build the attribute regex once. Matches: on<event>="..."  or  on<event>='...'
+HANDLER_RE = re.compile(
+    r"""\son(?P<event>""" + "|".join(EVENTS) + r""")\s*=\s*(?P<q>['"])(?P<body>.*?)(?P=q)""",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _mask_raw(text: str):
+    holes: list[str] = []
+
+    def repl(m):
+        holes.append(m.group(0))
+        return f"\x00H{len(holes)-1}\x00"
+
+    return RAW_RE.sub(repl, text), holes
+
+
+def _unmask(text: str, holes: list[str]) -> str:
+    for i, h in enumerate(holes):
+        text = text.replace(f"\x00H{i}\x00", h)
+    return text
+
+
+def _strip_old_block(text: str) -> str:
+    """Remove a previously-generated registration block so re-runs are clean."""
+    pattern = re.compile(
+        re.escape(INLINE_HANDLERS_MARKER_OPEN)
+        + r".*?"
+        + re.escape(INLINE_HANDLERS_MARKER_CLOSE),
+        re.DOTALL,
+    )
+    return pattern.sub("", text)
+
+
+def _action_id(template_rel: str, event: str, body: str, idx: int) -> str:
+    """
+    Deterministic id from (path, event, body, ordinal). The ordinal disambiguates
+    multiple identical handlers in the same file (e.g. five buttons each
+    `onclick="confirmDelete()"`). Hash is short for readable HTML.
+    """
+    norm_body = re.sub(r"\s+", " ", body).strip()
+    seed = f"{template_rel}|{event}|{norm_body}|{idx}"
+    return f"h_{hashlib.sha1(seed.encode('utf-8')).hexdigest()[:10]}"
+
+
+def _escape_js(body: str) -> str:
+    """Body goes inside a JS function. We embed it verbatim and let Jinja
+    interpolation run; the only thing we must protect is the literal sequence
+    `</script>` which would otherwise close our wrapping <script> tag."""
+    return body.replace("</", "<\\/")
+
+
+def process_file(path: Path) -> int:
+    original = path.read_text(encoding="utf-8")
+    text = _strip_old_block(original)
+    masked, holes = _mask_raw(text)
+
+    # ord_seq: per-(event,body) counter for deterministic idx disambiguation.
+    ord_seq: dict[tuple[str, str], int] = defaultdict(int)
+    # Collected registrations in source order.
+    registrations: list[tuple[str, str, str]] = []  # (id, event, body)
+
+    template_rel = str(path.relative_to(ROOT)).replace("\\", "/")
+
+    def repl(m: re.Match) -> str:
+        event = m.group("event").lower()
+        body  = m.group("body")
+        if not body.strip():
+            return ""  # drop empty handler
+        key = (event, re.sub(r"\s+", " ", body).strip())
+        idx = ord_seq[key]
+        ord_seq[key] += 1
+        aid = _action_id(template_rel, event, body, idx)
+        registrations.append((aid, event, body))
+        # `data-action` (no suffix) is the click fallback; for other events
+        # use `data-action-<event>` (camelCased via dataset) so the delegator
+        # routes the right event to the right handler.
+        attr_name = "data-action" if event == "click" else f"data-action-{event}"
+        return f' {attr_name}="{aid}"'
+
+    new_masked = HANDLER_RE.sub(repl, masked)
+    new_text = _unmask(new_masked, holes)
+
+    if not registrations:
+        if new_text != original:
+            path.write_text(new_text, encoding="utf-8")
+        return 0
+
+    # Build the registration block. One IIFE keeps lint clean and avoids
+    # leaking helper names into the global scope.
+    lines = [
+        "",
+        INLINE_HANDLERS_MARKER_OPEN,
+        '<script nonce="{{ csp_nonce() }}">',
+        "/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */",
+        "(function () {",
+        "  var R = window.SSActions || (window.SSActions = {});",
+    ]
+    for aid, _event, body in registrations:
+        safe_body = _escape_js(body)
+        lines.append(f"  R[{aid!r}] = function (event, el) {{ {safe_body} }};")
+    lines.append("})();")
+    lines.append("</script>")
+    lines.append(INLINE_HANDLERS_MARKER_CLOSE)
+    lines.append("")
+    block = "\n".join(lines)
+
+    # Append at the very end of the file (after any existing trailing whitespace).
+    new_text = new_text.rstrip() + "\n" + block
+    path.write_text(new_text, encoding="utf-8")
+    return len(registrations)
+
+
+def main() -> int:
+    if not TEMPLATES.is_dir():
+        print(f"ERROR: templates dir not found at {TEMPLATES}", file=sys.stderr)
+        return 1
+
+    total_handlers = 0
+    files_modified = 0
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        n = process_file(path)
+        if n:
+            files_modified += 1
+            total_handlers += n
+
+    print(f"Files modified : {files_modified}")
+    print(f"Handlers wired : {total_handlers}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

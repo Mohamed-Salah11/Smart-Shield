@@ -110,7 +110,15 @@ def login():
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cur.fetchone()
 
-        if user and check_password_hash(user["password"], password):
+        # Reject disabled/inactive accounts. Don't differentiate the error
+        # message — keep "invalid username or password" so the existence of
+        # the account isn't disclosed.
+        user_status = None
+        if user and "status" in user.keys():
+            user_status = (user["status"] or "active").strip().lower()
+        is_active = user is not None and (user_status is None or user_status == "active")
+
+        if user and is_active and check_password_hash(user["password"], password):
             # Clear failure history on successful login (both IP and username based)
             conn.execute("DELETE FROM login_failures WHERE remote_addr=?", (remote,))
             conn.execute("DELETE FROM login_failures WHERE username=?", (username,))
@@ -138,20 +146,33 @@ def login():
                 (remote, time.time(), username or None)
             )
             conn.commit()
+            # Forward a failure-burst alert to the SOC portal (single fails pass).
+            try:
+                from app.services.login_alerts import note_login_failure
+                note_login_failure(conn, username, remote, target="admin_ui")
+            except Exception:
+                pass
+        reason = "invalid_credentials"
+        if user and not is_active:
+            # Distinguish inactive-account rejection in the audit log even
+            # though the UI message stays generic.
+            reason = "inactive_account"
         log_event(
             category="session",
             action="login_failed",
             username=username or "anonymous",
             remote_addr=remote,
-            details={"reason": "invalid_credentials"},
+            details={"reason": reason},
         )
         error = "Invalid username or password"
 
     return render_template("login.html", error=error)
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 def logout():
+    # CSRF for browser sessions is enforced by app/__init__.py's
+    # _csrf_guard before_request hook for all unsafe methods.
     log_event(
         category="session",
         action="logout",
@@ -163,6 +184,12 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
+# Failed reauth attempts within this window trigger a lockout.
+_REAUTH_WINDOW_SECONDS = 600    # 10 min
+_REAUTH_MAX_FAILURES   = 5
+_REAUTH_LOCKOUT_SECS   = 300    # 5 min
+
+
 @auth_bp.route("/reauth", methods=["POST"])
 def reauth():
     """
@@ -170,6 +197,11 @@ def reauth():
     POST JSON: {"password": "..."}
     On success sets session["reauth_time"] and returns {"ok": True}.
     On failure increments login_failures and returns {"ok": False}.
+
+    Throttling: after _REAUTH_MAX_FAILURES failed reauth attempts within
+    _REAUTH_WINDOW_SECONDS, the user is locked out for _REAUTH_LOCKOUT_SECS.
+    Lockout is keyed by user_id (not IP) because reauth is always for an
+    authenticated session.
     """
     user_id = session.get("user_id")
     if not user_id:
@@ -185,6 +217,35 @@ def reauth():
     row     = conn.execute("SELECT username, password FROM users WHERE id=?", (user_id,)).fetchone()
     if not row:
         return jsonify({"ok": False, "message": "User not found."}), 404
+
+    # Throttle check — count recent failures for this username.
+    now = time.time()
+    fail_count = conn.execute(
+        "SELECT COUNT(*) FROM login_failures WHERE username=? AND failed_at>?",
+        (row["username"], now - _REAUTH_WINDOW_SECONDS),
+    ).fetchone()[0]
+    if fail_count >= _REAUTH_MAX_FAILURES:
+        last_fail = conn.execute(
+            "SELECT MAX(failed_at) FROM login_failures WHERE username=?",
+            (row["username"],),
+        ).fetchone()[0] or 0
+        if (now - last_fail) < _REAUTH_LOCKOUT_SECS:
+            wait = int(_REAUTH_LOCKOUT_SECS - (now - last_fail))
+            log_event(
+                category="security",
+                action="reauth_locked",
+                username=row["username"],
+                remote_addr=remote,
+                details={"wait_seconds": wait, "failures": fail_count},
+            )
+            # Invalidate any cached reauth on lockout so the in-flight
+            # sensitive flow has to be re-initiated.
+            session.pop("reauth_time", None)
+            return jsonify({
+                "ok": False,
+                "message": f"Too many failed attempts. Try again in {wait} second(s).",
+                "locked_seconds": wait,
+            }), 429
 
     if check_password_hash(row["password"], password):
         session["reauth_time"] = datetime.now(timezone.utc).isoformat()

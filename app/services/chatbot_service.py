@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -22,30 +23,53 @@ SYSTEM_PROMPT = """You are SmartShield AI, an expert network security assistant 
 into the Smart Shield firewall appliance. You have direct access to real-time data from
 this specific installation through the tools provided.
 
+SCOPE — STRICT (read this first):
+- You assist ONLY with: this firewall appliance, the SOC (Security Operations Center)
+  portal, network security, threat analysis, incident response, and security best practices.
+- For ANY request outside that scope (greetings beyond a one-line hello, general knowledge,
+  math, weather, news, coding help, personal questions, entertainment, trivia, etc.) you MUST
+  politely decline and redirect. Reply with a single short sentence, e.g.:
+  "I'm SmartShield AI — I can only help with firewall, SOC, and network-security topics."
+  Do NOT answer the off-topic question, even partially, and do NOT call any tool for it.
+- General security questions (CVEs, attack techniques, hardening, protocols) ARE in scope —
+  answer them, and use search_web for external or up-to-date facts.
+
 Guidelines:
 - ALWAYS use tools to fetch current data before answering questions about system state,
-  logs, rules, or configuration. Never fabricate or guess system values.
+  logs, rules, cases, alerts, or configuration. Never fabricate or guess system values.
 - Be specific to THIS installation, not generic. Quote actual IPs, rule names, and counts.
 - Flag any security concerns you notice in the data (failed logins, IDS alerts, open ports).
-- For external security questions (CVEs, best practices) use search_web.
 - Keep answers concise and actionable. Use bullet points for lists.
 - If a tool fails or returns an error, tell the user and suggest what to check manually.
 
 Agent capabilities:
-- You can block or unblock domains via the DNS filter using block_domain / unblock_domain.
-- You can add firewall block rules using add_firewall_block_rule.
+- Firewall: block/unblock domains (block_domain / unblock_domain) and add firewall block
+  rules (add_firewall_block_rule).
+- SOC portal: open, annotate, escalate and close security cases, and triage alerts
+  (open_soc_case, add_soc_case_note, escalate_soc_case, close_soc_case, triage_soc_alert).
+
+SOC portal (helping the SOC team):
+- The SOC portal uses a tiered analyst model: L1 (triage) < L2 (investigation) < L3 (incident
+  response). The current user's tier determines which SOC write actions they may take.
+- Use get_soc_cases / get_soc_case_detail to review incident cases, get_soc_alerts to review
+  the live security/IDS alert queue and its triage status, get_threat_intel_status for feed
+  health, and lookup_threat_intel to check an IP / domain / URL / file-hash against abuse.ch.
+- Tier rules for SOC write actions: open_soc_case = L1+, add_soc_case_note = L2+,
+  escalate_soc_case = L1 or L2 (L3 is already top tier and cannot escalate), close_soc_case =
+  L1/L2 may close ONLY as false_positive while L3 may also close as resolved,
+  triage_soc_alert = L1+. NEVER offer an action the current user's tier cannot perform —
+  instead tell them which tier is required.
 
 How-to questions (IMPORTANT):
 - For ANY question containing "how to", "steps to", "guide me", "show me how", "how do I",
   "what are the steps", "walk me through", or similar phrasing:
   Call get_firewall_help for the most relevant section and return the manual UI steps.
-  NEVER call write tools (block_domain, unblock_domain, add_firewall_block_rule) for how-to
-  questions. Answer with the steps only.
+  NEVER call write tools for how-to questions. Answer with the steps only.
 
-When asked to PERFORM an action (block a domain, add a rule, unblock something, etc.):
+When asked to PERFORM an action (block a domain, add a rule, open a case, escalate, etc.):
   1. Call get_firewall_help for the relevant section to retrieve the manual UI steps.
   2. Present those steps as a clear numbered list tailored to the specific request
-     (e.g. substitute the actual domain name, port, or IP into the steps).
+     (e.g. substitute the actual domain name, port, IP, or case id into the steps).
   3. End with exactly: "Would you like me to apply this for you automatically?"
   4. ONLY after the user replies with explicit confirmation (yes, do it, go ahead, apply,
      sure, please, ok, yeah, confirm) — call the write tool.
@@ -60,11 +84,6 @@ Content policy:
   'allow' (Allow whitelist only — blocks non-whitelisted LAN devices, passes whitelisted ones).
 - Use get_tracked_hosts to see which devices are whitelisted and get_content_policy to inspect
   active rules. Whitelisted devices are managed in Network → Devices.
-
-General conversation:
-- You are a helpful AI assistant as well as a firewall expert. For casual or off-topic questions
-  (greetings, general knowledge, time, date, math, etc.) respond naturally and helpfully without
-  using tools. Only use firewall tools when the question is specifically about THIS system's state.
 """
 
 # ---------------------------------------------------------------------------
@@ -208,15 +227,17 @@ TOOLS = [
         "name": "search_web",
         "description": (
             "Search the internet for firewall configuration guides, security advisories, "
-            "CVE information, or best practices. Use when the user asks about external "
-            "security topics not specific to this appliance."
+            "CVE information, threat intelligence, or security best practices. "
+            "RESTRICTED: only security, firewall, and network topics are permitted — "
+            "queries unrelated to security are rejected. Do not use this for general "
+            "knowledge, news, or off-topic searches."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query focused on network security, firewalls, or FreeBSD topics.",
+                    "description": "Security-focused search query (firewalls, CVEs, threats, FreeBSD, network security).",
                 }
             },
             "required": ["query"],
@@ -230,7 +251,8 @@ TOOLS = [
             "'where do I find Y', 'what does the VPN page do', or any navigation/how-to "
             "question about this appliance. "
             "Sections: dashboard, firewall, nat, dhcp, dhcpv6, dns, ids, vpn, "
-            "routing, content_policy, devices, captive_portal, certificates, system, siem."
+            "routing, content_policy, devices, captive_portal, certificates, system, "
+            "siem, soc_portal, soc."
         ),
         "parameters": {
             "type": "object",
@@ -250,6 +272,98 @@ TOOLS = [
             "installation. Use when the user asks what this system can do, what pages/sections "
             "exist, or what features are available. Returns all registered URL routes and a "
             "summary of each guide section."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    # ── SOC portal read tools ─────────────────────────────────────────────
+    {
+        "name": "get_soc_cases",
+        "description": (
+            "List SOC incident cases from the SIEM. Use when the user asks about "
+            "security cases, open incidents, closed cases, or case workload."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "closed", "all"],
+                    "description": "Filter by case status. Default: open.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max cases to return (1–100). Default 50.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_soc_case_detail",
+        "description": (
+            "Get the full detail of a single SOC case: metadata, all investigation "
+            "notes, and linked security events. Use when the user asks about a "
+            "specific case by its id."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "case_id": {
+                    "type": "integer",
+                    "description": "The numeric id of the SOC case.",
+                }
+            },
+            "required": ["case_id"],
+        },
+    },
+    {
+        "name": "get_soc_alerts",
+        "description": (
+            "Get the SOC alert queue — recent security and IDS events enriched with "
+            "their triage status (new, acknowledged, false_positive, escalated). "
+            "Use when the user asks about alerts to triage or recent security events."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["new", "acknowledged", "false_positive", "escalated", "all"],
+                    "description": "Filter by triage status. Default: all.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max alerts to return (1–100). Default 30.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "lookup_threat_intel",
+        "description": (
+            "Look up an indicator of compromise (IOC) against abuse.ch threat "
+            "intelligence. Accepts an IP address, domain/hostname, URL, or file "
+            "hash (MD5/SHA1/SHA256) and auto-selects ThreatFox, URLhaus, or "
+            "MalwareBazaar. Use to check whether an IP, domain, URL, or file is malicious."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "indicator": {
+                    "type": "string",
+                    "description": "The IOC to check: an IP, domain, URL, or file hash.",
+                }
+            },
+            "required": ["indicator"],
+        },
+    },
+    {
+        "name": "get_threat_intel_status",
+        "description": (
+            "Get the status of the abuse.ch threat-intelligence feed: last update "
+            "time, indicator count, and the PF blocklist table it feeds. Use when "
+            "the user asks if threat feeds are up to date."
         ),
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
@@ -338,10 +452,128 @@ TOOLS = [
             "required": ["description"],
         },
     },
+    # ── SOC portal write tools (tier-gated, require user confirmation) ─────
+    {
+        "name": "open_soc_case",
+        "description": (
+            "Open a new SOC incident case. Requires SOC tier L1 or higher. "
+            "Requires user confirmation before it is created."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Short case title (required).",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of the incident or concern.",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"],
+                    "description": "Case severity. Default: medium.",
+                },
+            },
+            "required": ["title"],
+        },
+    },
+    {
+        "name": "add_soc_case_note",
+        "description": (
+            "Add an investigation note to an existing SOC case. Requires SOC tier "
+            "L2 or higher. Requires user confirmation."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "case_id": {"type": "integer", "description": "Target case id."},
+                "note": {"type": "string", "description": "The investigation note text."},
+            },
+            "required": ["case_id", "note"],
+        },
+    },
+    {
+        "name": "escalate_soc_case",
+        "description": (
+            "Escalate a SOC case up one tier (L1→L2 or L2→L3). The current user "
+            "must be L1 or L2 — L3 is the top tier and cannot escalate further. "
+            "Requires user confirmation."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "case_id": {"type": "integer", "description": "Target case id."},
+                "note": {"type": "string", "description": "Optional escalation note."},
+            },
+            "required": ["case_id"],
+        },
+    },
+    {
+        "name": "close_soc_case",
+        "description": (
+            "Close a SOC case. L1 and L2 analysts may close only as 'false_positive'; "
+            "L3 may also close as 'resolved'. Requires user confirmation."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "case_id": {"type": "integer", "description": "Target case id."},
+                "closure_type": {
+                    "type": "string",
+                    "enum": ["false_positive", "resolved"],
+                    "description": "How the case is being closed. Default: resolved.",
+                },
+                "resolution": {
+                    "type": "string",
+                    "description": "Short closing summary / resolution note.",
+                },
+            },
+            "required": ["case_id"],
+        },
+    },
+    {
+        "name": "triage_soc_alert",
+        "description": (
+            "Triage a SOC alert by marking it acknowledged or false_positive. "
+            "Requires SOC tier L1 or higher. Requires user confirmation."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_key": {
+                    "type": "string",
+                    "description": "The alert's event key (event timestamp from get_soc_alerts).",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["acknowledge", "false_positive"],
+                    "description": "Triage action to apply.",
+                },
+                "note": {"type": "string", "description": "Optional triage note."},
+            },
+            "required": ["event_key", "action"],
+        },
+    },
 ]
 
 # Tools that mutate system state — intercepted for user confirmation
-_WRITE_TOOLS = {"block_domain", "unblock_domain", "add_firewall_block_rule"}
+_WRITE_TOOLS = {
+    "block_domain", "unblock_domain", "add_firewall_block_rule",
+    "open_soc_case", "add_soc_case_note", "escalate_soc_case",
+    "close_soc_case", "triage_soc_alert",
+}
+
+# SOC write tools — gated by the user's SOC tier instead of is_superuser.
+_SOC_WRITE_TOOLS = {
+    "open_soc_case", "add_soc_case_note", "escalate_soc_case",
+    "close_soc_case", "triage_soc_alert",
+}
+
+# Firewall/DNS write tools — require an admin (is_superuser) session. These are
+# not exposed on the SOC portal surface, which has no admin session.
+_FIREWALL_WRITE_TOOLS = {"block_domain", "unblock_domain", "add_firewall_block_rule"}
 
 # Groq/OpenAI tool format wraps each schema in {"type": "function", "function": ...}
 _GROQ_TOOLS = [{"type": "function", "function": t} for t in TOOLS]
@@ -377,6 +609,16 @@ def _execute_tool(conn, name: str, args: dict) -> Any:
             return _tool_firewall_help(args)
         if name == "get_app_structure":
             return _tool_app_structure()
+        if name == "get_soc_cases":
+            return _tool_soc_cases(conn, args)
+        if name == "get_soc_case_detail":
+            return _tool_soc_case_detail(conn, args)
+        if name == "get_soc_alerts":
+            return _tool_soc_alerts(conn, args)
+        if name == "lookup_threat_intel":
+            return _tool_lookup_threat_intel(args.get("indicator", ""))
+        if name == "get_threat_intel_status":
+            return _tool_threat_intel_status(conn)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         return {"error": str(exc)}
@@ -518,6 +760,171 @@ def _tool_vpn_status(conn) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# SOC portal read tools
+# ---------------------------------------------------------------------------
+
+def _tool_soc_cases(conn, args: dict) -> dict:
+    status = (args.get("status") or "open").lower()
+    limit  = min(int(args.get("limit") or 50), 100)
+    cols = ("id, title, severity, status, created_by, assigned_to, "
+            "escalation_tier, closure_type, created_at, updated_at")
+    if status == "all":
+        rows = conn.execute(
+            f"SELECT {cols} FROM siem_cases ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    else:
+        if status not in ("open", "closed"):
+            status = "open"
+        rows = conn.execute(
+            f"SELECT {cols} FROM siem_cases WHERE status=? ORDER BY created_at DESC LIMIT ?",
+            (status, limit),
+        ).fetchall()
+    cases = [dict(r) for r in rows]
+    return {"status_filter": status, "count": len(cases), "cases": cases}
+
+
+def _tool_soc_case_detail(conn, args: dict) -> dict:
+    try:
+        case_id = int(args.get("case_id"))
+    except (TypeError, ValueError):
+        return {"error": "A numeric case_id is required."}
+    case = conn.execute("SELECT * FROM siem_cases WHERE id=?", (case_id,)).fetchone()
+    if not case:
+        return {"error": f"No SOC case found with id {case_id}."}
+    notes = [dict(r) for r in conn.execute(
+        "SELECT note, created_by, created_at FROM siem_case_notes "
+        "WHERE case_id=? ORDER BY created_at ASC", (case_id,)
+    )]
+    events = [dict(r) for r in conn.execute(
+        "SELECT event_timestamp, event_action, event_category, event_summary "
+        "FROM siem_case_events WHERE case_id=? ORDER BY event_timestamp ASC", (case_id,)
+    )]
+    return {"case": dict(case), "notes": notes, "linked_events": events}
+
+
+def _tool_soc_alerts(conn, args: dict) -> dict:
+    status_filter = (args.get("status") or "all").lower()
+    limit = min(int(args.get("limit") or 30), 100)
+    from app.audit_log import tail_events_since
+    events = tail_events_since(limit=500, categories=["security", "ids"])
+
+    # Build lookups of the latest triage action: uuid-keyed (preferred) and
+    # timestamp-keyed (fallback for pre-v35 rows whose backfill missed).
+    action_map: dict = {}    # by event_uuid
+    action_legacy: dict = {} # by timestamp
+    if events:
+        uuids = [e.get("event_uuid", "") for e in events if e.get("event_uuid")]
+        keys  = [e.get("timestamp", "")  for e in events if e.get("timestamp")]
+        if uuids:
+            u_ph = ",".join("?" * len(uuids))
+            for r in conn.execute(
+                f"SELECT event_uuid, action, taken_by, taken_at, note, case_id "
+                f"FROM siem_alert_actions WHERE event_uuid IN ({u_ph}) "
+                f"ORDER BY taken_at ASC",
+                uuids,
+            ):
+                if r["event_uuid"]:
+                    action_map[r["event_uuid"]] = {
+                        "triage_status": r["action"],
+                        "triage_by":     r["taken_by"],
+                        "triage_at":     r["taken_at"],
+                        "triage_note":   r["note"],
+                        "case_id":       r["case_id"],
+                    }
+        if keys:
+            k_ph = ",".join("?" * len(keys))
+            for r in conn.execute(
+                f"SELECT event_key, action, taken_by, taken_at, note, case_id "
+                f"FROM siem_alert_actions WHERE event_key IN ({k_ph}) "
+                f"ORDER BY taken_at ASC",
+                keys,
+            ):
+                action_legacy[r["event_key"]] = {
+                    "triage_status": r["action"],
+                    "triage_by":     r["taken_by"],
+                    "triage_at":     r["taken_at"],
+                    "triage_note":   r["note"],
+                    "case_id":       r["case_id"],
+                }
+
+    enriched = []
+    for e in events:
+        key    = e.get("timestamp", "")
+        uu     = e.get("event_uuid", "")
+        act    = (action_map.get(uu) if uu else None) or action_legacy.get(key)
+        merged = dict(e)
+        # The LLM uses event_key as its triage handle — prefer the uuid (so
+        # subsequent triage calls land on the right row even for same-ms
+        # collisions); fall back to timestamp for any pre-v34 row.
+        merged["event_key"]     = uu or key
+        merged["event_uuid"]    = uu
+        merged["triage_status"] = act["triage_status"] if act else "new"
+        if act:
+            merged.update({k: v for k, v in act.items() if k != "triage_status"})
+        if status_filter == "new" and act:
+            continue
+        if status_filter in ("acknowledged", "false_positive", "escalated") \
+                and merged["triage_status"] != status_filter:
+            continue
+        enriched.append(merged)
+        if len(enriched) >= limit:
+            break
+    return {"status_filter": status_filter, "count": len(enriched), "alerts": enriched}
+
+
+def _tool_lookup_threat_intel(indicator: str) -> dict:
+    """Auto-route an IOC to the right abuse.ch service."""
+    indicator = (indicator or "").strip()
+    if not indicator:
+        return {"error": "An indicator (IP, domain, URL, or file hash) is required."}
+
+    import ipaddress as _ip
+    from app.services import abusech_client as _ti
+
+    is_hash = (len(indicator) in (32, 40, 64)
+               and all(c in "0123456789abcdefABCDEF" for c in indicator))
+    is_url  = indicator.lower().startswith(("http://", "https://"))
+    is_ip   = False
+    if not is_hash and not is_url:
+        try:
+            _ip.ip_address(indicator)
+            is_ip = True
+        except ValueError:
+            is_ip = False
+
+    results: dict = {"indicator": indicator}
+    try:
+        if is_hash:
+            results["type"] = "file_hash"
+            results["malwarebazaar"] = _ti.malwarebazaar_lookup_hash(indicator)
+            results["threatfox"]     = _ti.threatfox_search_ioc(indicator)
+        elif is_url:
+            results["type"] = "url"
+            results["urlhaus"]   = _ti.urlhaus_lookup_url(indicator)
+            results["threatfox"] = _ti.threatfox_search_ioc(indicator)
+        else:
+            results["type"]      = "ip" if is_ip else "domain"
+            results["urlhaus"]   = _ti.urlhaus_lookup_host(indicator)
+            results["threatfox"] = _ti.threatfox_search_ioc(indicator)
+        results["note"] = (
+            "query_status 'dry_run' means live abuse.ch lookups are disabled "
+            "(set ABUSECH_DRY_RUN=0 and configure ABUSECH_AUTH_KEY to enable)."
+        )
+    except Exception as exc:
+        results["error"] = f"Threat-intel lookup failed: {exc}"
+    return results
+
+
+def _tool_threat_intel_status(conn) -> dict:
+    from app.services.abusech_client import get_threat_intel_status
+    try:
+        return get_threat_intel_status(conn)
+    except Exception as exc:
+        return {"error": f"Could not read threat-intel status: {exc}"}
+
+
 def _load_search_settings(conn) -> dict:
     """Read Google CSE key/cx from service_state or env vars."""
     try:
@@ -537,10 +944,51 @@ def _load_search_settings(conn) -> dict:
     }
 
 
+# Substring roots that mark a web-search query as in-scope (security / network).
+# Matched as plain substrings so plurals and variants are covered
+# (e.g. "firewall" matches "firewalls", "vulnerab" matches "vulnerability").
+_SECURITY_SEARCH_TERMS = frozenset({
+    "firewall", "pf ", "packet filter", "freebsd", "network",
+    "security", "secure", "cve", "vulnerab", "exploit", "malware", "ransomware",
+    "phishing", "threat", "attack", "breach", "intrusion", "ids", "ips",
+    "suricata", "snort", "vpn", "ipsec", "openvpn", "wireguard", "l2tp",
+    "dns", "dnssec", "tls", "ssl", "certificate", "encrypt", "decrypt",
+    "cipher", "port scan", "nmap", "ddos", "dos attack", "botnet", "c2",
+    "command and control", "ioc", "indicator of compromise", "mitre", "att&ck",
+    "soc", "siem", "incident", "forensic", "hardening", "authentication",
+    "credential", "password", "brute force", "privilege", "rootkit", "trojan",
+    "backdoor", "spoof", "mitm", "man-in-the-middle", "nat", "subnet", "router",
+    "gateway", "proxy", "captive portal", "dhcp", "arp", "packet", "protocol",
+    "cyber", "abuse.ch", "threatfox", "urlhaus", "virustotal", "zero-day",
+    "patch", "advisory", "owasp", "cis benchmark", "honeypot", "sandbox",
+    "antivirus", "edr", "xdr", "log4j", "rce", "sql injection", "xss", "csrf",
+})
+
+
+def _is_security_query(query: str) -> bool:
+    """True if the query is about security / firewall / networking topics."""
+    q = (query or "").lower()
+    return any(term in q for term in _SECURITY_SEARCH_TERMS)
+
+
 def _tool_search_web(query: str, conn=None) -> dict:
-    """Search the web. Uses Google Custom Search if configured, else DuckDuckGo."""
+    """Search the web. Uses Google Custom Search if configured, else DuckDuckGo.
+
+    Restricted to security / firewall / network topics — off-topic queries are
+    rejected before any external call is made.
+    """
     if not query.strip():
         return {"error": "Empty query."}
+
+    if not _is_security_query(query):
+        return {
+            "error": (
+                "Out of scope: web search is limited to security, firewall, and "
+                "network topics. Rephrase the query around a security subject, or "
+                "decline the request."
+            ),
+            "query": query,
+        }
 
     # Tier 1: Google Custom Search (if configured)
     if conn is not None:
@@ -808,6 +1256,49 @@ _FIREWALL_GUIDE = {
             "Adjust refresh rate: use the refresh dropdown (2s/5s/10s/30s/paused)",
         ],
     },
+    "soc_portal": {
+        "title": "SOC Team Portal",
+        "url": "/soc-portal/",
+        "description": (
+            "Dedicated portal for the Security Operations Center team, with its own "
+            "login separate from the admin UI. Pages: Dashboard (open-case counts, "
+            "feed status), Alerts (live security/IDS event queue), Cases (incident "
+            "case list), Threat Intel (abuse.ch feed status, IOC lookups), and "
+            "Quick Actions (block IP, reload firewall). Access is tiered: "
+            "L1 (triage) < L2 (investigation) < L3 (incident response); superusers "
+            "get L3. SmartShield AI can read cases/alerts/threat-intel and, for "
+            "permitted tiers, open/note/escalate/close cases and triage alerts."
+        ),
+        "common_tasks": [
+            "Open a case: SOC Portal → Cases → Open Case, enter title and severity (L1+)",
+            "Add an investigation note: open the case → Notes → Add (L2+)",
+            "Escalate a case: open the case → Escalate (L1→L2, L2→L3)",
+            "Close a case: open the case → Close — L1/L2 may close only as false positive, L3 may resolve",
+            "Triage an alert: SOC Portal → Alerts → Acknowledge or mark False Positive (L1+)",
+            "Check an IOC: SOC Portal → Threat Intel → IOC lookup (L2+)",
+            "Block an IP / reload firewall: SOC Portal → Quick Actions (L3 only)",
+        ],
+        "tips": "A user's SOC tier comes from their group's soc_tier field (Users → Groups). "
+                "Logging out of the admin UI does not end the SOC portal session.",
+    },
+    "soc": {
+        "title": "SOC Portal",
+        "url": "/soc-portal/dashboard",
+        "description": (
+            "Tier-gated SOC analyst portal at /soc-portal. Pages include "
+            "Live Alerts (/soc-portal/alerts) — the streaming alert queue for "
+            "acknowledging, escalating, or marking alerts false positive; "
+            "Cases (/soc-portal/cases) — incident workflow with notes, "
+            "assignment, and L1→L2→L3 escalation; Threat Intel (L2+); and "
+            "Quick Actions (L3+) for IP blocking and firewall reload. "
+            "The older /soc/l1 and /soc/l2 admin-side pages now redirect here."
+        ),
+        "common_tasks": [
+            "Triage alerts: open /soc-portal/alerts, pick an alert, acknowledge / escalate / mark false positive",
+            "Investigate an IP: from /soc-portal/cases create a case linked to the event timeline",
+            "Set up MFA: /soc-portal/security — enrol TOTP from any authenticator app",
+        ],
+    },
 }
 
 
@@ -871,6 +1362,21 @@ def _format_manual_offer(tool: str, args: dict, help_data: dict) -> str:
     elif tool == "add_firewall_block_rule":
         desc = args.get("description") or "this traffic"
         intro = f"Here's how to add a firewall block rule for **{desc}** manually:"
+    elif tool == "open_soc_case":
+        title = args.get("title") or "a new case"
+        intro = f"Here's how to open a SOC case for **{title}** manually:"
+    elif tool == "add_soc_case_note":
+        case_id = args.get("case_id", "?")
+        intro = f"Here's how to add a note to SOC case **#{case_id}** manually:"
+    elif tool == "escalate_soc_case":
+        case_id = args.get("case_id", "?")
+        intro = f"Here's how to escalate SOC case **#{case_id}** manually:"
+    elif tool == "close_soc_case":
+        case_id = args.get("case_id", "?")
+        intro = f"Here's how to close SOC case **#{case_id}** manually:"
+    elif tool == "triage_soc_alert":
+        action = args.get("action", "triage")
+        intro = f"Here's how to {action} this alert in the SOC portal manually:"
     else:
         intro = "Here's how to do this manually:"
 
@@ -958,10 +1464,216 @@ def _describe_pending_action(tool: str, args: dict) -> tuple:
             f"Add firewall block rule: {desc}",
             f"Create a floating BLOCK rule — {proto.upper()} {src} → {dst}{port_str}. Description: {desc}",
         )
+    if tool == "open_soc_case":
+        title    = args.get("title", "Untitled case")
+        severity = args.get("severity", "medium")
+        return (
+            f"Open SOC case: {title}",
+            f"Create a new {severity}-severity SOC incident case titled '{title}'.",
+        )
+    if tool == "add_soc_case_note":
+        case_id = args.get("case_id", "?")
+        return (
+            f"Add note to SOC case #{case_id}",
+            f"Append an investigation note to SOC case #{case_id}.",
+        )
+    if tool == "escalate_soc_case":
+        case_id = args.get("case_id", "?")
+        return (
+            f"Escalate SOC case #{case_id}",
+            f"Escalate SOC case #{case_id} to the next response tier (L1→L2 or L2→L3).",
+        )
+    if tool == "close_soc_case":
+        case_id      = args.get("case_id", "?")
+        closure_type = args.get("closure_type", "resolved")
+        return (
+            f"Close SOC case #{case_id}",
+            f"Close SOC case #{case_id} as '{closure_type}'.",
+        )
+    if tool == "triage_soc_alert":
+        action    = args.get("action", "acknowledge")
+        event_key = args.get("event_key", "?")
+        return (
+            f"Triage SOC alert ({action})",
+            f"Mark the alert with event key '{event_key}' as '{action}'.",
+        )
     return (f"Execute: {tool}", f"Arguments: {json.dumps(args)}")
 
 
-def execute_approved_action(conn, action: dict, username: str) -> dict:
+_SOC_TIER_RANK = {"L1": 1, "L2": 2, "L3": 3}
+
+
+def _resolve_soc_tier(user_id):
+    """Return the SOC tier ('L1'/'L2'/'L3') for a user id, or None."""
+    if user_id is None:
+        return None
+    try:
+        from app.soc_portal_auth import get_user_soc_tier
+        return get_user_soc_tier(int(user_id))
+    except Exception:
+        return None
+
+
+def _execute_soc_action(conn, tool: str, args: dict, username: str, user_id) -> dict:
+    """Execute an approved SOC write action after re-checking the user's tier."""
+    from app.audit_log import log_event
+
+    tier = _resolve_soc_tier(user_id)
+    rank = _SOC_TIER_RANK.get(tier or "", 0)
+    if rank == 0:
+        return {"ok": False, "reply": (
+            "You don't have a SOC analyst tier assigned, so SOC actions are not "
+            "permitted. Ask an administrator to add you to a SOC-tier group."
+        )}
+
+    if tool == "open_soc_case":
+        title = (args.get("title") or "").strip()
+        if not title:
+            return {"ok": False, "reply": "A case title is required."}
+        description = (args.get("description") or "").strip()
+        severity = args.get("severity", "medium")
+        if severity not in ("low", "medium", "high", "critical"):
+            severity = "medium"
+        cur = conn.execute(
+            "INSERT INTO siem_cases (title, description, severity, status, created_by, source_event) "
+            "VALUES (?,?,?,'open',?,'')",
+            (title, description, severity, username),
+        )
+        conn.commit()
+        case_id = cur.lastrowid
+        log_event(category="security", action="soc_case_opened", username=username,
+                  remote_addr="", details={"case_id": case_id, "title": title,
+                                           "severity": severity, "via": "chatbot"})
+        return {"ok": True,
+                "reply": f"SOC case **#{case_id}** — *{title}* ({severity}) has been opened."}
+
+    if tool == "add_soc_case_note":
+        if rank < 2:
+            return {"ok": False, "reply": "Adding case notes requires SOC tier L2 or higher."}
+        try:
+            case_id = int(args.get("case_id"))
+        except (TypeError, ValueError):
+            return {"ok": False, "reply": "A numeric case_id is required."}
+        note = (args.get("note") or "").strip()
+        if not note:
+            return {"ok": False, "reply": "The note text cannot be empty."}
+        if not conn.execute("SELECT id FROM siem_cases WHERE id=?", (case_id,)).fetchone():
+            return {"ok": False, "reply": f"No SOC case found with id {case_id}."}
+        conn.execute("INSERT INTO siem_case_notes (case_id, note, created_by) VALUES (?,?,?)",
+                     (case_id, note, username))
+        conn.execute("UPDATE siem_cases SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (case_id,))
+        conn.commit()
+        log_event(category="security", action="soc_case_note_added", username=username,
+                  remote_addr="", details={"case_id": case_id, "via": "chatbot"})
+        return {"ok": True, "reply": f"Investigation note added to SOC case **#{case_id}**."}
+
+    if tool == "escalate_soc_case":
+        target = {"L1": "L2", "L2": "L3"}.get(tier)
+        if not target:
+            return {"ok": False, "reply": (
+                "L3 is the top response tier and cannot escalate further. "
+                "Close the case instead."
+            )}
+        try:
+            case_id = int(args.get("case_id"))
+        except (TypeError, ValueError):
+            return {"ok": False, "reply": "A numeric case_id is required."}
+        if not conn.execute("SELECT id FROM siem_cases WHERE id=?", (case_id,)).fetchone():
+            return {"ok": False, "reply": f"No SOC case found with id {case_id}."}
+        note = (args.get("note") or "").strip()
+        conn.execute("UPDATE siem_cases SET escalation_tier=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                     (target, case_id))
+        note_text = f"[ESCALATED TO {target}]" + (f" {note}" if note else "")
+        conn.execute("INSERT INTO siem_case_notes (case_id, note, created_by) VALUES (?,?,?)",
+                     (case_id, note_text, username))
+        conn.commit()
+        log_event(category="security", action="soc_case_escalated", username=username,
+                  remote_addr="", details={"case_id": case_id, "escalated_to": target,
+                                           "via": "chatbot"})
+        return {"ok": True, "reply": f"SOC case **#{case_id}** escalated to **{target}**."}
+
+    if tool == "close_soc_case":
+        try:
+            case_id = int(args.get("case_id"))
+        except (TypeError, ValueError):
+            return {"ok": False, "reply": "A numeric case_id is required."}
+        closure_type = (args.get("closure_type") or "resolved").strip()
+        if closure_type not in ("false_positive", "resolved"):
+            closure_type = "resolved"
+        if rank < 3 and closure_type != "false_positive":
+            return {"ok": False, "reply": (
+                f"{tier} analysts can only close cases as false positives. "
+                "Escalate true positives so an L3 responder can resolve them."
+            )}
+        if not conn.execute("SELECT id FROM siem_cases WHERE id=?", (case_id,)).fetchone():
+            return {"ok": False, "reply": f"No SOC case found with id {case_id}."}
+        resolution = (args.get("resolution") or "").strip()
+        label = "FALSE POSITIVE — RESOLVED" if closure_type == "false_positive" else "RESOLVED"
+        note_text = f"[CLOSED — {label}]" + (f" {resolution}" if resolution else "")
+        conn.execute(
+            "UPDATE siem_cases SET status='closed', closure_type=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (closure_type, case_id),
+        )
+        conn.execute("INSERT INTO siem_case_notes (case_id, note, created_by) VALUES (?,?,?)",
+                     (case_id, note_text, username))
+        conn.commit()
+        log_event(category="security", action="soc_case_closed", username=username,
+                  remote_addr="", details={"case_id": case_id, "closure_type": closure_type,
+                                           "via": "chatbot"})
+        return {"ok": True, "reply": f"SOC case **#{case_id}** closed as **{closure_type}**."}
+
+    if tool == "triage_soc_alert":
+        # ``event_key`` is the LLM's triage handle. The new soc_alerts tool
+        # populates it with the event_uuid when available, but can also be
+        # a legacy timestamp from older transcripts. Resolve to uuid first.
+        handle = (args.get("event_key") or args.get("event_uuid") or "").strip()
+        if not handle:
+            return {"ok": False, "reply": "An event_uuid is required to triage an alert."}
+        action_in = (args.get("action") or "").strip().lower()
+        db_action = {"acknowledge": "acknowledged", "acknowledged": "acknowledged",
+                     "false_positive": "false_positive"}.get(action_in)
+        if not db_action:
+            return {"ok": False, "reply": "Triage action must be 'acknowledge' or 'false_positive'."}
+
+        # A 32-char hex string is treated as a uuid; anything else (e.g. an
+        # ISO timestamp) is resolved by joining on events.ts.
+        event_uuid = ""
+        event_key = ""
+        if len(handle) == 32 and all(c in "0123456789abcdef" for c in handle.lower()):
+            event_uuid = handle.lower()
+        else:
+            event_key = handle
+            try:
+                row = conn.execute(
+                    "SELECT event_uuid FROM events WHERE ts = ? "
+                    "ORDER BY id DESC LIMIT 1",
+                    (handle,),
+                ).fetchone()
+                if row and row["event_uuid"]:
+                    event_uuid = row["event_uuid"]
+            except Exception:
+                pass
+
+        note = (args.get("note") or "").strip()
+        conn.execute(
+            "INSERT INTO siem_alert_actions "
+            "(event_key, event_uuid, event_action, action, taken_by, note) "
+            "VALUES (?,?,?,?,?,?)",
+            (event_key, event_uuid, args.get("event_action", ""),
+             db_action, username, note),
+        )
+        conn.commit()
+        log_event(category="system",
+                  action="siem_alert_acknowledged" if db_action == "acknowledged" else "siem_alert_fp",
+                  username=username, remote_addr="",
+                  details={"event_uuid": event_uuid,
+                           "event_key": event_key, "via": "chatbot"})
+        return {"ok": True, "reply": f"Alert `{handle}` marked as **{db_action}**."}
+
+    return {"ok": False, "reply": f"Unknown SOC action: {tool}"}
+
+
+def execute_approved_action(conn, action: dict, username: str, user_id=None) -> dict:
     """Execute a write action that has been approved by the user."""
     tool = action.get("tool", "")
     args = action.get("args", {})
@@ -972,6 +1684,9 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
         )
         import sys as _sys
         _dry = not _sys.platform.startswith("freebsd")
+
+        if tool in _SOC_WRITE_TOOLS:
+            return _execute_soc_action(conn, tool, args, username, user_id)
 
         if tool == "block_domain":
             domain      = args.get("domain", "").strip()
@@ -1080,11 +1795,15 @@ def execute_approved_action(conn, action: dict, username: str) -> dict:
 # Agentic chat loop (Groq)
 # ---------------------------------------------------------------------------
 
-def process_chat(conn, messages: list, username: str) -> dict:
+def process_chat(conn, messages: list, username: str, user_id=None,
+                 surface: str = "admin") -> dict:
     """
     Run the SmartShield AI agent loop using Groq.
 
     Accepts `messages` in the format [{"role": "user"/"assistant", "content": str}].
+    `surface` selects the available toolset: "admin" exposes every tool;
+    "soc" (the SOC portal) hides the firewall/DNS write tools, which require an
+    admin session the SOC portal does not have.
     Returns {"ok": True, "reply": str, "messages": updated_list} or {"ok": False, "message": str}.
     """
     api_key = _load_groq_key(conn)
@@ -1098,8 +1817,34 @@ def process_chat(conn, messages: list, username: str) -> dict:
 
     client = Groq(api_key=api_key)
 
+    # Append the user's SOC tier so the model only offers permitted SOC actions.
+    tier = _resolve_soc_tier(user_id)
+    _tier_caps = {
+        "L1": "may open cases, escalate cases, and triage alerts; may NOT add case "
+              "notes; may close cases only as false_positive",
+        "L2": "may open cases, add case notes, escalate cases, and triage alerts; "
+              "may close cases only as false_positive",
+        "L3": "may perform all SOC actions including closing cases as resolved; "
+              "cannot escalate (already the top tier)",
+    }
+    if tier:
+        tier_line = (f"\n\nCURRENT USER: '{username}', SOC tier {tier} — {_tier_caps.get(tier, '')}.")
+    else:
+        tier_line = (f"\n\nCURRENT USER: '{username}' has NO SOC tier assigned and cannot "
+                     "perform any SOC write action. If they request one, explain that an "
+                     "administrator must add them to a SOC-tier group first.")
+    system_prompt = SYSTEM_PROMPT + tier_line
+
     # Build internal message chain: system prompt prepended to the full conversation history.
-    internal_messages: list = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    internal_messages: list = [{"role": "system", "content": system_prompt}] + list(messages)
+
+    # The SOC portal surface cannot run firewall/DNS write tools (no admin
+    # session), so hide them from the model entirely on that surface.
+    if surface == "soc":
+        groq_tools = [t for t in _GROQ_TOOLS
+                      if t["function"]["name"] not in _FIREWALL_WRITE_TOOLS]
+    else:
+        groq_tools = _GROQ_TOOLS
 
     max_iterations = 8
 
@@ -1108,7 +1853,7 @@ def process_chat(conn, messages: list, username: str) -> dict:
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=internal_messages,
-                tools=_GROQ_TOOLS,
+                tools=groq_tools,
                 tool_choice="auto",
             )
         except Exception as exc:
@@ -1161,7 +1906,11 @@ def process_chat(conn, messages: list, username: str) -> dict:
                 "yes", "yep", "yeah", "sure", "ok", "okay", "do it", "go ahead",
                 "please do", "apply it", "apply", "go for it", "confirm", "please",
             }
-            user_confirmed = any(kw in last_user_msg for kw in _confirmation_kw)
+            _conf_pattern = re.compile(
+                r'\b(' + '|'.join(re.escape(kw) for kw in _confirmation_kw) + r')\b',
+                re.IGNORECASE,
+            )
+            user_confirmed = bool(_conf_pattern.search(last_user_msg))
 
             if already_offered and user_confirmed:
                 # User confirmed after seeing manual steps → show approval card
@@ -1184,9 +1933,14 @@ def process_chat(conn, messages: list, username: str) -> dict:
             else:
                 # First mention → give manual steps and ask if user wants AI to apply
                 _section_map = {
-                    "block_domain":           "content_policy",
-                    "unblock_domain":         "content_policy",
+                    "block_domain":            "content_policy",
+                    "unblock_domain":          "content_policy",
                     "add_firewall_block_rule": "firewall",
+                    "open_soc_case":           "soc_portal",
+                    "add_soc_case_note":       "soc_portal",
+                    "escalate_soc_case":       "soc_portal",
+                    "close_soc_case":          "soc_portal",
+                    "triage_soc_alert":        "soc_portal",
                 }
                 section   = _section_map.get(write_call.function.name, "firewall")
                 help_data = _tool_firewall_help({"section": section})

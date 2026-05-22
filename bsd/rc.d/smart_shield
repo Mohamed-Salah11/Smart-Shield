@@ -9,14 +9,12 @@
 # 4) Control service: service smart_shield start|stop|restart|status
 #
 # Required runtime assumptions:
-# - Project code is installed under /usr/local/share/smart-shield
-# - Environment file exists at /usr/local/etc/smart-shield/smart-shield.env
+# - Project code is installed under /usr/local/share/smartshield
+# - Environment file exists at /usr/local/etc/smartshield/smartshield.env
 # - SECRET_KEY is set in env file (required by app startup)
 #
-# Before production:
-# - Review path variables below to match your final appliance image.
-# - Replace built-in Flask server startup with a production WSGI server
-#   (gunicorn/uwsgi/waitress equivalent for your FreeBSD stack).
+# The service is served by gunicorn (production WSGI server) bound to
+# 127.0.0.1 by default; nginx terminates TLS and reverse-proxies to it.
 #
 # PROVIDE: smart_shield
 # REQUIRE: LOGIN NETWORKING
@@ -35,16 +33,16 @@ load_rc_config "${name}"
 # are executed directly. sudo remains installed as a fallback for non-root
 # deployments.
 # App root where run.py/wsgi.py live in deployed system.
-: ${smart_shield_app_root:="/usr/local/share/smart-shield"}
+: ${smart_shield_app_root:="/usr/local/share/smartshield"}
 # Environment file containing SECRET_KEY and DB path vars.
-: ${smart_shield_env_file:="/usr/local/etc/smart-shield/smart-shield.env"}
-: ${smart_shield_rundir:="/var/run/smart-shield"}
-: ${smart_shield_logdir:="/var/log/smart-shield"}
-: ${smart_shield_datadir:="/var/db/smart-shield"}
-: ${smart_shield_configdir:="/usr/local/etc/smart-shield"}
-: ${smart_shield_pidfile:="/var/run/smart-shield/smart_shield.pid"}
-: ${smart_shield_python:="/usr/local/share/smart-shield/.venv/bin/python3"}
-: ${smart_shield_gunicorn:="/usr/local/share/smart-shield/.venv/bin/gunicorn"}
+: ${smart_shield_env_file:="/usr/local/etc/smartshield/smartshield.env"}
+: ${smart_shield_rundir:="/var/run/smartshield"}
+: ${smart_shield_logdir:="/var/log/smartshield"}
+: ${smart_shield_datadir:="/var/db/smartshield"}
+: ${smart_shield_configdir:="/usr/local/etc/smartshield"}
+: ${smart_shield_pidfile:="/var/run/smartshield/smart_shield.pid"}
+: ${smart_shield_python:="/usr/local/share/smartshield/.venv/bin/python3"}
+: ${smart_shield_gunicorn:="/usr/local/share/smartshield/.venv/bin/gunicorn"}
 : ${smart_shield_wsgi:="wsgi:app"}
 : ${smart_shield_bind:="127.0.0.1:5000"}
 : ${smart_shield_workers:="2"}
@@ -56,6 +54,7 @@ command="/usr/sbin/daemon"
 command_args="-f -P ${pidfile} -o ${smart_shield_logdir}/app.log \
     ${smart_shield_gunicorn} \
     --workers ${smart_shield_workers} \
+    --worker-class gevent \
     --bind ${smart_shield_bind} \
     --chdir ${smart_shield_app_root} \
     --access-logfile ${smart_shield_logdir}/access.log \
@@ -67,6 +66,11 @@ stop_postcmd="${name}_poststop"
 
 smart_shield_prestart()
 {
+    # Publish the env-file path so the Flask app can re-read it from a fresh
+    # worker (Gunicorn workers may exec without inheriting the sourced vars).
+    SMARTSHIELD_ENV_FILE="${smart_shield_env_file}"
+    export SMARTSHIELD_ENV_FILE
+
     # Load optional runtime env values if file exists.
     if [ -f "${smart_shield_env_file}" ]; then
         # shellcheck source=/dev/null
@@ -102,6 +106,34 @@ smart_shield_prestart()
 
     touch "${SMARTSHIELD_AUDIT_LOG_PATH}"
 
+    # First-boot setup claim token.
+    #
+    # On a fresh, unclaimed appliance, generate a one-time token and print it
+    # to the local console. The setup wizard requires this token (or an
+    # authenticated superuser) before it will run, which keeps the
+    # unauthenticated first-boot wizard from being claimed over the network.
+    # The app removes the token and writes a ".setup_claimed" sentinel when
+    # setup completes, so it is not regenerated afterwards.
+    _claim_token_file="${smart_shield_datadir}/setup_claim_token"
+    _claim_sentinel="${smart_shield_datadir}/.setup_claimed"
+    if [ ! -f "${_claim_token_file}" ] && [ ! -f "${_claim_sentinel}" ]; then
+        _claim_token="$(/usr/bin/openssl rand -hex 16 2>/dev/null)"
+        if [ -z "${_claim_token}" ]; then
+            # Fall back to the kernel RNG if openssl is unavailable.
+            _claim_token="$(head -c 16 /dev/urandom | sha256 -q 2>/dev/null | cut -c1-32)"
+        fi
+        if [ -n "${_claim_token}" ]; then
+            ( umask 077; printf '%s\n' "${_claim_token}" > "${_claim_token_file}" )
+            chmod 0600 "${_claim_token_file}" 2>/dev/null
+            echo "" > /dev/console 2>/dev/null
+            echo "==================================================================" > /dev/console 2>/dev/null
+            echo " Smart Shield first-boot setup token:" > /dev/console 2>/dev/null
+            echo "   ${_claim_token}" > /dev/console 2>/dev/null
+            echo " Enter this token in the setup wizard to claim this appliance." > /dev/console 2>/dev/null
+            echo "==================================================================" > /dev/console 2>/dev/null
+        fi
+    fi
+
     # Export variables used by app startup logic.
     export APP_ENV
     export FLASK_DEBUG
@@ -114,9 +146,11 @@ smart_shield_prestart()
     export SMARTSHIELD_ENABLE_NETWORK_APPLY
     export SMARTSHIELD_NETWORK_DRY_RUN
     export SMARTSHIELD_MASTER_KEY
-    export GOOGLE_API_KEY
     export ABUSECH_AUTH_KEY
     export ABUSECH_DRY_RUN
+    export GROQ_API_KEY
+    export GOOGLE_CSE_KEY
+    export GOOGLE_CSE_CX
 }
 
 smart_shield_poststop()

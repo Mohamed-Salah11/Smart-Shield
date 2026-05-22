@@ -1,6 +1,6 @@
 #!/bin/sh
 # =============================================================================
-# smartshield-cli — Smart Shield interactive console (pfSense-style)
+# smartshield-cli — Smart Shield appliance console
 # =============================================================================
 # Install: install -m 0555 smartshield-cli /usr/local/sbin/smartshield-cli
 # Launch:  smartshield-cli   (or via: smartshieldctl menu)
@@ -11,8 +11,8 @@
 set -eu
 
 CTL="${CTL:-smartshieldctl}"
-APP_ROOT="${SMARTSHIELD_APP_ROOT:-/usr/local/share/smart-shield}"
-ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smart-shield/smart-shield.env}"
+APP_ROOT="${SMARTSHIELD_APP_ROOT:-/usr/local/share/smartshield}"
+ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smartshield/smartshield.env}"
 
 # ── Display helpers ───────────────────────────────────────────────────────────
 _bold()  { printf "\033[1m%s\033[0m" "$1"; }
@@ -163,7 +163,7 @@ _menu_logs() {
         read -r c
         case "${c}" in
             1) clear; "${CTL}" logs 50; _pause ;;
-            2) clear; echo "Following log — press Ctrl+C to stop"; tail -f /var/log/smart-shield/app.log ;;
+            2) clear; echo "Following log — press Ctrl+C to stop"; tail -f /var/log/smartshield/app.log ;;
             3) clear; "${CTL}" audit 50; _pause ;;
             4) clear; "${CTL}" access 30; _pause ;;
             5) clear; "${CTL}" pf-status; _pause ;;

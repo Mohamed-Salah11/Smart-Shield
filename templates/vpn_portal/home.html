@@ -1,0 +1,82 @@
+{% extends "vpn_portal/base.html" %}
+{% block title %}Your VPN profile{% endblock %}
+{% block content %}
+<div class="vp-card ext-d80f5e63">
+  <h1>Welcome, {{ user.full_name or user.username }}</h1>
+  <p class="subtitle">Download the OpenVPN profile assigned to your account.</p>
+
+  {% if server %}
+    <div class="mb-3 p-3 ext-b9beae4c">
+      <div class="text-muted small">Assigned server</div>
+      <div><strong>{{ server.description or ("Server #" ~ server.id) }}</strong></div>
+      <div class="small text-muted">
+        Mode: {{ server.server_mode }} &nbsp;·&nbsp;
+        Protocol: {{ server.protocol|upper }}/{{ server.local_port }}
+      </div>
+    </div>
+
+    <a href="{{ url_for('vpn_portal.download_ovpn') }}"
+       class="btn btn-vp w-100 mb-2">
+      <i class="fas fa-download"></i> Download .ovpn profile
+    </a>
+  {% else %}
+    <div class="alert-vp-danger mb-3">
+      No OpenVPN profile is assigned to your account yet. Please contact your administrator.
+    </div>
+  {% endif %}
+
+  <a href="{{ url_for('vpn_portal.enroll_mfa') }}"
+     class="btn btn-outline-light w-100 mb-2">
+    <i class="fas fa-shield-halved"></i>
+    {% if user.totp_enrolled %}Manage two-factor (enabled){% else %}Enable two-factor authentication{% endif %}
+  </a>
+
+  <hr class="ext-87bb382e">
+
+  <details>
+    <summary class="text-muted small ext-b202c6d4">Change password</summary>
+    <form id="pw-form" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input class="form-control mb-2" type="password" name="current" placeholder="Current password" required>
+      <input class="form-control mb-2" type="password" name="new" placeholder="New password (10+ chars)" required>
+      <input class="form-control mb-2" type="password" name="confirm" placeholder="Confirm new password" required>
+      <button type="submit" class="btn btn-vp w-100">Update password</button>
+      <div id="pw-msg" class="vp-meta mt-2"></div>
+    </form>
+  </details>
+
+  <p class="vp-meta mt-3">
+    Session log-in: {{ user.last_login_at or "—" }}
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+  document.getElementById("pw-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const fd = new FormData(form);
+    const msg = document.getElementById("pw-msg");
+    msg.textContent = "Saving…";
+    try {
+      const r = await fetch("{{ url_for('vpn_portal.change_password') }}", {
+        method: "POST", body: fd,
+        headers: { "X-CSRFToken": document.querySelector('meta[name=csrf-token]').content }
+      });
+      const j = await r.json();
+      if (j.ok) {
+        msg.textContent = "Password updated.";
+        msg.style.color = "var(--vp-success)";
+        form.reset();
+      } else {
+        msg.textContent = j.error || "Update failed.";
+        msg.style.color = "var(--vp-danger)";
+      }
+    } catch (err) {
+      msg.textContent = "Network error.";
+      msg.style.color = "var(--vp-danger)";
+    }
+  });
+</script>
+{% endblock %}

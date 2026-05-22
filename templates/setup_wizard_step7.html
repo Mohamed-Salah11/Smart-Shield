@@ -11,16 +11,17 @@
 <span class="badge bg-primary">Step 6 of 9</span>
 <small class="text-muted">66% Complete</small>
 </div>
-<div class="progress" style="height: 8px; border-radius: 4px;">
-<div class="progress-bar" role="progressbar" style="width: 66%; background: var(--primary);" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100"></div>
+<div class="progress ext-6937aa3d">
+<div class="progress-bar ext-748742da" role="progressbar" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100"></div>
 </div>
 </div>
 
-<form method="post" action="#">
+<form method="post" action="">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <!-- Content Card -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-lock"></i></div><div><div class="ss-card-title">Set Admin Password</div></div></div>
-<div class="ss-card-body" style="padding: 24px;">
+<div class="ss-card-body ext-7174bca8">
 <div class="d-flex align-items-start mb-4">
 <div class="me-3">
 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="var(--warning)" viewBox="0 0 16 16">
@@ -85,7 +86,7 @@ Continue
 </form>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('show_password').addEventListener('change', function() {
 const type = this.checked ? 'text' : 'password';
 document.getElementById('admin_password').type = type;

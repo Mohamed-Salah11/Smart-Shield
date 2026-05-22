@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style nonce="{{ csp_nonce() }}">
+.dns-bar       { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+                 padding:10px 14px; background:var(--panel);
+                 border:1px solid var(--border-color); border-radius:10px 10px 0 0;
+                 border-bottom:none; }
+.dns-bar input, .dns-bar select {
+                 height:32px; padding:0 10px; font-size:.82rem;
+                 border:1px solid var(--border-color); border-radius:7px;
+                 background:var(--border-color-soft); color:var(--text-color); }
+.dns-bar input:focus, .dns-bar select:focus {
+                 outline:none; border-color:var(--primary);
+                 box-shadow:0 0 0 3px rgba(37,99,235,.1); background:var(--panel); }
+.dns-actions   { display:flex; gap:8px; flex-wrap:wrap; }
+.dns-actions button {
+                 height:32px; padding:0 12px; border-radius:6px; font-size:.78rem;
+                 font-weight:600; border:1px solid var(--border-color);
+                 background:var(--border-color-soft); color:var(--text-color);
+                 cursor:pointer; }
+.dns-actions button.primary { background:var(--primary); color:#fff;
+                              border-color:var(--primary); }
+
+.dns-stats     { display:flex; gap:10px; flex-wrap:wrap; padding:10px 14px;
+                 background:var(--panel); border:1px solid var(--border-color);
+                 border-top:none; border-bottom:none; }
+.dns-tot-card  { background:var(--bg); border:1px solid var(--border-color);
+                 border-radius:8px; padding:8px 14px; min-width:140px; }
+.dns-tot-label { font-size:.65rem; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.05em; color:var(--muted); }
+.dns-tot-val   { font-size:1.4rem; font-weight:700; line-height:1.1; margin-top:2px; }
+.dns-tot-blocked .dns-tot-val { color:#ef4444; }
+
+.dns-mode-card { background:var(--bg); border:1px solid var(--border-color);
+                 border-radius:8px; padding:8px 14px; min-width:240px; }
+.dns-mode-card label { font-size:.7rem; color:var(--muted);
+                 text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+.dns-mode-card select { width:100%; margin-top:4px; height:28px; }
+.dns-mode-warn { display:none; margin-top:6px; padding:6px 10px; font-size:.72rem;
+                 background:rgba(245,158,11,.18); color:#b45309;
+                 border:1px solid rgba(245,158,11,.4); border-radius:6px; }
+.dns-mode-warn.active { display:block; }
+
+.dns-wrap      { background:var(--panel); border:1px solid var(--border-color);
+                 border-radius:0 0 10px 10px; overflow:hidden; }
+.dns-table     { width:100%; border-collapse:collapse; font-size:.78rem; }
+.dns-table th, .dns-table td {
+                 padding:6px 10px; border-bottom:1px solid var(--border-color);
+                 text-align:left; white-space:nowrap; }
+.dns-table th  { background:var(--border-color-soft); font-weight:700;
+                 font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;
+                 color:var(--muted); }
+.dns-table tr.row-blocked td { background:rgba(239,68,68,.06); }
+
+.dns-badge     { display:inline-block; padding:1px 7px; border-radius:99px;
+                 font-size:.66rem; font-weight:700; text-transform:uppercase; }
+.dns-badge.allowed { background:rgba(16,185,129,.18); color:#10b981; }
+.dns-badge.blocked { background:rgba(239,68,68,.18);  color:#ef4444; }
+.dns-mono      { font-family:ui-monospace,Menlo,monospace; font-size:.74rem; }
+.dns-msg       { color:var(--muted); font-size:.78rem; padding:10px 14px; }
+
+.dns-toplists  { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+                 gap:10px; padding:10px 14px; background:var(--panel);
+                 border:1px solid var(--border-color); border-top:none; }
+.dns-top-card  { background:var(--bg); border:1px solid var(--border-color);
+                 border-radius:8px; padding:8px 12px; }
+.dns-top-title { font-size:.7rem; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.04em; color:var(--muted); margin-bottom:6px; }
+.dns-top-row   { display:flex; justify-content:space-between; font-size:.78rem;
+                 padding:2px 0; border-bottom:1px dashed var(--border-color); }
+.dns-top-row:last-child { border-bottom:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ext-75f111c7">
+  <h2 class="ext-1386d503">DNS Logs</h2>
+  <span class="dns-msg" id="liveStatus">Loading…</span>
+</div>
+
+<form class="dns-bar" data-action-submit="h_3364ff5a1c">
+  <input class="ext-4f0489cb" type="text"   id="search"    placeholder="Search query / host…">
+  <input class="ext-2f01efdd" type="text"   id="client_ip" placeholder="Client IP">
+  <input class="ext-2f01efdd" type="text"   id="qtype"     placeholder="Type (A, AAAA, TXT…)">
+  <select id="rcode">
+    <option value="">RCODE (any)</option>
+    <option value="NOERROR">NOERROR</option>
+    <option value="NXDOMAIN">NXDOMAIN</option>
+    <option value="SERVFAIL">SERVFAIL</option>
+  </select>
+  <label class="ext-6a785612">
+    <input type="checkbox" id="blocked"> Blocked only
+  </label>
+  <div class="dns-actions ext-83456371">
+    <button class="primary" data-action="h_42245686d5">Apply</button>
+    <button data-action="h_cd85b8c861">Clear</button>
+  </div>
+</form>
+
+<div class="dns-stats">
+  <div class="dns-tot-card">
+    <div class="dns-tot-label">Total queries</div>
+    <div class="dns-tot-val" id="totTotal">0</div>
+  </div>
+  <div class="dns-tot-card dns-tot-blocked">
+    <div class="dns-tot-label">Blocked</div>
+    <div class="dns-tot-val" id="totBlocked">0</div>
+  </div>
+  <div class="dns-mode-card">
+    <label for="modeSel">DNS query logging mode</label>
+    <select id="modeSel" data-action-change="h_50e798ab4b">
+      <option value="off">Off — no DNS events recorded</option>
+      <option value="blocked_only">Blocked queries only (default)</option>
+      <option value="all">All queries (high volume)</option>
+    </select>
+    <div class="dns-mode-warn" id="modeWarn">
+      Full DNS logging captures every query — including browsing metadata for
+      every device on the LAN. Use a short retention window
+      (Settings → Retention → <code>dns_events</code>) and disable when not needed.
+    </div>
+    <div class="dns-msg ext-57ce1f1b" id="modeMsg"></div>
+  </div>
+</div>
+
+<div class="dns-toplists" id="dnsTopLists"></div>
+
+<div class="dns-wrap">
+  <table class="dns-table">
+    <thead><tr>
+      <th>Time</th><th>Client</th><th>Query</th><th>Type</th><th>RCODE</th>
+      <th>Action</th><th>Host</th>
+    </tr></thead>
+    <tbody id="dnsBody">
+      <tr><td colspan="7" class="dns-msg">No DNS events yet.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const LIST_URL   = "{{ url_for('dns_logs.api_list') }}";
+const STATS_URL  = "{{ url_for('dns_logs.api_stats') }}";
+const MODE_URL   = "{{ url_for('dns_logs.api_mode_get') }}";
+
+let offset = 0;
+const LIMIT = 100;
+
+function htmlEscape(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function currentFilters() {
+  const f = new URLSearchParams();
+  for (const id of ["search","client_ip","qtype","rcode"]) {
+    const v = document.getElementById(id).value.trim();
+    if (v) f.set(id, v);
+  }
+  if (document.getElementById("blocked").checked) f.set("blocked", "1");
+  return f;
+}
+
+async function loadList() {
+  const f = currentFilters();
+  f.set("limit", LIMIT); f.set("offset", offset);
+  const r = await fetch(LIST_URL + "?" + f.toString(), {credentials:"same-origin"});
+  if (!r.ok) return;
+  const d = await r.json();
+  renderRows(d.rows || []);
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById("dnsBody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="dns-msg">No matching DNS events.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr class="${r.blocked?'row-blocked':''}">
+      <td class="dns-mono">${htmlEscape((r.ts||"").replace("T"," ").slice(0,19))}</td>
+      <td class="dns-mono">${htmlEscape(r.client_ip||"")}</td>
+      <td class="dns-mono">${htmlEscape(r.query||"")}</td>
+      <td>${htmlEscape(r.qtype||"")}</td>
+      <td>${htmlEscape(r.rcode||"")}</td>
+      <td><span class="dns-badge ${r.blocked?'blocked':'allowed'}">${r.blocked?'block':'allow'}</span></td>
+      <td>${htmlEscape(r.hostname||"")}</td>
+    </tr>`).join("");
+}
+
+async function loadStats() {
+  const r = await fetch(STATS_URL + "?" + currentFilters().toString(), {credentials:"same-origin"});
+  if (!r.ok) return;
+  const d = await r.json();
+  document.getElementById("totTotal").textContent   = (d.total || 0).toLocaleString();
+  document.getElementById("totBlocked").textContent = (d.blocked || 0).toLocaleString();
+  document.getElementById("liveStatus").textContent = "Live";
+  renderTopLists(d);
+}
+
+function renderTopLists(d) {
+  const cards = [
+    ["Top clients",       d.top_client,  "client_ip"],
+    ["Top blocked queries", d.top_query, "query"],
+    ["Top query types",   d.top_qtype,   "qtype"],
+  ];
+  const container = document.getElementById("dnsTopLists");
+  if (!container) return;
+  container.innerHTML = cards.map(([title, rows, key]) => {
+    const body = (rows || []).map(r => `
+      <div class="dns-top-row">
+        <span class="dns-mono">${htmlEscape(String(r[key] || ""))}</span>
+        <span>${(r.count || 0).toLocaleString()}</span>
+      </div>`).join("");
+    return `<div class="dns-top-card">
+              <div class="dns-top-title">${htmlEscape(title)}</div>
+              ${body || '<div class="dns-msg ext-57ce1f1b">No data</div>'}
+            </div>`;
+  }).join("");
+}
+
+function applyModeWarning(mode) {
+  const warn = document.getElementById("modeWarn");
+  if (warn) warn.classList.toggle("active", mode === "all");
+}
+
+async function loadMode() {
+  const r = await fetch(MODE_URL, {credentials:"same-origin"});
+  if (!r.ok) return;
+  const d = await r.json();
+  const mode = d.mode || "blocked_only";
+  document.getElementById("modeSel").value = mode;
+  applyModeWarning(mode);
+}
+
+async function saveMode() {
+  const mode = document.getElementById("modeSel").value;
+  const msg  = document.getElementById("modeMsg");
+  msg.textContent = "Saving…";
+  const r = await fetch(MODE_URL, {
+    method:"POST", credentials:"same-origin",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({mode}),
+  });
+  const d = await r.json();
+  msg.textContent = d.ok ? ("Saved (now " + d.mode + ")") : (d.message || "Failed — superuser required");
+  if (d.ok) applyModeWarning(d.mode);
+}
+
+function loadAll() { offset = 0; loadList(); loadStats(); }
+function clearFilters() {
+  for (const id of ["search","client_ip","qtype","rcode"]) document.getElementById(id).value = "";
+  document.getElementById("blocked").checked = false;
+  loadAll();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadAll(); loadMode();
+  setInterval(() => { loadList(); loadStats(); }, 15000);
+});
+</script>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_3364ff5a1c'] = function (event, el) { return false; };
+  R['h_42245686d5'] = function (event, el) { loadAll() };
+  R['h_cd85b8c861'] = function (event, el) { clearFilters() };
+  R['h_50e798ab4b'] = function (event, el) { saveMode() };
+})();
+</script>
+<!-- /inline-handlers:auto -->

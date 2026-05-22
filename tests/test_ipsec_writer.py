@@ -228,6 +228,86 @@ class TestValidatePhase2:
 # apply dry-run
 # ---------------------------------------------------------------------------
 
+class TestMultiPhase2Config:
+    """Verify that multiple Phase-2 child SAs produce distinct conn blocks."""
+
+    def _setup_db(self, p1_row, p2_rows):
+        import secrets as _secrets
+        os.environ["SMARTSHIELD_DB_PATH"] = (
+            f"file:ipsec_{_secrets.token_hex(4)}?mode=memory&cache=shared"
+        )
+        from app.database import init_db, get_db
+        from app.secret_store import encrypt_secret
+        init_db()
+        conn = get_db()
+        p1_row["pre_shared_key"] = encrypt_secret("testpsk")
+        conn.execute(
+            "INSERT INTO ipsec_phase1 (disabled, ike_version, remote_gateway, auth_method, "
+            "my_identifier, peer_identifier, pre_shared_key, p1_life_time, dpd_enable, "
+            "dpd_delay, dpd_max_failures, nat_traversal, description) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (p1_row["disabled"], p1_row["ike_version"], p1_row["remote_gateway"],
+             p1_row["auth_method"], p1_row["my_identifier"], p1_row["peer_identifier"],
+             p1_row["pre_shared_key"], p1_row["p1_life_time"], p1_row["dpd_enable"],
+             p1_row["dpd_delay"], p1_row["dpd_max_failures"], p1_row["nat_traversal"],
+             p1_row["description"]),
+        )
+        p1_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        for p2 in p2_rows:
+            conn.execute(
+                "INSERT INTO ipsec_phase2 "
+                "(phase1_id, disabled, mode, local_network, remote_network, protocol, "
+                "encryption_algorithms, hash_algorithms, pfs_key_group, lifetime) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (p1_id, p2.get("disabled", 0), p2.get("mode", "tunnel"),
+                 p2["local_network"], p2["remote_network"],
+                 p2.get("protocol", "esp"), p2.get("encryption_algorithms", "aes256"),
+                 p2.get("hash_algorithms", "sha256"), p2.get("pfs_key_group", "14"),
+                 p2.get("lifetime", 3600)),
+            )
+        conn.commit()
+        return conn
+
+    def test_single_phase2_inline(self, p1_row, p2_row):
+        """Single Phase2: child SA embedded directly in the Phase 1 conn block."""
+        from app.services.ipsec_writer import generate_ipsec_conf
+        conn = self._setup_db(p1_row, [p2_row])
+        conf = generate_ipsec_conf(conn)
+        assert "leftsubnet=192.168.1.0/24" in conf
+        assert "_child_" not in conf
+
+    def test_two_phase2_creates_child_conns(self, p1_row, p2_row):
+        """Two Phase2 entries must produce two separate child conn blocks."""
+        from app.services.ipsec_writer import generate_ipsec_conf
+        p2b = dict(p2_row)
+        p2b["local_network"] = "192.168.2.0/24"
+        p2b["remote_network"] = "10.20.0.0/24"
+        conn = self._setup_db(p1_row, [p2_row, p2b])
+        conf = generate_ipsec_conf(conn)
+        assert "_child_1" in conf
+        assert "_child_2" in conf
+        assert "also=" in conf
+
+    def test_disabled_phase2_skipped(self, p1_row, p2_row):
+        """Disabled Phase2 rows must not appear in the generated config."""
+        from app.services.ipsec_writer import generate_ipsec_conf
+        p2_disabled = dict(p2_row)
+        p2_disabled["disabled"] = 1
+        conn = self._setup_db(p1_row, [p2_disabled])
+        conf = generate_ipsec_conf(conn)
+        # No child conn should appear since the only Phase2 is disabled
+        assert "leftsubnet=192.168.1.0/24" not in conf
+
+    def test_three_phase2_all_child_conns(self, p1_row, p2_row):
+        """Three Phase2 entries — verify _child_3 is generated."""
+        from app.services.ipsec_writer import generate_ipsec_conf
+        p2b = dict(p2_row); p2b["local_network"] = "172.16.0.0/16"; p2b["remote_network"] = "10.1.0.0/24"
+        p2c = dict(p2_row); p2c["local_network"] = "172.17.0.0/16"; p2c["remote_network"] = "10.2.0.0/24"
+        conn = self._setup_db(p1_row, [p2_row, p2b, p2c])
+        conf = generate_ipsec_conf(conn)
+        assert "_child_3" in conf
+
+
 class TestApplyIpsec:
 
     def test_apply_dry_run_no_tunnels(self):

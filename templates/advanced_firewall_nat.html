@@ -2,7 +2,7 @@
 
 {% block main %}
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function() {
         const enableMssCheckbox = document.getElementById('enable_mss');
         const maxMssField = document.getElementById('max_mss_field');
@@ -79,7 +79,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_optimization" class="col-sm-3 col-form-label fw-semibold">Optimization</label>
                     <div class="col-sm-9">
-                        <select id="firewall_optimization" name="firewall_optimization" class="form-select" style="max-width: 300px;">
+                        <select id="firewall_optimization" name="firewall_optimization" class="form-select ext-9dd291e0">
                             <option value="normal" {{ 'selected' if not config or config['firewall_optimization'] == 'normal' else '' }}>Normal</option>
                             <option value="high-latency" {{ 'selected' if config and config['firewall_optimization'] == 'high-latency' else '' }}>High-latency</option>
                             <option value="aggressive" {{ 'selected' if config and config['firewall_optimization'] == 'aggressive' else '' }}>Aggressive</option>
@@ -102,8 +102,8 @@
                     <label class="col-sm-3 col-form-label fw-semibold">Adaptive Timeouts</label>
                     <div class="col-sm-9">
                         <div class="d-flex gap-2 mb-2">
-                            <input type="number" id="adaptive_start" name="adaptive_start" class="form-control" style="max-width: 150px;" value="{{ config['adaptive_start'] if config and config['adaptive_start'] else 1134000 }}" placeholder="Start">
-                            <input type="number" id="adaptive_end" name="adaptive_end" class="form-control" style="max-width: 150px;" value="{{ config['adaptive_end'] if config and config['adaptive_end'] else 2333332 }}" placeholder="End">
+                            <input type="number" id="adaptive_start" name="adaptive_start" class="form-control ext-a2984eed" value="{{ config['adaptive_start'] if config and config['adaptive_start'] else 1134000 }}" placeholder="Start">
+                            <input type="number" id="adaptive_end" name="adaptive_end" class="form-control ext-a2984eed" value="{{ config['adaptive_end'] if config and config['adaptive_end'] else 2333332 }}" placeholder="End">
                         </div>
                         <small class="text-muted">Adaptive scaling begins when state entries exceed start value. Defaults: 60% and 120% of max states.</small>
                     </div>
@@ -112,7 +112,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_states" class="col-sm-3 col-form-label fw-semibold">Max States</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_states" name="firewall_max_states" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_states'] if config and config['firewall_max_states'] else 1990000 }}">
+                        <input type="number" id="firewall_max_states" name="firewall_max_states" class="form-control ext-7ea37169" value="{{ config['firewall_max_states'] if config and config['firewall_max_states'] else 1990000 }}">
                         <small class="text-muted">Maximum connections in firewall state table. Requires reboot.</small>
                     </div>
                 </div>
@@ -120,7 +120,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_table" class="col-sm-3 col-form-label fw-semibold">Max Table Entries</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_table" name="firewall_max_table" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_table'] if config and config['firewall_max_table'] else 400000 }}">
+                        <input type="number" id="firewall_max_table" name="firewall_max_table" class="form-control ext-7ea37169" value="{{ config['firewall_max_table'] if config and config['firewall_max_table'] else 400000 }}">
                         <small class="text-muted">Maximum table entries for aliases, sshlguard, snort, etc.</small>
                     </div>
                 </div>
@@ -128,7 +128,7 @@
                 <div class="mb-3 row">
                     <label for="firewall_max_fragment" class="col-sm-3 col-form-label fw-semibold">Max Fragment Entries</label>
                     <div class="col-sm-9">
-                        <input type="number" id="firewall_max_fragment" name="firewall_max_fragment" class="form-control" style="max-width: 200px;" value="{{ config['firewall_max_fragment'] if config and config['firewall_max_fragment'] else 5000 }}">
+                        <input type="number" id="firewall_max_fragment" name="firewall_max_fragment" class="form-control ext-7ea37169" value="{{ config['firewall_max_fragment'] if config and config['firewall_max_fragment'] else 5000 }}">
                         <small class="text-muted">Maximum packet fragments for reassembly by scrub rules.</small>
                     </div>
                 </div>
@@ -179,10 +179,10 @@
                     </div>
                 </div>
 
-                <div class="mb-3 row" id="max_mss_field" style="display: none;">
+                <div class="mb-3 row ext-9c766357" id="max_mss_field">
                     <label for="maximum_mss" class="col-sm-3 col-form-label fw-semibold">Maximum MSS</label>
                     <div class="col-sm-9">
-                        <input type="number" id="maximum_mss" name="maximum_mss" class="form-control" style="max-width: 200px;" value="{{ config['maximum_mss'] if config and config['maximum_mss'] else 1400 }}">
+                        <input type="number" id="maximum_mss" name="maximum_mss" class="form-control ext-7ea37169" value="{{ config['maximum_mss'] if config and config['maximum_mss'] else 1400 }}">
                         <small class="text-muted">Helps overcome PMTUD problems on IPsec VPN links. Default: 1400 bytes.</small>
                     </div>
                 </div>
@@ -203,14 +203,14 @@
                             <input type="checkbox" class="form-check-input" id="disable_firewall" name="disable_firewall" {{ 'checked' if config and config['disable_firewall'] else '' }}>
                             <label class="form-check-label" for="disable_firewall">Disable all packet filtering</label>
                         </div>
-                        <small class="text-muted text-danger">Warning: Converts Smart Shield to routing-only and disables NAT!</small>
+                        <small class="text-muted text-danger">Warning: Converts SmartShield to routing-only and disables NAT!</small>
                     </div>
                 </div>
 
                 <div class="mb-3 row">
                     <label for="firewall_state_policy" class="col-sm-3 col-form-label fw-semibold">State Policy</label>
                     <div class="col-sm-9">
-                        <select id="firewall_state_policy" name="firewall_state_policy" class="form-select" style="max-width: 300px;">
+                        <select id="firewall_state_policy" name="firewall_state_policy" class="form-select ext-9dd291e0">
                             <option value="interface_bound" {{ 'selected' if not config or config['firewall_state_policy'] == 'interface_bound' else '' }}>Interface Bound States</option>
                             <option value="floating" {{ 'selected' if config and config['firewall_state_policy'] == 'floating' else '' }}>Floating States</option>
                         </select>
@@ -281,7 +281,7 @@
                 <div class="mb-3 row">
                     <label for="aliases_hostnames_interval" class="col-sm-3 col-form-label fw-semibold">Alias Resolve Interval</label>
                     <div class="col-sm-9">
-                        <input type="number" id="aliases_hostnames_interval" name="aliases_hostnames_interval" class="form-control" style="max-width: 200px;" value="{{ config['aliases_hostnames_interval'] if config and config['aliases_hostnames_interval'] else 300 }}">
+                        <input type="number" id="aliases_hostnames_interval" name="aliases_hostnames_interval" class="form-control ext-7ea37169" value="{{ config['aliases_hostnames_interval'] if config and config['aliases_hostnames_interval'] else 300 }}">
                         <small class="text-muted">Interval in seconds to resolve hostnames in aliases. Default: 300s.</small>
                     </div>
                 </div>
@@ -308,7 +308,7 @@
                 <div class="mb-3 row">
                     <label for="update_frequency" class="col-sm-3 col-form-label fw-semibold">Update Frequency</label>
                     <div class="col-sm-9">
-                        <select id="update_frequency" name="update_frequency" class="form-select" style="max-width: 200px;">
+                        <select id="update_frequency" name="update_frequency" class="form-select ext-7ea37169">
                             <option value="monthly" {{ 'selected' if not config or config['update_frequency'] == 'monthly' else '' }}>Monthly</option>
                             <option value="weekly" {{ 'selected' if config and config['update_frequency'] == 'weekly' else '' }}>Weekly</option>
                             <option value="daily" {{ 'selected' if config and config['update_frequency'] == 'daily' else '' }}>Daily</option>
@@ -329,7 +329,7 @@
                 <div class="mb-3 row">
                     <label for="nat_reflection_mode" class="col-sm-3 col-form-label fw-semibold">NAT Reflection Mode</label>
                     <div class="col-sm-9">
-                        <select id="nat_reflection_mode" name="nat_reflection_mode" class="form-select" style="max-width: 300px;">
+                        <select id="nat_reflection_mode" name="nat_reflection_mode" class="form-select ext-9dd291e0">
                             <option value="disabled" {{ 'selected' if not config or config['nat_reflection_mode'] == 'disabled' else '' }}>Disabled</option>
                             <option value="pure-nat" {{ 'selected' if config and config['nat_reflection_mode'] == 'pure-nat' else '' }}>Pure NAT</option>
                             <option value="nat-proxy" {{ 'selected' if config and config['nat_reflection_mode'] == 'nat-proxy' else '' }}>NAT + Proxy</option>
@@ -341,7 +341,7 @@
                 <div class="mb-3 row">
                     <label for="reflection_timeout" class="col-sm-3 col-form-label fw-semibold">Reflection Timeout</label>
                     <div class="col-sm-9">
-                        <input type="number" id="reflection_timeout" name="reflection_timeout" class="form-control" style="max-width: 200px;" placeholder="2000" value="{{ config['reflection_timeout'] if config and config['reflection_timeout'] else '' }}">
+                        <input type="number" id="reflection_timeout" name="reflection_timeout" class="form-control ext-7ea37169" placeholder="2000" value="{{ config['reflection_timeout'] if config and config['reflection_timeout'] else '' }}">
                         <small class="text-muted">Timeout in seconds. Only applies to NAT + Proxy mode.</small>
                     </div>
                 </div>

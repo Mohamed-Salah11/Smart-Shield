@@ -7,8 +7,8 @@
     <div class="ss-page-header"><div><h1 class="ss-page-title">Certificate Manager</h1><p class="ss-page-desc">CA authorities, certificates, and revocation lists</p></div></div>
 
     <!-- Toast -->
-    <div id="cert-toast" class="alert d-none" role="alert"
-         style="position:fixed;top:70px;right:20px;z-index:9999;min-width:340px;"></div>
+    <div id="cert-toast" class="alert d-none ext-cd6c86d1" role="alert"
+        ></div>
 
     <!-- View Cert Modal -->
     <div class="modal fade" id="viewCertModal" tabindex="-1">
@@ -20,8 +20,8 @@
           </div>
           <div class="modal-body">
             <dl class="row" id="cert-detail-fields"></dl>
-            <pre id="cert-pem-display" class="bg-dark text-light p-3 rounded"
-                 style="font-size:.75rem;max-height:300px;overflow-y:auto;"></pre>
+            <pre id="cert-pem-display" class="bg-dark text-light p-3 rounded ext-f08b5a0a"
+                ></pre>
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" onclick="doP12Export()">Download .p12</button>
+            <button class="btn btn-primary" data-action="h_bc573f3c2c">Download .p12</button>
           </div>
         </div>
       </div>
@@ -53,30 +53,30 @@
         <li class="nav-item">
             <a class="nav-link {{ 'active' if active_section == 'authorities' else '' }}"
                href="{{ url_for('system.certificates', section='authorities') }}"
-               onclick="showSection('authorities', this); return false;">
+               data-action="h_60fd385a20">
                <i class="fa-solid fa-building-columns me-1"></i>Authorities
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link {{ 'active' if active_section == 'certificates' else '' }}"
                href="{{ url_for('system.certificates', section='certificates') }}"
-               onclick="showSection('certificates', this); return false;">
+               data-action="h_93f051ec3e">
                <i class="fa-solid fa-file-certificate me-1"></i>Certificates
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link {{ 'active' if active_section == 'revocation' else '' }}"
                href="{{ url_for('system.certificates', section='revocation') }}"
-               onclick="showSection('revocation', this); return false;">
+               data-action="h_e62c5c8c68">
                <i class="fa-solid fa-ban me-1"></i>Revocation
             </a>
         </li>
     </ul>
 
     <!-- Search Section (Hidden by default) -->
-    <div class="ss-card mb-4" id="search-section" style="display: none;">
-        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-search"></i></div><div><div class="ss-card-title">Search Certificates</div></div><button type="button" class="btn btn-sm btn-outline-light ms-auto" onclick="toggleSearch()" title="Close"><i class="fa-solid fa-times"></i></button></div>
-        <div class="ss-card-body" style="padding: 15px;">
+    <div class="ss-card mb-4 ext-9c766357" id="search-section">
+        <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-search"></i></div><div><div class="ss-card-title">Search Certificates</div></div><button type="button" class="btn btn-sm btn-outline-light ms-auto" data-action="h_eb86ad99bd" title="Close"><i class="fa-solid fa-times"></i></button></div>
+        <div class="ss-card-body ext-2c9e984f">
             <form method="get" class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label">Search Term</label>
@@ -94,7 +94,7 @@
                     <button type="submit" class="btn btn-primary me-2">
                         <i class="fa-solid fa-search me-1"></i>Search
                     </button>
-                    <button type="button" class="btn btn-secondary" onclick="clearSearch()">
+                    <button type="button" class="btn btn-secondary" data-action="h_4f0b105a48">
                         <i class="fa-solid fa-times me-1"></i>Clear
                     </button>
                 </div>
@@ -104,12 +104,12 @@
     </div>
 
     <!-- Certificate Authorities Section -->
-    <div class="ss-card" id="authorities-section" style="display: {{ 'block' if active_section == 'authorities' else 'none' }};">
+    <div class="ss-card{{ '' if active_section == 'authorities' else ' ss-hidden' }}" id="authorities-section">
         <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-building-columns"></i></div><div><div class="ss-card-title">Certificate Authorities</div></div><a href="{{ url_for('system.add_ca') }}" class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add</a></div>
         <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead style="background:var(--border-color-soft);">
+            <table class="table table-hover mb-0 ext-1e28117f">
+                <thead class="ext-4c3186f1">
                     <tr>
                         <th>Name</th>
                         <th>Internal</th>
@@ -117,7 +117,7 @@
                         <th>Certificates</th>
                         <th>Distinguished Name</th>
                         <th>In Use</th>
-                        <th style="width: 140px;">Actions</th>
+                        <th class="ext-90f9553f">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -150,11 +150,11 @@
                                     <i class="fa-solid fa-download"></i>
                                 </a>
                                 <button class="btn btn-outline-secondary" title="Generate CRL"
-                                        onclick="generateCrl({{ ca.id }})">
+                                        data-action="h_9c9b16e498">
                                     <i class="fa-solid fa-list-check"></i>
                                 </button>
                                 <button class="btn btn-outline-danger" title="Delete"
-                                        onclick="deleteCa({{ ca.id }}, '{{ ca.name | e }}')">
+                                        data-action="h_a962888cc0">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -176,18 +176,18 @@
     </div>
 
     <!-- Certificates Section -->
-    <div class="ss-card" id="certificates-section" style="display: {{ 'block' if active_section == 'certificates' else 'none' }};">
+    <div class="ss-card{{ '' if active_section == 'certificates' else ' ss-hidden' }}" id="certificates-section">
         <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-file-certificate"></i></div><div><div class="ss-card-title">Certificates</div></div><a href="{{ url_for('system.add_certificate') }}" class="btn btn-success btn-sm ms-auto"><i class="fa-solid fa-plus me-1"></i>Add / Sign</a></div>
         <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead style="background:var(--border-color-soft);">
+            <table class="table table-hover mb-0 ext-1e28117f">
+                <thead class="ext-4c3186f1">
                     <tr>
                         <th>Name</th>
                         <th>Issuer</th>
                         <th>Distinguished Name</th>
                         <th>In Use</th>
-                        <th style="width: 210px;">Actions</th>
+                        <th class="ext-c8f60b55">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -207,7 +207,7 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <button class="btn btn-outline-secondary" title="View"
-                                        onclick="viewCert({{ cert.id }})">
+                                        data-action="h_89f6868dce">
                                     <i class="fa-solid fa-eye"></i>
                                 </button>
                                 <a href="/vpn/api/certs/{{ cert.id }}/export-pem"
@@ -216,15 +216,15 @@
                                     <i class="fa-solid fa-download"></i>
                                 </a>
                                 <button class="btn btn-outline-primary" title="Export P12"
-                                        onclick="openP12Export({{ cert.id }})">
+                                        data-action="h_d7bbfadfef">
                                     <i class="fa-solid fa-box-archive"></i>
                                 </button>
                                 <button class="btn btn-outline-warning" title="Revoke"
-                                        onclick="revokeCert({{ cert.id }}, '{{ cert.name | e }}')">
+                                        data-action="h_f87ff48ac9">
                                     <i class="fa-solid fa-ban"></i>
                                 </button>
                                 <button class="btn btn-outline-danger" title="Delete"
-                                        onclick="deleteCert({{ cert.id }}, '{{ cert.name | e }}')">
+                                        data-action="h_ac69f403d3">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -246,18 +246,18 @@
     </div>
 
     <!-- Revocation Section -->
-    <div class="ss-card" id="revocation-section" style="display: {{ 'block' if active_section == 'revocation' else 'none' }};">
+    <div class="ss-card{{ '' if active_section == 'revocation' else ' ss-hidden' }}" id="revocation-section">
         <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-ban"></i></div><div><div class="ss-card-title">Certificate Revocation Lists</div></div></div>
         <div class="ss-card-body">
         <div class="table-responsive">
-            <table class="table table-hover mb-0" style="font-size:.85rem;">
-                <thead style="background:var(--border-color-soft);">
+            <table class="table table-hover mb-0 ext-1e28117f">
+                <thead class="ext-4c3186f1">
                     <tr>
                         <th>Name</th>
                         <th>CA</th>
                         <th>Common Name</th>
                         <th>Revoked At</th>
-                        <th style="width: 100px;">Actions</th>
+                        <th class="ext-b3a15a8a">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -271,7 +271,7 @@
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <button class="btn btn-outline-danger" title="Delete"
-                                        onclick="deleteCert({{ crl.id }}, '{{ crl.name | e }}')">
+                                        data-action="h_1d4d344e60">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -294,7 +294,7 @@
 
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     function showSection(section, linkEl) {
         document.querySelectorAll('.ss-card[id$="-section"]').forEach(s => {
             if (s.id !== 'search-section') s.style.display = 'none';
@@ -424,3 +424,25 @@
 </script>
 
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_bc573f3c2c'] = function (event, el) { doP12Export() };
+  R['h_60fd385a20'] = function (event, el) { showSection('authorities', this); return false; };
+  R['h_93f051ec3e'] = function (event, el) { showSection('certificates', this); return false; };
+  R['h_e62c5c8c68'] = function (event, el) { showSection('revocation', this); return false; };
+  R['h_eb86ad99bd'] = function (event, el) { toggleSearch() };
+  R['h_4f0b105a48'] = function (event, el) { clearSearch() };
+  R['h_9c9b16e498'] = function (event, el) { generateCrl({{ ca.id }}) };
+  R['h_a962888cc0'] = function (event, el) { deleteCa({{ ca.id }}, '{{ ca.name | e }}') };
+  R['h_89f6868dce'] = function (event, el) { viewCert({{ cert.id }}) };
+  R['h_d7bbfadfef'] = function (event, el) { openP12Export({{ cert.id }}) };
+  R['h_f87ff48ac9'] = function (event, el) { revokeCert({{ cert.id }}, '{{ cert.name | e }}') };
+  R['h_ac69f403d3'] = function (event, el) { deleteCert({{ cert.id }}, '{{ cert.name | e }}') };
+  R['h_1d4d344e60'] = function (event, el) { deleteCert({{ crl.id }}, '{{ crl.name | e }}') };
+})();
+</script>
+<!-- /inline-handlers:auto -->

@@ -5,10 +5,11 @@ Common atomic file write + rollback helpers for Smart Shield config writers.
 
 Public API
 ----------
-atomic_write(path, content, mode=0o644)   -> None
-backup_config(path)                        -> str | None
-rollback_config(path)                      -> dict
-apply_with_rollback(path, content, restart_fn, mode=0o644) -> dict
+atomic_write(path, content, mode=0o644)               -> None
+backup_config(path)                                    -> str | None
+rollback_config(path)                                  -> dict
+apply_with_rollback(path, content, restart_fn,
+                    *, validate_fn=None, mode=0o644)   -> dict
 
 Non-FreeBSD behaviour
 ---------------------
@@ -19,12 +20,24 @@ Non-FreeBSD behaviour
                          before calling, but the function is safe to call
                          on non-FreeBSD — it will still write atomically and
                          run restart_fn (the caller can pass a no-op).
+
+Wave I additions
+----------------
+- Optional ``validate_fn(tmp_path)`` runs against the temp file *before*
+  it replaces the real config — syntax errors are caught without touching
+  the live file.
+- Every step (write / validate / backup / swap / restart / rollback) is
+  emitted through the module logger so transaction history is visible in
+  the audit log and the admin UI's apply-job rows.
 """
 
 import os
 import sys
 import shutil
 import tempfile
+import logging
+
+_log = logging.getLogger(__name__)
 
 _BACKUP_SUFFIX = ".known_good"
 
@@ -119,56 +132,126 @@ def apply_with_rollback(
     path: str,
     content: str,
     restart_fn,
+    *,
+    validate_fn=None,
     mode: int = 0o644,
+    rollback_on_restart_failure: bool = True,
 ) -> dict:
     """
-    Atomically write *content* to *path*, run *restart_fn*, and roll back
+    Tmp-file → optionally validate → backup → swap → reload, with rollback
     on failure.
 
     Sequence
     --------
-    1. backup_config(path)         — save .known_good (FreeBSD only)
-    2. atomic_write(path, content, mode)
-    3. result = restart_fn()       — must return {"ok": bool, "message": str}
-    4. If not result["ok"]:
-         rollback_config(path)
-         return {"ok": False, "rolled_back": True/False, ...}
-    5. Return {"ok": True, "rolled_back": False, ...}
+    1. Write *content* to a temp file in the same directory as *path*.
+    2. If *validate_fn* is given, call it with the temp path. It must return
+       ``{"ok": bool, "message": str, "output": str}`` (or raise). On failure
+       the temp file is unlinked and the live config is **left untouched**.
+    3. backup_config(path)         — save .known_good (FreeBSD only).
+    4. os.replace(tmp, path)       — atomic swap.
+    5. result = restart_fn()       — must return ``{"ok": bool, "message": str}``.
+    6. If restart fails AND ``rollback_on_restart_failure`` is true,
+       rollback_config(path) and report rolled_back flag. When false, the new
+       file is left in place so the operator can diagnose without losing the
+       intended change (used by nginx, where reverting to an older LAN-IP-
+       bound config produces a strictly worse stuck state).
 
-    *restart_fn* must return a dict with at least {"ok": bool, "message": str}.
-
-    Returns dict with keys: ok, message, rolled_back.
+    Returns a dict with: ok, message, rolled_back, and (when set) validation
+    metadata.
     """
-    # Step 1 – backup
-    backup_config(path)
-
-    # Step 2 – write
+    # Step 1 — write to temp file in the same directory
+    dir_name = os.path.dirname(os.path.abspath(path))
+    os.makedirs(dir_name, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ss_tmp_")
     try:
-        atomic_write(path, content, mode)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(content)
+        os.chmod(tmp_path, mode)
+        _log.debug("config_file_utils: staged %s -> %s (%d bytes)",
+                   path, tmp_path, len(content))
     except OSError as exc:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        _log.error("config_file_utils: write failed for %s: %s", path, exc)
         return {
             "ok": False,
             "rolled_back": False,
             "message": f"Failed to write {path}: {exc}",
         }
 
-    # Step 3 – restart
+    # Step 2 — validate the temp file before touching the live one
+    if validate_fn is not None:
+        try:
+            v = validate_fn(tmp_path)
+        except Exception as exc:
+            v = {"ok": False, "message": str(exc), "output": ""}
+        if not isinstance(v, dict):
+            v = {"ok": bool(v), "message": "", "output": ""}
+        if not v.get("ok"):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            _log.warning("config_file_utils: validation rejected %s: %s",
+                         path, v.get("message", "")[:200])
+            return {
+                "ok": False,
+                "rolled_back": False,   # live config still untouched
+                "validated": False,
+                "validation_output": v.get("output", ""),
+                "message": v.get("message") or f"Validation failed for {path}",
+            }
+        _log.info("config_file_utils: validation OK for %s", path)
+
+    # Step 3 — backup live config
+    backup_path = backup_config(path)
+    if backup_path:
+        _log.debug("config_file_utils: backed up %s -> %s", path, backup_path)
+
+    # Step 4 — atomic swap
+    try:
+        os.replace(tmp_path, path)
+    except OSError as exc:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        _log.error("config_file_utils: swap failed for %s: %s", path, exc)
+        return {
+            "ok": False,
+            "rolled_back": False,
+            "message": f"Failed to install {path}: {exc}",
+        }
+
+    # Step 5 — restart / reload
     try:
         result = restart_fn()
     except Exception as exc:
         result = {"ok": False, "message": str(exc)}
 
-    # Step 4 – rollback if restart failed
+    # Step 6 — rollback on restart failure (skippable; see docstring)
     if not result.get("ok"):
-        rb = rollback_config(path)
+        if rollback_on_restart_failure:
+            rb = rollback_config(path)
+            _log.warning("config_file_utils: restart failed for %s; rollback ok=%s",
+                         path, rb.get("ok"))
+            return {
+                "ok": False,
+                "rolled_back": rb.get("ok", False),
+                "message": result.get("message", "restart failed"),
+                "rollback_message": rb.get("message", ""),
+            }
+        _log.warning("config_file_utils: restart failed for %s; new file kept "
+                     "(rollback_on_restart_failure=False)", path)
         return {
             "ok": False,
-            "rolled_back": rb.get("ok", False),
+            "rolled_back": False,
             "message": result.get("message", "restart failed"),
-            "rollback_message": rb.get("message", ""),
         }
 
-    # Step 5 – success
+    _log.info("config_file_utils: apply OK for %s", path)
     return {
         "ok": True,
         "rolled_back": False,

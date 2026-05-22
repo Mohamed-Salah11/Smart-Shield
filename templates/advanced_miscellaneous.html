@@ -31,6 +31,7 @@
     </ul>
 
     <form method="POST" action="{{ url_for('system.advanced_miscellaneous') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Proxy Support Section -->
         <div class="ss-card">
@@ -42,7 +43,7 @@
                 <div class="mb-3 row">
                     <label for="proxy_url" class="col-sm-3 col-form-label fw-semibold">Proxy URL</label>
                     <div class="col-sm-9">
-                        <input type="text" id="proxy_url" name="proxy_url" class="form-control" style="max-width: 500px;">
+                        <input type="text" id="proxy_url" name="proxy_url" class="form-control ext-1357bbd5">
                         <small class="text-muted">Hostname or IP address of proxy server for outbound Internet access.</small>
                     </div>
                 </div>
@@ -50,7 +51,7 @@
                 <div class="mb-3 row">
                     <label for="proxy_port" class="col-sm-3 col-form-label fw-semibold">Proxy Port</label>
                     <div class="col-sm-9">
-                        <input type="text" id="proxy_port" name="proxy_port" class="form-control" style="max-width: 200px;">
+                        <input type="text" id="proxy_port" name="proxy_port" class="form-control ext-7ea37169">
                         <small class="text-muted">Port where proxy server is listening.</small>
                     </div>
                 </div>
@@ -58,7 +59,7 @@
                 <div class="mb-3 row">
                     <label for="proxy_username" class="col-sm-3 col-form-label fw-semibold">Proxy Username</label>
                     <div class="col-sm-9">
-                        <input type="text" id="proxy_username" name="proxy_username" class="form-control" style="max-width: 400px;">
+                        <input type="text" id="proxy_username" name="proxy_username" class="form-control ext-6bdce2a0">
                         <small class="text-muted">Optional username for proxy authentication.</small>
                     </div>
                 </div>
@@ -67,8 +68,8 @@
                     <label for="proxy_password" class="col-sm-3 col-form-label fw-semibold">Proxy Password</label>
                     <div class="col-sm-9">
                         <div class="d-flex gap-2">
-                            <input type="password" id="proxy_password" name="proxy_password" class="form-control" style="max-width: 200px;" placeholder="Password">
-                            <input type="password" id="proxy_password_confirm" name="proxy_password_confirm" class="form-control" style="max-width: 200px;" placeholder="Confirm">
+                            <input type="password" id="proxy_password" name="proxy_password" class="form-control ext-7ea37169" placeholder="Password">
+                            <input type="password" id="proxy_password_confirm" name="proxy_password_confirm" class="form-control ext-7ea37169" placeholder="Confirm">
                         </div>
                     </div>
                 </div>
@@ -90,7 +91,7 @@
                                 <input type="checkbox" class="form-check-input" id="load_balancing" name="load_balancing">
                                 <label class="form-check-label" for="load_balancing">Use sticky connections</label>
                             </div>
-                            <select id="sticky_timeout" name="sticky_timeout" class="form-select" style="max-width: 150px;">
+                            <select id="sticky_timeout" name="sticky_timeout" class="form-select ext-a2984eed">
                                 <option value="0">0</option>
                                 <option value="30">30</option>
                                 <option value="60">60</option>
@@ -125,7 +126,7 @@
                 <div class="mb-3 row">
                     <label for="ac_power" class="col-sm-3 col-form-label fw-semibold">AC Power</label>
                     <div class="col-sm-9">
-                        <select id="ac_power" name="ac_power" class="form-select" style="max-width: 200px;">
+                        <select id="ac_power" name="ac_power" class="form-select ext-7ea37169">
                             <option value="hadaptive" selected>Hiadaptive</option>
                             <option value="adaptive">Adaptive</option>
                             <option value="minimum">Minimum</option>
@@ -137,7 +138,7 @@
                 <div class="mb-3 row">
                     <label for="battery_power" class="col-sm-3 col-form-label fw-semibold">Battery Power</label>
                     <div class="col-sm-9">
-                        <select id="battery_power" name="battery_power" class="form-select" style="max-width: 200px;">
+                        <select id="battery_power" name="battery_power" class="form-select ext-7ea37169">
                             <option value="hadaptive" selected>Hiadaptive</option>
                             <option value="adaptive">Adaptive</option>
                             <option value="minimum">Minimum</option>
@@ -149,7 +150,7 @@
                 <div class="mb-3 row">
                     <label for="unknown_power" class="col-sm-3 col-form-label fw-semibold">Unknown Power</label>
                     <div class="col-sm-9">
-                        <select id="unknown_power" name="unknown_power" class="form-select" style="max-width: 200px;">
+                        <select id="unknown_power" name="unknown_power" class="form-select ext-7ea37169">
                             <option value="hadaptive" selected>Hiadaptive</option>
                             <option value="adaptive">Adaptive</option>
                             <option value="minimum">Minimum</option>
@@ -170,7 +171,7 @@
                 <div class="mb-3 row">
                     <label for="cryptographic_hardware" class="col-sm-3 col-form-label fw-semibold">Crypto Hardware</label>
                     <div class="col-sm-9">
-                        <select id="cryptographic_hardware" name="cryptographic_hardware" class="form-select" style="max-width: 400px;">
+                        <select id="cryptographic_hardware" name="cryptographic_hardware" class="form-select ext-6bdce2a0">
                             <option value="none" selected>None</option>
                             <option value="aesni">AES-NI CPU-based Acceleration</option>
                             <option value="glxsb">AMD Geode LX Security Block</option>
@@ -183,7 +184,7 @@
                 <div class="mb-3 row">
                     <label for="thermal_sensors" class="col-sm-3 col-form-label fw-semibold">Thermal Sensors</label>
                     <div class="col-sm-9">
-                        <select id="thermal_sensors" name="thermal_sensors" class="form-select" style="max-width: 400px;">
+                        <select id="thermal_sensors" name="thermal_sensors" class="form-select ext-6bdce2a0">
                             <option value="none_acpi" selected>None/ACPI</option>
                             <option value="intel_coretemp">Intel Core* CPU on-die thermal sensor</option>
                             <option value="amd_k8temp">AMD K8 thermal sensor</option>
@@ -224,7 +225,7 @@
                 <div class="mb-3 row">
                     <label for="mds_mode" class="col-sm-3 col-form-label fw-semibold">MDS Mode</label>
                     <div class="col-sm-9">
-                        <select id="mds_mode" name="mds_mode" class="form-select" style="max-width: 300px;">
+                        <select id="mds_mode" name="mds_mode" class="form-select ext-9dd291e0">
                             <option value="mitigation_disabled" selected>Mitigation disabled</option>
                             <option value="verw">VERW</option>
                             <option value="verw_no_smt">VERW; no SMT</option>
@@ -265,7 +266,7 @@
                 <div class="mb-3 row">
                     <label for="state_killing_on_gateway_recovery" class="col-sm-3 col-form-label fw-semibold">On Gateway Recovery</label>
                     <div class="col-sm-9">
-                        <select id="state_killing_on_gateway_recovery" name="state_killing_on_gateway_recovery" class="form-select" style="max-width: 400px;">
+                        <select id="state_killing_on_gateway_recovery" name="state_killing_on_gateway_recovery" class="form-select ext-6bdce2a0">
                             <option value="dont_kill" selected>Don't kill states from the firewall itself</option>
                             <option value="kill_all">Kill all states</option>
                             <option value="kill_gateway">Kill states for this gateway only</option>
@@ -276,7 +277,7 @@
                 <div class="mb-3 row">
                     <label for="state_killing_on_gateway_failure" class="col-sm-3 col-form-label fw-semibold">On Gateway Failure</label>
                     <div class="col-sm-9">
-                        <select id="state_killing_on_gateway_failure" name="state_killing_on_gateway_failure" class="form-select" style="max-width: 400px;">
+                        <select id="state_killing_on_gateway_failure" name="state_killing_on_gateway_failure" class="form-select ext-6bdce2a0">
                             <option value="do_not_kill" selected>Do not kill states on gateway failure</option>
                             <option value="kill_states">Kill states for this gateway</option>
                         </select>
@@ -315,7 +316,7 @@
                 <div class="mb-3 row">
                     <label for="memory_limit" class="col-sm-3 col-form-label fw-semibold">Memory Limit</label>
                     <div class="col-sm-9">
-                        <input type="text" id="memory_limit" name="memory_limit" class="form-control" style="max-width: 200px;" placeholder="128 to 1479">
+                        <input type="text" id="memory_limit" name="memory_limit" class="form-control ext-7ea37169" placeholder="128 to 1479">
                         <small class="text-muted">PHP memory limit in MiB. Default: 512</small>
                     </div>
                 </div>
@@ -351,11 +352,11 @@
                     <div class="col-sm-9">
                         <div class="row g-3">
                             <div class="col-auto">
-                                <input type="text" id="tmp_ram_disk" name="tmp_ram_disk" class="form-control" style="width: 120px;" placeholder="40">
+                                <input type="text" id="tmp_ram_disk" name="tmp_ram_disk" class="form-control ext-d44c18c4" placeholder="40">
                                 <small class="text-muted">/tmp (min: 40)</small>
                             </div>
                             <div class="col-auto">
-                                <input type="text" id="var_ram_disk" name="var_ram_disk" class="form-control" style="width: 120px;" placeholder="60">
+                                <input type="text" id="var_ram_disk" name="var_ram_disk" class="form-control ext-d44c18c4" placeholder="60">
                                 <small class="text-muted">/var (min: 60)</small>
                             </div>
                         </div>
@@ -374,7 +375,7 @@
                 <div class="mb-3 row">
                     <label for="hard_disk_standby_time" class="col-sm-3 col-form-label fw-semibold">Hard Disk Standby</label>
                     <div class="col-sm-9">
-                        <select id="hard_disk_standby_time" name="hard_disk_standby_time" class="form-select" style="max-width: 200px;">
+                        <select id="hard_disk_standby_time" name="hard_disk_standby_time" class="form-select ext-7ea37169">
                             <option value="always_on" selected>Always on</option>
                             <option value="1_min">1 minute</option>
                             <option value="5_min">5 minutes</option>

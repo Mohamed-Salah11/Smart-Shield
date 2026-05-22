@@ -2,7 +2,7 @@
 
 {% block main %}
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function() {
         const tunnelCheckbox = document.getElementById('ipv6_over_ipv4_tunneling');
         const tunnelPeerField = document.getElementById('tunnel_peer_field');
@@ -45,6 +45,7 @@
     </ul>
 
     <form method="POST" action="{{ url_for('system.advanced_network') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- DHCP Options Section -->
         <div class="ss-card">
@@ -108,7 +109,7 @@
                 <div class="mb-3 row">
                     <label for="dhcpv6_duid" class="col-sm-3 col-form-label fw-semibold">DHCPv6 DUID</label>
                     <div class="col-sm-9">
-                        <select id="dhcpv6_duid" name="dhcpv6_duid" class="form-select" style="max-width: 500px;">
+                        <select id="dhcpv6_duid" name="dhcpv6_duid" class="form-select ext-1357bbd5">
                             <option value="raw_duid" selected>Raw DUID: As stored in DUID file</option>
                             <option value="duid_llt">DUID-LLT: Based on Link-layer Address Plus Time</option>
                             <option value="duid_en">DUID-EN: Assigned by Vendor Based on Enterprise Number</option>
@@ -123,7 +124,7 @@
                     <label for="raw_duid" class="col-sm-3 col-form-label fw-semibold">Raw DUID</label>
                     <div class="col-sm-9">
                         <div class="d-flex gap-2 align-items-start">
-                            <textarea id="raw_duid" name="raw_duid" class="form-control" rows="3" style="max-width: 400px;" placeholder="0e:00:00:01:00:01:30:78:04:cc:00:0c:29:ed:cb:ae"></textarea>
+                            <textarea id="raw_duid" name="raw_duid" class="form-control ext-6bdce2a0" rows="3" placeholder="0e:00:00:01:00:01:30:78:04:cc:00:0c:29:ed:cb:ae"></textarea>
                             <button type="button" class="btn btn-outline-secondary">Copy DUID</button>
                         </div>
                     </div>
@@ -159,10 +160,10 @@
                     </div>
                 </div>
 
-                <div class="mb-3 row" id="tunnel_peer_field" style="display: none;">
+                <div class="mb-3 row ext-9c766357" id="tunnel_peer_field">
                     <label for="ipv4_address_tunnel_peer" class="col-sm-3 col-form-label fw-semibold">Tunnel Peer IPv4</label>
                     <div class="col-sm-9">
-                        <input type="text" id="ipv4_address_tunnel_peer" name="ipv4_address_tunnel_peer" class="form-control" style="max-width: 300px;">
+                        <input type="text" id="ipv4_address_tunnel_peer" name="ipv4_address_tunnel_peer" class="form-control ext-9dd291e0">
                     </div>
                 </div>
 

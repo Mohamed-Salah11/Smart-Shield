@@ -609,21 +609,30 @@ class TestCaptivePortal:
     def test_generate_pf_anchor_contains_rules(self, conn):
         from app.services.captive_portal import generate_pf_anchor
         anchor = generate_pf_anchor(conn)
-        assert "authenticated_clients" in anchor
-        assert "rdr on" in anchor
+        # Anchor is now split into rdr + filter sections to satisfy PF section ordering.
+        assert "authenticated_clients" in anchor["filter"]
+        assert "rdr on" in anchor["rdr"]
+        # The filter anchor must not contain any rdr rules and vice versa.
+        assert "rdr on" not in anchor["filter"]
+        assert "pass in" not in anchor["rdr"]
+        assert "block in" not in anchor["rdr"]
 
-    def test_generate_pf_anchor_redirects_http_only(self, conn):
+    def test_generate_pf_anchor_redirects_http_and_https(self, conn):
         from app.services.captive_portal import generate_pf_anchor
         anchor = generate_pf_anchor(conn)
-        assert "port 80" in anchor
-        assert "port 443" not in anchor
+        # HTTP port-80 rdr lives in the rdr anchor.
+        assert any(
+            l.strip().startswith("rdr") and "port 80" in l
+            for l in anchor["rdr"].splitlines()
+        )
 
     def test_generate_pf_anchor_defaults_to_lan_ip(self, conn):
         from app.services.captive_portal import generate_pf_anchor
         conn.execute("UPDATE lan_config SET ipv4_address='192.168.50.1/24' WHERE id=1")
         conn.commit()
         anchor = generate_pf_anchor(conn)
-        assert "-> 192.168.50.1 port 5000" in anchor
+        # Default redirect port is 80 (nginx in front of Flask); LAN IP is stripped of CIDR.
+        assert "-> 192.168.50.1 port 80" in anchor["rdr"]
 
     def test_apply_dry_run(self, conn):
         from app.services.captive_portal import apply_captive_portal

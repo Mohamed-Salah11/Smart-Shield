@@ -2,7 +2,7 @@
 {% set title = "System - Group Manager" %}
 
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 .permission-search-wrap {
     max-width: 420px;
 }
@@ -55,7 +55,7 @@
                 </button>
             </div>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="ext-df74e8d8">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
@@ -64,7 +64,7 @@
                             <th>Description</th>
                             <th>Members</th>
                             <th>Allowed Pages</th>
-                            <th style="width: 200px;">Actions</th>
+                            <th class="ext-fa486ad4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -93,7 +93,8 @@
                                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGroupModal{{ g.id }}" title="Edit Group">
                                         <i class="fa-solid fa-pen me-1"></i>Edit
                                     </button>
-                                    <form method="POST" action="/system/user-manager/delete-group/{{ g.id }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this group? All member associations will be removed.')">
+                                    <form class="ext-2d150e54" method="POST" action="/system/user-manager/delete-group/{{ g.id }}" data-action-submit="h_4e806cfa11">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Group">
                                             <i class="fa-solid fa-trash me-1"></i>Delete
                                         </button>
@@ -106,6 +107,7 @@
                         <div class="modal fade" id="editGroupModal{{ g.id }}" tabindex="-1">
                             <div class="modal-dialog">
                                 <form method="POST" action="/system/user-manager/edit-group/{{ g.id }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title">
@@ -152,6 +154,7 @@
                                             </div>
                                             <div class="card-body">
                                                 <form method="POST" action="/system/user-manager/group/{{ g.id }}/add-member" class="row g-3 align-items-end">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <div class="col-md-8">
                                                         <label class="form-label">Select User</label>
                                                         <select name="user_id" class="form-select" required>
@@ -190,6 +193,7 @@
                         <div class="modal fade permissions-modal" id="permissionsModal{{ g.id }}" tabindex="-1" data-group-id="{{ g.id }}">
                             <div class="modal-dialog modal-xl">
                                 <form method="POST" action="/system/user-manager/group/{{ g.id }}/permissions">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title">
@@ -302,6 +306,7 @@
 <div class="modal fade" id="addGroupModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <form method="POST" action="/system/user-manager/add-group">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
@@ -373,7 +378,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 // Load members when modal is shown
 document.addEventListener('DOMContentLoaded', function() {
     {% for g in groups %}
@@ -405,8 +410,9 @@ function loadGroupMembers(groupId) {
                                 <strong>${member.username}</strong>
                                 ${member.full_name ? '<span class="text-muted ms-2">(' + member.full_name + ')</span>' : ''}
                             </div>
-                            <form method="POST" action="/system/user-manager/group/${groupId}/remove-member/${member.id}" style="display: inline;">
-                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove this user from the group?')">
+                            <form class="ext-2d150e54" method="POST" action="/system/user-manager/group/${groupId}/remove-member/${member.id}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" data-action="h_90120fd5a9">
                                     <i class="fa-solid fa-user-minus"></i>
                                 </button>
                             </form>
@@ -573,3 +579,14 @@ function setupCreateGroupWhitelist() {
 </script>
 
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_4e806cfa11'] = function (event, el) { return confirm('Are you sure you want to delete this group? All member associations will be removed.') };
+  R['h_90120fd5a9'] = function (event, el) { return confirm('Remove this user from the group?') };
+})();
+</script>
+<!-- /inline-handlers:auto -->

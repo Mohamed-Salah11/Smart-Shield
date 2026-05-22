@@ -19,7 +19,55 @@ The UI reads feature_applied_state to show accurate status badges:
 
 import hashlib
 import time
+from dataclasses import dataclass, asdict, field
 from typing import Optional
+
+
+# ---------------------------------------------------------------------------
+# ApplyResult — uniform return shape for every config writer
+#
+# Existing writers (PF / Unbound / nginx / DHCP / etc.) historically
+# returned ad-hoc ``{"ok": bool, "message": str, ...}`` dicts. Wrapping
+# those in ApplyResult gives callers a single typed shape — the dataclass
+# is still dict-compatible via ``asdict()`` so existing JSON consumers
+# continue to work unchanged.
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ApplyResult:
+    ok: bool
+    component: str                          # "pf" | "unbound" | "nginx" | "dhcp" | ...
+    action: str = "apply"                   # "validate" | "reload" | "rollback" | "apply"
+    message: str = ""
+    validation_output: Optional[str] = None
+    rollback_performed: bool = False
+    details: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_legacy(cls, component: str, payload: dict, action: str = "apply") -> "ApplyResult":
+        """Wrap a legacy ``{"ok", "message", ...}`` dict in an ApplyResult.
+        Unknown keys are preserved in ``details`` so nothing is silently
+        dropped on the way through.
+        """
+        if not isinstance(payload, dict):
+            return cls(ok=False, component=component, action=action,
+                       message=f"non-dict result: {payload!r}")
+        known = {"ok", "message", "conf", "validation_output",
+                 "rolled_back", "rollback_performed"}
+        details = {k: v for k, v in payload.items() if k not in known}
+        return cls(
+            ok=bool(payload.get("ok")),
+            component=component,
+            action=action,
+            message=str(payload.get("message", "")),
+            validation_output=payload.get("validation_output"),
+            rollback_performed=bool(payload.get("rolled_back")
+                                     or payload.get("rollback_performed")),
+            details=details,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +202,24 @@ def record_apply_result(conn, job_id: int, ok: bool, message: str = "",
     ).fetchone()
     if row:
         _update_feature_summary(conn, row["feature_key"], state, message or "", job_id)
+
+    # A failed apply is a real operational incident — surface it as a
+    # high-severity event so it shows up in the SIEM, not just the job row.
+    if not ok:
+        try:
+            from app.audit_log import log_event
+            log_event(
+                category="system", action="config_apply_failed", severity="high",
+                username="system", remote_addr="",
+                details={
+                    "feature":  row["feature_key"] if row else "",
+                    "job_id":   job_id,
+                    "state":    state,
+                    "message":  (message or "")[:500],
+                },
+            )
+        except Exception:
+            pass
 
 
 def record_dry_run(conn, feature_key: str, config_preview: str = "",

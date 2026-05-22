@@ -37,7 +37,7 @@
           <div class="ss-toggle-content"><p class="ss-toggle-label">Ignore Revoked Certificates</p><p class="ss-toggle-desc">Skip expiry notifications for certificates that have been revoked</p></div>
         </div>
         <hr class="ss-divider">
-        <div class="ss-field" style="max-width:220px;">
+        <div class="ss-field ext-ac5a4114">
           <label class="ss-label">Certificate Expiration Threshold (days)</label>
           <input type="number" id="certificate_expiration_threshold" name="certificate_expiration_threshold" class="form-control" value="{{ settings.get('certificate_expiration_threshold', 27) }}">
           <p class="ss-hint">Notify when a certificate expires within this many days</p>
@@ -64,12 +64,12 @@
           </div>
           <div class="ss-field">
             <label class="ss-label">SMTP Port</label>
-            <input type="number" id="smtp_port" name="smtp_port" class="form-control" placeholder="587" style="max-width:160px;" value="{{ settings.get('smtp_port', '') }}">
+            <input type="number" id="smtp_port" name="smtp_port" class="form-control ext-844e0595" placeholder="587" value="{{ settings.get('smtp_port', '') }}">
             <p class="ss-hint">Typically 25, 587 (STARTTLS), or 465 (SSL)</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">Connection Timeout (sec)</label>
-            <input type="number" id="connection_timeout" name="connection_timeout" class="form-control" placeholder="20" style="max-width:160px;" value="{{ settings.get('connection_timeout', '') }}">
+            <input type="number" id="connection_timeout" name="connection_timeout" class="form-control ext-844e0595" placeholder="20" value="{{ settings.get('connection_timeout', '') }}">
           </div>
           <div class="ss-field">
             <label class="ss-label">Auth Mechanism</label>

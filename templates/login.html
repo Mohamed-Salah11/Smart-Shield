@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Shield — Sign In</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <title>SmartShield — Sign In</title>
+    <link rel="stylesheet" href="{{ static_v('vendor/inter/inter.css') }}">
+    <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ static_v('css/login.css') }}">
 </head>
 <body>
 
@@ -19,10 +17,10 @@
 
         <!-- Shield logo -->
         <div class="logo">
-            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield">
+            <img src="{{ static_v('images/SS.png') }}" alt="SmartShield">
         </div>
 
-        <h2>Smart Shield</h2>
+        <h2>SmartShield</h2>
         <p class="login-subtitle">Network Defense Platform</p>
 
         <div class="login-edition">
@@ -49,14 +47,14 @@
 
             <div class="login-btn-wrap">
                 <button type="submit">
-                    <i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:8px;"></i>
+                    <i class="fa-solid fa-arrow-right-to-bracket ext-d109945c"></i>
                     Sign In
                 </button>
             </div>
         </form>
     </div>
 
-    <footer>Smart Shield &nbsp;·&nbsp; Network Defense Platform &nbsp;·&nbsp; &copy; 2025</footer>
+    <footer>SmartShield &nbsp;·&nbsp; Network Defense Platform &nbsp;·&nbsp; &copy; 2025</footer>
 
 </body>
 </html>

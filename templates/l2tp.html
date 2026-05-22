@@ -102,6 +102,47 @@
             <label class="form-label fw-semibold">DNS Server 2</label>
             <input type="text" class="form-control" id="l2tp_dns2" placeholder="8.8.4.4" autocomplete="off">
           </div>
+
+          <!-- IPsec Pre-Shared Key -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">
+              IPsec Pre-Shared Key
+              <span class="badge bg-danger ms-1 ext-bc9efe64">Required for L2TP/IPsec</span>
+            </label>
+            <div class="input-group ext-5ab11840">
+              <input type="password" class="form-control" id="l2tp_psk"
+                     placeholder="Enter a strong pre-shared key" autocomplete="new-password">
+              <button class="btn btn-outline-secondary" type="button" data-action="h_d91aebac9d">
+                <i class="fa fa-eye" id="l2tp-psk-eye"></i>
+              </button>
+              <button class="btn btn-outline-secondary" type="button" data-action="h_7da7d874a2">
+                <i class="fa fa-dice me-1"></i>Generate
+              </button>
+            </div>
+            <div class="form-text">Shared between this L2TP server and all connecting IPsec clients. Leave blank to keep existing.</div>
+            <div id="psk-set-indicator" class="form-text text-success d-none">
+              <i class="fa fa-check-circle me-1"></i>A pre-shared key is currently configured.
+            </div>
+          </div>
+
+          <!-- RADIUS server fields (shown only when RADIUS auth selected) -->
+          <div class="col-md-6 d-none" id="radius-server-row">
+            <label class="form-label fw-semibold">RADIUS Server</label>
+            <input type="text" class="form-control" id="l2tp_radius_server"
+                   placeholder="192.168.1.10" autocomplete="off">
+            <div class="form-text">IP address of the RADIUS authentication server.</div>
+          </div>
+          <div class="col-md-6 d-none" id="radius-secret-row">
+            <label class="form-label fw-semibold">RADIUS Shared Secret</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="l2tp_radius_secret"
+                     placeholder="Leave blank to keep existing" autocomplete="new-password">
+              <button class="btn btn-outline-secondary" type="button"
+                      data-action="h_e75ceb38c4">
+                <i class="fa fa-eye"></i>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="mt-4">
           <button class="btn btn-primary" id="btn-save-config">
@@ -131,8 +172,8 @@
         </button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
             <thead><tr><th>Username</th><th>Assigned IP</th><th>Actions</th></tr></thead>
             <tbody id="users-tbody">
               <tr><td colspan="3" class="text-center text-muted py-3">Loading…</td></tr>
@@ -156,9 +197,7 @@
         </div>
       </div>
       <div>
-        <pre id="conf-preview" style="background:var(--bg);color:var(--text-color);
-          font-family:monospace;font-size:.8rem;padding:1rem;margin:0;
-          min-height:200px;white-space:pre-wrap;border-radius:0 0 8px 8px;">
+        <pre class="ext-325de3cc" id="conf-preview">
 Click Refresh to load…</pre>
       </div>
     </div>
@@ -197,7 +236,7 @@ Click Refresh to load…</pre>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 // ─── Tabs ──────────────────────────────────────────────────────────────────────
 document.querySelectorAll('[data-tab]').forEach(a => {
   a.addEventListener('click', e => {
@@ -247,18 +286,45 @@ document.getElementById('btn-apply').addEventListener('click', function () {
   });
 });
 
+// ─── PSK helpers ──────────────────────────────────────────────────────────────
+function toggleL2tpPsk() {
+  const el = document.getElementById('l2tp_psk');
+  const icon = document.getElementById('l2tp-psk-eye');
+  el.type = el.type === 'password' ? 'text' : 'password';
+  icon.className = el.type === 'password' ? 'fa fa-eye' : 'fa fa-eye-slash';
+}
+function generateL2tpPsk() {
+  const arr = new Uint8Array(24);
+  crypto.getRandomValues(arr);
+  const psk = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, '').substring(0, 32);
+  const el = document.getElementById('l2tp_psk');
+  el.value = psk;
+  el.type = 'text';
+  document.getElementById('l2tp-psk-eye').className = 'fa fa-eye-slash';
+}
+
+// Show/hide RADIUS fields based on authentication selection
+function updateRadiusVisibility() {
+  const isRadius = document.getElementById('l2tp_authentication').value === 'radius';
+  document.getElementById('radius-server-row').classList.toggle('d-none', !isRadius);
+  document.getElementById('radius-secret-row').classList.toggle('d-none', !isRadius);
+}
+document.getElementById('l2tp_authentication').addEventListener('change', updateRadiusVisibility);
+
 // ─── Load / Save config ───────────────────────────────────────────────────────
 fetch('/vpn/api/l2tp/get-config').then(r=>r.json()).then(d => {
-  if (!d.success || !d.config) return;
-  const c = d.config;
-  document.getElementById('l2tp_enabled').checked       = !!c.enabled;
-  document.getElementById('l2tp_interface').value       = c.interface        || 'wan';
-  document.getElementById('l2tp_server_address').value  = c.server_address   || '';
-  document.getElementById('l2tp_remote_address').value  = c.remote_address_range || '';
-  document.getElementById('l2tp_subnet_mask').value     = c.subnet_mask      || '';
-  document.getElementById('l2tp_authentication').value  = c.authentication   || 'chap';
-  document.getElementById('l2tp_dns1').value            = c.dns_server1      || '';
-  document.getElementById('l2tp_dns2').value            = c.dns_server2      || '';
+  if (d.status === 'error') return;
+  document.getElementById('l2tp_enabled').checked       = !!d.enabled;
+  document.getElementById('l2tp_interface').value       = d.interface        || 'wan';
+  document.getElementById('l2tp_server_address').value  = d.server_address   || '';
+  document.getElementById('l2tp_remote_address').value  = d.remote_address_range || '';
+  document.getElementById('l2tp_subnet_mask').value     = d.subnet_mask      || '';
+  document.getElementById('l2tp_authentication').value  = d.authentication   || 'chap';
+  document.getElementById('l2tp_dns1').value            = d.dns_server1      || '';
+  document.getElementById('l2tp_dns2').value            = d.dns_server2      || '';
+  if (d.radius_server) document.getElementById('l2tp_radius_server').value = d.radius_server;
+  if (d.has_psk) document.getElementById('psk-set-indicator').classList.remove('d-none');
+  updateRadiusVisibility();
 }).catch(() => {});
 
 document.getElementById('btn-save-config').addEventListener('click', function () {
@@ -271,6 +337,9 @@ document.getElementById('btn-save-config').addEventListener('click', function ()
     authentication:       document.getElementById('l2tp_authentication').value,
     dns_server1:          document.getElementById('l2tp_dns1').value,
     dns_server2:          document.getElementById('l2tp_dns2').value,
+    pre_shared_key:       document.getElementById('l2tp_psk').value,
+    radius_server:        document.getElementById('l2tp_radius_server').value,
+    radius_secret:        document.getElementById('l2tp_radius_secret').value,
   };
   const res = document.getElementById('save-result');
   this.disabled = true;
@@ -278,10 +347,14 @@ document.getElementById('btn-save-config').addEventListener('click', function ()
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(payload),
   }).then(r=>r.json()).then(d => {
-    const ok = d.success || d.ok;
+    const ok = d.status === 'success';
     res.className = 'alert '+(ok?'alert-success':'alert-danger');
     res.textContent = d.message || (ok?'Saved.':'Save failed.');
     res.classList.remove('d-none');
+    if (ok && payload.pre_shared_key) {
+      document.getElementById('psk-set-indicator').classList.remove('d-none');
+      document.getElementById('l2tp_psk').value = '';
+    }
   }).catch(e => {
     res.className='alert alert-danger';
     res.textContent='Request failed: '+e.message;
@@ -304,10 +377,10 @@ function loadUsers() {
         <td>${u.ip_address || '<span class="text-muted">Dynamic</span>'}</td>
         <td>
           <button class="btn btn-sm btn-outline-primary me-1"
-            onclick="openEditUser(${u.id},'${u.username}','${u.ip_address||''}')">
+            data-action="h_272a6fcbe6">
             <i class="fa fa-pen"></i>
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${u.id})">
+          <button class="btn btn-sm btn-outline-danger" data-action="h_d9dcfc3f57">
             <i class="fa fa-trash"></i>
           </button>
         </td>
@@ -373,3 +446,17 @@ function loadPreview() {
 document.getElementById('btn-refresh-preview').addEventListener('click', loadPreview);
 </script>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_d91aebac9d'] = function (event, el) { toggleL2tpPsk() };
+  R['h_7da7d874a2'] = function (event, el) { generateL2tpPsk() };
+  R['h_e75ceb38c4'] = function (event, el) { var e=this.previousElementSibling;e.type=e.type==='password'?'text':'password'; };
+  R['h_272a6fcbe6'] = function (event, el) { openEditUser(${u.id},'${u.username}','${u.ip_address||''}') };
+  R['h_d9dcfc3f57'] = function (event, el) { deleteUser(${u.id}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->
