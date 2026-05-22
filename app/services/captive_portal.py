@@ -23,10 +23,12 @@ expire_sessions(conn)                                            -> int
 generate_voucher(conn, duration_minutes, bandwidth_kbps)        -> dict
 redeem_voucher(conn, code, mac, ip)                             -> dict
 get_captive_status(conn)                                         -> dict
-generate_pf_anchor(conn)                                         -> str
+generate_pf_anchor(conn)                                         -> dict  ({"rdr": str, "filter": str})
+generate_pf_anchor_preview(conn)                                 -> str   (human-readable concat for UI)
 apply_captive_portal(conn)                                       -> dict
 """
 
+import logging
 import os
 import secrets
 import ssl
@@ -36,15 +38,25 @@ import threading
 import time
 from datetime import datetime, timezone, timedelta
 
+from app.services.bypass_policy import bypass_tables_for
 from app.services.priv_helper import run_privileged
 
-_CP_ANCHOR_PATH   = "/etc/pf.captive_portal.conf"
-_CP_ANCHOR_NAME   = "captive_portal"
+_log = logging.getLogger(__name__)
+
+_CP_RDR_NAME      = "captive_portal_rdr"
+_CP_FILTER_NAME   = "captive_portal_filter"
+_CP_RDR_PATH      = "/etc/pf.captive_portal.rdr.conf"
+_CP_FILTER_PATH   = "/etc/pf.captive_portal.filter.conf"
 _CP_REDIRECT_IP   = "127.0.0.1"
 _CP_REDIRECT_PORT = 80    # nginx listens on LAN IP:80 and proxies to Flask
 _CP_HTTPS_PORT    = 5443  # HTTPS redirect listener for port-443 interception
 _CP_CERT_PATH     = "/etc/smart_shield_block.crt"
 _CP_KEY_PATH      = "/etc/smart_shield_block.key"
+
+# Files used by reconcile_captive_pf_tables() to atomically replace PF tables.
+from app.config import _ss_dir as _ss_dir_cp
+_CP_AUTH_TABLE_FILE  = os.path.join(_ss_dir_cp("/var/db"), "captive_authenticated_ips.txt")
+_CP_ADMIN_TABLE_FILE = os.path.join(_ss_dir_cp("/var/db"), "captive_admin_bypass_ips.txt")
 
 # Guard so the HTTPS redirect thread is only started once per process
 _https_thread_started = threading.Event()
@@ -67,6 +79,59 @@ def _rows(conn, sql, params=()):
 
 def _now_ts() -> int:
     return int(time.time())
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting (captive_auth_attempts)
+# ---------------------------------------------------------------------------
+
+def record_captive_auth_attempt(
+    conn, ip: str, username: str = "", auth_type: str = "", success: bool = False
+) -> None:
+    """Record one captive-portal authentication attempt for rate limiting."""
+    try:
+        conn.execute(
+            "INSERT INTO captive_auth_attempts "
+            "(ip_address, username, auth_type, success, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ((ip or "").strip(), (username or "").strip(),
+             (auth_type or "").strip(), 1 if success else 0, _now_ts()),
+        )
+        conn.commit()
+    except Exception:
+        # Never let logging break the auth flow.
+        pass
+
+
+def too_many_recent_attempts(
+    conn, ip: str, window_seconds: int = 300, max_attempts: int = 10,
+    auth_type: str = "",
+) -> bool:
+    """
+    Return True if the given IP has made `max_attempts` failed attempts in the
+    last `window_seconds`. Successful attempts do not count toward the cap.
+    `auth_type` optionally restricts the check to a single type (e.g. voucher).
+    """
+    ip = (ip or "").strip()
+    if not ip:
+        return False
+    cutoff = _now_ts() - max(1, int(window_seconds))
+    try:
+        if auth_type:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM captive_auth_attempts "
+                "WHERE ip_address=? AND success=0 AND auth_type=? AND created_at >= ?",
+                (ip, auth_type, cutoff),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM captive_auth_attempts "
+                "WHERE ip_address=? AND success=0 AND created_at >= ?",
+                (ip, cutoff),
+            ).fetchone()
+        return bool(row and row["c"] >= max_attempts)
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +158,9 @@ def authenticate_session(
         mac = f"ip:{ip}"
 
     expires_at = _now_ts() + duration_minutes * 60
+    # `created_at` is intentionally NOT updated on ON CONFLICT so that
+    # `get_active_sessions()` ordering and audit logs preserve the first-auth
+    # timestamp even when the same device re-authenticates.
     conn.execute(
         """
         INSERT INTO captive_sessions
@@ -103,8 +171,7 @@ def authenticate_session(
             username=excluded.username,
             is_superuser=excluded.is_superuser,
             expires_at=excluded.expires_at,
-            logged_out=0,
-            created_at=CURRENT_TIMESTAMP
+            logged_out=0
         """,
         (mac, ip, uname, int(is_superuser), expires_at),
     )
@@ -112,30 +179,61 @@ def authenticate_session(
 
     # Add to PF table on FreeBSD
     if sys.platform.startswith("freebsd"):
+        # On PF failure, DELETE the session row rather than mark logged_out=1.
+        # Marking logged_out leaves an orphan that pollutes audit views and
+        # confuses the voucher rollback path in redeem_voucher().
         try:
             result = run_privileged("pf.table_add", table="authenticated_clients", ip=ip)
             if result.returncode != 0:
                 message = (result.stderr or result.stdout or "pf.table_add failed").strip()
-                conn.execute(
-                    "UPDATE captive_sessions SET logged_out=1 WHERE mac_address=?",
-                    (mac,),
-                )
+                conn.execute("DELETE FROM captive_sessions WHERE mac_address=?", (mac,))
                 conn.commit()
                 return {"ok": False, "message": message}
         except Exception as exc:
-            conn.execute(
-                "UPDATE captive_sessions SET logged_out=1 WHERE mac_address=?",
-                (mac,),
-            )
+            conn.execute("DELETE FROM captive_sessions WHERE mac_address=?", (mac,))
             conn.commit()
             return {"ok": False, "message": str(exc)}
 
-        # Admin accounts also bypass content policy at PF level
+        # Admin accounts also bypass content policy at PF level. If this fails,
+        # the session itself is still valid — surface a partial-success flag so
+        # the caller/UI can warn that content-policy will still apply.
         if is_superuser:
             try:
-                run_privileged("pf.table_add", table="admin_bypass_clients", ip=ip)
+                bypass = run_privileged("pf.table_add", table="admin_bypass_clients", ip=ip)
+                bypass_ok = getattr(bypass, "returncode", 0) == 0
+                bypass_msg = (getattr(bypass, "stderr", "") or getattr(bypass, "stdout", "") or "").strip()
+            except Exception as exc:
+                bypass_ok, bypass_msg = False, str(exc)
+            # admin_bypass_toggle: a superuser session grants full bypass —
+            # captive portal AND content policy. Compliance needs to see this.
+            try:
+                from app.audit_log import log_event
+                log_event(
+                    category="admin_audit", action="admin_bypass_toggle",
+                    username=uname or "", remote_addr=ip,
+                    details={"ip": ip, "enabled": bypass_ok,
+                             "reason": "superuser_portal_login",
+                             "bypass_scope": "captive_portal+content_policy"},
+                    severity="high",
+                )
             except Exception:
                 pass
+            if not bypass_ok:
+                try:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "admin_bypass_clients pf.table_add failed for %s: %s", ip, bypass_msg,
+                    )
+                except Exception:
+                    pass
+                return {
+                    "ok": True,
+                    "partial": True,
+                    "message": (
+                        f"Session active for {ip} ({uname or mac}), but admin "
+                        f"bypass could not be applied — content policy will still apply."
+                    ),
+                }
 
     return {"ok": True, "message": f"Session created for {ip} ({uname or mac})."}
 
@@ -155,11 +253,23 @@ def logout_session(conn, session_id: int) -> dict:
         try:
             from app.services.priv_helper import run_privileged
             run_privileged("pf.table_delete", table="authenticated_clients", ip=ip)
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("captive_portal: failed to remove %s from authenticated_clients: %s", ip, exc)
         if was_superuser:
             try:
                 run_privileged("pf.table_delete", table="admin_bypass_clients", ip=ip)
+            except Exception as exc:
+                _log.warning("captive_portal: failed to remove %s from admin_bypass_clients: %s", ip, exc)
+            try:
+                from app.audit_log import log_event
+                log_event(
+                    category="admin_audit", action="admin_bypass_toggle",
+                    username=session_id and "" or "", remote_addr=ip,
+                    details={"ip": ip, "enabled": False,
+                             "reason": "session_logout",
+                             "session_id": session_id},
+                    severity="medium",
+                )
             except Exception:
                 pass
 
@@ -202,11 +312,25 @@ def expire_sessions(conn) -> int:
         if sys.platform.startswith("freebsd"):
             try:
                 run_privileged("pf.table_delete", table="authenticated_clients", ip=row["ip_address"])
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning("captive_portal: failed to expire %s from authenticated_clients: %s",
+                             row["ip_address"], exc)
             if row.get("is_superuser"):
                 try:
                     run_privileged("pf.table_delete", table="admin_bypass_clients", ip=row["ip_address"])
+                except Exception as exc:
+                    _log.warning("captive_portal: failed to expire %s from admin_bypass_clients: %s",
+                                 row["ip_address"], exc)
+                try:
+                    from app.audit_log import log_event
+                    log_event(
+                        category="admin_audit", action="admin_bypass_toggle",
+                        username="", remote_addr=row["ip_address"],
+                        details={"ip": row["ip_address"], "enabled": False,
+                                 "reason": "session_expired",
+                                 "session_id": row["id"]},
+                        severity="medium",
+                    )
                 except Exception:
                     pass
 
@@ -225,6 +349,54 @@ def expire_sessions(conn) -> int:
         pass
 
     return len(rows)
+
+
+def reconcile_captive_pf_tables(conn) -> dict:
+    """
+    Rebuild the captive PF tables from the captive_sessions DB so that the
+    runtime state can never silently drift after a crash, manual pfctl edit,
+    or process restart. Safe to call repeatedly.
+    """
+    # First drop expired sessions so we never re-add stale IPs.
+    try:
+        expire_sessions(conn)
+    except Exception as exc:
+        _log.warning("captive_portal: expire_sessions failed during reconcile: %s", exc)
+
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "skipped": "not freebsd"}
+
+    active = _rows(
+        conn,
+        "SELECT ip_address, is_superuser FROM captive_sessions "
+        "WHERE logged_out=0 AND expires_at > ?",
+        (_now_ts(),),
+    )
+    auth_ips  = sorted({r["ip_address"] for r in active if r.get("ip_address")})
+    admin_ips = sorted({r["ip_address"] for r in active
+                        if r.get("ip_address") and r.get("is_superuser")})
+
+    def _replace(table: str, file_path: str, ips: list) -> tuple:
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, "w") as fh:
+                for ip in ips:
+                    fh.write(ip + "\n")
+            r = run_privileged("pf.table_replace_file", table=table, file_path=file_path)
+            if getattr(r, "returncode", 0) != 0:
+                return False, (getattr(r, "stderr", "") or getattr(r, "stdout", "") or "").strip()
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
+
+    auth_ok,  auth_msg  = _replace("authenticated_clients", _CP_AUTH_TABLE_FILE,  auth_ips)
+    admin_ok, admin_msg = _replace("admin_bypass_clients",  _CP_ADMIN_TABLE_FILE, admin_ips)
+
+    if not (auth_ok and admin_ok):
+        return {"ok": False,
+                "message": f"reconcile failed: auth={auth_msg or 'ok'} admin={admin_msg or 'ok'}",
+                "auth": len(auth_ips), "admin": len(admin_ips)}
+    return {"ok": True, "auth": len(auth_ips), "admin": len(admin_ips)}
 
 
 # ---------------------------------------------------------------------------
@@ -334,8 +506,8 @@ def generate_self_signed_cert(cert_path: str, key_path: str, ip: str) -> None:
         .issuer_name(name)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(_dt.datetime.utcnow())
-        .not_valid_after(_dt.datetime.utcnow() + _dt.timedelta(days=3650))
+        .not_valid_before(_dt.datetime.now(_dt.timezone.utc))
+        .not_valid_after(_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=3650))
         .add_extension(x509.SubjectAlternativeName(san), critical=False)
         .sign(key, hashes.SHA256())
     )
@@ -351,79 +523,33 @@ def generate_self_signed_cert(cert_path: str, key_path: str, ip: str) -> None:
 
 def _handle_https_redirect(raw_conn: socket.socket, ctx: ssl.SSLContext,
                            portal_ip: str, portal_port: int) -> None:
+    """Handle a TLS connection that PF redirected here from port 443.
+
+    We do NOT attempt to render a per-domain "pretty" block page — browsers
+    will reject the self-signed cert for any real hostname, so promising a
+    nice landing page is impossible without TLS interception. Instead we send
+    a minimal HTTP 302 to the portal HTTPS landing and let the client decide
+    whether to trust the cert there.
+    """
     try:
         with ctx.wrap_socket(raw_conn, server_side=True) as tls:
-            data = b""
             try:
-                data = tls.recv(4096)
+                tls.recv(4096)   # drain the request line; we ignore Host/path
             except Exception:
                 pass
-            host = ""
-            for line in data.decode("utf-8", "replace").splitlines():
-                if line.lower().startswith("host:"):
-                    host = line.split(":", 1)[1].strip().split(":")[0]
-                    break
-
-            portal_url = f"http://{portal_ip}:{portal_port}/portal/block"
-            if host:
-                portal_url += f"?domain={host}"
-
-            display_host = host or "this site"
+            portal_url = f"https://{portal_ip}/portal/"
             body = (
-                "<!DOCTYPE html><html><head>"
-                "<meta charset='utf-8'>"
-                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-                f"<title>Blocked — Smart Shield</title>"
-                "<style>"
-                "*{box-sizing:border-box;margin:0;padding:0}"
-                "body{background:linear-gradient(135deg,#0f172a,#1e3a5f);min-height:100vh;"
-                "display:flex;align-items:center;justify-content:center;"
-                "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:1rem}"
-                ".card{background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);"
-                "width:100%;max-width:420px;overflow:hidden;text-align:center}"
-                ".hdr{background:#1e3a5f;color:#fff;padding:1.4rem 2rem}"
-                ".hdr .ic{font-size:2rem;display:block;margin-bottom:.3rem}"
-                ".hdr h1{font-size:1.15rem;font-weight:700;letter-spacing:.02em}"
-                ".hdr p{font-size:.78rem;opacity:.7;margin-top:.2rem}"
-                ".body{padding:1.5rem 2rem 1.75rem}"
-                ".notice{background:#fef2f2;border-left:4px solid #dc2626;"
-                "padding:.9rem 1.2rem;border-radius:0 6px 6px 0;text-align:left;margin-bottom:1.25rem}"
-                ".notice strong{color:#991b1b;font-size:.88rem}"
-                ".notice code{background:#fee2e2;border-radius:3px;padding:1px 5px;"
-                "font-size:.85rem;color:#7f1d1d;word-break:break-all}"
-                ".notice p{font-size:.8rem;color:#b91c1c;margin-top:.3rem;line-height:1.4}"
-                ".btn{display:block;width:100%;padding:.75rem;background:#1e3a5f;color:#fff;"
-                "border-radius:6px;font-size:.95rem;font-weight:700;text-decoration:none;"
-                "transition:background .2s;margin-bottom:.65rem}"
-                ".btn:hover{background:#2d5a8f}"
-                ".btn-v{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}"
-                ".btn-v:hover{background:#dcfce7}"
-                ".hint{font-size:.72rem;color:#9ca3af;margin-top:.5rem;line-height:1.5}"
-                ".ftr{font-size:.72rem;color:#9ca3af;padding:.7rem;border-top:1px solid #f1f5f9}"
-                "</style></head><body><div class='card'>"
-                "<div class='hdr'><span class='ic'>🛡️</span>"
-                "<h1>Smart Shield — Content Police</h1>"
-                "<p>Network access control &amp; content filtering</p></div>"
-                "<div class='body'>"
-                "<div class='notice'>"
-                f"<strong>🚫 Site blocked: <code>{display_host}</code></strong>"
-                "<p>This domain is restricted by the content policy.<br>"
-                "Sign in below to bypass filtering for your device.</p>"
-                "</div>"
-                f"<a href='{portal_url}' class='btn'>🔐 Proceed to Login</a>"
-                f"<a href='{portal_url}' class='btn btn-v'>🎟 Use a Voucher Code</a>"
-                "<p class='hint'>Your session will allow access for the duration of your visit.</p>"
-                "</div>"
-                "<div class='ftr'>Protected by Smart Shield &middot; Content Police Filter</div>"
-                "</div></body></html>"
-            )
-            body_bytes = body.encode("utf-8")
+                "<!DOCTYPE html><html><body>"
+                f"Redirecting to <a href=\"{portal_url}\">{portal_url}</a>"
+                "</body></html>"
+            ).encode("utf-8")
             response = (
-                f"HTTP/1.1 200 OK\r\n"
-                f"Content-Type: text/html; charset=utf-8\r\n"
-                f"Content-Length: {len(body_bytes)}\r\n"
-                f"Connection: close\r\n\r\n"
-            ).encode() + body_bytes
+                "HTTP/1.1 302 Found\r\n"
+                f"Location: {portal_url}\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ).encode() + body
             try:
                 tls.sendall(response)
             except Exception:
@@ -475,14 +601,44 @@ def start_https_redirect_server(portal_ip: str, portal_port: int,
     t.start()
 
 
+def ensure_https_redirect_cert(portal_ip: str) -> dict:
+    """Generate the self-signed cert/key if they are missing.
+
+    Returns {"ok": True} when the cert is present after the call, otherwise
+    {"ok": False, "message": ...}.
+    """
+    if os.path.exists(_CP_CERT_PATH) and os.path.exists(_CP_KEY_PATH):
+        return {"ok": True}
+    try:
+        cert_dir = os.path.dirname(_CP_CERT_PATH)
+        if cert_dir:
+            os.makedirs(cert_dir, exist_ok=True)
+        generate_self_signed_cert(_CP_CERT_PATH, _CP_KEY_PATH, portal_ip)
+        try:
+            os.chmod(_CP_KEY_PATH, 0o600)
+            os.chmod(_CP_CERT_PATH, 0o644)
+        except Exception:
+            pass
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
 # ---------------------------------------------------------------------------
 # PF anchor generation
 # ---------------------------------------------------------------------------
 
-def generate_pf_anchor(conn) -> str:
+def generate_pf_anchor(conn) -> dict:
     """
     Generate the PF anchor rules for the captive portal.
-    This anchor is loaded by the main pf.conf.
+
+    Returns a dict with two keys:
+      - "rdr":    translation rules (rdr only) for the captive_portal_rdr anchor
+      - "filter": filter rules (pass/block only) for the captive_portal_filter anchor
+
+    PF requires translation rules to be loaded into a separate anchor from
+    filter rules; emitting them mixed into a single anchor body causes pfctl
+    to reject the ruleset with "syntax error" on the first rdr after a pass.
     """
     rows = conn.execute(
         "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
@@ -494,9 +650,12 @@ def generate_pf_anchor(conn) -> str:
     portal_port = settings.get("portal_port") or _CP_REDIRECT_PORT
     dns_allow   = bool(settings.get("allow_dns", True))
     http_port   = settings.get("http_redirect_port") or 80
-    # strict_mode=True blocks ALL unauthenticated traffic (not just HTTP redirects).
-    # Authenticated clients still pass freely; the portal itself is always reachable.
-    strict_mode = bool(settings.get("strict_mode", False))
+    # Strict mode is the appliance default. Authenticated clients still pass
+    # freely; the portal itself is always reachable.
+    strict_mode = bool(settings.get("strict_mode", True))
+    # Opt-in: only when explicitly enabled do admin_bypass_clients reach upstream
+    # DNS directly. Default is False so content policy keeps applying after login.
+    dns_bypass_admin = bool(settings.get("dns_bypass_for_admin", False))
 
     # Prefer the interface stored in captive portal settings; fall back to
     # the LAN assigned_port from the interface config table.
@@ -510,8 +669,7 @@ def generate_pf_anchor(conn) -> str:
         except Exception:
             lan_iface = "em1"
 
-    # Upstream DNS for authenticated clients — bypasses Unbound's block redirects
-    # so after auth, blocked domains resolve to their real IPs.
+    # Upstream DNS only used when dns_bypass_for_admin is explicitly enabled.
     upstream_dns = (settings.get("upstream_dns") or "8.8.8.8").strip()
 
     mode_comment = (
@@ -519,12 +677,11 @@ def generate_pf_anchor(conn) -> str:
         "# Only the portal itself and (optionally) DNS queries are allowed."
         if strict_mode else
         "# Soft captive portal: redirect HTTP only — all other traffic passes normally.\n"
-        "# HTTPS interception and block-all are intentionally omitted so that\n"
-        "# unauthenticated clients retain full internet access; only port-80 browsing\n"
-        "# is redirected to the login page. Content-policy DNS blocking is independent."
+        "# Soft mode is for testing/splash-page deployments only and does not\n"
+        "# provide real network access control."
     )
 
-    lines = [
+    header = [
         "# ============================================================",
         "# Smart Shield - Captive Portal / Content Filter PF anchor",
         "# Generated by app/services/captive_portal.py",
@@ -533,45 +690,135 @@ def generate_pf_anchor(conn) -> str:
         "",
         mode_comment,
         "",
-        "# Translation rules (unauthenticated HTTP → portal login)",
-        f"rdr on {lan_iface} proto tcp from !<authenticated_clients> to any port {http_port} -> {portal_ip} port {portal_port}",
+    ]
+
+    # ── Translation rules (rdr only) ───────────────────────────────────────
+    # PF evaluates rdr top-down and the first match wins, so every `no rdr`
+    # exemption must be emitted BEFORE the catch-all `rdr` it exempts. The
+    # bypass-table list per layer lives in app/services/bypass_policy.py so
+    # every filter generator agrees on who skips which enforcement layer.
+    rdr_lines = list(header) + [
+        "# Force ALL LAN DNS through Unbound so content policy keeps applying.",
+        "# Authenticated and whitelisted clients are NOT exempt by default —",
+        "# they still resolve through Unbound so DNS/content-policy stays in",
+        "# effect. Only admin_bypass_clients may opt out via dns_bypass_for_admin.",
+    ]
+
+    if dns_bypass_admin:
+        rdr_lines += [
+            "",
+            "# Opt-in: admin_bypass_clients skip the DNS redirect entirely and",
+            "# reach the configured upstream resolver directly. Emitted FIRST so",
+            "# the catch-all DNS rdr below cannot short-circuit them.",
+        ]
+        for table in bypass_tables_for("captive_portal_dns"):
+            rdr_lines.append(
+                f"no rdr on {lan_iface} proto udp from <{table}> to any port 53"
+            )
+            rdr_lines.append(
+                f"no rdr on {lan_iface} proto tcp from <{table}> to any port 53"
+            )
+
+    rdr_lines += [
         "",
-        "# DNS bypass for authenticated clients — route to upstream resolver instead of",
-        "# Unbound so that previously blocked domains return their real IPs after login.",
-        f"rdr on {lan_iface} proto udp from <authenticated_clients> to any port 53 -> {upstream_dns} port 53",
-        f"rdr on {lan_iface} proto tcp from <authenticated_clients> to any port 53 -> {upstream_dns} port 53",
+        f"rdr on {lan_iface} proto udp from any to !{portal_ip} port 53 -> {portal_ip} port 53",
+        f"rdr on {lan_iface} proto tcp from any to !{portal_ip} port 53 -> {portal_ip} port 53",
         "",
-        "# Filter rules — authenticated clients pass all traffic",
-        f"pass in on {lan_iface} from <authenticated_clients> to any keep state",
-        "# Portal itself is always reachable (needed for login page)",
-        f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {portal_port} keep state",
+        "# Defense-in-depth: bypass clients also skip the HTTP redirect at the",
+        "# rdr layer, so a misordered filter anchor cannot accidentally portal",
+        "# them. The filter anchor's pass-in-quick rules remain the primary",
+        "# enforcement; this is belt-and-braces.",
+    ]
+    for table in bypass_tables_for("captive_portal_http"):
+        rdr_lines.append(
+            f"no rdr on {lan_iface} proto tcp from <{table}> to any port {http_port}"
+        )
+    rdr_lines += [
+        "",
+        "# Redirect unauthenticated HTTP (port 80) to the portal login page.",
+        f"rdr on {lan_iface} proto tcp from any to any port {http_port} -> {portal_ip} port {portal_port}",
+    ]
+
+    if not strict_mode:
+        rdr_lines += [
+            "",
+            "# Soft mode: HTTPS may optionally be redirected to the portal HTTPS landing",
+            "# (best-effort — browsers will still flag the self-signed cert).",
+            f"rdr on {lan_iface} proto tcp from any to any port 443 -> {portal_ip} port {_CP_HTTPS_PORT}",
+        ]
+
+    # ── Filter rules (pass / block only) ───────────────────────────────────
+    # PF labels (smartshield:captive_portal:*) tag every rule so the firewall
+    # log collector can attribute the pflog event to captive-portal enforcement
+    # rather than mislabelling it as user_rule / default_deny. Block rules carry
+    # the 'log' keyword so they actually surface in pflog0.
+    filter_lines = list(header) + [
+        "# Pass authenticated / whitelisted / admin-bypass clients FIRST so the",
+        "# block rule at the end never matches them. Order matters: 'quick' makes",
+        "# each rule terminal on match.",
+        f"pass in quick on {lan_iface} from <authenticated_clients> to any "
+        f'label "smartshield:captive_portal:allow_auth" keep state',
+        f"pass in quick on {lan_iface} from <device_whitelist>      to any "
+        f'label "smartshield:captive_portal:allow_device_wl" keep state',
+        f"pass in quick on {lan_iface} from <access_whitelist>      to any "
+        f'label "smartshield:captive_portal:allow_access_wl" keep state',
+        f"pass in quick on {lan_iface} from <admin_bypass_clients>  to any "
+        f'label "smartshield:captive_portal:allow_admin_bypass" keep state',
+        "",
+        "# DHCP must work before authentication so clients can acquire an IP.",
+        f"pass in quick on {lan_iface} proto udp from any port 68 to any port 67 "
+        f'label "smartshield:captive_portal:allow_dhcp" keep state',
+        "",
+        "# Portal itself is always reachable (needed for login page and HTTPS landing).",
+        f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port {portal_port} "
+        f'label "smartshield:captive_portal:allow_portal_http" keep state',
+        f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port 443 "
+        f'label "smartshield:captive_portal:allow_portal_https" keep state',
     ]
 
     if dns_allow:
-        lines += [
-            f"pass in quick on {lan_iface} proto udp from any to {portal_ip} port 53 keep state",
-            f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port 53 keep state",
+        filter_lines += [
+            f"pass in quick on {lan_iface} proto udp from any to {portal_ip} port 53 "
+            f'label "smartshield:captive_portal:allow_dns_udp" keep state',
+            f"pass in quick on {lan_iface} proto tcp from any to {portal_ip} port 53 "
+            f'label "smartshield:captive_portal:allow_dns_tcp" keep state',
         ]
 
     if strict_mode:
-        # In strict mode also allow DHCP (port 67/68) so clients can get an IP address,
-        # and DNS to Unbound (needed so browser can resolve the portal hostname).
-        lines += [
+        filter_lines += [
             "",
-            "# DHCP must pass so unauthenticated clients can acquire an IP",
-            f"pass in quick on {lan_iface} proto udp from any port 68 to any port 67 keep state",
+            "# Strict mode: reject HTTPS with a clean TCP RST so the browser shows",
+            "# 'connection refused' instead of a misleading TLS error from a self-signed cert.",
+            f"block return in log quick on {lan_iface} proto tcp from any to any port 443 "
+            f'label "smartshield:captive_portal:block_unauth_https"',
             "",
-            "# Block everything else from unauthenticated clients",
-            f"block in quick on {lan_iface} from !<authenticated_clients> to any",
+            "# Block everything else. Unauthenticated clients only have HTTP redirect + DNS.",
+            f"block in log quick on {lan_iface} from any to any "
+            f'label "smartshield:captive_portal:block_unauth"',
         ]
     else:
-        lines += [
+        filter_lines += [
             "",
-            "# Allow all other traffic — content policy and firewall rules handle blocking.",
-            f"pass in on {lan_iface} from !<authenticated_clients> to any keep state",
+            "# Soft mode: allow remaining traffic after rdr decisions.",
+            f"pass in on {lan_iface} from any to any "
+            f'label "smartshield:captive_portal:soft_pass" keep state',
         ]
 
-    return "\n".join(lines) + "\n"
+    return {
+        "rdr":    "\n".join(rdr_lines) + "\n",
+        "filter": "\n".join(filter_lines) + "\n",
+    }
+
+
+def generate_pf_anchor_preview(conn) -> str:
+    """Human-readable concatenation of both anchor files for the admin UI preview."""
+    parts = generate_pf_anchor(conn)
+    return (
+        "# ── captive_portal_rdr anchor (/etc/pf.captive_portal.rdr.conf) ──\n"
+        + parts["rdr"]
+        + "\n# ── captive_portal_filter anchor (/etc/pf.captive_portal.filter.conf) ──\n"
+        + parts["filter"]
+    )
 
 
 def apply_captive_portal(conn) -> dict:
@@ -586,43 +833,85 @@ def apply_captive_portal(conn) -> dict:
     if not settings.get("enabled", False):
         if sys.platform.startswith("freebsd"):
             try:
-                with open(_CP_ANCHOR_PATH, "w") as fh:
-                    fh.write("# captive portal disabled\n")
+                from app.services.config_file_utils import atomic_write
                 from app.services.priv_helper import run_privileged
-                run_privileged("pf.anchor_reload",
-                               anchor_name=_CP_ANCHOR_NAME,
-                               config_path=_CP_ANCHOR_PATH)
-            except Exception:
-                pass
-        return {"ok": True, "message": "Captive portal disabled — PF anchor cleared."}
+                for path, name in (
+                    (_CP_RDR_PATH,    _CP_RDR_NAME),
+                    (_CP_FILTER_PATH, _CP_FILTER_NAME),
+                ):
+                    atomic_write(path, "# captive portal disabled\n")
+                    run_privileged("pf.anchor_reload",
+                                   anchor_name=name,
+                                   config_path=path)
+            except Exception as exc:
+                _log.warning("captive_portal: failed to clear PF anchors on disable: %s", exc)
+        return {"ok": True, "message": "Captive portal disabled — PF anchors cleared."}
 
     conf = generate_pf_anchor(conn)
+
+    # Static section-order check: rdr block must contain no filter rules and
+    # vice versa. Catches accidental cross-pollination if the generator is
+    # edited later without keeping the split clean.
+    try:
+        from app.services.pf_static_validator import (
+            validate_section_order, PfRuleOrderError,
+        )
+        validate_section_order(conf["rdr"])
+        validate_section_order(conf["filter"])
+    except PfRuleOrderError as exc:
+        return {"ok": False, "message": f"Captive portal rule-order error: {exc}", "conf": conf}
 
     portal_ip   = (settings.get("portal_ip") or _default_portal_ip(conn)).strip()
     portal_port = settings.get("portal_port") or _CP_REDIRECT_PORT
 
-    # HTTPS interception is disabled (soft captive portal mode — see generate_pf_anchor).
-    # The HTTPS redirect server is no longer started.
-
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — captive portal anchor generated but not applied.",
+        return {"ok": True, "message": "Non-FreeBSD — captive portal anchors generated but not applied.",
                 "conf": conf}
 
     try:
-        with open(_CP_ANCHOR_PATH, "w") as fh:
-            fh.write(conf)
+        from app.services.config_file_utils import atomic_write
         from app.services.priv_helper import run_privileged
 
-        run_privileged(
-    "pf.anchor_reload",
-    anchor_name=_CP_ANCHOR_NAME,
-    config_path=_CP_ANCHOR_PATH,
-)
+        atomic_write(_CP_RDR_PATH,    conf["rdr"])
+        atomic_write(_CP_FILTER_PATH, conf["filter"])
 
-# Ensure PF table exists and is readable.
+        run_privileged(
+            "pf.anchor_reload",
+            anchor_name=_CP_RDR_NAME,
+            config_path=_CP_RDR_PATH,
+        )
+        run_privileged(
+            "pf.anchor_reload",
+            anchor_name=_CP_FILTER_NAME,
+            config_path=_CP_FILTER_PATH,
+        )
+
+        # Ensure PF table exists and is readable.
         run_privileged("pf.table_show", table="authenticated_clients")
     except Exception as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
+
+    # Make sure the self-signed cert/key exist before the HTTPS daemon tries to load them.
+    # Failure here is fatal — the daemon would otherwise silently die in ctx.load_cert_chain().
+    cert_result = ensure_https_redirect_cert(portal_ip)
+    if not cert_result.get("ok"):
+        return {
+            "ok": False,
+            "message": "Captive portal HTTPS redirect certificate could not be created: "
+                       + cert_result.get("message", "unknown error"),
+            "conf": conf,
+        }
+
+    # Start the HTTPS→HTTP redirect daemon so port-5443 receives rdr'd HTTPS connections.
+    # The thread is idempotent — it only starts once per process lifetime.
+    start_https_redirect_server(portal_ip, portal_port, _CP_CERT_PATH, _CP_KEY_PATH)
+
+    # Reconcile the PF tables to match the DB. Without this, a fresh apply
+    # leaves the anchor live with whatever the kernel had cached.
+    try:
+        reconcile_captive_pf_tables(conn)
+    except Exception as exc:
+        _log.warning("captive_portal: reconcile after apply failed: %s", exc)
 
     from app.audit_log import log_event
     log_event(
@@ -635,8 +924,9 @@ def apply_captive_portal(conn) -> dict:
 
 def authenticate_radius(conn, username: str, password: str) -> dict:
     """
-    Authenticate a user against the RADIUS server configured in
-    captive_portal_config (columns radius_server / radius_secret).
+    Authenticate a user against the RADIUS server configured in the
+    ``captive_portal_settings`` service_state blob (keys radius_server /
+    radius_secret).
 
     Uses a raw RADIUS Access-Request over UDP — no third-party library needed.
     Returns {"ok": bool, "message": str}.
@@ -652,26 +942,14 @@ def authenticate_radius(conn, username: str, password: str) -> dict:
     if not username or not password:
         return {"ok": False, "message": "Username and password are required."}
 
-    # Load config
-    try:
-        row = conn.execute(
-            "SELECT radius_server, radius_secret FROM captive_portal_config WHERE id=1"
-        ).fetchone()
-    except Exception:
-        row = None
-
-    if not row:
-        # Fall back to service_state blob
-        import json as _json
-        srow = conn.execute(
-            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
-        ).fetchone()
-        settings = _json.loads(srow["value_json"]) if srow else {}
-        radius_server = settings.get("radius_server", "")
-        radius_secret = settings.get("radius_secret", "")
-    else:
-        radius_server = (row["radius_server"] or "").strip()
-        radius_secret = (row["radius_secret"] or "").strip()
+    # Load config from the captive_portal_settings service_state blob.
+    import json as _json
+    srow = conn.execute(
+        "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+    ).fetchone()
+    settings = _json.loads(srow["value_json"]) if srow else {}
+    radius_server = (settings.get("radius_server") or "").strip()
+    radius_secret = (settings.get("radius_secret") or "").strip()
 
     if not radius_server or not radius_secret:
         return {"ok": False, "message": "RADIUS server not configured."}
@@ -755,6 +1033,80 @@ def authenticate_radius(conn, username: str, password: str) -> dict:
     return {"ok": False, "message": f"Unexpected RADIUS response code {resp_code}."}
 
 
+def try_password_auth(conn, username: str, password: str) -> dict:
+    """
+    Shared credential check used by both the portal HTML route and the public
+    captive-auth API endpoint.
+
+    Tries RADIUS first (if configured), then falls back to the local `users`
+    table. Keeps the API and portal in lockstep so a credential that logs in
+    via the portal also logs in via /api/captive-portal/authenticate.
+
+    Returns
+    -------
+    dict with keys:
+      ok               - bool
+      auth_type        - "radius" | "local" | ""  (empty on failure)
+      is_superuser     - bool (local users only — RADIUS has no superuser concept here)
+      message          - detailed reason; callers MUST sanitize before returning
+                         to unauthenticated clients (see routes/portal.py).
+    """
+    username = (username or "").strip()
+    password = (password or "").strip()
+    if not username or not password:
+        return {
+            "ok": False, "auth_type": "", "is_superuser": False,
+            "message": "Username and password are required.",
+        }
+
+    # 1. RADIUS first — only if a server is actually configured. authenticate_radius
+    # returns ok=False / "RADIUS server not configured." when not set up; treat
+    # that as "skip RADIUS, try local" rather than a credential failure.
+    radius_result = authenticate_radius(conn, username, password)
+    if radius_result.get("ok"):
+        return {
+            "ok": True, "auth_type": "radius", "is_superuser": False,
+            "message": radius_result.get("message", ""),
+        }
+
+    radius_msg = (radius_result.get("message") or "").lower()
+    radius_configured = "not configured" not in radius_msg
+
+    # 2. Local users — werkzeug password hash check against the users table.
+    try:
+        from werkzeug.security import check_password_hash as _chk
+        row = conn.execute(
+            "SELECT password, is_superuser FROM users "
+            "WHERE username=? AND (status IS NULL OR status='active')",
+            (username,),
+        ).fetchone()
+    except Exception as exc:
+        return {
+            "ok": False, "auth_type": "", "is_superuser": False,
+            "message": f"Local user lookup failed: {exc}",
+        }
+
+    if row and _chk(row["password"], password):
+        return {
+            "ok": True, "auth_type": "local",
+            "is_superuser": bool(row["is_superuser"]),
+            "message": "Local authentication succeeded.",
+        }
+
+    # 3. Both failed. Preserve the RADIUS error if it was a real rejection
+    # (not a "not configured") for internal logging — the caller is responsible
+    # for translating to a generic client-facing string.
+    if radius_configured:
+        return {
+            "ok": False, "auth_type": "", "is_superuser": False,
+            "message": radius_result.get("message") or "Authentication failed.",
+        }
+    return {
+        "ok": False, "auth_type": "", "is_superuser": False,
+        "message": "Invalid username or password.",
+    }
+
+
 def get_captive_status(conn) -> dict:
     active = get_active_sessions(conn)
     expire_sessions(conn)
@@ -766,6 +1118,7 @@ def get_captive_status(conn) -> dict:
     enabled = bool(settings.get("enabled", False))
     return {
         "enabled": enabled,
+        "active_sessions": len(active),
         "active_sessions_count": len(active),
         "state": "running" if enabled else "stopped",
     }

@@ -40,14 +40,21 @@ def ids_index():
     cfg  = _cfg(conn)
     rulesets = _rulesets(conn)
 
-    # Inject display-time WAN interface fallback so the status banner is never blank.
-    # Empty string in DB means "auto (WAN)" — show the actual WAN interface name.
+    # Inject display-time LAN interface fallback so the status banner is never blank.
+    # Empty string in DB means "auto (LAN)" — the IDS monitors the LAN side by
+    # default (see ids_writer.generate_suricata_yaml), so show the LAN port here
+    # to match what Suricata will actually bind to.
+    # Sanitise: ``assigned_port`` can legacy-format as "em1 (00:0c…)" but Suricata
+    # only accepts the bare kernel name — strip everything after the first space.
     if not cfg.get("interface"):
-        wan_row = conn.execute(
-            "SELECT assigned_port FROM wan_config LIMIT 1"
+        from app.services.ids_writer import _clean_iface
+        lan_row = conn.execute(
+            "SELECT assigned_port FROM lan_config LIMIT 1"
         ).fetchone()
         cfg = dict(cfg)
-        cfg["interface"] = (wan_row["assigned_port"] if wan_row else None) or "em0"
+        cfg["interface"] = _clean_iface(
+            (lan_row["assigned_port"] if lan_row else None) or "em1"
+        )
 
     # Live status (non-blocking; returns quickly on non-FreeBSD)
     from app.services.ids_writer import get_ids_status
@@ -83,7 +90,8 @@ def ids_save():
 
     mode        = request.form.get("mode", "ids")
     interface   = request.form.get("interface", "")
-    home_net    = request.form.get("home_net", "192.168.0.0/16").strip()
+    # Blank = auto: generate_suricata_yaml derives HOME_NET from the LAN subnet.
+    home_net    = request.form.get("home_net", "").strip()
     ext_net     = request.form.get("external_net", "!$HOME_NET").strip()
     eve_json    = 1 if request.form.get("eve_json_enabled") else 0
     fast_log    = 1 if request.form.get("fast_log_enabled") else 0
@@ -136,6 +144,57 @@ def ids_toggle():
         details={"enabled": enabled, "result": result},
     )
     return jsonify(result)
+
+
+# ── Suricata daemon log tail (GUI diagnostics) ─────────────────────────────
+
+@ids_bp.route("/api/log", methods=["GET"])
+@login_required
+def ids_log():
+    """
+    Return the tail of ``/var/log/suricata/<source>.log`` plus a live
+    ``service suricata status`` snapshot, so operators can self-diagnose
+    a Stopped IDS without ssh.
+
+    Query params:
+      source = suricata | fast | stats   (default suricata)
+      lines  = 1 .. 2000                  (default 200)
+      grep   = optional case-insensitive substring filter
+    """
+    from app.services.ids_writer import tail_suricata_log, get_ids_status
+    from app.services.service_manager import service_action
+
+    source = (request.args.get("source") or "suricata").strip().lower()
+    try:
+        n = max(1, min(int(request.args.get("lines") or 200), 2000))
+    except (TypeError, ValueError):
+        n = 200
+    needle = (request.args.get("grep") or "").strip().lower()
+
+    tail = tail_suricata_log(lines=n, source=source)
+    lines = tail.get("lines", []) or []
+    if needle:
+        lines = [ln for ln in lines if needle in ln.lower()]
+
+    try:
+        svc = service_action("suricata", "status")
+    except Exception as exc:
+        svc = {"ok": False, "message": f"status query failed: {exc}"}
+
+    log_event(
+        category="system", action="ids_log_viewed",
+        username=session.get("username"), remote_addr=request.remote_addr,
+        details={"source": source, "lines_requested": n, "grep": needle},
+    )
+    return jsonify({
+        "ok":           tail.get("ok", False),
+        "path":         tail.get("path", ""),
+        "missing":      tail.get("missing", False),
+        "message":      tail.get("message", ""),
+        "lines":        lines,
+        "service":      svc,
+        "status":       get_ids_status(get_db()),
+    })
 
 
 # ── Ruleset CRUD ───────────────────────────────────────────────────────────
@@ -199,8 +258,16 @@ def ids_ruleset_delete(rid):
 @api_permission_required("api.ids.edit")
 def ids_update_rules():
     conn = get_db()
-    from app.services.ids_writer import update_rules
-    result = update_rules(conn)
+    from app.services.ids_writer import update_rules, _SURICATA_UPDATE_RULES
+    try:
+        result = update_rules(conn)
+    except Exception as exc:
+        # suricata-update can raise on timeout or unexpected pip failure —
+        # surface a clean JSON error so the GUI does not see an HTTP 500.
+        result = {"ok": False,
+                  "message": f"Rule update failed: {exc}",
+                  "updated": [],
+                  "rules_path": _SURICATA_UPDATE_RULES}
     return jsonify(result)
 
 
@@ -210,7 +277,7 @@ def ids_update_rules():
 @login_required
 def ids_status():
     from app.services.ids_writer import get_ids_status
-    return jsonify(get_ids_status())
+    return jsonify(get_ids_status(get_db()))
 
 
 # ── Threat Feeds (abuse.ch Auth-Key) ─────────────────────────────────────
@@ -222,8 +289,20 @@ def ids_feeds_get():
     row = conn.execute(
         "SELECT abusech_dry_run FROM ids_threat_feeds WHERE id=1"
     ).fetchone()
-    dry_run = bool(row["abusech_dry_run"]) if row else True
-    return jsonify({"ok": True, "has_key": _feeds_has_key(conn), "dry_run": dry_run})
+    dry_run  = bool(row["abusech_dry_run"]) if row else True
+    has_key  = _feeds_has_key(conn)
+    # Derived, unambiguous state for the UI:
+    #   live    — key set, live calls enabled
+    #   dry_run — key set but live calls suppressed
+    #   offline — no key + dry-run (safe default; no calls attempted)
+    #   invalid — no key but live mode requested (calls will fail)
+    if has_key:
+        mode = "dry_run" if dry_run else "live"
+    else:
+        mode = "offline" if dry_run else "invalid"
+    return jsonify({
+        "ok": True, "has_key": has_key, "dry_run": dry_run, "mode": mode,
+    })
 
 
 @ids_bp.route("/api/feeds", methods=["POST"])
@@ -428,3 +507,164 @@ def ids_alerts():
             pass
 
     return jsonify({"ok": True, "alerts": alerts, "total": len(alerts)})
+
+
+# ── File download event log ────────────────────────────────────────────────
+
+@ids_bp.route("/api/file-events", methods=["GET"])
+@login_required
+def ids_file_events():
+    """
+    Return recent file download / executable-transfer events detected by Suricata.
+
+    These are written to the audit log with category='file_download' by the
+    SIEM EVE collector (siem_collector._handle_fileinfo_event and
+    _handle_http_event).
+
+    Query params:
+      limit  — max events to return (default 100, max 500)
+      hours  — only events within the last N hours (0 = all time)
+      search — case-insensitive substring filter applied to filename / src_ip / dest_ip
+    """
+    from app.audit_log import tail_events_since
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        limit = min(int(request.args.get("limit", 100)), 500)
+    except (ValueError, TypeError):
+        limit = 100
+
+    try:
+        hours = int(request.args.get("hours", 24))
+    except (ValueError, TypeError):
+        hours = 24
+
+    search = (request.args.get("search") or "").lower().strip()
+
+    after_ts = ""
+    if hours > 0:
+        after_ts = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat()
+
+    raw = tail_events_since(
+        after_ts=after_ts,
+        limit=limit * 3,
+        categories=["file_download"],
+    )
+
+    events = []
+    for e in raw:
+        d = e.get("details", {})
+        if search:
+            haystack = " ".join([
+                str(d.get("filename", "")),
+                str(d.get("src_ip", "")),
+                str(d.get("dest_ip", "")),
+                str(d.get("http_url", "")),
+                str(d.get("http_host", "")),
+            ]).lower()
+            if search not in haystack:
+                continue
+        events.append({
+            "timestamp":  e.get("timestamp", ""),
+            "action":     e.get("action", ""),
+            "severity":   e.get("severity", "high"),
+            "src_ip":     d.get("src_ip", ""),
+            "dest_ip":    d.get("dest_ip", ""),
+            "dest_port":  d.get("dest_port", ""),
+            "filename":   d.get("filename", ""),
+            "extension":  d.get("extension", ""),
+            "magic":      d.get("magic", ""),
+            "mime":       d.get("mime", ""),
+            "size":       d.get("size", 0),
+            "md5":        d.get("md5", ""),
+            "sha256":     d.get("sha256", ""),
+            "http_url":   d.get("http_url", ""),
+            "http_host":  d.get("http_host", ""),
+            "http_agent": d.get("http_agent", ""),
+            "hostname":   d.get("hostname", ""),
+            "mac":        d.get("mac", ""),
+        })
+        if len(events) >= limit:
+            break
+
+    return jsonify({"ok": True, "events": events, "total": len(events)})
+
+
+# ── Enriched connection log (EVE flow events via audit log) ───────────────
+
+@ids_bp.route("/api/connections", methods=["GET"])
+@login_required
+def ids_connections():
+    """
+    Return recent network connection events from the PF state tracker and
+    IDS-enriched events (ids_alert, c2_agent_detected, exe_url_detected).
+
+    Merges audit log entries from categories: connection, ids, file_download.
+    """
+    from app.audit_log import tail_events_since
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        limit = min(int(request.args.get("limit", 100)), 500)
+    except (ValueError, TypeError):
+        limit = 100
+
+    try:
+        hours = int(request.args.get("hours", 1))
+    except (ValueError, TypeError):
+        hours = 1
+
+    search = (request.args.get("search") or "").lower().strip()
+
+    after_ts = ""
+    if hours > 0:
+        after_ts = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat()
+
+    raw = tail_events_since(
+        after_ts=after_ts,
+        limit=limit * 4,
+        categories=["connection", "ids", "file_download"],
+    )
+
+    connections = []
+    for e in raw:
+        d = e.get("details", {})
+        src = d.get("src_ip") or e.get("remote_addr", "")
+        if search:
+            haystack = " ".join([
+                src,
+                str(d.get("dest_ip", "")),
+                str(d.get("service", "")),
+                str(d.get("signature", "")),
+                str(d.get("filename", "")),
+                str(d.get("http_url", "")),
+            ]).lower()
+            if search not in haystack:
+                continue
+        connections.append({
+            "timestamp":  e.get("timestamp", ""),
+            "category":   e.get("category", ""),
+            "action":     e.get("action", ""),
+            "severity":   e.get("severity", "info"),
+            "src_ip":     src,
+            "dest_ip":    d.get("dest_ip", ""),
+            "dest_port":  d.get("dest_port", ""),
+            "proto":      d.get("proto", ""),
+            "service":    d.get("service", ""),
+            "signature":  d.get("signature", ""),
+            "filename":   d.get("filename", ""),
+            "http_url":   d.get("http_url", ""),
+            "http_host":  d.get("http_host", d.get("http_hostname", "")),
+            "http_agent": d.get("http_agent", ""),
+            "tls_sni":    d.get("tls_sni", ""),
+            "hostname":   d.get("hostname", ""),
+            "mac":        d.get("mac", ""),
+        })
+        if len(connections) >= limit:
+            break
+
+    return jsonify({"ok": True, "connections": connections, "total": len(connections)})

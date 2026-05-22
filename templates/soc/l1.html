@@ -1,0 +1,739 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style nonce="{{ csp_nonce() }}">
+/* ═══════════════════════════════════════════════
+   SOC L1 — ALERT TRIAGE CONSOLE
+   Inspired by Elastic Security Alerts page
+═══════════════════════════════════════════════ */
+
+.soc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.soc-brand { font-size: 1.2rem; font-weight: 800; color: var(--text-color); }
+.soc-brand span { color: var(--primary); }
+.soc-analyst { font-size: .8rem; color: var(--muted); }
+
+/* KPI strip */
+.l1-kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.l1-kpi {
+  flex: 1; min-width: 110px; padding: 12px 16px;
+  background: var(--panel); border: 1px solid var(--border-color);
+  border-radius: 10px; text-align: center; box-shadow: var(--shadow-soft);
+}
+.l1-kpi-val { font-size: 1.6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.l1-kpi-lbl { font-size: .68rem; font-weight: 700; text-transform: uppercase;
+              letter-spacing: .06em; color: var(--muted); margin-top: 3px; }
+.kpi-new    { color: #ef4444; }
+.kpi-ack    { color: #10b981; }
+.kpi-esc    { color: #f59e0b; }
+.kpi-fp     { color: #94a3b8; }
+
+/* Toolbar */
+.l1-toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 14px;
+  background: var(--panel); border: 1px solid var(--border-color);
+  border-radius: 10px 10px 0 0; border-bottom: none; margin-bottom: 0;
+}
+.l1-filter-pill {
+  padding: 3px 11px; border-radius: 99px; font-size: .72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
+  border: 1px solid var(--border-color); background: var(--border-color-soft);
+  color: var(--secondary); transition: all .12s; user-select: none;
+}
+.l1-filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+.l1-filter-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.l1-filter-pill[data-status="new"].active         { background:#ef4444; border-color:#ef4444; }
+.l1-filter-pill[data-status="acknowledged"].active { background:#10b981; border-color:#10b981; }
+.l1-filter-pill[data-status="escalated"].active   { background:#f59e0b; border-color:#f59e0b; }
+.l1-filter-pill[data-status="false_positive"].active { background:#64748b; border-color:#64748b; }
+
+.l1-refresh-ctrl { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #10b981; animation: lm-pulse 1.8s ease-in-out infinite;
+}
+.live-dot.paused { background: var(--muted); animation: none; }
+@keyframes lm-pulse { 0%,100%{box-shadow:0 0 0 2px rgba(16,185,129,.2)} 50%{box-shadow:0 0 0 5px rgba(16,185,129,.06)} }
+
+/* Main split layout */
+.l1-workspace {
+  display: grid; grid-template-columns: 1fr 420px; gap: 0;
+  border: 1px solid var(--border-color); border-radius: 0 0 10px 10px;
+  overflow: hidden; min-height: 600px;
+}
+
+/* Alert queue (left) */
+.l1-queue {
+  background: var(--panel); border-right: 1px solid var(--border-color);
+  overflow-y: auto; max-height: 640px;
+}
+.l1-queue-header {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--border-color-soft);
+  padding: 7px 14px;
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  border-bottom: 1px solid var(--border-color);
+  display: grid;
+  grid-template-columns: 10px 68px 52px 1fr 80px 88px;
+  gap: 8px; align-items: center;
+}
+.l1-alert-row {
+  display: grid;
+  grid-template-columns: 10px 68px 52px 1fr 80px 88px;
+  gap: 8px; align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  cursor: pointer; transition: background .1s;
+  font-size: .82rem;
+}
+[data-theme="dark"] .l1-alert-row { border-bottom-color: rgba(255,255,255,.04); }
+.l1-alert-row:hover { background: var(--border-color-soft); }
+.l1-alert-row.selected { background: rgba(0,180,160,.08); border-left: 3px solid var(--primary); }
+.l1-alert-row.sev-critical { border-left: 3px solid #ef4444; }
+.l1-alert-row.sev-high     { border-left: 3px solid #f97316; }
+.l1-alert-row.sev-medium   { border-left: 2px solid #eab308; }
+.l1-alert-row.sev-low      { border-left: 2px solid #3b82f6; }
+.l1-alert-row.selected.sev-critical { border-left: 4px solid var(--primary); }
+
+.status-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dot-new    { background: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,.25); animation: pulse-red 2s infinite; }
+.dot-ack    { background: #10b981; }
+.dot-esc    { background: #f59e0b; }
+.dot-fp     { background: #94a3b8; }
+@keyframes pulse-red { 0%,100%{box-shadow:0 0 0 2px rgba(239,68,68,.25)} 50%{box-shadow:0 0 0 5px rgba(239,68,68,.06)} }
+
+.sev-badge {
+  display: inline-block; padding: 1px 5px; border-radius: 4px;
+  font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+}
+.sev-critical { background: #ef4444; color: #fff; }
+.sev-high     { background: #f97316; color: #fff; }
+.sev-medium   { background: #eab308; color: #000; }
+.sev-low      { background: #3b82f6; color: #fff; }
+.sev-info     { background: #1e3a5f; color: #94a3b8; }
+
+.status-chip {
+  display: inline-block; padding: 1px 7px; border-radius: 99px;
+  font-size: .62rem; font-weight: 700; text-transform: uppercase; white-space: nowrap;
+}
+.chip-new  { background: rgba(239,68,68,.12); color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
+.chip-ack  { background: rgba(16,185,129,.12); color: #10b981; border: 1px solid rgba(16,185,129,.3); }
+.chip-esc  { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+.chip-fp   { background: rgba(100,116,139,.12); color: #94a3b8; border: 1px solid rgba(100,116,139,.3); }
+
+/* Detail panel (right) */
+.l1-detail {
+  background: var(--bg); display: flex; flex-direction: column;
+  overflow-y: auto; max-height: 640px;
+}
+.l1-detail-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .88rem; gap: 10px;
+}
+.l1-detail-empty i { font-size: 2.5rem; opacity: .3; }
+.l1-detail-body { padding: 18px 20px; flex: 1; }
+.detail-sev-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.detail-sev-icon { font-size: 1.8rem; }
+.detail-title { font-size: 1.05rem; font-weight: 700; color: var(--text-color); }
+.detail-subtitle { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+
+.detail-field-grid {
+  display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px;
+  font-size: .82rem; margin-bottom: 16px;
+}
+.detail-field-lbl { color: var(--muted); font-weight: 600; font-size: .75rem;
+                    text-transform: uppercase; letter-spacing: .04em; align-self: start; padding-top: 2px; }
+.detail-field-val { color: var(--text-color); word-break: break-all; font-family: ui-monospace, monospace; font-size: .78rem; }
+
+.detail-summary-box {
+  background: var(--panel); border: 1px solid var(--border-color);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: .83rem; color: var(--text-color); line-height: 1.5;
+}
+
+.l1-action-bar {
+  padding: 14px 20px; border-top: 1px solid var(--border-color);
+  background: var(--panel); display: flex; gap: 8px; flex-wrap: wrap;
+}
+
+.l1-empty { padding: 40px; text-align: center; color: var(--muted); }
+
+/* SOC Suite nav strip */
+.soc-suite-nav {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 9px 16px; margin-bottom: 14px;
+  background: var(--panel); border: 1px solid var(--border-color); border-radius: 10px; font-size: .8rem;
+}
+.soc-suite-label { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-right: 8px; }
+.soc-nav-step {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px;
+  font-weight: 600; border: 1px solid var(--border-color); cursor: pointer;
+  text-decoration: none; transition: all .12s; color: var(--secondary); background: var(--border-color-soft);
+}
+.soc-nav-step:hover { border-color: var(--primary); color: var(--primary); }
+.soc-nav-step.active   { background: rgba(0,180,160,.12); border-color: var(--primary); color: var(--primary); cursor: default; }
+.soc-nav-step.active-l1{ background: rgba(239,68,68,.1); border-color: #ef4444; color: #ef4444; cursor: default; }
+.soc-nav-step.active-l2{ background: rgba(139,92,246,.1); border-color: #8b5cf6; color: #8b5cf6; cursor: default; }
+.soc-nav-arrow { color: var(--muted); font-size: .65rem; }
+.soc-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; font-size: .62rem; font-weight: 800;
+}
+.badge-new  { background: #ef4444; color: #fff; }
+.badge-open { background: #8b5cf6; color: #fff; }
+.badge-crit { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="container-fluid px-3">
+
+  <!-- Header -->
+  <div class="soc-header">
+    <div>
+      <div class="soc-brand"><i class="fa-solid fa-eye me-2"></i>SOC <span>L1</span> — Alert Triage Console</div>
+      <div class="soc-analyst">
+        <i class="fa-solid fa-user me-1"></i>{{ session.get('username','Analyst') }}
+        &nbsp;·&nbsp; <span id="shiftTimer">Shift: 00:00</span>
+        &nbsp;·&nbsp; <span class="ext-640fb1f6" id="lastRefreshLabel"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOC Workflow Nav Strip -->
+  <div class="soc-suite-nav">
+    <span class="soc-suite-label"><i class="fa-solid fa-shield-halved me-1"></i>SOC Suite</span>
+    <a href="/status/system-logs" class="soc-nav-step">
+      <i class="fa-solid fa-list-ul"></i> SIEM
+      <span class="soc-count-badge badge-crit ext-cb458930" id="navSiemCount"></span>
+    </a>
+    <i class="fa-solid fa-chevron-right soc-nav-arrow"></i>
+    <span class="soc-nav-step active-l1">
+      <i class="fa-solid fa-eye"></i> L1 Triage
+      <span class="soc-count-badge badge-new ext-cb458930" id="navL1Count"></span>
+    </span>
+    <i class="fa-solid fa-chevron-right soc-nav-arrow"></i>
+    <a href="/soc/l2" class="soc-nav-step">
+      <i class="fa-solid fa-magnifying-glass-chart"></i> L2 Investigation
+      <span class="soc-count-badge badge-open ext-cb458930" id="navL2Count"></span>
+    </a>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="l1-kpis">
+    <div class="l1-kpi">
+      <div class="l1-kpi-val kpi-new" id="kpi-new">—</div>
+      <div class="l1-kpi-lbl"><i class="fa-solid fa-circle me-1"></i>New Alerts</div>
+    </div>
+    <div class="l1-kpi">
+      <div class="l1-kpi-val kpi-ack" id="kpi-ack">—</div>
+      <div class="l1-kpi-lbl"><i class="fa-solid fa-check me-1"></i>Acknowledged</div>
+    </div>
+    <div class="l1-kpi">
+      <div class="l1-kpi-val kpi-esc" id="kpi-esc">—</div>
+      <div class="l1-kpi-lbl"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Escalated</div>
+    </div>
+    <div class="l1-kpi">
+      <div class="l1-kpi-val kpi-fp" id="kpi-fp">—</div>
+      <div class="l1-kpi-lbl"><i class="fa-solid fa-xmark me-1"></i>False Positives</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="l1-toolbar">
+    <span class="ext-2c474518">FILTER</span>
+    <span class="l1-filter-pill active" data-status="all"           data-action="h_762c56dc54">All</span>
+    <span class="l1-filter-pill"        data-status="new"           data-action="h_1834bcb5f3">New</span>
+    <span class="l1-filter-pill"        data-status="acknowledged"  data-action="h_a235511843">Acknowledged</span>
+    <span class="l1-filter-pill"        data-status="escalated"     data-action="h_b83cb52319">Escalated</span>
+    <span class="l1-filter-pill"        data-status="false_positive" data-action="h_463ca76c90">False Positive</span>
+    <div class="l1-refresh-ctrl">
+      <div class="live-dot" id="liveDot"></div>
+      <span class="ext-87891c56" id="liveLabel">Live</span>
+      <select class="form-select form-select-sm ext-f012d0d4"
+              data-action-change="h_ce8f86124f">
+        <option value="5000" selected>5s</option>
+        <option value="10000">10s</option>
+        <option value="30000">30s</option>
+        <option value="0">Pause</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Main workspace: queue left, detail right -->
+  <div class="l1-workspace">
+
+    <!-- Alert Queue -->
+    <div class="l1-queue" id="alertQueue">
+      <div class="l1-queue-header">
+        <span></span>
+        <span>Time</span>
+        <span>Severity</span>
+        <span>Alert</span>
+        <span>Source</span>
+        <span>Status</span>
+      </div>
+      <div id="alertList">
+        <div class="l1-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading alerts…</div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div class="l1-detail" id="detailPanel">
+      <div class="l1-detail-empty" id="detailEmpty">
+        <i class="fa-solid fa-arrow-pointer"></i>
+        Select an alert to review
+      </div>
+      <div class="l1-detail-body ext-cb458930" id="detailBody"></div>
+      <div class="l1-action-bar ext-cb458930" id="actionBar">
+        <button class="btn btn-sm btn-success" id="btnAck" data-action="h_de603a771e">
+          <i class="fa-solid fa-check me-1"></i>Acknowledge
+        </button>
+        <button class="btn btn-sm btn-warning" id="btnEsc" data-action="h_48371fb25a">
+          <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Escalate to L2
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" id="btnFP" data-action="h_cdd36d1d1f">
+          <i class="fa-solid fa-xmark me-1"></i>False Positive
+        </button>
+        <a id="btnViewSiem" href="/status/system-logs" target="_blank"
+           class="btn btn-sm btn-outline-secondary ms-auto">
+          <i class="fa-solid fa-list-ul me-1"></i>View in SIEM
+        </a>
+        <span class="ext-eaf1a950" id="actionMsg"></span>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /container -->
+
+<!-- Escalate Modal -->
+<div class="modal fade" id="escalateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-arrow-up-right-from-square me-2 text-warning"></i>Escalate to L2</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Case Title <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="escTitle" placeholder="Brief description of the incident">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Severity</label>
+          <select class="form-select" id="escSeverity">
+            <option value="critical">Critical</option>
+            <option value="high" selected>High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Investigation Notes</label>
+          <textarea class="form-control" id="escNote" rows="3"
+                    placeholder="What did you observe? Why are you escalating?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span id="escError" class="text-danger me-auto ext-0de4e77b"></span>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning" id="escSubmitBtn" data-action="h_82c9d7b30a">
+          <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Escalate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const QUEUE_URL  = '/soc/api/l1/queue';
+const ACK_URL    = '/soc/api/l1/acknowledge';
+const ESC_URL    = '/soc/api/l1/escalate';
+const FP_URL     = '/soc/api/l1/false_positive';
+const csrf       = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+let allAlerts    = [];
+let selectedIdx  = -1;
+let activeFilter = 'all';
+let pollTimer    = null;
+let pollInterval = 5000;
+let modalOpen    = false;
+
+/* Helpers */
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const apiFetch = (url, opts={}) => {
+  opts.headers = Object.assign({'X-CSRF-Token': csrf, 'Content-Type':'application/json'}, opts.headers||{});
+  return fetch(url, opts);
+};
+
+/* Human-readable one-liner per event type (L1 triage format) */
+function buildSummary(e) {
+  const d = e.details || {};
+  switch (e.action) {
+    case 'brute_force_detected':
+      return `Brute Force: ${d.count||'?'} failed logins from ${esc(e.remote_addr||'?')} in ${d.window_minutes||5} min`;
+    case 'ids_flood_detected':
+      return `IDS Flood: ${d.count||'?'} hits from ${esc(e.remote_addr||'?')} (${esc(d.top_signature||'?')})`;
+    case 'ids_alert':
+      return `IDS: ${esc(d.signature||'Unknown signature')} — ${esc(d.src_ip||e.remote_addr)}→${esc(d.dest_ip)}:${esc(d.dest_port||'?')}`;
+    case 'ssh_login_failed':
+      return `SSH Failed: user <strong>${esc(d.user||'?')}</strong> via ${esc(d.method||'?')} from ${esc(d.src_ip||e.remote_addr)}`;
+    case 'ssh_login_success':
+      return `SSH Login: user <strong>${esc(d.user||'?')}</strong> from ${esc(d.src_ip||e.remote_addr)}`;
+    case 'su_attempt_failed':
+      return `BAD SU: ${esc(d.from_user||'?')} → ${esc(d.to_user||'?')}`;
+    case 'insecure_protocol_detected':
+      return `Insecure Protocol: <strong>${esc(d.protocol||'?')}</strong> from ${esc(d.hostname||d.src||'?')} → ${esc(d.dst||'?')}`;
+    case 'login_failed':
+      return `Portal: Failed login for <strong>${esc(d.username||e.username||'?')}</strong> from ${esc(e.remote_addr||'?')}`;
+    case 'login_blocked_user_lockout':
+      return `Account Locked: <strong>${esc(e.username||'?')}</strong> after ${d.failures||'?'} failures from ${esc(e.remote_addr||'?')}`;
+    case 'kernel_panic':
+      return `KERNEL PANIC: ${esc((d.message||'').slice(0,80))}`;
+    case 'pf_table_overload':
+      return `PF Table Overload: ${esc((d.message||'').slice(0,80))}`;
+    case 'out_of_memory':
+      return `Out of Memory: ${esc((d.message||'').slice(0,80))}`;
+    case 'link_state_change':
+      return `Link ${esc(d.state||'?')}: interface <strong>${esc(d.interface||'?')}</strong>`;
+    default:
+      return (e.action||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  }
+}
+
+function alertTitle(e) {
+  const labels = {
+    brute_force_detected:'Brute Force Attack', ids_alert:'IDS Alert',
+    ids_flood_detected:'IDS Flood', ssh_login_failed:'SSH Login Failed',
+    ssh_login_success:'SSH Login', su_attempt_failed:'SU Escalation Failed',
+    insecure_protocol_detected:'Insecure Protocol', login_failed:'Login Failed',
+    login_blocked_user_lockout:'Account Lockout', kernel_panic:'Kernel Panic',
+    pf_table_overload:'PF Table Overload', out_of_memory:'Out of Memory',
+    link_state_change:'Link State Changed',
+  };
+  return labels[e.action] || (e.action||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function statusChip(a) {
+  if (!a) return '<span class="status-chip chip-new">NEW</span>';
+  if (a === 'acknowledged')  return '<span class="status-chip chip-ack">ACK ✓</span>';
+  if (a === 'escalated')     return `<span class="status-chip chip-esc">ESC ↑</span>`;
+  if (a === 'false_positive') return '<span class="status-chip chip-fp">FP ✗</span>';
+  return `<span class="status-chip">${esc(a)}</span>`;
+}
+
+function statusDotClass(a) {
+  if (!a) return 'status-dot dot-new';
+  if (a === 'acknowledged')   return 'status-dot dot-ack';
+  if (a === 'escalated')      return 'status-dot dot-esc';
+  if (a === 'false_positive') return 'status-dot dot-fp';
+  return 'status-dot dot-new';
+}
+
+/* Render the alert queue */
+function renderQueue() {
+  const list = document.getElementById('alertList');
+  if (!allAlerts.length) {
+    list.innerHTML = '<div class="l1-empty"><i class="fa-solid fa-shield-check fa-lg me-2 text-success"></i>No alerts match the current filter.</div>';
+    return;
+  }
+  list.innerHTML = allAlerts.map((e, i) => {
+    const sev  = (e.severity||'info').toLowerCase();
+    const ts   = (e.timestamp||'').slice(11,19);
+    const sel  = i === selectedIdx ? ' selected' : '';
+    return `<div class="l1-alert-row sev-${sev}${sel}" data-action="h_c6f02b47c6">
+      <div class="${statusDotClass(e.action_status)}"></div>
+      <span class="ext-65586f03">${esc(ts)}</span>
+      <span class="sev-badge sev-${sev}">${sev.slice(0,4).toUpperCase()}</span>
+      <span class="ext-cf5dac8a">${esc(alertTitle(e))}</span>
+      <span class="ext-0179fe48">${esc(e.remote_addr||'—')}</span>
+      ${statusChip(e.action_status)}
+    </div>`;
+  }).join('');
+
+  // Re-highlight selected row after re-render
+  if (selectedIdx >= 0) {
+    const rows = list.querySelectorAll('.l1-alert-row');
+    if (rows[selectedIdx]) rows[selectedIdx].scrollIntoView({block:'nearest'});
+  }
+}
+
+/* Populate the detail panel */
+function selectAlert(idx) {
+  selectedIdx = idx;
+  const e = allAlerts[idx];
+  if (!e) return;
+
+  // Update row selection highlight
+  document.querySelectorAll('.l1-alert-row').forEach((r,i) => {
+    r.classList.toggle('selected', i === idx);
+  });
+
+  const sev   = (e.severity||'info').toLowerCase();
+  const icons = {critical:'🔴', high:'🟠', medium:'🟡', low:'🔵', info:'⚪'};
+  const d     = e.details || {};
+
+  // Build field rows
+  const fields = [];
+  if (e.remote_addr)    fields.push(['Source IP',   e.remote_addr]);
+  if (d.src_ip && d.src_ip !== e.remote_addr) fields.push(['Src IP (detail)', d.src_ip]);
+  if (d.dest_ip)        fields.push(['Dest IP',     d.dest_ip]);
+  if (d.dest_port)      fields.push(['Dest Port',   d.dest_port]);
+  if (d.user)           fields.push(['User',        d.user]);
+  if (d.hostname)       fields.push(['Hostname',    d.hostname]);
+  if (d.mac)            fields.push(['MAC',         d.mac]);
+  if (d.signature)      fields.push(['Signature',   d.signature]);
+  if (d.method)         fields.push(['Auth Method', d.method]);
+  if (d.interface)      fields.push(['Interface',   d.interface]);
+  if (d.protocol)       fields.push(['Protocol',    d.protocol]);
+  if (e.username && e.username !== 'siem') fields.push(['Username', e.username]);
+  fields.push(['Category',   e.category||'—']);
+  fields.push(['Timestamp',  (e.timestamp||'').slice(0,19).replace('T',' ')]);
+
+  const fieldRows = fields.map(([k,v]) =>
+    `<span class="detail-field-lbl">${esc(k)}</span><span class="detail-field-val">${esc(String(v))}</span>`
+  ).join('');
+
+  document.getElementById('detailBody').innerHTML = `
+    <div class="detail-sev-header">
+      <div class="detail-sev-icon">${icons[sev]||'⚪'}</div>
+      <div>
+        <div class="detail-title">${esc(alertTitle(e))}</div>
+        <div class="detail-subtitle">${esc(e.category||'')} · <span class="sev-badge sev-${sev}">${sev.toUpperCase()}</span>
+          ${e.action_status ? ' · ' + statusChip(e.action_status) : ''}
+        </div>
+      </div>
+    </div>
+    <div class="detail-summary-box">${buildSummary(e)}</div>
+    <div class="detail-field-grid">${fieldRows}</div>
+    <details class="ext-eac8f080">
+      <summary class="ext-5582292b">Raw JSON</summary>
+      <pre class="ext-e9227c6a">${esc(JSON.stringify(e, null, 2))}</pre>
+    </details>`;
+
+  document.getElementById('detailEmpty').style.display = 'none';
+  document.getElementById('detailBody').style.display  = 'block';
+  document.getElementById('actionBar').style.display   = '';
+  document.getElementById('actionMsg').textContent     = '';
+
+  // Point "View in SIEM" to this event's source IP
+  const siemBtn = document.getElementById('btnViewSiem');
+  if (siemBtn) {
+    const ip = e.remote_addr || (e.details||{}).src_ip || '';
+    siemBtn.href = '/status/system-logs' + (ip ? '?ip=' + encodeURIComponent(ip) : '');
+  }
+
+  // Pre-fill escalate modal
+  const escTitle = document.getElementById('escTitle');
+  if (escTitle) {
+    escTitle.value = alertTitle(e) + ' — ' + (e.remote_addr||'unknown source');
+    document.getElementById('escSeverity').value = sev === 'critical' ? 'critical' : sev === 'high' ? 'high' : 'medium';
+  }
+}
+
+/* Load the queue from API */
+async function loadQueue() {
+  try {
+    document.getElementById('liveDot').classList.add('active');
+    const url = `${QUEUE_URL}?status=${activeFilter}&limit=300`;
+    const r   = await fetch(url);
+    const d   = await r.json();
+    document.getElementById('liveDot').classList.remove('active');
+    if (!d.ok) return;
+
+    allAlerts = d.events || [];
+    renderQueue();
+    updateKPIs(allAlerts);
+
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('lastRefreshLabel').textContent = `Last refresh: ${now}`;
+    document.getElementById('liveLabel').textContent = 'Live';
+    document.getElementById('liveDot').style.background = '#10b981';
+    document.getElementById('liveDot').classList.remove('paused');
+  } catch(_) {
+    document.getElementById('liveDot').style.background = '#ef4444';
+    document.getElementById('liveLabel').textContent = 'Error';
+  }
+}
+
+function updateKPIs(events) {
+  // Always fetch all statuses for KPI accuracy
+  fetch(`${QUEUE_URL}?status=all&limit=500`)
+    .then(r => r.json())
+    .then(d => {
+      const all = d.events || [];
+      const count = s => all.filter(e => (e.action_status||null) === s).length;
+      document.getElementById('kpi-new').textContent = count(null);
+      document.getElementById('kpi-ack').textContent = count('acknowledged');
+      document.getElementById('kpi-esc').textContent = count('escalated');
+      document.getElementById('kpi-fp').textContent  = count('false_positive');
+    }).catch(_=>{});
+}
+
+/* Filter */
+function setFilter(el) {
+  document.querySelectorAll('.l1-filter-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  activeFilter = el.dataset.status;
+  selectedIdx  = -1;
+  document.getElementById('detailEmpty').style.display = '';
+  document.getElementById('detailBody').style.display  = 'none';
+  document.getElementById('actionBar').style.display   = 'none';
+  loadQueue();
+}
+
+/* Poll interval */
+function setInterval_(ms) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollInterval = ms;
+  if (ms === 0) {
+    pollTimer = null;
+    document.getElementById('liveLabel').textContent = 'Paused';
+    document.getElementById('liveDot').classList.add('paused');
+  } else {
+    document.getElementById('liveLabel').textContent = 'Live';
+    document.getElementById('liveDot').classList.remove('paused');
+    pollTimer = setInterval(loadQueue, ms);
+  }
+}
+
+/* Actions */
+async function doAcknowledge() {
+  const e = allAlerts[selectedIdx]; if (!e) return;
+  const msg = document.getElementById('actionMsg');
+  msg.textContent = 'Saving…';
+  const r = await apiFetch(ACK_URL, {method:'POST', body: JSON.stringify({
+    event_uuid: e.event_uuid || '',
+    event_key:  e.timestamp,
+    event_action: e.action,
+  })});
+  const d = await r.json();
+  if (d.ok) { msg.textContent = 'Acknowledged ✓'; allAlerts[selectedIdx].action_status = 'acknowledged'; renderQueue(); selectAlert(selectedIdx); }
+  else       { msg.textContent = 'Error: ' + (d.message||'failed'); }
+}
+
+async function doFalsePositive() {
+  const e = allAlerts[selectedIdx]; if (!e) return;
+  const msg = document.getElementById('actionMsg');
+  msg.textContent = 'Saving…';
+  const r = await apiFetch(FP_URL, {method:'POST', body: JSON.stringify({
+    event_uuid: e.event_uuid || '',
+    event_key:  e.timestamp,
+    event_action: e.action,
+  })});
+  const d = await r.json();
+  if (d.ok) { msg.textContent = 'Marked as False Positive ✗'; allAlerts[selectedIdx].action_status = 'false_positive'; renderQueue(); selectAlert(selectedIdx); }
+  else       { msg.textContent = 'Error: ' + (d.message||'failed'); }
+}
+
+function openEscalateModal() {
+  if (selectedIdx < 0) return;
+  modalOpen = true;
+  if (pollTimer) clearInterval(pollTimer);
+  document.getElementById('escError').textContent = '';
+  new bootstrap.Modal(document.getElementById('escalateModal')).show();
+}
+
+document.getElementById('escalateModal').addEventListener('hidden.bs.modal', () => {
+  modalOpen = false;
+  if (pollInterval > 0) pollTimer = setInterval(loadQueue, pollInterval);
+});
+
+async function doEscalate() {
+  const e     = allAlerts[selectedIdx]; if (!e) return;
+  const title = document.getElementById('escTitle').value.trim();
+  if (!title) { document.getElementById('escError').textContent = 'Title is required.'; return; }
+  const btn = document.getElementById('escSubmitBtn');
+  btn.disabled = true;
+  const r = await apiFetch(ESC_URL, {method:'POST', body: JSON.stringify({
+    event_uuid:   e.event_uuid || '',
+    event_key:    e.timestamp,
+    event_action: e.action,
+    title,
+    severity:     document.getElementById('escSeverity').value,
+    note:         document.getElementById('escNote').value.trim(),
+    source_event: e,
+  })});
+  const d = await r.json();
+  btn.disabled = false;
+  if (d.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('escalateModal')).hide();
+    allAlerts[selectedIdx].action_status = 'escalated';
+    allAlerts[selectedIdx].case_id       = d.case_id;
+    document.getElementById('actionMsg').innerHTML =
+      `Escalated &rarr; <a href="/soc/l2?case_id=${d.case_id}"
+       class="btn btn-warning ms-1 ext-2a072448">
+       Open Case #${d.case_id} in L2 &rarr;</a>`;
+    renderQueue(); selectAlert(selectedIdx);
+  } else {
+    document.getElementById('escError').textContent = d.message||'Failed';
+  }
+}
+
+/* Shift timer */
+const shiftStart = Date.now();
+setInterval(() => {
+  const elapsed = Math.floor((Date.now() - shiftStart) / 1000);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  document.getElementById('shiftTimer').textContent =
+    `Shift: ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}, 1000);
+
+/* ── SOC nav strip live counts ── */
+async function updateSocNavCounts() {
+  try {
+    const r = await fetch('/soc/api/l1/queue?status=new&limit=1');
+    const d = await r.json();
+    const b = document.getElementById('navL1Count');
+    if (b) { if (d.count > 0) { b.textContent = d.count; b.style.display = ''; } else b.style.display = 'none'; }
+  } catch(_) {}
+  try {
+    const r = await fetch('/status/api/siem/cases?status=open&limit=1');
+    const d = await r.json();
+    const b = document.getElementById('navL2Count');
+    if (b) { if (d.total > 0) { b.textContent = d.total; b.style.display = ''; } else b.style.display = 'none'; }
+  } catch(_) {}
+  try {
+    const r = await fetch('/status/api/logs/stats');
+    const d = await r.json();
+    const b = document.getElementById('navSiemCount');
+    if (b) { const n = (d._critical||0) + (d._high||0); if (n > 0) { b.textContent = n; b.style.display = ''; } else b.style.display = 'none'; }
+  } catch(_) {}
+}
+updateSocNavCounts();
+setInterval(updateSocNavCounts, 30000);
+
+/* Boot */
+loadQueue();
+pollTimer = setInterval(loadQueue, pollInterval);
+</script>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_762c56dc54'] = function (event, el) { setFilter(this) };
+  R['h_1834bcb5f3'] = function (event, el) { setFilter(this) };
+  R['h_a235511843'] = function (event, el) { setFilter(this) };
+  R['h_b83cb52319'] = function (event, el) { setFilter(this) };
+  R['h_463ca76c90'] = function (event, el) { setFilter(this) };
+  R['h_ce8f86124f'] = function (event, el) { setInterval_(+this.value) };
+  R['h_de603a771e'] = function (event, el) { doAcknowledge() };
+  R['h_48371fb25a'] = function (event, el) { openEscalateModal() };
+  R['h_cdd36d1d1f'] = function (event, el) { doFalsePositive() };
+  R['h_82c9d7b30a'] = function (event, el) { doEscalate() };
+  R['h_c6f02b47c6'] = function (event, el) { selectAlert(${i}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

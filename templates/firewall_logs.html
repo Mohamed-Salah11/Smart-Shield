@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style nonce="{{ csp_nonce() }}">
+.fwl-bar       { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+                 padding:10px 14px; background:var(--panel);
+                 border:1px solid var(--border-color); border-radius:10px 10px 0 0;
+                 border-bottom:none; }
+.fwl-bar input, .fwl-bar select {
+                 height:32px; padding:0 10px; font-size:.82rem;
+                 border:1px solid var(--border-color); border-radius:7px;
+                 background:var(--border-color-soft); color:var(--text-color); }
+.fwl-bar input:focus, .fwl-bar select:focus {
+                 outline:none; border-color:var(--primary);
+                 box-shadow:0 0 0 3px rgba(37,99,235,.1); background:var(--panel); }
+.fwl-actions   { display:flex; gap:8px; flex-wrap:wrap; }
+.fwl-actions button {
+                 height:32px; padding:0 12px; border-radius:6px; font-size:.78rem;
+                 font-weight:600; border:1px solid var(--border-color);
+                 background:var(--border-color-soft); color:var(--text-color);
+                 cursor:pointer; }
+.fwl-actions button.primary { background:var(--primary); color:#fff;
+                              border-color:var(--primary); }
+.fwl-actions button:hover  { background:var(--primary-soft); color:var(--primary); }
+
+.fwl-stats     { display:flex; gap:10px; flex-wrap:wrap; padding:10px 14px;
+                 background:var(--panel); border:1px solid var(--border-color);
+                 border-top:none; border-bottom:none; }
+.fwl-tot-card  { background:var(--bg); border:1px solid var(--border-color);
+                 border-radius:8px; padding:8px 14px; min-width:120px; }
+.fwl-tot-label { font-size:.65rem; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.05em; color:var(--muted); }
+.fwl-tot-val   { font-size:1.4rem; font-weight:700; line-height:1.1; margin-top:2px; }
+.fwl-tot-pass   .fwl-tot-val { color:#10b981; }
+.fwl-tot-block  .fwl-tot-val { color:#ef4444; }
+.fwl-tot-reject .fwl-tot-val { color:#f59e0b; }
+
+.fwl-wrap      { background:var(--panel); border:1px solid var(--border-color);
+                 border-radius:0 0 10px 10px; overflow:hidden; }
+.fwl-table     { width:100%; border-collapse:collapse; font-size:.78rem; }
+.fwl-table th, .fwl-table td {
+                 padding:6px 10px; border-bottom:1px solid var(--border-color);
+                 text-align:left; white-space:nowrap; }
+.fwl-table th  { background:var(--border-color-soft); font-weight:700;
+                 font-size:.7rem; text-transform:uppercase;
+                 letter-spacing:.04em; color:var(--muted); }
+.fwl-table tr.row-block  td { background:rgba(239,68,68,.06); }
+.fwl-table tr.row-reject td { background:rgba(245,158,11,.06); }
+
+.fwl-badge     { display:inline-block; padding:1px 7px; border-radius:99px;
+                 font-size:.66rem; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.04em; }
+.fwl-badge.pass   { background:rgba(16,185,129,.18); color:#10b981; }
+.fwl-badge.block  { background:rgba(239,68,68,.18);  color:#ef4444; }
+.fwl-badge.reject { background:rgba(245,158,11,.18); color:#f59e0b; }
+.fwl-badge.in     { background:rgba(59,130,246,.18); color:#3b82f6; }
+.fwl-badge.out    { background:rgba(168,85,247,.18); color:#a855f7; }
+.fwl-badge.src-user_rule       { background:rgba(99,102,241,.18); color:#6366f1; }
+.fwl-badge.src-default_deny    { background:rgba(220,38,38,.18);  color:#dc2626; }
+.fwl-badge.src-captive_portal  { background:rgba(234,88,12,.18);  color:#ea580c; }
+.fwl-badge.src-content_policy  { background:rgba(13,148,136,.18); color:#0d9488; }
+.fwl-badge.src-hardening       { background:rgba(101,163,13,.18); color:#65a30d; }
+.fwl-badge.src-admin           { background:rgba(37,99,235,.18);  color:#2563eb; }
+.fwl-badge.src-ids             { background:rgba(190,18,60,.18);  color:#be123c; }
+.fwl-badge.src-soc             { background:rgba(124,58,237,.18); color:#7c3aed; }
+.fwl-badge.src-external_or_unlabeled { background:rgba(148,163,184,.22); color:#64748b; }
+
+.fwl-pager     { padding:8px 14px; display:flex; justify-content:space-between;
+                 align-items:center; gap:8px; border-top:1px solid var(--border-color);
+                 background:var(--panel); }
+.fwl-msg       { color:var(--muted); font-size:.78rem; }
+.fwl-mono      { font-family:ui-monospace,Menlo,monospace; font-size:.74rem; }
+
+.fwl-toplists  { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+                 gap:10px; padding:10px 14px; background:var(--panel);
+                 border:1px solid var(--border-color); border-top:none; }
+.fwl-top-card  { background:var(--bg); border:1px solid var(--border-color);
+                 border-radius:8px; padding:8px 12px; }
+.fwl-top-title { font-size:.7rem; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.04em; color:var(--muted); margin-bottom:6px; }
+.fwl-top-row   { display:flex; justify-content:space-between; font-size:.78rem;
+                 padding:2px 0; border-bottom:1px dashed var(--border-color); }
+.fwl-top-row:last-child { border-bottom:none; }
+
+.fwl-table tbody tr { cursor:pointer; }
+.fwl-table tbody tr:hover td { background:rgba(37,99,235,.06); }
+
+.fwl-drawer       { position:fixed; top:0; right:0; bottom:0; width:480px;
+                    max-width:90vw; background:var(--panel);
+                    border-left:1px solid var(--border-color);
+                    box-shadow:-8px 0 16px rgba(0,0,0,.18);
+                    transform:translateX(100%); transition:transform .18s ease;
+                    z-index:50; display:flex; flex-direction:column; }
+.fwl-drawer.open  { transform:translateX(0); }
+.fwl-drawer-head  { display:flex; justify-content:space-between; align-items:center;
+                    padding:14px 16px; border-bottom:1px solid var(--border-color); }
+.fwl-drawer-head h3 { margin:0; font-size:.96rem; }
+.fwl-drawer-close { background:none; border:none; font-size:1.2rem; cursor:pointer;
+                    color:var(--muted); }
+.fwl-drawer-body  { padding:14px 16px; overflow:auto; flex:1;
+                    font-size:.82rem; }
+.fwl-drawer-row   { display:flex; gap:8px; padding:4px 0;
+                    border-bottom:1px dashed var(--border-color); }
+.fwl-drawer-row .k { color:var(--muted); min-width:120px; font-weight:600; }
+.fwl-drawer-row .v { word-break:break-all; font-family:ui-monospace,Menlo,monospace; }
+.fwl-drawer-raw   { margin-top:14px; padding:10px; background:var(--bg);
+                    border-radius:6px; border:1px solid var(--border-color);
+                    font-family:ui-monospace,Menlo,monospace; font-size:.74rem;
+                    white-space:pre-wrap; word-break:break-all; }
+.fwl-drawer-why   { margin-top:12px; padding:10px; border-radius:6px;
+                    background:rgba(13,148,136,.08); border:1px solid rgba(13,148,136,.3);
+                    font-size:.78rem; color:#0d9488; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ext-75f111c7">
+  <h2 class="ext-1386d503">Firewall Logs</h2>
+  <span class="fwl-msg" id="liveStatus">Loading…</span>
+</div>
+
+<form id="fwlFilterForm" class="fwl-bar" data-action-submit="h_5ed465eff2">
+  <input class="ext-4f0489cb" type="text"   id="search"   placeholder="Search source IP, host, rule…">
+  <select id="action">
+    <option value="">Action (any)</option>
+    <option value="block">Block</option>
+    <option value="pass">Pass</option>
+    <option value="reject">Reject</option>
+  </select>
+  <select id="direction">
+    <option value="">Direction (any)</option>
+    <option value="in">In</option>
+    <option value="out">Out</option>
+  </select>
+  <select id="protocol">
+    <option value="">Protocol (any)</option>
+    <option value="tcp">TCP</option>
+    <option value="udp">UDP</option>
+    <option value="icmp">ICMP</option>
+    <option value="icmp6">ICMPv6</option>
+    <option value="esp">ESP</option>
+    <option value="gre">GRE</option>
+  </select>
+  <input class="ext-39248fe8" type="text"   id="interface" placeholder="Interface (em0, em1…)">
+  <input class="ext-2f01efdd" type="text"   id="src_ip"    placeholder="Source IP">
+  <input class="ext-2f01efdd" type="text"   id="dst_ip"    placeholder="Destination IP">
+  <input class="ext-ee0435f7" type="number" id="dst_port"  placeholder="Dst port" min="0" max="65535">
+  <input class="ext-c78f4943" type="text"   id="rule_id"   placeholder="Rule ID">
+  <select id="policy_source" title="Filter by which policy emitted the rule">
+    <option value="">Source (any)</option>
+    <option value="user_rule">User rule</option>
+    <option value="default_deny">Default deny</option>
+    <option value="captive_portal">Captive portal</option>
+    <option value="content_policy">Content policy</option>
+    <option value="hardening">Hardening</option>
+    <option value="admin">Admin</option>
+    <option value="ids">IDS</option>
+    <option value="soc">SOC</option>
+    <option value="external_or_unlabeled">Unlabeled / external</option>
+  </select>
+  <div class="fwl-actions ext-83456371">
+    <button class="primary" id="applyBtn"  data-action="h_464859ba1f">Apply</button>
+    <button id="clearBtn"  data-action="h_20d834b3d7">Clear</button>
+    <button id="exportBtn" data-action="h_34c3cecdef">Export CSV</button>
+  </div>
+</form>
+
+<div class="fwl-stats">
+  <div class="fwl-tot-card fwl-tot-pass">
+    <div class="fwl-tot-label">Pass</div>
+    <div class="fwl-tot-val" id="totPass">0</div>
+  </div>
+  <div class="fwl-tot-card fwl-tot-block">
+    <div class="fwl-tot-label">Block</div>
+    <div class="fwl-tot-val" id="totBlock">0</div>
+  </div>
+  <div class="fwl-tot-card fwl-tot-reject">
+    <div class="fwl-tot-label">Reject</div>
+    <div class="fwl-tot-val" id="totReject">0</div>
+  </div>
+  <div class="fwl-tot-card">
+    <div class="fwl-tot-label">Matched rows</div>
+    <div class="fwl-tot-val" id="totMatched">0</div>
+  </div>
+</div>
+
+<div class="fwl-toplists" id="topLists"></div>
+
+<div class="fwl-wrap">
+  <table class="fwl-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Action</th>
+        <th>Dir</th>
+        <th>Iface</th>
+        <th>Proto</th>
+        <th>Source</th>
+        <th>Destination</th>
+        <th>Flags</th>
+        <th>Rule</th>
+        <th>Source</th>
+        <th>Host</th>
+      </tr>
+    </thead>
+    <tbody id="fwlBody">
+      <tr><td colspan="11" class="fwl-msg">No firewall events yet — generate traffic and refresh.</td></tr>
+    </tbody>
+  </table>
+  <div class="fwl-pager">
+    <div class="fwl-msg" id="pageInfo">—</div>
+    <div class="fwl-actions">
+      <button id="prevBtn" data-action="h_c378eaa479" disabled>← Prev</button>
+      <button id="nextBtn" data-action="h_7792b64127" disabled>Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Row-detail drawer (Wave L) — slides in when a row is clicked. -->
+<aside id="fwlDrawer" class="fwl-drawer" aria-hidden="true">
+  <div class="fwl-drawer-head">
+    <h3>Firewall event detail</h3>
+    <button class="fwl-drawer-close" data-action="h_bd554ab9a4">×</button>
+  </div>
+  <div class="fwl-drawer-body" id="fwlDrawerBody"></div>
+</aside>
+
+<script nonce="{{ csp_nonce() }}">
+const FWL_LIST_URL   = "{{ url_for('firewall_logs.api_list') }}";
+const FWL_STATS_URL  = "{{ url_for('firewall_logs.api_stats') }}";
+const FWL_EXPORT_URL = "{{ url_for('firewall_logs.api_export') }}";
+
+let offset = 0;
+const LIMIT = 100;
+let lastTotal = 0;
+let lastRows = [];
+
+const POLICY_EXPLAIN = {
+  user_rule:       "Matched a user-defined firewall rule (Floating/WAN/LAN). The rule_id field identifies which.",
+  default_deny:    "Caught by the default-deny tail. No earlier user rule matched.",
+  captive_portal:  "Captive-portal anchor (e.g. block_unauth / allow_portal_http). Detail tells you which branch.",
+  content_policy:  "Content-policy enforcement (DNS-egress block, QUIC block, etc.) — see detail.",
+  hardening:       "Hardening rule (bogon / private-net block on WAN, antispoof, etc.).",
+  admin:           "Admin-UI rule (allow_admin_https, block_lan_to_gunicorn, allow_local_gunicorn, soc_portal).",
+  ids:             "Triggered by an IDS-populated table (ss_ids_blocks). Suricata signature caused the block.",
+  soc:             "Source IP is on the SOC blocklist — analyst pushed it via the L3 quick-block action.",
+  external_or_unlabeled: "PF rule has no Smart Shield label (third-party anchor, manual edit, or pre-label install).",
+};
+
+function htmlEscape(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function currentFilters() {
+  const f = new URLSearchParams();
+  for (const id of ["search","action","direction","protocol","interface",
+                    "src_ip","dst_ip","dst_port","rule_id","policy_source"]) {
+    const v = document.getElementById(id).value.trim();
+    if (v) f.set(id, v);
+  }
+  return f;
+}
+
+async function loadList() {
+  const f = currentFilters();
+  f.set("limit", LIMIT);
+  f.set("offset", offset);
+  const r = await fetch(FWL_LIST_URL + "?" + f.toString(), {credentials:"same-origin"});
+  if (!r.ok) {
+    document.getElementById("liveStatus").textContent = "List request failed (" + r.status + ")";
+    return;
+  }
+  const d = await r.json();
+  lastTotal = d.total || 0;
+  document.getElementById("totMatched").textContent = lastTotal.toLocaleString();
+  renderRows(d.rows || []);
+  renderPager();
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById("fwlBody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="fwl-msg">No matching events.</td></tr>';
+    return;
+  }
+  lastRows = rows;
+  const html = rows.map((r, idx) => {
+    const src = (r.src_ip || "") + (r.src_port ? ":"+r.src_port : "");
+    const dst = (r.dst_ip || "") + (r.dst_port ? ":"+r.dst_port : "");
+    const cls = r.action === "block"  ? "row-block"
+              : r.action === "reject" ? "row-reject" : "";
+    const flags = r.tcp_flags || r.icmp_type || "";
+    const rule  = r.rule_id ? ("ss-" + r.rule_id) : "";
+    const ruleLabel = r.rule_label || "";
+    const src_pol = r.policy_source || "external_or_unlabeled";
+    return `<tr class="${cls}" data-idx="${idx}" data-action="h_78da71b2e9">
+      <td class="fwl-mono">${htmlEscape((r.ts||"").replace("T"," ").slice(0,19))}</td>
+      <td><span class="fwl-badge ${r.action}">${htmlEscape(r.action||"")}</span></td>
+      <td><span class="fwl-badge ${r.direction||""}">${htmlEscape(r.direction||"")}</span></td>
+      <td>${htmlEscape(r.interface||"")}</td>
+      <td>${htmlEscape(r.protocol||"")}${r.ip_version===6?"<sup>v6</sup>":""}</td>
+      <td class="fwl-mono">${htmlEscape(src)}</td>
+      <td class="fwl-mono">${htmlEscape(dst)}</td>
+      <td>${htmlEscape(flags)}</td>
+      <td title="${htmlEscape(ruleLabel)}">${htmlEscape(rule)}</td>
+      <td><span class="fwl-badge src-${htmlEscape(src_pol)}" title="${htmlEscape(ruleLabel)}">${htmlEscape(src_pol.replace(/_/g,' '))}</span></td>
+      <td>${htmlEscape(r.hostname || "")}</td>
+    </tr>`;
+  }).join("");
+  tbody.innerHTML = html;
+}
+
+function renderPager() {
+  document.getElementById("prevBtn").disabled = offset <= 0;
+  document.getElementById("nextBtn").disabled = (offset + LIMIT) >= lastTotal;
+  const from = lastTotal ? offset + 1 : 0;
+  const to   = Math.min(offset + LIMIT, lastTotal);
+  document.getElementById("pageInfo").textContent =
+    `Showing ${from}–${to} of ${lastTotal}`;
+}
+
+function changePage(delta) {
+  offset = Math.max(0, offset + delta * LIMIT);
+  loadList();
+}
+
+async function loadStats() {
+  const r = await fetch(FWL_STATS_URL + "?" + currentFilters().toString(),
+                        {credentials:"same-origin"});
+  if (!r.ok) return;
+  const d = await r.json();
+  const totals = d.totals || {};
+  document.getElementById("totPass").textContent  = (totals.pass   || 0).toLocaleString();
+  document.getElementById("totBlock").textContent = (totals.block  || 0).toLocaleString();
+  document.getElementById("totReject").textContent= (totals.reject || 0).toLocaleString();
+  renderTopLists(d);
+  document.getElementById("liveStatus").textContent = "Live";
+}
+
+function renderTopLists(d) {
+  const cards = [
+    ["Top sources",       d.top_src,    "src_ip"],
+    ["Top destinations",  d.top_dst,    "dst_ip"],
+    ["Top dest ports",    d.top_port,   "dst_port"],
+    ["Top rules",         d.top_rule,   "rule_id"],
+    ["Top protocols",     d.top_proto,  "protocol"],
+    ["Top interfaces",    d.top_iface,  "interface"],
+    ["Top policy sources",d.top_source, "policy_source"],
+  ];
+  document.getElementById("topLists").innerHTML = cards.map(([title, rows, key]) => {
+    const body = (rows || []).map(r => `
+      <div class="fwl-top-row">
+        <span class="fwl-mono">${htmlEscape(r[key])}</span>
+        <span>${(r.count||0).toLocaleString()}</span>
+      </div>`).join("");
+    return `<div class="fwl-top-card">
+              <div class="fwl-top-title">${htmlEscape(title)}</div>
+              ${body || '<div class="fwl-msg">No data</div>'}
+            </div>`;
+  }).join("");
+}
+
+function loadAll() { offset = 0; loadList(); loadStats(); }
+
+function clearFilters() {
+  for (const id of ["search","action","direction","protocol","interface",
+                    "src_ip","dst_ip","dst_port","rule_id","policy_source"]) {
+    document.getElementById(id).value = "";
+  }
+  loadAll();
+}
+
+function exportCsv() {
+  const url = FWL_EXPORT_URL + "?" + currentFilters().toString();
+  window.location = url;
+}
+
+function openDrawer(idx) {
+  const r = lastRows[idx];
+  if (!r) return;
+  const fields = [
+    ["Time",           (r.ts || "").replace("T", " ")],
+    ["Action",         r.action || ""],
+    ["Direction",      r.direction || ""],
+    ["Interface",      r.interface || ""],
+    ["Severity",       r.severity || ""],
+    ["Policy source",  r.policy_source || ""],
+    ["Rule label",     r.rule_label || ""],
+    ["Rule id",        r.rule_id != null ? r.rule_id : ""],
+    ["Policy id",      r.policy_id || ""],
+    ["Policy name",    r.policy_name || ""],
+    ["Protocol",       (r.protocol || "") + (r.ip_version === 6 ? " (v6)" : "")],
+    ["Source",         (r.src_ip || "") + (r.src_port ? ":" + r.src_port : "")],
+    ["Destination",    (r.dst_ip || "") + (r.dst_port ? ":" + r.dst_port : "")],
+    ["NAT src",        r.nat_translated_src || ""],
+    ["NAT dst",        r.nat_translated_dst || ""],
+    ["Zone in",        r.zone_in || ""],
+    ["Zone out",       r.zone_out || ""],
+    ["TCP flags",      r.tcp_flags || ""],
+    ["ICMP type",      r.icmp_type || ""],
+    ["Packet length",  r.packet_length != null ? r.packet_length : ""],
+    ["Hostname",       r.hostname || ""],
+    ["MAC",            r.mac || ""],
+    ["Event uuid",     r.event_uuid || ""],
+  ];
+  const body = fields
+    .filter(([_, v]) => v !== "" && v !== null && v !== undefined)
+    .map(([k, v]) => `<div class="fwl-drawer-row"><span class="k">${htmlEscape(k)}</span><span class="v">${htmlEscape(String(v))}</span></div>`)
+    .join("");
+  const explain = POLICY_EXPLAIN[r.policy_source || ""] || "";
+  const explainBlock = explain
+    ? `<div class="fwl-drawer-why"><strong>Why ${htmlEscape(r.policy_source || "")}?</strong><br>${htmlEscape(explain)}</div>`
+    : "";
+  const raw = r.raw_line || "";
+  const rawBlock = raw
+    ? `<h4 class="ext-974ca506">Raw pflog line</h4><div class="fwl-drawer-raw">${htmlEscape(raw)}</div>`
+    : "";
+  document.getElementById("fwlDrawerBody").innerHTML = body + explainBlock + rawBlock;
+  const drawer = document.getElementById("fwlDrawer");
+  drawer.classList.add("open");
+  drawer.setAttribute("aria-hidden", "false");
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById("fwlDrawer");
+  drawer.classList.remove("open");
+  drawer.setAttribute("aria-hidden", "true");
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeDrawer();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadAll();
+  // Poll every 15s so blocks streaming in from pflog show up live.
+  setInterval(() => { loadList(); loadStats(); }, 15000);
+});
+</script>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_5ed465eff2'] = function (event, el) { return false; };
+  R['h_464859ba1f'] = function (event, el) { loadAll() };
+  R['h_20d834b3d7'] = function (event, el) { clearFilters() };
+  R['h_34c3cecdef'] = function (event, el) { exportCsv() };
+  R['h_c378eaa479'] = function (event, el) { changePage(-1) };
+  R['h_7792b64127'] = function (event, el) { changePage(+1) };
+  R['h_bd554ab9a4'] = function (event, el) { closeDrawer() };
+  R['h_78da71b2e9'] = function (event, el) { openDrawer(${idx}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

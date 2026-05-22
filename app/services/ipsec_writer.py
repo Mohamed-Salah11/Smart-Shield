@@ -305,7 +305,9 @@ def generate_ipsec_secrets(conn) -> str:
             continue
         left_str  = "%any" if left  in ("my-ip","myaddress","%defaultroute","") else left
         right_str = right or "%any"
-        key = (left_str, right_str)
+        # Deduplicate by left identity only so dedicated PSK table entries
+        # for the same identifier don't produce duplicate ipsec.secrets lines.
+        key = left_str
         if key not in seen:
             seen.add(key)
             lines.append(f"{left_str} {right_str} : PSK \"{psk}\"")
@@ -317,7 +319,7 @@ def generate_ipsec_secrets(conn) -> str:
         secret     = decrypt_secret((psk.get("pre_shared_key") or "").strip())
         if not secret:
             continue
-        key = (identifier, "")
+        key = identifier
         if key not in seen:
             seen.add(key)
             lines.append(f"{identifier} : PSK \"{secret}\"")
@@ -381,6 +383,24 @@ def validate_ipsec_config(conn) -> list:
 
 def apply_ipsec(conn) -> dict:
     """Validate, write config files, then reload strongSwan."""
+    # If no Phase 1 tunnels are enabled, stop strongSwan and clear its rc.conf
+    # knob — reload-all should not leave a stale daemon running with no tunnels.
+    enabled_p1 = _rows(conn, "SELECT id FROM ipsec_phase1 WHERE disabled=0 LIMIT 1")
+    if not enabled_p1:
+        if not sys.platform.startswith("freebsd"):
+            return {"ok": True, "skipped": True,
+                    "message": "IPsec has no enabled Phase 1 tunnels — non-FreeBSD, nothing to stop."}
+        try:
+            from app.services.priv_helper import run_privileged
+            from app.services.service_manager import sysrc_set
+            sysrc_set("strongswan_enable", "NO")
+            run_privileged("service.action", service_name="strongswan", action="stop")
+        except Exception as exc:
+            return {"ok": False, "rolled_back": False,
+                    "message": f"IPsec disabled but stop failed: {exc}"}
+        return {"ok": True, "skipped": True,
+                "message": "IPsec has no enabled tunnels — strongswan stopped and disabled in rc.conf."}
+
     validation_errors = validate_ipsec_config(conn)
     if validation_errors:
         return {

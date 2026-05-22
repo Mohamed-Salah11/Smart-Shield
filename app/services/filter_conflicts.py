@@ -14,6 +14,8 @@ export_filter_list(conn, filter_type) -> str  (newline-separated domains/pattern
 
 import re
 
+from app.services.content_policy import normalize_domain
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -26,10 +28,12 @@ def _rows(conn, sql, params=()):
 
 
 def _sanitize_domain(raw: str) -> str:
-    d = re.sub(r'^https?://', '', (raw or "").strip().lower())
-    d = d.split('/')[0].strip()
-    d = d.lstrip('*.').strip('.')
-    return d
+    """Validate and lowercase a domain; "" if invalid.
+
+    Delegates to ``content_policy.normalize_domain`` so the conflict checker
+    sees the same domains the writers emit.
+    """
+    return normalize_domain(raw or "")
 
 
 # ---------------------------------------------------------------------------

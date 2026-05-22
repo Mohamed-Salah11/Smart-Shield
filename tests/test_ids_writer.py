@@ -82,11 +82,19 @@ class TestGenerateSuricataYaml:
         assert "fast.log" in yaml
 
     def test_default_ruleset_when_none_active(self, conn):
-        from app.services.ids_writer import generate_suricata_yaml
+        import os
+        from app.services.ids_writer import generate_suricata_yaml, _SURICATA_UPDATE_RULES
         conn.execute("UPDATE ids_rulesets SET enabled=0")
         conn.commit()
         yaml = generate_suricata_yaml(conn)
-        assert "emerging-threats.rules" in yaml
+        # When no rulesets are active, the writer falls back to the suricata-update
+        # managed combined rule file. Rule files are emitted RELATIVE to
+        # default-rule-path (see test_yaml_uses_default_rule_path), so assert the
+        # bare basename appears under that path — not the absolute path.
+        rules_dir  = os.path.dirname(_SURICATA_UPDATE_RULES)
+        rules_base = os.path.basename(_SURICATA_UPDATE_RULES)
+        assert f"default-rule-path: {rules_dir}" in yaml
+        assert f"- {rules_base}" in yaml
 
     def test_active_ruleset_appears(self, conn):
         from app.services.ids_writer import generate_suricata_yaml
@@ -139,17 +147,21 @@ class TestValidateIpsSafety:
         from app.services.ids_writer import validate_ips_safety
         conn.execute("UPDATE ids_config SET interface='' WHERE id=1")
         conn.commit()
-        warnings = validate_ips_safety(conn)
-        assert any("requires" in w.lower() for w in warnings)
+        safety = validate_ips_safety(conn)
+        # Missing interface is a hard error → not safe to proceed.
+        assert safety["ok"] is False
+        assert any("interface" in e.lower() for e in safety["errors"])
 
     def test_interface_set_produces_only_informational_warning(self, conn):
         from app.services.ids_writer import validate_ips_safety
         conn.execute("UPDATE ids_config SET interface='em0' WHERE id=1")
         conn.commit()
-        warnings = validate_ips_safety(conn)
-        # Should produce only the netmap informational warning (not a hard "requires" error)
-        hard = [w for w in warnings if "requires" in w.lower()]
-        assert len(hard) == 0
+        safety = validate_ips_safety(conn)
+        # On non-FreeBSD with an interface set: no hard errors, just an
+        # informational netmap warning.
+        assert safety["ok"] is True
+        assert safety["errors"] == []
+        assert len(safety["warnings"]) >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -198,3 +210,240 @@ class TestWriteSuricataConfig:
         result = write_suricata_config(conn)
         assert result["ok"] is True
         assert "suricata.yaml" in result["conf"] or "YAML" in result["conf"]
+
+
+# ---------------------------------------------------------------------------
+# Rule path layout — default-rule-path + relative rule files
+# ---------------------------------------------------------------------------
+
+class TestRulePathLayout:
+
+    def test_yaml_uses_default_rule_path(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        yaml = generate_suricata_yaml(conn)
+        assert "default-rule-path: /var/lib/suricata/rules" in yaml
+        # Merged file should appear as a bare name, not the absolute path.
+        assert "- suricata.rules" in yaml
+        assert "- /var/lib/suricata/rules/suricata.rules" not in yaml
+
+
+# ---------------------------------------------------------------------------
+# LAN interface fallback inside generate_suricata_yaml
+# The IDS monitors the LAN side by default: explicit ids_config.interface wins,
+# else the configured LAN port (lan_config.assigned_port), else "em1".
+# ---------------------------------------------------------------------------
+
+class TestLanInterfaceFallback:
+
+    def test_explicit_interface_wins(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET interface='em3' WHERE id=1")
+        conn.execute("UPDATE lan_config SET assigned_port='em2' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "interface: em3" in yaml
+
+    def test_lan_fallback_when_interface_blank(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET interface='' WHERE id=1")
+        conn.execute("INSERT OR IGNORE INTO lan_config (id) VALUES (1)")
+        # Use a non-default port so this verifies the lan_config lookup, not the
+        # hardcoded "em1" last-resort default.
+        conn.execute("UPDATE lan_config SET assigned_port='em2' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "interface: em2" in yaml
+
+    def test_em1_default_when_nothing_set(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET interface='' WHERE id=1")
+        # No usable LAN port → fall back to the LAN default "em1".
+        conn.execute("INSERT OR IGNORE INTO lan_config (id) VALUES (1)")
+        conn.execute("UPDATE lan_config SET assigned_port='' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "interface: em1" in yaml
+
+
+# ---------------------------------------------------------------------------
+# HOME_NET derivation from the LAN subnet
+# ---------------------------------------------------------------------------
+
+class TestHomeNetDerivation:
+
+    def test_derives_from_lan_subnet_when_unset(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET home_net='' WHERE id=1")
+        conn.execute("UPDATE lan_config SET ipv4_address='192.168.50.1/24' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "192.168.50.0/24" in yaml
+
+    def test_explicit_home_net_wins(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET home_net='10.0.0.0/8' WHERE id=1")
+        conn.execute("UPDATE lan_config SET ipv4_address='192.168.50.1/24' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "10.0.0.0/8" in yaml
+        assert "192.168.50.0/24" not in yaml
+
+    def test_falls_back_to_broad_range_when_no_lan_address(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET home_net='' WHERE id=1")
+        conn.execute("UPDATE lan_config SET ipv4_address='' WHERE id=1")
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        assert "192.168.0.0/16" in yaml
+
+
+# ---------------------------------------------------------------------------
+# update_rules — --output flag, timeouts, post-check, placeholder restore
+# ---------------------------------------------------------------------------
+
+class _RunCommandRecorder:
+    """Captures every run_command call so tests can assert argv + timeouts."""
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.calls = []
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __call__(self, cmd, check=True, timeout_seconds=20, _audit=True):
+        self.calls.append({"cmd": list(cmd), "timeout_seconds": timeout_seconds})
+        class _R:
+            pass
+        r = _R()
+        r.returncode = self.returncode
+        r.stdout = self.stdout
+        r.stderr = self.stderr
+        return r
+
+
+def _force_freebsd(monkeypatch):
+    """Make sys.platform.startswith('freebsd') true for the writer module."""
+    import app.services.ids_writer as iw
+    monkeypatch.setattr(iw.sys, "platform", "freebsd13", raising=False)
+
+
+class TestUpdateRules:
+
+    def test_uses_output_flag_and_300s_timeout(self, conn, monkeypatch, tmp_path):
+        import app.services.ids_writer as iw
+        _force_freebsd(monkeypatch)
+        rules_path = tmp_path / "rules" / "suricata.rules"
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.write_text("alert ip any any -> any any (sid:1;)\n")
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES", str(rules_path))
+        monkeypatch.setattr(iw, "_find_suricata_update", lambda: "/fake/suricata-update")
+        rec = _RunCommandRecorder(returncode=0)
+        monkeypatch.setattr(iw, "run_command", rec)
+        # ensure_rules_file is a no-op since the tmp path already exists.
+
+        result = iw.update_rules(conn)
+
+        # Main run must include --output <dir> and use the 300s ceiling.
+        main = [c for c in rec.calls if "--output" in c["cmd"]]
+        assert main, f"--output not passed; calls: {rec.calls}"
+        assert main[0]["cmd"][1] == "--output"
+        assert main[0]["cmd"][2] == str(rules_path.parent)
+        assert main[0]["timeout_seconds"] == 300
+        assert result["ok"] is True
+        assert result["rules_path"] == str(rules_path)
+        assert result["rules_size"] > 0
+
+    def test_update_sources_uses_180s_timeout(self, conn, monkeypatch, tmp_path):
+        import app.services.ids_writer as iw
+        _force_freebsd(monkeypatch)
+        rules_path = tmp_path / "rules" / "suricata.rules"
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        rules_path.touch()
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES", str(rules_path))
+        monkeypatch.setattr(iw, "_find_suricata_update", lambda: "/fake/suricata-update")
+        rec = _RunCommandRecorder(returncode=0)
+        monkeypatch.setattr(iw, "run_command", rec)
+
+        iw.update_rules(conn)
+
+        srcs = [c for c in rec.calls if "update-sources" in c["cmd"]]
+        assert srcs, f"update-sources not invoked; calls: {rec.calls}"
+        assert srcs[0]["timeout_seconds"] == 180
+
+    def test_restores_placeholder_after_failure(self, conn, monkeypatch, tmp_path):
+        import app.services.ids_writer as iw
+        _force_freebsd(monkeypatch)
+        rules_path = tmp_path / "rules" / "suricata.rules"
+        rules_path.parent.mkdir(parents=True, exist_ok=True)
+        # Start with no file — simulates a failed prior run.
+        assert not rules_path.exists()
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES", str(rules_path))
+        monkeypatch.setattr(iw, "_find_suricata_update", lambda: "/fake/suricata-update")
+        rec = _RunCommandRecorder(returncode=1, stderr="boom")
+        monkeypatch.setattr(iw, "run_command", rec)
+
+        result = iw.update_rules(conn)
+
+        assert result["ok"] is False
+        # ensure_rules_file() must have re-created the empty placeholder.
+        assert rules_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# apply_ids — same ordering as the GUI enable path
+# ---------------------------------------------------------------------------
+
+class TestApplyIds:
+
+    def test_skipped_when_disabled(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET enabled=0 WHERE id=1")
+        conn.commit()
+        called = {"restart": False}
+        def _no_restart(*_a, **_k):
+            called["restart"] = True
+            return {"ok": True, "message": ""}
+        monkeypatch.setattr(iw, "service_action", _no_restart)
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is True
+        assert "disabled" in result["message"].lower() or "skipped" in result["message"].lower()
+        assert called["restart"] is False
+
+    def test_runs_rules_then_write_then_restart_when_enabled(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET enabled=1 WHERE id=1")
+        conn.commit()
+        order = []
+        monkeypatch.setattr(iw, "ensure_rules_present",
+                            lambda _c: (order.append("rules"),
+                                        {"ok": True, "message": ""})[1])
+        monkeypatch.setattr(iw, "write_suricata_config",
+                            lambda _c: (order.append("write"),
+                                        {"ok": True, "message": "", "conf": ""})[1])
+        monkeypatch.setattr(iw, "service_action",
+                            lambda *_a, **_k: (order.append("restart"),
+                                               {"ok": True, "message": "ok"})[1])
+
+        result = iw.apply_ids(conn)
+
+        assert order == ["rules", "write", "restart"]
+        assert result["ok"] is True
+
+    def test_bails_when_rule_bootstrap_fails(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET enabled=1 WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "ensure_rules_present",
+                            lambda _c: {"ok": False, "message": "cannot create"})
+        called = {"write": False, "restart": False}
+        monkeypatch.setattr(iw, "write_suricata_config",
+                            lambda _c: called.__setitem__("write", True) or {"ok": True, "message": "", "conf": ""})
+        monkeypatch.setattr(iw, "service_action",
+                            lambda *_a, **_k: called.__setitem__("restart", True) or {"ok": True, "message": ""})
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is False
+        assert called["write"] is False
+        assert called["restart"] is False

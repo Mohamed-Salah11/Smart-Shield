@@ -15,10 +15,10 @@
 
 set -e
 
-ENV_FILE="/usr/local/etc/smart-shield/smart-shield.env"
-SS_DIR="/var/db/smart-shield"
+ENV_FILE="/usr/local/etc/smartshield/smartshield.env"
+SS_DIR="/var/db/smartshield"
 SVCNAME="smart_shield"
-LOGFILE="/var/log/smart-shield/console.log"
+LOGFILE="/var/log/smartshield/console.log"
 
 _log() { echo "[console] $*" | tee -a "$LOGFILE"; }
 
@@ -64,7 +64,7 @@ _show_status() {
 }
 
 _view_log() {
-    local logpath="/var/log/smart-shield/app.log"
+    local logpath="/var/log/smartshield/app.log"
     if [ -f "$logpath" ]; then
         tail -40 "$logpath"
     else
@@ -73,7 +73,7 @@ _view_log() {
 }
 
 _view_audit() {
-    local apath="/var/log/smart-shield/audit.log"
+    local apath="/var/log/smartshield/audit.log"
     if [ -f "$apath" ]; then
         tail -40 "$apath"
     else
@@ -102,7 +102,7 @@ _reset_admin_password() {
         return
     fi
     DB_PATH=$(grep SMARTSHIELD_DB_PATH "$ENV_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
-    DB_PATH=${DB_PATH:-/var/db/smart-shield/data.db}
+    DB_PATH=${DB_PATH:-/var/db/smartshield/data.db}
     PY_SCRIPT=$(cat <<PYEOF
 import sqlite3, sys
 from werkzeug.security import generate_password_hash

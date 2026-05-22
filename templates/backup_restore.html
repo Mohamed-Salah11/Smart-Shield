@@ -46,7 +46,7 @@
                     <h5 class="mb-0">Create Full Snapshot Backup</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_download') }}">
+                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_download') }}" data-reauth-form>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3 row">
                             <label class="col-sm-2 col-form-label fw-semibold">Scope</label>
@@ -145,7 +145,7 @@
                         Restore applies the full snapshot state (data + logs) and overwrites current files.
                     </div>
 
-                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_restore') }}" enctype="multipart/form-data">
+                    <form method="POST" action="{{ url_for('diagnostics.backup_restore_restore') }}" enctype="multipart/form-data" data-reauth-form>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label fw-semibold" for="backup_file">Backup File</label>
@@ -201,7 +201,29 @@
     </div>
 </div>
 
-<style>
+<!-- Reauth modal: backup download and restore require a recent password
+     re-entry (server enforces reauth_required_form + superuser_required). -->
+<div class="modal fade" id="reauthModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm your identity</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-2">Backup and restore are sensitive operations. Re-enter your password to continue.</p>
+        <input type="password" class="form-control" id="reauthPassword" autocomplete="current-password" placeholder="Your password">
+        <div class="text-danger small mt-2 d-none" id="reauthError"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="reauthConfirmBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style nonce="{{ csp_nonce() }}">
 #backupRestoreTabsContent.tab-content {
     display: block !important;
     background: transparent;
@@ -216,7 +238,7 @@
 }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.addEventListener("DOMContentLoaded", function() {
     const tabButtons = document.querySelectorAll("#backupRestoreTabs button[data-bs-toggle='tab']");
     const queryTab = new URLSearchParams(window.location.search).get("tab");
@@ -236,6 +258,63 @@ document.addEventListener("DOMContentLoaded", function() {
                 localStorage.setItem("backupRestoreActiveTab", target);
             }
         });
+    });
+
+    // Reauth gate for sensitive backup/restore submits.
+    const CSRF_TOKEN = "{{ csrf_token() }}";
+    let pendingForm = null;
+    const reauthModalEl = document.getElementById("reauthModal");
+    const reauthModal = (window.bootstrap && bootstrap.Modal)
+        ? bootstrap.Modal.getOrCreateInstance(reauthModalEl) : null;
+    const reauthPassword = document.getElementById("reauthPassword");
+    const reauthError = document.getElementById("reauthError");
+    const reauthConfirmBtn = document.getElementById("reauthConfirmBtn");
+
+    document.querySelectorAll("form[data-reauth-form]").forEach((form) => {
+        form.addEventListener("submit", function(event) {
+            if (form.dataset.reauthDone === "1") {
+                return; // already re-authenticated; let it submit
+            }
+            event.preventDefault();
+            pendingForm = form;
+            if (reauthError) { reauthError.classList.add("d-none"); reauthError.textContent = ""; }
+            if (reauthPassword) { reauthPassword.value = ""; }
+            if (reauthModal) { reauthModal.show(); setTimeout(() => reauthPassword && reauthPassword.focus(), 200); }
+            else { form.dataset.reauthDone = "1"; form.submit(); } // fallback: server still gates
+        });
+    });
+
+    async function doReauth() {
+        const pw = reauthPassword ? reauthPassword.value : "";
+        if (!pw) { showReauthError("Password is required."); return; }
+        reauthConfirmBtn.disabled = true;
+        try {
+            const r = await fetch("{{ url_for('auth.reauth') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF_TOKEN },
+                body: JSON.stringify({ password: pw }),
+            });
+            const body = await r.json().catch(() => ({}));
+            if (r.ok && body.ok) {
+                if (reauthModal) reauthModal.hide();
+                if (pendingForm) { pendingForm.dataset.reauthDone = "1"; pendingForm.submit(); }
+            } else {
+                showReauthError(body.message || "Re-authentication failed.");
+            }
+        } catch (e) {
+            showReauthError("Network error during re-authentication.");
+        } finally {
+            reauthConfirmBtn.disabled = false;
+        }
+    }
+
+    function showReauthError(msg) {
+        if (reauthError) { reauthError.textContent = msg; reauthError.classList.remove("d-none"); }
+    }
+
+    if (reauthConfirmBtn) reauthConfirmBtn.addEventListener("click", doReauth);
+    if (reauthPassword) reauthPassword.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); doReauth(); }
     });
 });
 </script>

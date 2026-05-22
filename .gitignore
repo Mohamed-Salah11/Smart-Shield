@@ -1,6 +1,10 @@
 # ============================================================
-# Smart Shield — .gitignore
+# Smart Shield — .gitignore  (production GitHub repo)
 # ============================================================
+# Source repo on GitHub keeps tests/, scripts/, docs/. The release
+# archive built by scripts/build_release.sh excludes runtime state
+# (tests, logs, *.db, __pycache__) on its own — see
+# tools/build_release.py EXCLUDE_PATTERNS for the authoritative list.
 
 # ── Python bytecode / cache ──────────────────────────────────
 __pycache__/
@@ -8,20 +12,26 @@ __pycache__/
 *.pyo
 *.pyd
 *.py[cod]
-*.pyi
+*$py.class
 
 # ── Virtual environments ─────────────────────────────────────
 .venv/
 venv/
 env/
 ENV/
+.python-version
+.envrc
 
-# ── Environment / secrets (keep templates) ───────────────────
+# ── Environment / secrets (KEEP TEMPLATES) ───────────────────
+# .env contains real keys; .env.example is shipped as the template.
 .env
 .env.*
 *.env
 !.env.example
+
+# Runtime config (operator data); the example variant is shipped.
 config.json
+!config.example.json
 
 # ── Runtime data / logs / uploads ────────────────────────────
 *.log
@@ -32,21 +42,31 @@ static/uploads/
 uploads/
 backups/
 *.pid
+
+# SQLite databases (DB + WAL/SHM sidecars). data.db is the
+# canonical Smart Shield DB; *.db catches the per-test fixtures
+# and the _v_hn.db quarantine that has leaked into past archives.
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 data.db
+_v_hn.db*
 
 # ── Secrets and credentials ──────────────────────────────────
+# master.key is the AES-GCM root for app/secret_store.py.
 master.key
 *.key
 *.psk
 *.p8
 ipsec.secrets
 *.ovpn
+# Allow filenames ending in .example.* (e.g. ssl.key.example) so
+# packaging examples stay tracked.
 !*.example.*
 
-# ── TLS / PKI artifacts (keep .example variants) ─────────────
+# ── TLS / PKI artifacts ──────────────────────────────────────
 *.pem
 *.crt
 *.csr
@@ -54,31 +74,46 @@ ipsec.secrets
 *.pfx
 !*.example.*
 
-# ── Tests directory ──────────────────────────────────────────
-tests/
+# ── Tests, scripts, docs — TRACKED on GitHub ────────────────
+# Previous ignore blocked these wholesale; that broke CI and hid
+# scripts/build_release.sh from version control. The release
+# builder excludes tests/ from the appliance archive on its own
+# (tools/build_release.py EXCLUDE_PATTERNS), so the repo can
+# safely track them here. Only the test runtime artefacts below
+# are ignored.
+test_*.db
+*.test.db
+conftest.py.bak
 
 # ── Test / coverage / linting cache ─────────────────────────
 .pytest_cache/
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 .mypy_cache/
 .ruff_cache/
 .cache/
 .hypothesis/
+.tox/
+.nox/
 pip-log.txt
 
 # ── Build / distribution artifacts ───────────────────────────
 build/
 dist/
+*.egg
 *.egg-info/
 pip-wheel-metadata/
+# Build-time metadata files emitted by scripts/build_release.sh
+# directly into the archive — never check in to the working tree.
+RELEASE_MANIFEST.json
 
-# ── Rust build artifacts (used by cryptography wheel) ────────
+# ── Rust build artifacts (cryptography wheel) ────────────────
 target/
 Cargo.lock
 
-# ── Documentation build ──────────────────────────────────────
+# ── Documentation build output (keep docs/ sources tracked) ─
 docs/_build/
 docs/_autosummary/
 
@@ -102,24 +137,28 @@ $RECYCLE.BIN/
 # ── Process output ───────────────────────────────────────────
 nohup.out
 
-# ── Claude Code project state (not needed on FreeBSD deployment) ──
+# ── Node / frontend tooling (if a frontend ever lands) ──────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Claude Code project state (per-machine; never publish) ──
 .claude/
 
-# ── Non-professional / working notes ─────────────────────────
-Testing.md
-TODO_FULL_LIVE_APPLIANCE.md
-docs/
+# ── Local working notes (personal scratch — keep out of GH) ─
 paper.bib
-
-# ── Local / generated project artifacts ──────────────────────
 edits.txt
 paths.txt
 project steps.txt
 integrations_steps_source.txt
 integrations steps of the vpns ids ips and every other service included in the project.pdf
 smart-shield-transfer-*.tar.gz
+_split*.py
+_*urlmap*.json
 
-# ── Generic archive outputs ───────────────────────────────────
+# ── Generic archive outputs (release tarballs live under dist/) ─
 *.zip
 *.tar
 *.tar.gz
@@ -134,7 +173,7 @@ smart-shield-transfer-*.tar.gz
 *.qcow2
 *.iso
 
-# ── Windows-only scripts (not needed on FreeBSD) ─────────────
+# ── Windows-only helper scripts (FreeBSD target) ────────────
 *.bat
 *.cmd
 *.ps1

@@ -28,11 +28,11 @@
         </button>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;width:40px;"></th>
+            <th class="ext-9a450db2"></th>
             <th>Interface</th><th>Server</th><th>Hostname</th><th>Cached IP</th><th>Description</th><th></th>
           </tr>
         </thead>
@@ -40,13 +40,13 @@
           {% set clients = clients if clients is defined else [] %}
           {% if clients %}{% for c in clients %}
           <tr>
-            <td style="padding:8px 14px;">{% if not c.disabled %}<span style="color:var(--success);font-size:1rem;">●</span>{% endif %}</td>
+            <td class="ext-ec6b5e99">{% if not c.disabled %}<span class="ext-d5696069">●</span>{% endif %}</td>
             <td>{{ c.interface }}</td><td>{{ c.server }}</td><td>{{ c.hostname }}</td>
-            <td><span style="font-family:monospace;font-size:.8rem;">—</span></td><td>{{ c.description }}</td>
+            <td><span class="ext-7abe10da">—</span></td><td>{{ c.description }}</td>
             <td><button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRFC2136Modal"><i class="fa-solid fa-pen"></i></button></td>
           </tr>
           {% endfor %}{% else %}
-          <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted);">No RFC 2136 clients configured</td></tr>
+          <tr><td class="ext-a9edf93a" colspan="7">No RFC 2136 clients configured</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -60,14 +60,15 @@
 <!-- Add/Edit Modal -->
 <div class="modal fade" id="addRFC2136Modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
-      <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
-        <h5 class="modal-title fw-700" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">RFC 2136 Client</h5>
+    <div class="modal-content ext-4e519faa">
+      <div class="modal-header ext-91a9433f">
+        <h5 class="modal-title fw-700 ext-4080a6fd">RFC 2136 Client</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="padding:24px;">
+      <div class="modal-body ext-0f8ab67f">
         <form id="rfc2136Form" method="post" action="{{ url_for('services.dynamic_dns_rfc2136') }}">
-          <div class="ss-toggle-row" style="padding-top:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="ss-toggle-row ext-511cd166">
             <label class="ss-toggle"><input type="checkbox" id="enable" name="enable"><span class="ss-toggle-slider"></span></label>
             <div class="ss-toggle-content"><p class="ss-toggle-label">Enable this client</p></div>
           </div>
@@ -146,7 +147,7 @@
           <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" name="use_public_ip"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Use Public IP</p><p class="ss-toggle-desc">If interface IP is private, fetch and use the public IP instead</p></div></div>
         </form>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color-soft);">
+      <div class="modal-footer ext-febac6a2">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="submit" form="rfc2136Form" class="btn btn-primary px-4">
           <i class="fa-solid fa-check me-1"></i>Save Client

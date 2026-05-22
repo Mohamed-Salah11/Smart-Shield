@@ -12,6 +12,7 @@ Covers:
 
 import os
 import sys
+from datetime import datetime, timezone
 import pytest
 
 os.environ.setdefault("SMARTSHIELD_DB_PATH", "file:inttest_sec?mode=memory&cache=shared")
@@ -39,6 +40,9 @@ def sec_client(sec_app):
 def superuser_client(sec_app, sec_client):
     _create_user(sec_app, "sec_super", "superpass123!", is_superuser=1)
     _login(sec_client, "sec_super", "superpass123!")
+    # Simulate a recent re-authentication so @reauth_required passes.
+    with sec_client.session_transaction() as sess:
+        sess["reauth_time"] = datetime.now(timezone.utc).isoformat()
     return sec_client
 
 

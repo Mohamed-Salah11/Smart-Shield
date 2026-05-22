@@ -3,33 +3,33 @@
 <div class="container">
 
   <!-- Toast -->
-  <div id="cp-toast" class="alert d-none" role="alert"
-       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:340px;"></div>
+  <div id="cp-toast" class="alert d-none ext-cd6c86d1" role="alert"
+      ></div>
 
   <!-- Page Header -->
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">Captive Portal</h1>
+      <h1 class="ss-page-title">Access Gateway</h1>
       <p class="ss-page-desc">Guest network authentication, vouchers, and session management</p>
     </div>
-    <button type="button" class="btn btn-primary" onclick="applyPortal()">
+    <button type="button" class="btn btn-primary" data-action="h_73778fb426">
       <i class="fa-solid fa-play me-1"></i>Apply &amp; Activate
     </button>
   </div>
 
   <!-- Status bar -->
   <div class="ss-card mb-4">
-    <div class="ss-card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:14px 20px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="ss-card-title" style="margin:0;">Status</span>
+    <div class="ss-card-body ext-d024bd23">
+      <div class="ext-c367548a">
+        <span class="ss-card-title ext-1386d503">Status</span>
         <span id="cp-status-badge" class="badge bg-secondary">Loading…</span>
       </div>
-      <div style="color:var(--muted);font-size:.85rem;">
+      <div class="ext-1e84a5f5">
         <i class="fa-solid fa-users me-1"></i>
         <span id="cp-session-count">—</span> active session(s)
       </div>
-      <div style="margin-left:auto;">
-        <button class="btn btn-sm btn-outline-secondary" onclick="loadStatus()">
+      <div class="ext-83456371">
+        <button class="btn btn-sm btn-outline-secondary" data-action="h_d2ebb3e105">
           <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh Status
         </button>
       </div>
@@ -39,13 +39,13 @@
   <!-- Tabs -->
   <ul class="nav nav-tabs mb-4">
     <li class="nav-item"><a class="nav-link active" id="tab-sessions" href="#"
-        onclick="showTab('sessions'); return false;"><i class="fa-solid fa-users me-1"></i>Sessions</a></li>
+        data-action="h_f68170d027"><i class="fa-solid fa-users me-1"></i>Sessions</a></li>
     <li class="nav-item"><a class="nav-link" id="tab-vouchers" href="#"
-        onclick="showTab('vouchers'); return false;"><i class="fa-solid fa-ticket me-1"></i>Vouchers</a></li>
+        data-action="h_f70974dfdd"><i class="fa-solid fa-ticket me-1"></i>Vouchers</a></li>
     <li class="nav-item"><a class="nav-link" id="tab-settings" href="#"
-        onclick="showTab('settings'); return false;"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
+        data-action="h_7996176196"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
     <li class="nav-item"><a class="nav-link" id="tab-preview" href="#"
-        onclick="showTab('preview'); return false;"><i class="fa-solid fa-code me-1"></i>PF Preview</a></li>
+        data-action="h_6111541474"><i class="fa-solid fa-code me-1"></i>PF Preview</a></li>
   </ul>
 
   <!-- ── TAB: Sessions ─────────────────────────────────────────────────── -->
@@ -58,19 +58,19 @@
           <div class="ss-card-subtitle" id="session-count">Loading…</div>
         </div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSessions()">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="h_469cf85f58">
             <i class="fa-solid fa-rotate me-1"></i>Refresh
           </button>
-          <button type="button" class="btn btn-sm btn-danger" onclick="disconnectAll()">
+          <button type="button" class="btn btn-sm btn-danger" data-action="h_7727762762">
             <i class="fa-solid fa-plug-circle-xmark me-1"></i>Disconnect All
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
             <tr>
-              <th style="padding:10px 14px;">IP Address</th>
+              <th class="ext-16e59a0f">IP Address</th>
               <th>MAC Address</th>
               <th>Username</th>
               <th>Session Start</th>
@@ -79,7 +79,7 @@
             </tr>
           </thead>
           <tbody id="sessions-tbody">
-            <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading sessions…</td></tr>
+            <tr><td class="ext-a9edf93a" colspan="6">Loading sessions…</td></tr>
           </tbody>
         </table>
       </div>
@@ -87,7 +87,7 @@
   </div>
 
   <!-- ── TAB: Vouchers ─────────────────────────────────────────────────── -->
-  <div id="content-vouchers" style="display:none;">
+  <div class="ext-cb458930" id="content-vouchers">
     <div class="ss-card mb-4">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-ticket"></i></div>
@@ -95,7 +95,7 @@
              <div class="ss-card-subtitle">Single-use access codes for guest Wi-Fi</div></div>
       </div>
       <div class="ss-card-body">
-        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:16px;">
+        <div class="ss-field-grid ss-field-grid-3 ext-8e86974b">
           <div class="ss-field">
             <label class="ss-label">Duration (minutes)</label>
             <input type="number" id="v-duration" class="form-control" value="60" min="1">
@@ -106,19 +106,19 @@
             <input type="number" id="v-bw" class="form-control" value="0" min="0">
             <p class="ss-hint">0 = unlimited</p>
           </div>
-          <div class="ss-field" style="display:flex;align-items:flex-end;">
-            <button type="button" class="btn btn-success w-100" onclick="generateVoucher()">
+          <div class="ss-field ext-3868b543">
+            <button type="button" class="btn btn-success w-100" data-action="h_1c6ede288a">
               <i class="fa-solid fa-plus me-1"></i>Generate
             </button>
           </div>
         </div>
         <div id="voucher-result" class="d-none">
-          <div class="alert alert-success d-flex align-items-center justify-content-between gap-3" style="border-radius:10px;">
+          <div class="alert alert-success d-flex align-items-center justify-content-between gap-3 ext-3c857204">
             <div>
               <strong>Voucher Code:</strong>
-              <code id="voucher-code" style="font-size:1.2rem;letter-spacing:.1em;margin-left:8px;"></code>
+              <code class="ext-25ccb3c8" id="voucher-code"></code>
             </div>
-            <button class="btn btn-sm btn-outline-success" onclick="copyVoucher()">
+            <button class="btn btn-sm btn-outline-success" data-action="h_1a4e67d171">
               <i class="fa-solid fa-copy me-1"></i>Copy
             </button>
           </div>
@@ -131,16 +131,16 @@
         <div class="ss-card-icon"><i class="fa-solid fa-list"></i></div>
         <div><div class="ss-card-title">Voucher List</div></div>
         <div class="ss-card-actions">
-          <button class="btn btn-sm btn-outline-secondary" onclick="loadVouchers()">
+          <button class="btn btn-sm btn-outline-secondary" data-action="h_01da6189ee">
             <i class="fa-solid fa-rotate me-1"></i>Refresh
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
             <tr>
-              <th style="padding:10px 14px;">Code</th>
+              <th class="ext-16e59a0f">Code</th>
               <th>Duration</th>
               <th>Bandwidth</th>
               <th>Status</th>
@@ -151,7 +151,7 @@
             </tr>
           </thead>
           <tbody id="vouchers-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Loading vouchers…</td></tr>
+            <tr><td class="ext-a9edf93a" colspan="8">Loading vouchers…</td></tr>
           </tbody>
         </table>
       </div>
@@ -159,16 +159,16 @@
   </div>
 
   <!-- ── TAB: Settings ─────────────────────────────────────────────────── -->
-  <div id="content-settings" style="display:none;">
+  <div class="ext-cb458930" id="content-settings">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
         <div><div class="ss-card-title">Portal Configuration</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-sm btn-warning me-1" onclick="reloadFirewall()">
+          <button type="button" class="btn btn-sm btn-warning me-1" data-action="h_a354cf7d11">
             <i class="fa-solid fa-fire me-1"></i>Reload Firewall
           </button>
-          <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()">
+          <button type="button" class="btn btn-sm btn-primary" data-action="h_6c52ced7f6">
             <i class="fa-solid fa-check me-1"></i>Save Settings
           </button>
         </div>
@@ -198,7 +198,7 @@
           <div class="ss-field">
             <label class="ss-label">Portal Port</label>
             <input type="number" id="cp-port" class="form-control" placeholder="5000">
-            <p class="ss-hint">Port the Smart Shield web app listens on</p>
+            <p class="ss-hint">Port the SmartShield web app listens on</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">HTTP Redirect Port</label>
@@ -216,16 +216,25 @@
             <p class="ss-toggle-desc">Permit DNS queries from unauthenticated guests (required for most devices to detect the captive portal)</p>
           </div>
         </div>
-        <div class="ss-toggle-row" style="margin-top:12px;">
+        <div class="ss-toggle-row ext-002535c2">
           <label class="ss-toggle">
-            <input type="checkbox" id="cp-strict"><span class="ss-toggle-slider"></span>
+            <input type="checkbox" id="cp-strict" checked><span class="ss-toggle-slider"></span>
           </label>
           <div class="ss-toggle-content">
-            <p class="ss-toggle-label">Strict Mode</p>
-            <p class="ss-toggle-desc">Block ALL unauthenticated traffic except the portal login page and DHCP. In soft mode (default) unauthenticated clients have full internet access.</p>
+            <p class="ss-toggle-label">Strict Mode (recommended)</p>
+            <p class="ss-toggle-desc">Block ALL unauthenticated traffic except the portal login page, DHCP, and DNS. Soft mode only redirects HTTP and should be used for testing or splash-page-only deployments — it does not provide real network access control.</p>
           </div>
         </div>
-        <div class="ss-field-grid ss-field-grid-2" style="margin-top:16px;">
+        <div class="ss-toggle-row ext-002535c2">
+          <label class="ss-toggle">
+            <input type="checkbox" id="cp-dns-bypass-admin"><span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Allow admin DNS bypass</p>
+            <p class="ss-toggle-desc">If enabled, clients in the <code>admin_bypass_clients</code> PF table reach the upstream DNS resolver directly (bypassing Unbound content policy). Authenticated normal users always stay on SmartShield Unbound.</p>
+          </div>
+        </div>
+        <div class="ss-field-grid ss-field-grid-2 ext-b0043ef4">
           <div class="ss-field">
             <label class="ss-label">Session Duration (minutes)</label>
             <input type="number" id="cp-session-dur" class="form-control" placeholder="60" min="1">
@@ -234,11 +243,11 @@
           <div class="ss-field">
             <label class="ss-label">Upstream DNS</label>
             <input type="text" id="cp-upstream-dns" class="form-control" placeholder="8.8.8.8">
-            <p class="ss-hint">DNS server authenticated clients use — bypasses Unbound content filtering</p>
+            <p class="ss-hint">Only used when "Allow admin DNS bypass" is enabled. Normal authenticated clients stay on SmartShield Unbound.</p>
           </div>
         </div>
         <hr class="ss-divider">
-        <div class="ss-card-title" style="margin-bottom:14px;font-size:.85rem;">RADIUS Authentication (optional)</div>
+        <div class="ss-card-title ext-034a90be">RADIUS Authentication (optional)</div>
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label">RADIUS Server</label>
@@ -264,19 +273,19 @@
       </div>
       <div class="ss-card-body">
         <div class="d-flex gap-2 mb-3">
-          <input type="text" id="wl-username-input" class="form-control"
-                 placeholder="Enter username to whitelist" style="max-width:300px;">
-          <button class="btn btn-outline-primary btn-sm" onclick="addWhitelistUser()">
+          <input type="text" id="wl-username-input" class="form-control ext-4d14681b"
+                 placeholder="Enter username to whitelist">
+          <button class="btn btn-outline-primary btn-sm" data-action="h_7c1dd9c2a4">
             <i class="fa-solid fa-plus me-1"></i>Add
           </button>
         </div>
-        <ul id="wl-user-list" class="list-group" style="max-width:420px;"></ul>
+        <ul id="wl-user-list" class="list-group ext-ae18a06a"></ul>
         <p class="ss-hint mt-2">
           Whitelisted users still authenticate via the portal login page but their traffic
           is exempt from content filtering and domain blocking.
         </p>
         <div class="mt-3">
-          <button type="button" class="btn btn-sm btn-primary" onclick="saveSettings()">
+          <button type="button" class="btn btn-sm btn-primary" data-action="h_a8fa3abdaa">
             <i class="fa-solid fa-check me-1"></i>Save Settings
           </button>
         </div>
@@ -285,7 +294,7 @@
   </div>
 
   <!-- ── TAB: PF Preview ───────────────────────────────────────────────── -->
-  <div id="content-preview" style="display:none;">
+  <div class="ext-cb458930" id="content-preview">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-code"></i></div>
@@ -294,26 +303,24 @@
           <div class="ss-card-subtitle">PF rules that will be written to the FreeBSD packet filter</div>
         </div>
         <div class="ss-card-actions">
-          <button class="btn btn-sm btn-outline-secondary" onclick="loadPreview()">
+          <button class="btn btn-sm btn-outline-secondary" data-action="h_b2f0c88bd2">
             <i class="fa-solid fa-rotate me-1"></i>Refresh
           </button>
-          <button class="btn btn-sm btn-primary" onclick="applyPortal()">
+          <button class="btn btn-sm btn-primary" data-action="h_447bc40c50">
             <i class="fa-solid fa-play me-1"></i>Apply &amp; Activate
           </button>
         </div>
       </div>
-      <div class="ss-card-body" style="padding:0;">
-        <pre id="pf-preview-text"
-             style="margin:0;padding:20px;background:var(--bg);color:var(--text-color);
-                    font-size:.8rem;border-radius:0 0 10px 10px;max-height:500px;overflow-y:auto;
-                    border-top:1px solid var(--border-color);">Loading…</pre>
+      <div class="ss-card-body ext-57ce1f1b">
+        <pre class="ext-a3096efe" id="pf-preview-text"
+            >Loading…</pre>
       </div>
     </div>
   </div>
 
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
@@ -325,15 +332,15 @@ function renderWhitelistUsers() {
   if (!ul) return;
   ul.innerHTML = '';
   if (_whitelistUsers.length === 0) {
-    ul.innerHTML = '<li class="list-group-item" style="background:var(--card-bg);border-color:var(--border-color);color:var(--muted);font-size:.85rem;">No whitelisted users</li>';
+    ul.innerHTML = '<li class="list-group-item ext-6ba94b27">No whitelisted users</li>';
     return;
   }
   _whitelistUsers.forEach((u, i) => {
     const li = document.createElement('li');
     li.className = 'list-group-item d-flex justify-content-between align-items-center';
     li.style.cssText = 'background:var(--card-bg);border-color:var(--border-color);';
-    li.innerHTML = `<span><i class="fa-solid fa-user me-2" style="color:var(--primary);"></i>${esc(u)}</span>
-      <button class="btn btn-sm btn-outline-danger" onclick="removeWhitelistUser(${i})">
+    li.innerHTML = `<span><i class="fa-solid fa-user me-2 ext-035cc887"></i>${esc(u)}</span>
+      <button class="btn btn-sm btn-outline-danger" data-action="h_3366f6899c">
         <i class="fa-solid fa-trash"></i>
       </button>`;
     ul.appendChild(li);
@@ -413,18 +420,18 @@ async function loadSessions() {
       sessions.length + ' user' + (sessions.length === 1 ? '' : 's') + ' logged in';
     const tbody = document.getElementById('sessions-tbody');
     if (!sessions.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+      tbody.innerHTML = '<tr><td class="ext-a9edf93a" colspan="6">No users currently logged in</td></tr>';
       return;
     }
     tbody.innerHTML = sessions.map(s => `
       <tr>
-        <td style="padding:8px 14px;font-family:monospace;font-size:.8rem;">${esc(s.ip_address)}</td>
-        <td style="font-family:monospace;font-size:.8rem;">${esc(s.mac_address||'—')}</td>
+        <td class="ext-d1733804">${esc(s.ip_address)}</td>
+        <td class="ext-7abe10da">${esc(s.mac_address||'—')}</td>
         <td>${esc(s.username||'—')}</td>
         <td>${esc(s.created_at||'—')}</td>
         <td>${esc(fmtTs(s.expires_at))}</td>
         <td>
-          <button class="btn btn-sm btn-danger" onclick="disconnectUser(${Number(s.id)})" title="Disconnect">
+          <button class="btn btn-sm btn-danger" data-action="h_45db3fc642" title="Disconnect">
             <i class="fa-solid fa-plug-circle-xmark"></i>
           </button>
         </td>
@@ -433,7 +440,7 @@ async function loadSessions() {
   } catch(e) {
     document.getElementById('session-count').textContent = '0 users logged in';
     document.getElementById('sessions-tbody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No users currently logged in</td></tr>';
+      '<tr><td class="ext-a9edf93a" colspan="6">No users currently logged in</td></tr>';
   }
 }
 
@@ -482,7 +489,7 @@ async function loadVouchers() {
     const vouchers = d.vouchers || [];
     const tbody = document.getElementById('vouchers-tbody');
     if (!vouchers.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">No vouchers generated yet</td></tr>';
+      tbody.innerHTML = '<tr><td class="ext-a9edf93a" colspan="8">No vouchers generated yet</td></tr>';
       return;
     }
     tbody.innerHTML = vouchers.map(v => {
@@ -492,26 +499,26 @@ async function loadVouchers() {
         : (v.redeemed ? '<span class="badge bg-secondary">Used</span>' : '<span class="badge bg-success">Active</span>');
       const disableBtn = v.redeemed ? '' : `
         <button class="btn btn-sm ${isDisabled ? 'btn-outline-success' : 'btn-outline-warning'} me-1"
-          onclick="toggleVoucherDisabled(${v.id}, ${isDisabled})"
+          data-action="h_588ed07092"
           title="${isDisabled ? 'Enable voucher' : 'Disable voucher'}">
           <i class="fa-solid ${isDisabled ? 'fa-circle-check' : 'fa-ban'}"></i>
         </button>`;
-      return `<tr style="${isDisabled ? 'opacity:.55;' : ''}">
-        <td style="padding:8px 14px;font-family:monospace;font-weight:700;letter-spacing:.05em;">${esc(v.code)}</td>
+      return `<tr class="ext-fd88789f">
+        <td class="ext-c8c51ace">${esc(v.code)}</td>
         <td>${esc(v.duration_minutes)} min</td>
         <td>${v.bandwidth_kbps ? esc(v.bandwidth_kbps) + ' kbps' : 'Unlimited'}</td>
         <td>${statusBadge}</td>
         <td>${v.redeemed ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
         <td>${esc(v.redeemed_at ? fmtTs(v.redeemed_at) : '—')}</td>
-        <td style="color:var(--muted);font-size:.78rem;">${esc(v.created_at||'—')}</td>
-        <td style="white-space:nowrap;">${disableBtn}<button class="btn btn-sm btn-outline-danger" onclick="revokeVoucher(${v.id})">
+        <td class="ext-6e862a35">${esc(v.created_at||'—')}</td>
+        <td class="ext-4ddbe905">${disableBtn}<button class="btn btn-sm btn-outline-danger" data-action="h_ea816e9f11">
           <i class="fa-solid fa-trash"></i>
         </button></td>
       </tr>`;
     }).join('');
   } catch(e) {
     document.getElementById('vouchers-tbody').innerHTML =
-      '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted);">Error loading vouchers</td></tr>';
+      '<tr><td class="ext-a9edf93a" colspan="8">Error loading vouchers</td></tr>';
   }
 }
 
@@ -551,7 +558,9 @@ async function loadSettings() {
     document.getElementById('cp-port').value       = s.portal_port       || '';
     document.getElementById('cp-redir-port').value = s.http_redirect_port || '';
     document.getElementById('cp-dns').checked      = !!s.allow_dns;
-    document.getElementById('cp-strict').checked      = !!s.strict_mode;
+    // strict_mode defaults to TRUE for new installs — fall back to true if missing.
+    document.getElementById('cp-strict').checked      = (s.strict_mode === undefined) ? true : !!s.strict_mode;
+    document.getElementById('cp-dns-bypass-admin').checked = !!s.dns_bypass_for_admin;
     document.getElementById('cp-session-dur').value   = s.session_duration_minutes || 60;
     document.getElementById('cp-upstream-dns').value  = s.upstream_dns || '8.8.8.8';
     document.getElementById('cp-radius-server').value = s.radius_server  || '';
@@ -571,6 +580,7 @@ async function saveSettings() {
     http_redirect_port: parseInt(document.getElementById('cp-redir-port').value) || 80,
     allow_dns:          document.getElementById('cp-dns').checked,
     strict_mode:              document.getElementById('cp-strict').checked,
+    dns_bypass_for_admin:     document.getElementById('cp-dns-bypass-admin').checked,
     session_duration_minutes: parseInt(document.getElementById('cp-session-dur').value) || 60,
     upstream_dns:             document.getElementById('cp-upstream-dns').value.trim() || '8.8.8.8',
     radius_server:      document.getElementById('cp-radius-server').value.trim(),
@@ -618,3 +628,33 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_73778fb426'] = function (event, el) { applyPortal() };
+  R['h_d2ebb3e105'] = function (event, el) { loadStatus() };
+  R['h_f68170d027'] = function (event, el) { showTab('sessions'); return false; };
+  R['h_f70974dfdd'] = function (event, el) { showTab('vouchers'); return false; };
+  R['h_7996176196'] = function (event, el) { showTab('settings'); return false; };
+  R['h_6111541474'] = function (event, el) { showTab('preview'); return false; };
+  R['h_469cf85f58'] = function (event, el) { loadSessions() };
+  R['h_7727762762'] = function (event, el) { disconnectAll() };
+  R['h_1c6ede288a'] = function (event, el) { generateVoucher() };
+  R['h_1a4e67d171'] = function (event, el) { copyVoucher() };
+  R['h_01da6189ee'] = function (event, el) { loadVouchers() };
+  R['h_a354cf7d11'] = function (event, el) { reloadFirewall() };
+  R['h_6c52ced7f6'] = function (event, el) { saveSettings() };
+  R['h_7c1dd9c2a4'] = function (event, el) { addWhitelistUser() };
+  R['h_a8fa3abdaa'] = function (event, el) { saveSettings() };
+  R['h_b2f0c88bd2'] = function (event, el) { loadPreview() };
+  R['h_447bc40c50'] = function (event, el) { applyPortal() };
+  R['h_3366f6899c'] = function (event, el) { removeWhitelistUser(${i}) };
+  R['h_45db3fc642'] = function (event, el) { disconnectUser(${Number(s.id)}) };
+  R['h_588ed07092'] = function (event, el) { toggleVoucherDisabled(${v.id}, ${isDisabled}) };
+  R['h_ea816e9f11'] = function (event, el) { revokeVoucher(${v.id}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

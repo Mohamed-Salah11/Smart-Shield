@@ -18,14 +18,17 @@ import os
 import sys
 import time
 
+from app.config import _ss_dir as _ss_dir_mrtg
 _MRTG_CONF_PATH  = "/usr/local/etc/mrtg/mrtg.cfg"
-_MRTG_WORK_DIR   = "/var/db/smart-shield/mrtg"
+_MRTG_WORK_DIR   = os.path.join(_ss_dir_mrtg("/var/db"), "mrtg")
 _PROBE_SCRIPT    = "/usr/local/sbin/mrtg-probe.sh"
-_MRTG_LOCK_FILE  = "/var/run/smart-shield/mrtg.lock"
-_CRON_FILE       = "/etc/cron.d/smart-shield-mrtg"
+_MRTG_RUN_DIR    = _ss_dir_mrtg("/var/run")
+_MRTG_LOCK_FILE  = os.path.join(_MRTG_RUN_DIR, "mrtg.lock")
+_CRON_FILE       = "/etc/cron.d/smartshield-mrtg"
 _CRON_LINE       = (
-    "*/5 * * * * root env LANG=C "
-    "/usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg "
+    "*/5 * * * * root "
+    f"mkdir -p {_MRTG_RUN_DIR} && "
+    "env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg "
     f"--lock-file {_MRTG_LOCK_FILE} 2>/dev/null\n"
 )
 
@@ -100,10 +103,14 @@ def _workdir_writable() -> bool:
 
 
 def _ensure_cron_job() -> bool:
-    """Write /etc/cron.d/smart-shield-mrtg if missing. Returns True when installed."""
-    if os.path.exists(_CRON_FILE):
-        return False
+    """Write (or rewrite) the MRTG cron file. Returns True when the file was (re)written."""
     try:
+        existing = ""
+        if os.path.exists(_CRON_FILE):
+            with open(_CRON_FILE) as f:
+                existing = f.read()
+        if existing == _CRON_LINE:
+            return False
         with open(_CRON_FILE, "w") as fh:
             fh.write(_CRON_LINE)
         os.chmod(_CRON_FILE, 0o644)
@@ -251,16 +258,29 @@ def apply_mrtg(conn) -> dict:
     stale_removed = _clear_stale_lock()
 
     # Run MRTG twice:
-    #   Pass 1: creates .log RRD files (exits non-zero because files are new — that is normal)
+    #   Pass 1: creates .log RRD files (may exit non-zero on first create — tolerated)
     #   Pass 2: reads the .log files and generates initial PNG graph images
     try:
         import subprocess
         _cmd = ["/usr/local/bin/mrtg", _MRTG_CONF_PATH,
-                "--lock-file", _MRTG_LOCK_FILE, "--log-level", "0"]
-        for i in range(2):
-            subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
-            if i == 0:
-                time.sleep(5)  # MRTG needs a time delta between runs to compute rates
+                "--lock-file", _MRTG_LOCK_FILE]
+        r1 = subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
+        _clear_stale_lock()   # clear any lock left by a crashed pass 1
+        time.sleep(5)         # MRTG needs a time delta between runs to compute rates
+        r2 = subprocess.run(_cmd, capture_output=True, text=True, timeout=30)
+        # Pass 2 must succeed: it generates the PNG files used by the GUI.
+        if r2.returncode != 0:
+            err = (r2.stderr or r2.stdout or "").strip()[:500]
+            rb = rollback_config(_MRTG_CONF_PATH)
+            return {
+                "ok": False,
+                "rolled_back": rb.get("ok", False),
+                "message": (
+                    f"MRTG failed to generate graphs (exit {r2.returncode}). "
+                    + (f"Error: {err}" if err else
+                       f"Check that mrtg and {_PROBE_SCRIPT} are installed.")
+                ),
+            }
     except FileNotFoundError:
         rb = rollback_config(_MRTG_CONF_PATH)
         return {"ok": False, "rolled_back": rb.get("ok", False),
@@ -350,14 +370,39 @@ def get_mrtg_status() -> dict:
 
     workdir_ok = os.path.isdir(_MRTG_WORK_DIR) and _workdir_writable()
 
+    # Probe script is needed when SNMP is not configured.
+    # Check whether SNMP is active; fall back to checking the script on disk.
+    snmp_active = False
+    try:
+        import json as _json
+        row = conn_row = None
+        try:
+            from app.database import get_db
+            conn_row = get_db().execute(
+                "SELECT value_json FROM service_state WHERE key_name='snmp_settings'"
+            ).fetchone()
+        except Exception:
+            pass
+        if conn_row:
+            s = _json.loads(conn_row["value_json"])
+            snmp_active = bool(s.get("enabled")) and bool((s.get("community") or "").strip())
+    except Exception:
+        pass
+
+    probe_ok = snmp_active or (
+        os.path.isfile(_PROBE_SCRIPT) and os.access(_PROBE_SCRIPT, os.X_OK)
+    )
+
     return {
-        "available":      True,
-        "state":          "cron",
-        "last_run":       last_run,
-        "graphs_ok":      len(graph_files) > 0,
-        "graph_count":    len(graph_files),
-        "cron_installed": os.path.exists(_CRON_FILE),
-        "stale_lock":     _is_stale_lock(),
-        "workdir_ok":     workdir_ok,
-        "message":        "MRTG runs via cron — not a persistent service.",
+        "available":        True,
+        "state":            "cron",
+        "last_run":         last_run,
+        "graphs_ok":        len(graph_files) > 0,
+        "graph_count":      len(graph_files),
+        "cron_installed":   os.path.exists(_CRON_FILE),
+        "stale_lock":       _is_stale_lock(),
+        "workdir_ok":       workdir_ok,
+        "probe_script_ok":  probe_ok,
+        "probe_script_path": _PROBE_SCRIPT,
+        "message":          "MRTG runs via cron — not a persistent service.",
     }

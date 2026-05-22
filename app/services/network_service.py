@@ -76,11 +76,23 @@ def redact_command(cmd: List[str]) -> List[str]:
     return out
 
 
+_PRIVILEGED_BINS = {
+    "/sbin/pfctl", "pfctl",
+    "/sbin/ifconfig", "ifconfig",
+    "/sbin/route", "route",
+    "/usr/sbin/service", "service",
+    "/usr/sbin/sysrc", "sysrc",
+    "/usr/local/sbin/unbound-control", "unbound-control",
+    "/usr/sbin/ppp", "ppp",
+    "pkill",
+}
+
+
 def run_command(
     cmd: List[str],
     check: bool = True,
     timeout_seconds: Optional[int] = 20,
-    _audit: bool = False,
+    _audit: bool = True,
 ) -> CommandResult:
     """
     Execute a system command safely.
@@ -90,42 +102,58 @@ def run_command(
     cmd             : Argument list.  shell=True is NEVER used.
     check           : If True, raise FreeBSDNetworkError on non-zero exit.
     timeout_seconds : Kill the process if it exceeds this duration.
-    _audit          : If True, emit an app-log INFO entry with the redacted
-                      command.  Default False to avoid log spam for
-                      high-frequency read-only calls.
+    _audit          : If True (default), emit an app.log entry for every call
+                      and an audit.log entry for state-changing calls (binary
+                      in _PRIVILEGED_BINS). Pass False on high-frequency
+                      read-only collectors (e.g. `pfctl -s states` polling).
     """
     if _network_dry_run_enabled():
         return CommandResult(command=cmd, returncode=0, stdout="", stderr="")
 
+    redacted = redact_command(cmd) if _audit else None
+
     if _audit:
         try:
             from app.app_log import log_info
-            log_info("network_service", "run_command", {"cmd": redact_command(cmd)})
+            log_info("network_service", "run_command", {"cmd": redacted})
+        except Exception:
+            pass
+        # State-changing commands also land in audit.log so the SOC sees them.
+        try:
+            if cmd and cmd[0] in _PRIVILEGED_BINS:
+                from app.audit_log import log_event
+                log_event(
+                    category="privileged", action="run_command",
+                    severity="info",
+                    details={"cmd": redacted},
+                )
         except Exception:
             pass
 
     # On FreeBSD, when running as root, privileged binaries are called directly.
     # In non-root deployments the sudoers allowlist (bsd/etc/sudoers.d/smartshield)
     # grants the exact set of permitted commands via sudo.
-    _PRIVILEGED_BINS = {
-        "/sbin/pfctl", "pfctl",
-        "/sbin/ifconfig", "ifconfig",
-        "/sbin/route", "route",
-        "/usr/sbin/service", "service",
-        "/usr/sbin/sysrc", "sysrc",
-        "/usr/local/sbin/unbound-control", "unbound-control",
-        "/usr/sbin/ppp", "ppp",
-        "pkill",
-    }
+    #
+    # Phase 4.4: route through priv_helper._resolve_sudo() so there's exactly
+    # one sudo-discovery code path in the project. Fails loudly when sudo is
+    # required but unavailable, instead of ENOENT-ing on a hardcoded path.
     actual_cmd = list(cmd)
     if (
         sys.platform.startswith("freebsd")
         and os.getuid() != 0
         and actual_cmd
         and actual_cmd[0] in _PRIVILEGED_BINS
-        and actual_cmd[0] not in {"/usr/bin/sudo", "/usr/local/bin/sudo"}
+        and os.path.basename(actual_cmd[0]) != "sudo"
     ):
-        actual_cmd = ["/usr/local/bin/sudo"] + actual_cmd
+        from app.services.priv_helper import _resolve_sudo
+        _sudo_path = _resolve_sudo()
+        if not _sudo_path:
+            raise FreeBSDNetworkError(
+                "sudo is required to run privileged commands as a non-root user "
+                "but was not found on PATH. Run Smart Shield as root, or install "
+                "the 'sudo' package."
+            )
+        actual_cmd = [_sudo_path] + actual_cmd
 
     try:
         proc = subprocess.run(
@@ -175,6 +203,32 @@ def set_default_gateway(gateway_ip: str):
     # Delete may fail if no default route exists yet.
     run_command(["route", "-n", "delete", "default"], check=False)
     run_command(["route", "-n", "add", "default", gateway_ip], check=True)
+
+
+def get_default_gateway() -> str:
+    """Return the current IPv4 default gateway, or '' if none.
+
+    Parses ``netstat -rn -f inet`` and picks the gateway column of the
+    ``default`` row. Returns '' on non-FreeBSD or when parsing fails.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return ""
+    try:
+        r = run_command(["netstat", "-rn", "-f", "inet"], check=False, timeout_seconds=5)
+        for line in (r.stdout or "").splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "default":
+                return parts[1]
+    except Exception:
+        pass
+    return ""
+
+
+def restore_default_gateway(old_gateway: str) -> None:
+    """Best-effort: delete current default route and re-add *old_gateway*."""
+    run_command(["route", "-n", "delete", "default"], check=False)
+    if old_gateway:
+        run_command(["route", "-n", "add", "default", old_gateway], check=False)
 
 
 def list_live_connections():
@@ -644,16 +698,25 @@ def apply_interface_with_rollback(
             old_netmask = str(_ip.ip_interface(old_cidr).network.netmask)
         except Exception:
             pass
+    # Capture the current default gateway so rollback can restore it if the
+    # new gateway/connectivity check fails.
+    old_gateway = get_default_gateway()
+    old_state["default_gateway"] = old_gateway
 
     def _restore_old():
-        """Best-effort restore of previous address."""
-        if not old_ip or not old_netmask:
-            return
+        """Best-effort restore of previous address + default gateway."""
+        if old_ip and old_netmask:
+            try:
+                run_command(
+                    ["ifconfig", iface_name, "inet", old_ip, "netmask", old_netmask],
+                    check=False,
+                )
+            except Exception:
+                pass
+        # Always try to restore the gateway — even if the interface restore
+        # was a no-op, the new_gateway above may have replaced the default route.
         try:
-            run_command(
-                ["ifconfig", iface_name, "inet", old_ip, "netmask", old_netmask],
-                check=False,
-            )
+            restore_default_gateway(old_gateway)
         except Exception:
             pass
 
@@ -673,7 +736,7 @@ def apply_interface_with_rollback(
         try:
             set_default_gateway(new_gateway)
         except FreeBSDNetworkError as exc:
-            # Gateway failed — restore old address and abort
+            # Gateway failed — restore old address + old gateway and abort
             _restore_old()
             return {
                 "ok": False,
@@ -687,14 +750,8 @@ def apply_interface_with_rollback(
     if target:
         reachable = _ping(target)
         if not reachable:
-            # Restore old address
+            # Restore old address + old default gateway.
             _restore_old()
-            if old_state.get("inet"):
-                # Also restore old gateway if we know it
-                try:
-                    run_command(["route", "-n", "delete", "default"], check=False)
-                except Exception:
-                    pass
             return {
                 "ok": False,
                 "message": (
@@ -760,10 +817,48 @@ def normalize_interface_payload(data, interface_type):
     }
 
 
+def _kick_dhcp_client(iface: str) -> dict:
+    """
+    Bring *iface* up and request a DHCP lease using whichever client is present.
+    FreeBSD 13 ships /sbin/dhclient; FreeBSD 14 ships dhcpcd. Failures are
+    non-fatal — the lease can arrive seconds later, so we report ok=True with
+    a "pending" message rather than blocking the wizard.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "message": f"{iface}: dhcp skipped (non-FreeBSD)"}
+
+    import shutil
+    dhcp_bin = shutil.which("dhclient") or shutil.which("dhcpcd")
+    if not dhcp_bin:
+        return {
+            "ok": False,
+            "message": f"{iface}: no DHCP client found (install dhclient or dhcpcd)",
+        }
+    try:
+        run_command(["/sbin/ifconfig", iface, "up"], check=False, timeout_seconds=5)
+    except Exception:
+        pass
+    try:
+        r = run_command([dhcp_bin, iface], check=False, timeout_seconds=15)
+        if r.returncode == 0:
+            return {"ok": True, "message": f"{iface}: DHCP lease requested via {dhcp_bin}"}
+        return {
+            "ok": True,
+            "message": (
+                f"{iface}: {dhcp_bin} returned rc={r.returncode}; lease pending "
+                f"({(r.stderr or r.stdout or '').strip()[:160]})"
+            ),
+        }
+    except Exception as exc:
+        return {"ok": True, "message": f"{iface}: DHCP client error: {exc} (lease pending)"}
+
+
 def apply_interface_config(conn) -> dict:
     """
     Read LAN and WAN config from the DB and apply each interface live.
-    Skips DHCP/PPPoE WAN (those are managed by dhclient/mpd, not ifconfig).
+    Static  → assign the address (with rollback on failure).
+    DHCP    → kick dhclient/dhcpcd so the lease + default route come up now.
+    PPPoE   → defer to apply_pppoe which manages the ppp daemon.
     Returns a combined result dict with ok/message keys.
     """
     results = []
@@ -786,16 +881,53 @@ def apply_interface_config(conn) -> dict:
         gateway = (row["ipv4_upstream_gateway"] or "").strip()
         mode    = (row["ipv4_config_type"] or "static").lower()
 
-        if not iface or not cidr or mode != "static":
+        if not iface:
             results.append({
                 "iface": label,
                 "ok": True,
-                "message": f"{label}: skipped (mode={mode}, iface={iface or 'unset'})",
+                "message": f"{label}: skipped (no interface assigned)",
             })
             continue
 
-        r = apply_interface_with_rollback(iface, cidr, gateway)
-        results.append({"iface": label, **r})
+        if mode == "static":
+            if not cidr:
+                results.append({
+                    "iface": label,
+                    "ok": True,
+                    "message": f"{label}: skipped (static mode but no address set)",
+                })
+                continue
+            r = apply_interface_with_rollback(iface, cidr, gateway)
+            results.append({"iface": label, **r})
+            continue
+
+        if mode == "dhcp":
+            r = _kick_dhcp_client(iface)
+            results.append({"iface": label, **r})
+            continue
+
+        if mode == "pppoe":
+            try:
+                from app.services.pppoe_writer import apply_pppoe
+                r = apply_pppoe(conn)
+                results.append({
+                    "iface": label,
+                    "ok": r.get("ok", False),
+                    "message": f"{label}: pppoe — {r.get('message', '')}",
+                })
+            except Exception as exc:
+                results.append({
+                    "iface": label,
+                    "ok": False,
+                    "message": f"{label}: pppoe apply failed: {exc}",
+                })
+            continue
+
+        results.append({
+            "iface": label,
+            "ok": True,
+            "message": f"{label}: skipped (unknown mode={mode})",
+        })
 
     overall_ok = all(r["ok"] for r in results)
     return {

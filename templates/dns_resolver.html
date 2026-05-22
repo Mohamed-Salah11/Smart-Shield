@@ -19,6 +19,7 @@
   </ul>
 
   <form method="post" id="dns-resolver-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <div class="ss-card">
       <div class="ss-card-head">
@@ -31,7 +32,7 @@
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNS Resolver</p><p class="ss-toggle-desc">Start the Unbound recursive resolver service</p></div>
         </div>
         <hr class="ss-divider">
-        <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+        <div class="ss-field-grid ss-field-grid-2 ext-3019698e">
           <div class="ss-field">
             <label class="ss-label">Listen Port</label>
             <input class="form-control" name="listen_port" placeholder="53 (default)">
@@ -65,7 +66,7 @@
           <label class="ss-toggle"><input class="form-check-input" type="checkbox" id="enable_tls" name="enable_tls"><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">Enable DNS-over-TLS (DoT)</p><p class="ss-toggle-desc">Respond to SSL/TLS queries from local clients</p></div>
         </div>
-        <div class="ss-field-grid ss-field-grid-2" style="margin-top:16px;">
+        <div class="ss-field-grid ss-field-grid-2 ext-b0043ef4">
           <div class="ss-field">
             <label class="ss-label">SSL/TLS Certificate</label>
             <select class="form-select" name="tls_cert"><option>GUI default certificate</option></select>
@@ -98,17 +99,17 @@
           </a>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
-            <tr><th style="padding:10px 14px;">Host</th><th>Domain</th><th>IP Address</th><th>Description</th><th></th></tr>
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
+            <tr><th class="ext-16e59a0f">Host</th><th>Domain</th><th>IP Address</th><th>Description</th><th></th></tr>
           </thead>
           <tbody>
             {% set hosts = hosts if hosts is defined else [] %}
             {% if hosts %}{% for h in hosts %}
-            <tr><td style="padding:8px 14px;">{{ h.host }}</td><td>{{ h.domain }}</td><td>{{ h.ip }}</td><td>{{ h.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
+            <tr><td class="ext-ec6b5e99">{{ h.host }}</td><td>{{ h.domain }}</td><td>{{ h.ip }}</td><td>{{ h.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
             {% endfor %}{% else %}
-            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">No host overrides configured</td></tr>
+            <tr><td class="ext-5306663a" colspan="5">No host overrides configured</td></tr>
             {% endif %}
           </tbody>
         </table>
@@ -126,17 +127,17 @@
           </a>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
-            <tr><th style="padding:10px 14px;">Domain</th><th>Lookup Server</th><th>Description</th><th></th></tr>
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
+            <tr><th class="ext-16e59a0f">Domain</th><th>Lookup Server</th><th>Description</th><th></th></tr>
           </thead>
           <tbody>
             {% set doms = domains if domains is defined else [] %}
             {% if doms %}{% for d in doms %}
-            <tr><td style="padding:8px 14px;">{{ d.domain }}</td><td>{{ d.server }}</td><td>{{ d.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
+            <tr><td class="ext-ec6b5e99">{{ d.domain }}</td><td>{{ d.server }}</td><td>{{ d.description }}</td><td><a class="btn btn-sm btn-primary" href="#">Edit</a></td></tr>
             {% endfor %}{% else %}
-            <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">No domain overrides configured</td></tr>
+            <tr><td class="ext-5306663a" colspan="4">No domain overrides configured</td></tr>
             {% endif %}
           </tbody>
         </table>

@@ -10,10 +10,10 @@
   </div>
 
   <ul class="nav nav-tabs mb-4">
-    <li class="nav-item"><a class="nav-link active" href="#" onclick="switchTab('settings');return false;" data-tab="settings">Settings</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('restore');return false;" data-tab="restore">Restore</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('backup');return false;" data-tab="backup">Backup Now</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('change-device-key');return false;" data-tab="change-device-key">Change Device Key</a></li>
+    <li class="nav-item"><a class="nav-link active" href="#" data-action="h_4fc1631f09" data-tab="settings">Settings</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-action="h_f0e5a0fcb4" data-tab="restore">Restore</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-action="h_eb1539621a" data-tab="backup">Backup Now</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-action="h_3cf920f41c" data-tab="change-device-key">Change Device Key</a></li>
   </ul>
 
   <!-- Settings Tab -->
@@ -38,14 +38,14 @@
         </div>
         <hr class="ss-divider">
         <div class="ss-field-grid ss-field-grid-2">
-          <div class="ss-field" style="grid-column:span 2;">
+          <div class="ss-field ext-a74d27d5">
             <label class="ss-label">Device Key</label>
             <div class="d-flex gap-2">
               <input type="text" id="device-key" class="form-control font-monospace" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="switchTab('change-device-key')">Change</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadDeviceKey()"><i class="fa-solid fa-download"></i></button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_75cbf652aa">Change</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_02fb4aa0b7"><i class="fa-solid fa-download"></i></button>
             </div>
-            <p class="ss-hint" style="color:var(--danger);font-weight:600;">Keep a secure copy — if this key is lost, all backups for this device will be lost!</p>
+            <p class="ss-hint ext-da9a94e6">Keep a secure copy — if this key is lost, all backups for this device will be lost!</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">Encryption Password</label>
@@ -55,7 +55,7 @@
           <div class="ss-field">
             <label class="ss-label">Confirm Password</label>
             <input type="password" id="encryption-password-confirm" class="form-control" placeholder="Confirm password">
-            <p class="ss-hint" style="color:var(--danger);font-weight:600;">Keep a secure copy — encrypted backups are unreadable without this!</p>
+            <p class="ss-hint ext-da9a94e6">Keep a secure copy — encrypted backups are unreadable without this!</p>
           </div>
           <div class="ss-field">
             <label class="ss-label">Hint / Identifier</label>
@@ -64,7 +64,7 @@
           </div>
           <div class="ss-field">
             <label class="ss-label">Manual Backup Limit</label>
-            <input type="number" id="manual-backup-limit" class="form-control" placeholder="e.g. 10" style="max-width:160px;">
+            <input type="number" id="manual-backup-limit" class="form-control ext-844e0595" placeholder="e.g. 10">
             <p class="ss-hint">Max manual backups retained (50 max)</p>
           </div>
         </div>
@@ -81,29 +81,29 @@
   </div>
 
   <!-- Restore Tab -->
-  <div id="tab-restore" style="display:none;">
+  <div class="ext-cb458930" id="tab-restore">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
         <div><div class="ss-card-title">Restore Configuration</div><div class="ss-card-subtitle">Roll back to a previous snapshot</div></div>
       </div>
       <div class="ss-card-body">
-        <p style="color:var(--muted);font-size:.85rem;">No backup revisions available. Enable Auto Config Backup and save a configuration to create restore points.</p>
+        <p class="ext-1e84a5f5">No backup revisions available. Enable Auto Config Backup and save a configuration to create restore points.</p>
       </div>
     </div>
   </div>
 
   <!-- Backup Now Tab -->
-  <div id="tab-backup" style="display:none;">
+  <div class="ext-cb458930" id="tab-backup">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-floppy-disk"></i></div>
         <div><div class="ss-card-title">Manual Backup</div></div>
       </div>
       <div class="ss-card-body">
-        <div class="alert" style="background:rgba(255,193,7,.1);border:1px solid #e6a817;border-radius:8px;padding:14px 18px;font-size:.85rem;margin-bottom:16px;">
-          <i class="fa-solid fa-triangle-exclamation me-2" style="color:#e6a817;"></i>
-          AutoConfigBackup is currently disabled — enable it on the <a href="#" onclick="switchTab('settings');return false;" style="color:var(--primary);">Settings tab</a> to allow manual backups.
+        <div class="alert ext-8235464a">
+          <i class="fa-solid fa-triangle-exclamation me-2 ext-ba9ffbbb"></i>
+          AutoConfigBackup is currently disabled — enable it on the <a class="ext-035cc887" href="#" data-action="h_348bf0a97d">Settings tab</a> to allow manual backups.
         </div>
         <button type="button" class="btn btn-primary" disabled><i class="fa-solid fa-cloud-arrow-up me-1"></i>Backup Now</button>
       </div>
@@ -111,7 +111,7 @@
   </div>
 
   <!-- Change Device Key Tab -->
-  <div id="tab-change-device-key" style="display:none;">
+  <div class="ext-cb458930" id="tab-change-device-key">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-key"></i></div>
@@ -119,23 +119,23 @@
       </div>
       <div class="ss-card-body">
         <div class="ss-field-grid ss-field-grid-2">
-          <div class="ss-field" style="grid-column:span 2;">
+          <div class="ss-field ext-a74d27d5">
             <label class="ss-label">Current Device Key</label>
             <input type="text" id="current-device-key" class="form-control font-monospace" value="89cfb56fda178b8f0fb8fde8343b9f13bb7293eefa14ae37dc7c26325f382e03" readonly>
-            <p class="ss-hint" style="color:var(--danger);font-weight:600;">If this key is lost, all backups for this device will be lost! (0 hosted backups)</p>
+            <p class="ss-hint ext-da9a94e6">If this key is lost, all backups for this device will be lost! (0 hosted backups)</p>
           </div>
-          <div class="ss-field" style="grid-column:span 2;">
+          <div class="ss-field ext-a74d27d5">
             <label class="ss-label">New Device Key</label>
             <div class="d-flex gap-2">
               <input type="text" id="new-device-key" class="form-control font-monospace" placeholder="64-character hex string">
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateNewKey()"><i class="fa-solid fa-dice me-1"></i>Generate</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_cb2fac8726"><i class="fa-solid fa-dice me-1"></i>Generate</button>
             </div>
-            <p class="ss-hint" style="color:var(--danger);font-weight:600;">Changing the key disconnects from all previous backups. Download the old key first!</p>
+            <p class="ss-hint ext-da9a94e6">Changing the key disconnects from all previous backups. Download the old key first!</p>
           </div>
         </div>
         <hr class="ss-divider">
         <div class="ss-toggle-row">
-          <label class="ss-toggle"><input type="checkbox" id="acknowledge-key-change" onchange="document.getElementById('update-key-btn').disabled=!this.checked;"><span class="ss-toggle-slider"></span></label>
+          <label class="ss-toggle"><input type="checkbox" id="acknowledge-key-change" data-action-change="h_a619f0f077"><span class="ss-toggle-slider"></span></label>
           <div class="ss-toggle-content"><p class="ss-toggle-label">I understand that changing the key disconnects from previous backups</p></div>
         </div>
       </div>
@@ -148,7 +148,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 function switchTab(name) {
   ['settings','restore','backup','change-device-key'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
@@ -174,3 +174,21 @@ function generateNewKey() {
 }
 </script>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_4fc1631f09'] = function (event, el) { switchTab('settings');return false; };
+  R['h_f0e5a0fcb4'] = function (event, el) { switchTab('restore');return false; };
+  R['h_eb1539621a'] = function (event, el) { switchTab('backup');return false; };
+  R['h_3cf920f41c'] = function (event, el) { switchTab('change-device-key');return false; };
+  R['h_75cbf652aa'] = function (event, el) { switchTab('change-device-key') };
+  R['h_02fb4aa0b7'] = function (event, el) { downloadDeviceKey() };
+  R['h_348bf0a97d'] = function (event, el) { switchTab('settings');return false; };
+  R['h_cb2fac8726'] = function (event, el) { generateNewKey() };
+  R['h_a619f0f077'] = function (event, el) { document.getElementById('update-key-btn').disabled=!this.checked; };
+})();
+</script>
+<!-- /inline-handlers:auto -->

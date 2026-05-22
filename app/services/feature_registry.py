@@ -141,7 +141,9 @@ _FEATURES: List[Feature] = [
         name="DNS Resolver (Unbound)",
         description="Unbound recursive DNS resolver / forwarder",
         required_commands=["unbound", "unbound-checkconf"],
-        required_services=["local_unbound"],
+        # The unbound package's rc.d service is `unbound` (what install.sh enables
+        # and the rest of the app manages) — NOT the base-system `local_unbound`.
+        required_services=["unbound"],
         freebsd_only=True,
         category="services",
     ),

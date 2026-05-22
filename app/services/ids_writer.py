@@ -27,12 +27,157 @@ import textwrap
 from app.services.network_service import run_command, FreeBSDNetworkError
 from app.services.service_manager import service_action, sysrc_set
 
-_SURICATA_CONF_DIR  = "/usr/local/etc/suricata"
-_SURICATA_CONF_PATH = "/usr/local/etc/suricata/suricata.yaml"
-_SURICATA_RULES_DIR = "/usr/local/etc/suricata/rules"
-_SURICATA_LOG_DIR   = "/var/log/suricata"
-_SURICATA_RUN_DIR   = "/var/run/suricata"
-_SERVICE_NAME       = "suricata"
+_SURICATA_CONF_DIR    = "/usr/local/etc/suricata"
+_SURICATA_CONF_PATH   = "/usr/local/etc/suricata/suricata.yaml"
+_SURICATA_RULES_DIR   = "/usr/local/etc/suricata/rules"
+# suricata-update writes a single merged rule file here (not per-source)
+_SURICATA_UPDATE_RULES = "/var/lib/suricata/rules/suricata.rules"
+_SURICATA_LOG_DIR     = "/var/log/suricata"
+_SURICATA_RUN_DIR     = "/var/run/suricata"
+_SERVICE_NAME         = "suricata"
+
+
+def _find_suricata_update() -> "str | None":
+    """Return the absolute path to suricata-update, or None if absent.
+
+    Preference order:
+      1. Project venv binary — clean isolated dependency metadata, avoids the
+         pkg_resources.ResolutionError that affects system-Python installs.
+      2. Direct path probes — /usr/local/bin is frequently missing from the
+         daemon's PATH on FreeBSD, so probe explicitly.
+      3. PATH lookup as a last resort.
+    """
+    import shutil
+    # 1. Same Python as the running app (works regardless of where the venv lives).
+    venv_bin = os.path.join(os.path.dirname(sys.executable), "suricata-update")
+    if os.path.isfile(venv_bin) and os.access(venv_bin, os.X_OK):
+        return venv_bin
+    # 2. Conventional system locations.
+    for candidate in ("/usr/local/bin/suricata-update", "/usr/bin/suricata-update"):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    # 3. Anything else on PATH.
+    return shutil.which("suricata-update")
+
+
+def _mem_budget() -> str:
+    """
+    Return ``'low'`` for small appliances (≲2 GiB RAM), else ``'normal'``.
+
+    Suricata's detect engine plus its memcaps must fit alongside the rest of
+    the Smart Shield stack (gunicorn, nginx, unbound, dhcpd…). On a small box
+    the larger defaults get the daemon OOM-killed shortly after it starts
+    processing traffic.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return "normal"
+    try:
+        r = run_command(["sysctl", "-n", "hw.physmem"], check=False)
+        physmem = int((r.stdout or "0").strip() or 0)
+    except Exception:
+        physmem = 0
+    # hw.physmem is in bytes; treat ≤2.5 GiB as "low" (covers 2 GB boxes).
+    if physmem and physmem <= 2_684_354_560:
+        return "low"
+    return "normal"
+
+
+def ensure_rules_file() -> bool:
+    """
+    Guarantee the merged Suricata rules file exists.
+
+    Suricata (and ``suricata -T``) warns and loads 0 rules when the file named
+    in ``rule-files`` is absent — and on some builds the test mode then fails
+    outright, which deadlocks first-time enable. Creating an empty placeholder
+    makes the deep check pass cleanly; real rules from ``suricata-update``
+    simply overwrite it. Returns True when a file is present. Never raises.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return True
+    try:
+        os.makedirs(os.path.dirname(_SURICATA_UPDATE_RULES), exist_ok=True)
+        if not os.path.exists(_SURICATA_UPDATE_RULES):
+            with open(_SURICATA_UPDATE_RULES, "a"):
+                pass
+        return True
+    except Exception:
+        return False
+
+
+def ensure_rules_present(conn) -> dict:
+    """
+    Make sure a usable rules file exists before the deep check or a daemon
+    start. Creates the empty placeholder, and when the merged file is still
+    empty fetches it once via suricata-update.
+
+    A failed fetch is non-fatal — the placeholder keeps the deep check
+    passing and Suricata starts with 0 rules until the operator retries.
+    Shared by ``toggle_ids`` and the watchdog so both bootstrap identically.
+    Returns ``{"ok", "fetched": bool, "degraded": bool, "rules_size": int,
+    "rules_path", "message"}`` so callers can warn loudly when a daemon would
+    start with an empty ruleset. ``degraded`` is True whenever the merged rules
+    file is empty (0 bytes). Never raises.
+    """
+    def _size() -> int:
+        try:
+            return os.path.getsize(_SURICATA_UPDATE_RULES)
+        except OSError:
+            return 0
+
+    ensure_rules_file()
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "fetched": False, "degraded": False, "rules_size": 0,
+                "rules_path": _SURICATA_UPDATE_RULES, "message": "non-freebsd"}
+
+    size = _size()
+    if size > 0:
+        return {"ok": True, "fetched": False, "degraded": False, "rules_size": size,
+                "rules_path": _SURICATA_UPDATE_RULES, "message": "rules already present"}
+    if not _find_suricata_update():
+        return {"ok": True, "fetched": False, "degraded": True, "rules_size": 0,
+                "rules_path": _SURICATA_UPDATE_RULES,
+                "message": "suricata-update not installed — starting with 0 rules"}
+
+    fetch = update_rules(conn)
+    ensure_rules_file()   # restore the placeholder if a failed run left nothing
+    size = _size()
+    try:
+        from app.audit_log import log_event
+        log_event(
+            category="security", action="ids_auto_fetch_rules",
+            severity="medium" if fetch.get("ok") else "high",
+            username="system", remote_addr="",
+            details={"ok": bool(fetch.get("ok")),
+                     "message": (fetch.get("message") or "")[:512],
+                     "rules_path": _SURICATA_UPDATE_RULES},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "fetched": bool(fetch.get("ok")),
+            "degraded": size == 0, "rules_size": size,
+            "rules_path": _SURICATA_UPDATE_RULES,
+            "source_warnings": fetch.get("source_warnings", []),
+            "message": fetch.get("message", "")}
+
+
+def _scan_dmesg_for_oom() -> str:
+    """
+    Return a one-line description if dmesg shows Suricata was recently
+    OOM-killed, else "". Used to turn a silent crash loop into an
+    actionable message.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return ""
+    try:
+        r = run_command(["dmesg"], check=False)
+        lines = (r.stdout or "").splitlines()
+    except Exception:
+        return ""
+    for line in reversed(lines):
+        low = line.lower()
+        if "suricata" in low and ("out of swap space" in low or "killed" in low):
+            return line.strip()
+    return ""
 
 
 def _rows(conn, sql, params=()):
@@ -46,6 +191,143 @@ def _cfg(conn) -> dict:
     return rows[0] if rows else {}
 
 
+def _clean_iface(name: str) -> str:
+    """
+    Sanitise an interface name pulled from `assigned_port` or similar.
+
+    Smart Shield stores ports in two formats:
+      * raw kernel name, e.g. ``em0``
+      * legacy "<name> (<mac>)" pulled from the picker, e.g. ``em0 (00:0c:29:a1:2b:3c)``
+
+    Suricata only accepts the kernel name. Strip everything after the first
+    whitespace token; that's the canonical port. Falls back to ``em0`` when
+    the input is empty so the YAML generator never produces a blank
+    ``interface:`` field (which would crash Suricata at startup).
+    """
+    s = (name or "").strip()
+    if not s:
+        return "em0"
+    return s.split()[0]
+
+
+def _derive_lan_home_net(conn) -> str:
+    """Default Suricata HOME_NET to the configured LAN subnet.
+
+    A LAN-side IDS should treat the LAN network as "home" so EXTERNAL_NET
+    (``!$HOME_NET``) precisely means "everything off-LAN". Reads the LAN
+    interface address (``lan_config.ipv4_address``, e.g. ``192.168.1.1/24``)
+    and returns its network (``192.168.1.0/24``). Falls back to the broad
+    RFC1918 ``192.168.0.0/16`` range when the LAN address isn't usable yet
+    (fresh install, or a LAN still on DHCP with no address recorded).
+    """
+    try:
+        import ipaddress
+        row = conn.execute(
+            "SELECT ipv4_address FROM lan_config LIMIT 1"
+        ).fetchone()
+        if row and row["ipv4_address"]:
+            return str(ipaddress.ip_interface(row["ipv4_address"].strip()).network)
+    except Exception:
+        pass
+    return "192.168.0.0/16"
+
+
+def _validate_cidr_list(value: str) -> "tuple[bool, str]":
+    """
+    Return ``(ok, error)`` for an IP/CIDR list (the shape Suricata's
+    ``HOME_NET`` accepts). Empty string is treated as OK — the writer
+    substitutes a default. Items may be comma-separated; ``!`` negation
+    is allowed in front of each entry.
+
+    Used as a preflight by ``validate_suricata_yaml`` so a malformed
+    HOME_NET produces an actionable error instead of a silent daemon exit
+    at parse time.
+    """
+    import ipaddress as _ipa
+    v = (value or "").strip()
+    if not v:
+        return (True, "")
+    for raw in v.split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        if item.startswith("!"):
+            item = item[1:].strip()
+        if not item:
+            return (False, "empty entry in HOME_NET / EXTERNAL_NET")
+        # Allow plain dollar-var references (Suricata syntax: $HOME_NET).
+        if item.startswith("$"):
+            continue
+        try:
+            _ipa.ip_network(item, strict=False)
+        except ValueError:
+            return (False, f"'{item}' is not a valid IP / CIDR")
+    return (True, "")
+
+
+# ---------------------------------------------------------------------------
+# Daemon log tail — surfaced in the GUI so operators can self-diagnose
+# silent Suricata exits without ssh access.
+# ---------------------------------------------------------------------------
+
+def tail_suricata_log(lines: int = 200, source: str = "suricata") -> dict:
+    """
+    Read the last *lines* lines of ``/var/log/suricata/<source>.log``.
+
+    source = "suricata"  → daemon log (errors, rule load summary, exits)
+    source = "fast"      → fast.log alert stream
+    source = "stats"     → throughput / drop counters
+
+    Returns ``{"ok", "path", "lines": [str, ...], "missing": bool,
+              "message": str}``. Every line is capped at 1024 chars and
+    has terminating CRLFs stripped. The function never raises.
+    """
+    src = (source or "suricata").strip().lower()
+    if src not in ("suricata", "fast", "stats"):
+        return {"ok": False, "path": "", "lines": [], "missing": True,
+                "message": f"unknown log source '{source}'"}
+    try:
+        n = max(1, min(int(lines or 200), 2000))
+    except (TypeError, ValueError):
+        n = 200
+
+    path = f"{_SURICATA_LOG_DIR}/{src}.log"
+    if not os.path.exists(path):
+        return {"ok": True, "path": path, "lines": [], "missing": True,
+                "message": f"{path} does not exist yet"}
+
+    try:
+        # Read the tail without pulling the whole file into memory — Suricata
+        # logs can grow large between rotations.
+        chunk_size = 8192
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            # Heuristic: ~200 chars / line × n lines, with a safety multiplier.
+            want = min(size, max(chunk_size, n * 240 * 2))
+            fh.seek(max(0, size - want))
+            blob = fh.read()
+        text = blob.decode("utf-8", errors="replace")
+        raw_lines = text.splitlines()[-n:]
+    except Exception as exc:
+        return {"ok": False, "path": path, "lines": [], "missing": False,
+                "message": f"read failed: {exc}"}
+
+    cleaned = []
+    for ln in raw_lines:
+        # Strip ANSI colour escapes — Suricata uses them in <Error>/<Warn> markers.
+        line = ln.replace("\r", "")
+        while "\x1b[" in line:
+            i = line.index("\x1b[")
+            j = line.find("m", i + 2)
+            if j < 0:
+                break
+            line = line[:i] + line[j + 1:]
+        cleaned.append(line[:1024])
+    return {"ok": True, "path": path, "lines": cleaned, "missing": False,
+            "message": ""}
+
+
 # ---------------------------------------------------------------------------
 # YAML generator
 # ---------------------------------------------------------------------------
@@ -56,25 +338,94 @@ def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
         cfg = {}
 
     mode        = cfg.get("mode", "ids") if not force_ids_mode else "ids"
-    interface   = cfg.get("interface") or "em0"
-    home_net    = cfg.get("home_net") or "192.168.0.0/16"
+    # Interface resolution mirrors routes/ids.py display: an explicit ids_config
+    # value wins; otherwise the IDS monitors the LAN side by default. LAN-side
+    # inspection gives real internal-host attribution (WAN is post-NAT) and far
+    # less internet-scan noise, which is the higher-value detection on this
+    # appliance. Fall back to the configured LAN port, then "em1" (the LAN
+    # default used by pf_generator) as a last resort.
+    #
+    # NOTE: _clean_iface("") returns "em0", so the empty case is guarded
+    # explicitly here — otherwise the lan_config lookup below would be dead code
+    # and Suricata would silently bind to em0 regardless of the real LAN port.
+    raw_iface   = (cfg.get("interface") or "").strip()
+    interface   = _clean_iface(raw_iface) if raw_iface else ""
+    if not interface:
+        try:
+            row = conn.execute(
+                "SELECT assigned_port FROM lan_config LIMIT 1"
+            ).fetchone()
+            if row and row["assigned_port"]:
+                interface = _clean_iface(row["assigned_port"])
+        except Exception:
+            pass
+    if not interface:
+        interface = "em1"
+    # HOME_NET: explicit operator value wins; otherwise derive the LAN subnet
+    # so EXTERNAL_NET (!$HOME_NET) is precise for LAN-side monitoring.
+    home_net    = (cfg.get("home_net") or "").strip() or _derive_lan_home_net(conn)
     ext_net     = cfg.get("external_net") or "!$HOME_NET"
     eve_enabled = bool(cfg.get("eve_json_enabled", 1))
     fast_log    = bool(cfg.get("fast_log_enabled", 1))
     max_pending = int(cfg.get("max_pending_packets") or 1024)
     stats_int   = int(cfg.get("stats_interval") or 8)
 
-    # Active rulesets
+    # Memory budget — small appliances get conservative memcaps so Suricata
+    # is not OOM-killed shortly after it starts processing traffic.
+    mem_budget = _mem_budget()
+    if mem_budget == "low":
+        detect_profile    = "low"
+        defrag_memcap     = "16mb"
+        flow_memcap       = "32mb"
+        stream_memcap     = "32mb"
+        reassembly_memcap = "64mb"
+        host_memcap       = "16mb"
+        max_pending       = min(max_pending, 256)
+    else:
+        detect_profile    = "medium"
+        defrag_memcap     = "32mb"
+        flow_memcap       = "128mb"
+        stream_memcap     = "64mb"
+        reassembly_memcap = "256mb"
+        host_memcap       = "32mb"
+
+    # Active rulesets.
+    # suricata-update writes a single combined file (_SURICATA_UPDATE_RULES).
+    # Only rulesets with an explicit local_path get their own entry in rule-files.
     rulesets = _rows(conn, "SELECT * FROM ids_rulesets WHERE enabled=1 ORDER BY id")
     rule_files = []
+    has_update_managed = False
     for rs in rulesets:
         lp = (rs.get("local_path") or "").strip()
-        nm = (rs.get("name") or "ruleset").strip().lower().replace(" ", "_")
-        path = lp if lp else f"{_SURICATA_RULES_DIR}/{nm}.rules"
-        rule_files.append(path)
+        if lp:
+            if lp not in rule_files:
+                rule_files.append(lp)
+        else:
+            has_update_managed = True
 
+    if has_update_managed or not rule_files:
+        rule_files.insert(0, _SURICATA_UPDATE_RULES)
+
+    # Drop rule files that do not exist on disk — a missing file makes
+    # `suricata -T` warn and load 0 rules. The merged suricata-update file is
+    # always kept; ensure_rules_file() guarantees it exists before a real run.
+    if sys.platform.startswith("freebsd"):
+        rule_files = [p for p in rule_files
+                      if p == _SURICATA_UPDATE_RULES or os.path.exists(p)]
     if not rule_files:
-        rule_files = [f"{_SURICATA_RULES_DIR}/emerging-threats.rules"]
+        rule_files = [_SURICATA_UPDATE_RULES]
+
+    # Emit relative names for files inside default-rule-path; keep absolute
+    # paths for operator local_path entries that live elsewhere. Matches the
+    # standard Suricata layout and avoids duplicating the prefix on every line.
+    default_rule_path = os.path.dirname(_SURICATA_UPDATE_RULES)
+    rule_files_rel = []
+    for p in rule_files:
+        if os.path.dirname(p) == default_rule_path:
+            rule_files_rel.append(os.path.basename(p))
+        else:
+            rule_files_rel.append(p)
+    rule_files = rule_files_rel
 
     # Build capture config depending on mode.
     # FreeBSD does not support af-packet (Linux AF_PACKET socket).
@@ -114,7 +465,11 @@ def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
                       extended: yes
                   - tls:
                       extended: yes
-                  - files
+                  - files:
+                      force-magic: yes
+                      force-filestore: no
+                  - flow:
+                      all: no
                   - stats:
                       totals: yes
         """))
@@ -144,7 +499,7 @@ def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
 # ============================================================
 # Smart Shield — auto-generated suricata.yaml
 # Generated by app/services/ids_writer.py
-# Mode: {mode.upper()}  Interface: {interface}
+# Mode: {mode.upper()}  Interface: {interface}  Memory budget: {mem_budget}
 # ============================================================
 
 vars:
@@ -244,7 +599,7 @@ threading:
   detect-thread-ratio: 1.0
 
 detect:
-  profile: medium
+  profile: {detect_profile}
   custom-values:
     toclient-groups: 3
     toserver-groups: 25
@@ -272,7 +627,7 @@ home-net-ranges:
   - {home_net}
 
 defrag:
-  memcap: 32mb
+  memcap: {defrag_memcap}
   hash-size: 65536
   trackers: 65535
   max-frags: 65535
@@ -280,7 +635,7 @@ defrag:
   timeout: 60
 
 flow:
-  memcap: 128mb
+  memcap: {flow_memcap}
   hash-size: 65536
   prealloc: 10000
   emergency-recovery: 30
@@ -289,11 +644,11 @@ vlan:
   use-for-tracking: true
 
 stream:
-  memcap: 64mb
+  memcap: {stream_memcap}
   checksum-validation: yes
   inline: {str(mode == 'ips').lower()}
   reassembly:
-    memcap: 256mb
+    memcap: {reassembly_memcap}
     depth: 1mb
     toserver-chunk-size: 2560
     toclient-chunk-size: 2560
@@ -302,8 +657,9 @@ stream:
 host:
   hash-size: 4096
   prealloc: 1000
-  memcap: 32mb
+  memcap: {host_memcap}
 
+default-rule-path: {default_rule_path}
 rule-files:
 {rule_files_yaml}
 
@@ -324,7 +680,23 @@ def validate_suricata_yaml(text: str) -> tuple:
     Validate the Suricata YAML via ``suricata -T -c <file>``.
     Returns ``(True, "")`` on success, ``(False, error)`` on failure.
     On non-FreeBSD or if suricata is not installed, returns ``(True, "skipped")``.
+
+    Includes a fast CIDR preflight on the HOME_NET / EXTERNAL_NET keys —
+    Suricata exits silently if these are malformed, producing a
+    "marked enabled but not running" loop that's hard to diagnose from
+    the GUI. Catch it here with an actionable error first.
     """
+    import re as _re
+    for var in ("HOME_NET", "EXTERNAL_NET"):
+        m = _re.search(rf'^\s*{var}\s*:\s*"?\[?(.*?)\]?"?\s*$',
+                       text, _re.MULTILINE)
+        if not m:
+            continue
+        candidate = m.group(1).strip().strip('"')
+        ok_pf, err = _validate_cidr_list(candidate)
+        if not ok_pf:
+            return (False, f"{var} preflight failed: {err}")
+
     import shutil, tempfile, os as _os
     if not sys.platform.startswith("freebsd"):
         return (True, "skipped-non-freebsd")
@@ -352,33 +724,43 @@ def validate_suricata_yaml(text: str) -> tuple:
                 pass
 
 
-def validate_ips_safety(conn) -> list:
+def validate_ips_safety(conn) -> dict:
     """
     Additional safety checks required before enabling IPS mode.
 
     Performs three checks on FreeBSD:
-    1. Interface is selected.
-    2. netmap.ko kernel module is loaded (kldstat -n netmap).
-    3. The NIC driver is in the known-good netmap driver list.
+    1. Interface is selected.       (hard error — IPS cannot bind)
+    2. netmap.ko kernel module loaded (kldstat -n netmap).  (hard error — inline
+       capture is impossible without it; missing netmap silently drops traffic)
+    3. The NIC driver is in the known-good netmap driver list. (warning — the
+       list is non-exhaustive, so an unknown driver is surfaced, not blocked)
 
-    Returns a list of warning/error strings; empty means safe to proceed.
+    Returns a structured result so callers can hard-block on ``errors`` while
+    still surfacing ``warnings``::
+
+        {"ok": bool, "errors": [str, ...], "warnings": [str, ...]}
+
+    ``ok`` is True only when there are no hard errors. Informational/success
+    text is NOT mixed into the error list (a previous version did, which made
+    the gate impossible to evaluate reliably).
     """
-    errors = []
+    errors: list = []
+    warnings: list = []
     cfg = _cfg(conn)
     interface = (cfg.get("interface") or "").strip()
     if not interface:
         errors.append("IPS mode requires an interface to be selected.")
-        return errors
+        return {"ok": False, "errors": errors, "warnings": warnings}
 
     if not sys.platform.startswith("freebsd"):
-        errors.append(
+        warnings.append(
             "IPS mode uses netmap(4) inline capture. Verify your NIC supports netmap "
             "before enabling IPS (check: kldload netmap). IPS mode will drop traffic on "
             "misconfiguration."
         )
-        return errors
+        return {"ok": True, "errors": errors, "warnings": warnings}
 
-    # Check 1: netmap kernel module loaded
+    # Check 1: netmap kernel module loaded — hard error.
     try:
         r = run_command(["kldstat", "-n", "netmap"], check=False)
         if r.returncode != 0:
@@ -389,7 +771,7 @@ def validate_ips_safety(conn) -> list:
     except FreeBSDNetworkError as exc:
         errors.append(f"Could not check netmap module: {exc}")
 
-    # Check 2: NIC driver compatibility
+    # Check 2: NIC driver compatibility — warning (list is non-exhaustive).
     _NETMAP_SUPPORTED_PREFIXES = (
         "em", "igb", "ixgbe", "ixl", "re", "vtnet", "vmx", "bnxt", "ix",
     )
@@ -398,19 +780,13 @@ def validate_ips_safety(conn) -> list:
     if driver:
         drv = driver.group(1)
         if not any(drv.startswith(p) for p in _NETMAP_SUPPORTED_PREFIXES):
-            errors.append(
+            warnings.append(
                 f"NIC driver '{drv}' may not support netmap(4). "
                 f"Known-good drivers: {', '.join(_NETMAP_SUPPORTED_PREFIXES)}. "
                 "Test carefully — IPS mode will silently drop traffic if netmap fails."
             )
 
-    if not errors:
-        errors.append(
-            "IPS mode preflight passed. netmap is loaded and the NIC driver looks compatible. "
-            "Monitor traffic after enabling to confirm inline capture is working."
-        )
-
-    return errors
+    return {"ok": not errors, "errors": errors, "warnings": warnings}
 
 
 def write_suricata_config(conn) -> dict:
@@ -423,6 +799,9 @@ def write_suricata_config(conn) -> dict:
     os.makedirs(_SURICATA_LOG_DIR, exist_ok=True)
     os.makedirs(_SURICATA_RUN_DIR, exist_ok=True)
     os.makedirs(_SURICATA_RULES_DIR, exist_ok=True)
+    # Guarantee the merged rules file exists so the deep check never fails
+    # on a missing file (real rules from suricata-update overwrite it).
+    ensure_rules_file()
 
     from app.services.config_file_utils import atomic_write, backup_config
     try:
@@ -439,40 +818,96 @@ def write_suricata_config(conn) -> dict:
 
 def update_rules(conn) -> dict:
     """
-    Run `suricata-update` to download/update all enabled rulesets.
-    Returns per-ruleset results.
+    Run suricata-update to download/update all enabled rulesets.
+    suricata-update writes a single merged file to _SURICATA_UPDATE_RULES.
     """
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — rule update skipped.", "updated": []}
+        return {"ok": True, "message": "Non-FreeBSD — rule update skipped.", "updated": [],
+                "rules_path": _SURICATA_UPDATE_RULES}
 
+    su_bin = _find_suricata_update()
+    if not su_bin:
+        # Lazy install into the project venv (sys.executable is the venv python
+        # under gunicorn). Avoids the pkg_resources.ResolutionError from
+        # --break-system-packages installs into system Python.
+        run_command(
+            [sys.executable, "-m", "pip", "install", "--upgrade",
+             "suricata-update", "idstools", "pyyaml"],
+            check=False,
+        )
+        su_bin = _find_suricata_update()
+
+    if not su_bin:
+        py_ver = f"{sys.version_info.major}{sys.version_info.minor}"
+        return {
+            "ok": False,
+            "message": (
+                f"suricata-update not found. Install it: "
+                f"pkg install py{py_ver}-suricata-update"
+            ),
+            "updated": [],
+        }
+
+    # Refresh the source index first (non-fatal if it fails — offline deployments).
+    # The default 20s ceiling can trip on slow links; bump to 180s for the index fetch.
+    run_command([su_bin, "update-sources"], check=False, timeout_seconds=180)
+
+    # Enable/register each managed ruleset source. Capture per-source failures
+    # so the UI can show exactly which feed could not be added/enabled instead
+    # of silently merging fewer rulesets than the operator configured.
+    source_warnings: list = []
     rulesets = _rows(conn, "SELECT * FROM ids_rulesets WHERE enabled=1")
-    updated = []
-    errors  = []
-
     for rs in rulesets:
         url  = (rs.get("url") or "").strip()
-        name = rs.get("name", "")
-        try:
-            if url:
-                result = run_command(["suricata-update", "add-source", name, url], check=False)
-            else:
-                # Built-in indexed source (e.g. "et/open") — enable via the index
-                result = run_command(["suricata-update", "enable-source", name], check=False)
-            updated.append({"name": name, "ok": result.returncode == 0})
-        except FreeBSDNetworkError as exc:
-            errors.append(f"{name}: {exc}")
+        name = (rs.get("name") or "").strip()
+        lp   = (rs.get("local_path") or "").strip()
+        if not name or lp:
+            continue  # skip local-path-only rulesets and unnamed entries
+        cmd = [su_bin, "add-source", name, url] if url else [su_bin, "enable-source", name]
+        rc = run_command(cmd, check=False)
+        if rc.returncode != 0:
+            detail = (rc.stderr or rc.stdout or "").strip().replace("\n", " ")
+            source_warnings.append(f"{name}: {detail[:200]}" if detail else name)
 
-    # Run the actual update
-    try:
-        result = run_command(["suricata-update"], check=False)
-        ok = result.returncode == 0
-    except FreeBSDNetworkError as exc:
-        return {"ok": False, "message": str(exc), "updated": updated}
+    # Run the actual download + merge. Pin --output so the merged file lands at
+    # the path the generated YAML reads (the tool's default has drifted across
+    # versions). 300s covers a cold first-time multi-ruleset download.
+    rules_dir = os.path.dirname(_SURICATA_UPDATE_RULES)
+    result = run_command([su_bin, "--output", rules_dir],
+                         check=False, timeout_seconds=300)
+    ok  = result.returncode == 0
+    out = (result.stdout or result.stderr or "").strip()
 
+    # A failed or timed-out run must not leave the YAML pointing at a missing
+    # file. Restore the placeholder before reporting back.
+    ensure_rules_file()
+
+    if ok and not os.path.exists(_SURICATA_UPDATE_RULES):
+        return {
+            "ok": False,
+            "message": (f"suricata-update exited 0 but did not write "
+                        f"{_SURICATA_UPDATE_RULES}"),
+            "updated": [],
+            "rules_path": _SURICATA_UPDATE_RULES,
+            "rules_size": 0,
+            "source_warnings": source_warnings,
+        }
+
+    size = (os.path.getsize(_SURICATA_UPDATE_RULES)
+            if os.path.exists(_SURICATA_UPDATE_RULES) else 0)
+    msg = (
+        f"Rules fetched → {_SURICATA_UPDATE_RULES} ({size} bytes)" if ok
+        else f"suricata-update failed: {out[:500]}"
+    )
+    if source_warnings:
+        msg += f" | source issues: {'; '.join(source_warnings)}"
     return {
         "ok": ok,
-        "message": "Rule update completed." if ok else "Rule update had errors — check logs.",
-        "updated": updated,
+        "message": msg,
+        "updated": [],
+        "rules_path": _SURICATA_UPDATE_RULES,
+        "rules_size": size,
+        "source_warnings": source_warnings,
     }
 
 
@@ -483,16 +918,19 @@ def update_rules(conn) -> dict:
 def get_ids_status(conn=None) -> dict:
     """Return running status + today's alert count (from eve.json)."""
     mode = "ids"
+    cfg_enabled = False
     if conn is not None:
         try:
-            row = conn.execute("SELECT mode FROM ids_config WHERE id=1").fetchone()
+            row = conn.execute("SELECT mode, enabled FROM ids_config WHERE id=1").fetchone()
             if row:
                 mode = (row["mode"] or "ids").lower()
+                cfg_enabled = bool(row["enabled"])
         except Exception:
             pass
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "running": False, "mode": mode, "message": "Non-FreeBSD host", "alerts_today": 0}
+        return {"ok": True, "running": False, "mode": mode, "message": "Non-FreeBSD host",
+                "alerts_today": 0, "cfg_enabled": cfg_enabled}
 
     # Check if process is running
     result = run_command(["pgrep", "-x", "suricata"], check=False)
@@ -517,6 +955,7 @@ def get_ids_status(conn=None) -> dict:
         "mode": mode,
         "message": "Running" if running else "Stopped",
         "alerts_today": alerts_today,
+        "cfg_enabled": cfg_enabled,
     }
 
 
@@ -543,12 +982,14 @@ def toggle_ids(conn, enabled: bool) -> dict:
     cfg = _cfg(conn)
     mode = (cfg.get("mode") or "ids").lower()
 
-    # IPS mode safety gate
+    # IPS mode safety gate — hard-block on any structured error (missing
+    # interface or unloaded netmap); pass warnings through for the UI.
     if enabled and mode == "ips":
-        safety_warnings = validate_ips_safety(conn)
-        hard_errors = [w for w in safety_warnings if "requires" in w.lower()]
-        if hard_errors:
-            return {"ok": False, "rolled_back": False, "message": " | ".join(hard_errors)}
+        safety = validate_ips_safety(conn)
+        if not safety["ok"]:
+            return {"ok": False, "rolled_back": False,
+                    "message": " | ".join(safety["errors"]),
+                    "warnings": safety.get("warnings", [])}
 
     # Non-FreeBSD: update DB directly (no service to manage)
     if not sys.platform.startswith("freebsd"):
@@ -559,7 +1000,28 @@ def toggle_ids(conn, enabled: bool) -> dict:
     if enabled:
         ips_mode = (mode == "ips")
 
-        # Validate and write config BEFORE touching the service or the DB
+        # --- Bootstrap rules BEFORE the deep check -------------------------
+        # The deep check (`suricata -T`) and the daemon both need a rules file
+        # present; fetch first so a missing file cannot fail validation and
+        # strand the auto-fetch behind it. Keep the result so we can surface a
+        # zero-rule "degraded" start to the operator instead of claiming a
+        # clean success.
+        rules_state = ensure_rules_present(conn)
+
+        # Explicit local_path rulesets must exist — these are operator-set.
+        missing = []
+        for rs in _rows(conn, "SELECT local_path FROM ids_rulesets WHERE enabled=1"):
+            lp = (rs.get("local_path") or "").strip()
+            if lp and not os.path.exists(lp):
+                missing.append(lp)
+        if missing:
+            return {
+                "ok": False,
+                "rolled_back": False,
+                "message": f"Rule file(s) not found: {', '.join(missing)}. Check local_path settings.",
+            }
+
+        # --- Deep check, then write config --------------------------------
         conf_text = generate_suricata_yaml(conn)
         ok, err   = validate_suricata_yaml(conf_text)
         if not ok:
@@ -569,8 +1031,12 @@ def toggle_ids(conn, enabled: bool) -> dict:
         if not write_result["ok"]:
             return {**write_result, "rolled_back": False}
 
-        # Start the service
-        sysrc_set("suricata_enable", "YES")
+        # Persist rc.conf FIRST — fail fast if sysrc is unavailable
+        sysrc_result = sysrc_set("suricata_enable", "YES")
+        if not sysrc_result["ok"]:
+            return {"ok": False, "rolled_back": False,
+                    "message": f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"}
+
         r = service_action(_SERVICE_NAME, "restart")
         if not r["ok"]:
             # Service failed — revert rc.conf and config file; leave DB as disabled
@@ -589,7 +1055,7 @@ def toggle_ids(conn, enabled: bool) -> dict:
                         sysrc_set("suricata_enable", "YES")
                         r2 = service_action(_SERVICE_NAME, "restart")
                         if r2["ok"]:
-                            _write_enabled(conn, True)   # ← DB updated only on success
+                            _write_enabled(conn, True)
                             return {
                                 **r2,
                                 "rolled_back": False,
@@ -604,9 +1070,88 @@ def toggle_ids(conn, enabled: bool) -> dict:
                     "message": r.get("message", "restart failed"),
                     "rollback_message": rb.get("message", "")}
 
-        # Service started successfully — NOW persist enabled=1
+        # service command exited 0, but FreeBSD's init script exits 0 even when
+        # the daemon crashes immediately on startup. Poll pgrep for up to 15s,
+        # accepting a result only after the process has been seen alive on
+        # two consecutive checks (otherwise we'd claim success during the
+        # tiny window between fork() and the child's exit on bad config).
+        import time as _time
+        deadline       = _time.time() + 15.0
+        consecutive_ok = 0
+        alive          = False
+        while _time.time() < deadline:
+            pgrep = run_command(["pgrep", "-x", "suricata"], check=False)
+            if pgrep.returncode == 0:
+                consecutive_ok += 1
+                if consecutive_ok >= 2:
+                    alive = True
+                    break
+            else:
+                consecutive_ok = 0
+            _time.sleep(0.5)
+
+        if not alive:
+            sysrc_set("suricata_enable", "NO")
+            from app.services.config_file_utils import rollback_config
+            rb = rollback_config(_SURICATA_CONF_PATH)
+            # DB must reflect reality — Suricata isn't running, so enabled=0.
+            try:
+                _write_enabled(conn, False)
+            except Exception:
+                pass
+
+            # Collect last lines of suricata log for actionable diagnostics.
+            log_snippet = ""
+            tail = tail_suricata_log(lines=12)
+            if tail.get("ok") and tail.get("lines"):
+                log_snippet = "\n".join(tail["lines"])
+
+            # If the kernel OOM-killed Suricata, say so — the cure is fewer
+            # rules / smaller memcaps, not "check the daemon log".
+            oom = _scan_dmesg_for_oom()
+            if oom:
+                headline = (
+                    "Suricata was killed by the kernel — out of memory. "
+                    "Reduce the enabled rulesets or lower the memcaps "
+                    f"(this box uses the '{_mem_budget()}' memory profile). "
+                    f"dmesg: {oom}"
+                )
+            else:
+                headline = (
+                    "Suricata process exited shortly after start. "
+                    "Open the Daemon log panel for the full reason."
+                )
+
+            return {
+                "ok": False,
+                "rolled_back": rb.get("ok", False),
+                "message": (
+                    f"{headline} "
+                    f"Service output: {r.get('message', '').strip()}"
+                    + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
+                ),
+                "rollback_message": rb.get("message", ""),
+                "log_tail": log_snippet,
+                "oom_killed": bool(oom),
+            }
+
+        # Confirmed running — persist enabled=1 and surface the startup banner.
         _write_enabled(conn, True)
-        return {**r, "rolled_back": False}
+        startup_tail = tail_suricata_log(lines=12)
+        degraded   = bool(rules_state.get("degraded"))
+        base_msg   = r.get("message", "")
+        if degraded:
+            base_msg = (
+                (base_msg + " — " if base_msg else "")
+                + "WARNING: Suricata started with 0 rules. Run 'Update Rules' once the "
+                  "appliance is online so the IDS can actually detect threats."
+            )
+        return {**r, "rolled_back": False,
+                "message": base_msg,
+                "degraded": degraded,
+                "rules_size": rules_state.get("rules_size", 0),
+                "source_warnings": rules_state.get("source_warnings", []),
+                "startup_log": startup_tail.get("lines", []) if startup_tail.get("ok") else []}
 
     else:
         # Disabling: stop the service, then update DB (stop failures are non-fatal)
@@ -614,6 +1159,45 @@ def toggle_ids(conn, enabled: bool) -> dict:
         r = service_action(_SERVICE_NAME, "stop")
         _write_enabled(conn, False)
         return {**r, "rolled_back": False}
+
+
+def apply_ids(conn) -> dict:
+    """
+    Re-apply the current IDS configuration to a running Suricata.
+
+    Composes the same ordering ``toggle_ids`` uses on enable — rules bootstrap
+    → yaml write → validate → restart — so reload-all picks up config changes
+    without bypassing the rule-file guarantee that caused first-time start to
+    fail. A no-op when ``ids_config.enabled`` is 0.
+
+    The ``suricata -T`` validation between write and restart matches the
+    pattern used by dhcp_writer / dns_writer / openvpn_writer / ipsec_writer:
+    a bad config must never reach ``service suricata restart``, which would
+    leave the IDS in the "marked enabled but not running" state that's
+    awkward to recover from via the web UI alone.
+    """
+    cfg = _cfg(conn)
+    if not cfg.get("enabled"):
+        return {"ok": True, "message": "IDS disabled; skipped"}
+
+    rules = ensure_rules_present(conn)
+    if not rules.get("ok"):
+        return {"ok": False,
+                "message": rules.get("message", "rule bootstrap failed")}
+
+    written = write_suricata_config(conn)
+    if not written.get("ok"):
+        return written
+
+    ok, err = validate_suricata_yaml(written.get("conf", ""))
+    if not ok:
+        return {"ok": False,
+                "message": f"suricata.yaml validation failed: {err}",
+                "conf": written.get("conf", "")}
+
+    restart = service_action(_SERVICE_NAME, "restart")
+    return {"ok": bool(restart.get("ok")),
+            "message": restart.get("message", "")}
 
 
 # ---------------------------------------------------------------------------
@@ -649,7 +1233,8 @@ def push_blocked_ips_to_pf(conn) -> dict:
     except Exception as exc:
         return {"ok": False, "count": 0, "message": f"DB query failed: {exc}"}
 
-    _IDS_BLOCK_FILE = "/var/db/smart-shield/ids_blocked_ips.txt"
+    from app.config import _ss_dir
+    _IDS_BLOCK_FILE = os.path.join(_ss_dir("/var/db"), "ids_blocked_ips.txt")
 
     try:
         os.makedirs(os.path.dirname(_IDS_BLOCK_FILE), exist_ok=True)

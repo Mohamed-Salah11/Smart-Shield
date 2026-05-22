@@ -1,0 +1,187 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Cases{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">Case Management</h2>
+    <p class="ext-6609c206">
+      {{ open_cases|length }} open · {{ closed_cases|length }} recently closed
+    </p>
+  </div>
+  <button class="btn-soc-primary" data-action="h_d1e61564df">
+    <i class="fa-solid fa-plus me-1"></i> New Case
+  </button>
+</div>
+
+<!-- New Case Form (inline) -->
+<div id="newCaseModal" class="soc-card d-none mb-4">
+  <div class="soc-card-head">
+    <i class="fa-solid fa-folder-plus ext-e07b2ee9"></i>
+    <div><div class="soc-card-title">Open New Case</div></div>
+    <button class="btn-soc-secondary ms-auto ext-4e8dc42d" data-action="h_d1aefc2ac3">×</button>
+  </div>
+  <div class="soc-card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="ext-4a110a8a">Title *</label>
+        <input type="text" id="nc-title" class="form-control mt-1 ext-4b1196ec" placeholder="e.g. Brute-force attack from 10.0.0.5">
+      </div>
+      <div class="col-md-3">
+        <label class="ext-4a110a8a">Severity</label>
+        <select id="nc-severity" class="form-select mt-1 ext-4b1196ec">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button class="btn-soc-primary w-100" data-action="h_d44fe32326">
+          <i class="fa-solid fa-folder-plus me-1"></i> Open Case
+        </button>
+      </div>
+      <div class="col-12">
+        <label class="ext-4a110a8a">Description</label>
+        <textarea id="nc-desc" class="form-control mt-1 ext-4b1196ec" rows="2" placeholder="Brief description of the incident…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Open Cases -->
+<div class="soc-card mb-4">
+  <div class="soc-card-head">
+    <i class="fa-solid fa-folder-open ext-385c5811"></i>
+    <div>
+      <div class="soc-card-title">Open Cases</div>
+      <div class="soc-card-subtitle">Requires analyst attention</div>
+    </div>
+  </div>
+  <div class="soc-card-body p-0">
+    {% if open_cases %}
+    <table class="soc-table">
+      <thead>
+        <tr>
+          <th class="ext-9ab095ba">#</th>
+          <th>Title</th>
+          <th class="ext-ee0435f7">Severity</th>
+          <th class="ext-2f01efdd">Assigned To</th>
+          <th class="ext-2f01efdd">Opened</th>
+          <th class="ext-ee0435f7"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in open_cases %}
+        {% set sev_class = {'critical':'soc-sev-critical','high':'soc-sev-high','medium':'soc-sev-medium','low':'soc-sev-low'}.get(c.severity, 'soc-sev-default') %}
+        <tr>
+          <td class="ext-0aef27fa">{{ c.id }}</td>
+          <td>
+            <a class="ext-aaea965a" href="{{ url_for('soc_portal.case_detail', case_id=c.id) }}"
+              >
+              {{ c.title }}
+            </a>
+            {% if c.escalation_tier %}
+            <span class="ext-dbd8a929" title="Escalated — awaiting {{ c.escalation_tier }}"
+                 >
+              <i class="fa-solid fa-arrow-up-right-dots"></i> {{ c.escalation_tier }}
+            </span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="soc-sev {{ sev_class }}">
+              {{ c.severity }}
+            </span>
+          </td>
+          <td class="ext-e3eeb9c4">{{ c.assignee_name or '—' }}</td>
+          <td class="ext-9fb8e23e">{{ c.created_at[:16] if c.created_at else '—' }}</td>
+          <td>
+            <a href="{{ url_for('soc_portal.case_detail', case_id=c.id) }}" class="btn-soc-secondary ext-1ba8eb38">
+              Open
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="soc-empty">
+      <i class="fa-solid fa-circle-check ext-58991e18"></i>
+      <p class="ext-75797c4c">No open cases — great work!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Closed Cases (collapsed) -->
+{% if closed_cases %}
+<div class="soc-card">
+  <div class="soc-card-head ext-b202c6d4" data-action="h_c6d219472a">
+    <i class="fa-solid fa-folder-closed ext-a729d7fe"></i>
+    <div>
+      <div class="soc-card-title">Recently Closed</div>
+      <div class="soc-card-subtitle">Last 50 resolved cases</div>
+    </div>
+    <i class="fa-solid fa-chevron-down ms-auto ext-a729d7fe"></i>
+  </div>
+  <div id="closed-body" class="d-none soc-card-body p-0">
+    <table class="soc-table">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Severity</th><th>Closed</th></tr>
+      </thead>
+      <tbody>
+        {% for c in closed_cases %}
+        <tr>
+          <td class="ext-0aef27fa">{{ c.id }}</td>
+          <td>
+            <a class="ext-0f86a98c" href="{{ url_for('soc_portal.case_detail', case_id=c.id) }}">
+              {{ c.title }}
+            </a>
+          </td>
+          <td class="ext-0516bea9">{{ c.severity }}</td>
+          <td class="ext-9fb8e23e">{{ c.updated_at[:16] if c.updated_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+async function submitNewCase() {
+  const payload = {
+    title:       document.getElementById('nc-title').value.trim(),
+    description: document.getElementById('nc-desc').value.trim(),
+    severity:    document.getElementById('nc-severity').value,
+  };
+  if (!payload.title) { alert('Title is required.'); return; }
+  const r = await fetch('/soc-portal/cases/open', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (data.ok) {
+    window.location.href = `/soc-portal/cases/${data.case_id}`;
+  } else {
+    alert(data.message || 'Failed to open case.');
+  }
+}
+</script>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_d1e61564df'] = function (event, el) { document.getElementById('newCaseModal').classList.toggle('d-none') };
+  R['h_d1aefc2ac3'] = function (event, el) { document.getElementById('newCaseModal').classList.add('d-none') };
+  R['h_d44fe32326'] = function (event, el) { submitNewCase() };
+  R['h_c6d219472a'] = function (event, el) { document.getElementById('closed-body').classList.toggle('d-none') };
+})();
+</script>
+<!-- /inline-handlers:auto -->

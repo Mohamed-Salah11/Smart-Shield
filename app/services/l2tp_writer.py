@@ -241,7 +241,7 @@ def generate_l2tp_ipsec_conf(conn) -> str:
     cfg = cfg_rows[0] if cfg_rows else {}
 
     psk_enc = (cfg.get("pre_shared_key") or "").strip()
-    psk     = decrypt_secret(psk_enc) if psk_enc else "changeme"
+    psk     = decrypt_secret(psk_enc) if psk_enc else ""
 
     return f"""\
 # ============================================================
@@ -280,15 +280,21 @@ def _write_l2tp_ipsec_conf(conf: str, conn=None) -> dict:
         cfg_rows = []
     cfg = cfg_rows[0] if cfg_rows else {}
     psk_enc = (cfg.get("pre_shared_key") or "").strip()
-    psk     = decrypt_secret(psk_enc) if psk_enc else "changeme"
+    psk     = decrypt_secret(psk_enc) if psk_enc else ""
+
+    if not psk:
+        return {"ok": False, "message": "L2TP/IPsec requires a Pre-Shared Key. Set it on the L2TP configuration page."}
 
     secrets_content = f": PSK \"{psk}\"\n"
 
+    from app.services.config_file_utils import atomic_write
     errors = []
-    for path, content in [(_IPSEC_CONF, conf), (_IPSEC_SECRETS, secrets_content)]:
+    for path, content, mode in [
+        (_IPSEC_CONF,    conf,            0o644),
+        (_IPSEC_SECRETS, secrets_content, 0o600),
+    ]:
         try:
-            with open(path, "w") as fh:
-                fh.write(content)
+            atomic_write(path, content, mode=mode)
         except OSError as exc:
             errors.append(f"{path}: {exc}")
 
@@ -306,6 +312,19 @@ def _write_l2tp_ipsec_conf(conf: str, conn=None) -> dict:
 def apply_l2tp(conn) -> dict:
     """Validate, write mpd5 config, and restart L2TP.
     Also writes and reloads the companion L2TP/IPsec strongSwan config."""
+    # If L2TP is disabled (or unconfigured) stop the service and clear its
+    # rc.conf knob so reload-all never leaves a stale tunnel running.
+    cfg_rows = _rows(conn, "SELECT enabled FROM l2tp_config WHERE id=1 LIMIT 1")
+    if not cfg_rows or not cfg_rows[0].get("enabled"):
+        if not _on_freebsd():
+            return {"ok": True, "skipped": True,
+                    "message": "L2TP disabled — non-FreeBSD, nothing to stop."}
+        from app.services.service_manager import service_action, sysrc_set
+        sysrc_set("mpd_enable", "NO")
+        service_action("mpd5", "stop")
+        return {"ok": True, "skipped": True,
+                "message": "L2TP disabled in DB — mpd5 stopped and disabled in rc.conf."}
+
     validation_errors = validate_l2tp_config(conn)
     if validation_errors:
         return {

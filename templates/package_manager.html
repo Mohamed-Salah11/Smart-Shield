@@ -2,7 +2,7 @@
 
 {% block main %}
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     function showTab(index) {
         const tabs = document.querySelectorAll('.nav-pills .nav-link');
         const sections = document.querySelectorAll('.tab-section');
@@ -71,17 +71,17 @@
     <div class="ss-page-header">
       <div>
         <h1 class="ss-page-title">Extensions</h1>
-        <p class="ss-page-desc">Install and manage Smart Shield extension packages</p>
+        <p class="ss-page-desc">Install and manage SmartShield extension packages</p>
       </div>
     </div>
 
     <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
-            <a class="nav-link active" href="#" onclick="showTab(0); return false;">Installed Packages</a>
+            <a class="nav-link active" href="#" data-action="h_ea97c445a2">Installed Packages</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#" onclick="showTab(1); return false;">Available Packages</a>
+            <a class="nav-link" href="#" data-action="h_6e144d5b95">Available Packages</a>
         </li>
     </ul>
 
@@ -93,8 +93,8 @@
           <div><div class="ss-card-title">Installed Packages</div></div>
         </div>
         <div class="ss-card-body">
-          <div class="alert" style="background:var(--primary-soft);border:1px solid var(--primary);border-radius:8px;padding:12px 16px;font-size:.85rem;margin:0;">
-            <i class="fa-solid fa-circle-info me-2" style="color:var(--primary);"></i>
+          <div class="alert ext-71039b81">
+            <i class="fa-solid fa-circle-info me-2 ext-035cc887"></i>
             There are no packages currently installed.
           </div>
         </div>
@@ -102,7 +102,7 @@
     </div>
 
     <!-- Available Packages Tab -->
-    <div class="tab-section" id="section-available" style="display: none;">
+    <div class="tab-section ext-9c766357" id="section-available">
         <!-- Search Section -->
         <div class="ss-card mb-4">
           <div class="ss-card-head">
@@ -115,20 +115,20 @@
                         <label class="col-form-label fw-semibold">Search term</label>
                     </div>
                     <div class="col-md-4">
-                        <input type="text" id="pkg-search-input" class="form-control" placeholder="Enter search string" oninput="searchPkgs()">
+                        <input type="text" id="pkg-search-input" class="form-control" placeholder="Enter search string" data-action-input="h_8598897c88">
                     </div>
                     <div class="col-auto">
-                        <select id="pkg-search-scope" class="form-select" onchange="searchPkgs()">
+                        <select id="pkg-search-scope" class="form-select" data-action-change="h_72787e9626">
                             <option>Both</option>
                             <option>Name only</option>
                             <option>Description only</option>
                         </select>
                     </div>
                     <div class="col-auto">
-                        <button class="btn btn-primary" onclick="searchPkgs()">
+                        <button class="btn btn-primary" data-action="h_489995e558">
                             <i class="fa-solid fa-search me-1"></i>Search
                         </button>
-                        <button class="btn btn-outline-secondary" onclick="clearSearch()">
+                        <button class="btn btn-outline-secondary" data-action="h_482569d7d5">
                             <i class="fa-solid fa-times me-1"></i>Clear
                         </button>
                     </div>
@@ -142,14 +142,14 @@
             <div class="ss-card-icon"><i class="fa-solid fa-cubes"></i></div>
             <div><div class="ss-card-title">Available Packages</div></div>
           </div>
-          <div style="overflow-x:auto;">
-            <table class="table table-hover mb-0" style="font-size:.85rem;">
-              <thead style="background:var(--border-color-soft);">
+          <div class="ext-df74e8d8">
+            <table class="table table-hover mb-0 ext-1e28117f">
+              <thead class="ext-4c3186f1">
                             <tr>
-                                <th style="width: 15%;">Name</th>
-                                <th style="width: 10%;">Version</th>
+                                <th class="ext-29bfe8f0">Name</th>
+                                <th class="ext-828e8eb9">Version</th>
                                 <th>Description</th>
-                                <th style="width: 10%;">Actions</th>
+                                <th class="ext-828e8eb9">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="pkg-table-body">
@@ -158,7 +158,7 @@
                                 <td><span class="badge bg-secondary">1.0</span></td>
                                 <td>Automated Certificate Management Environment for LetsEncrypt.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="acme" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="acme" data-action="h_986acbfced">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -168,7 +168,7 @@
                                 <td><span class="badge bg-secondary">0.3.92_9</span></td>
                                 <td>Control and log APC UPS models and perform network-based shutdowns.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="apcupsd" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="apcupsd" data-action="h_0a9ecdabfa">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -178,7 +178,7 @@
                                 <td><span class="badge bg-secondary">1.2.2_6</span></td>
                                 <td>Broadcasts who-has ARP packets and prints answers.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="arping" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="arping" data-action="h_ecfa7fe186">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -188,7 +188,7 @@
                                 <td><span class="badge bg-secondary">2.0.1_9</span></td>
                                 <td>Tracks network usage and builds HTML graphs.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="bandwidthd" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="bandwidthd" data-action="h_aa22617c39">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -198,7 +198,7 @@
                                 <td><span class="badge bg-secondary">3.0.721</span></td>
                                 <td>Network statistics gatherer with a web interface.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="darkstat" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="darkstat" data-action="h_7d96c227f4">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -208,7 +208,7 @@
                                 <td><span class="badge bg-secondary">3.0.25</span></td>
                                 <td>FreeRADIUS authentication and accounting server.</td>
                                 <td>
-                                    <button class="btn btn-success btn-sm" data-pkg="freeradius3" onclick="installPkg(this)">
+                                    <button class="btn btn-success btn-sm" data-pkg="freeradius3" data-action="h_d805817307">
                                         <i class="fa-solid fa-download me-1"></i>Install
                                     </button>
                                 </td>
@@ -223,3 +223,24 @@
 </div>
 
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_ea97c445a2'] = function (event, el) { showTab(0); return false; };
+  R['h_6e144d5b95'] = function (event, el) { showTab(1); return false; };
+  R['h_8598897c88'] = function (event, el) { searchPkgs() };
+  R['h_72787e9626'] = function (event, el) { searchPkgs() };
+  R['h_489995e558'] = function (event, el) { searchPkgs() };
+  R['h_482569d7d5'] = function (event, el) { clearSearch() };
+  R['h_986acbfced'] = function (event, el) { installPkg(this) };
+  R['h_0a9ecdabfa'] = function (event, el) { installPkg(this) };
+  R['h_ecfa7fe186'] = function (event, el) { installPkg(this) };
+  R['h_aa22617c39'] = function (event, el) { installPkg(this) };
+  R['h_7d96c227f4'] = function (event, el) { installPkg(this) };
+  R['h_d805817307'] = function (event, el) { installPkg(this) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

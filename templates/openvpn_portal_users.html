@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container">
+
+  <div id="vpu-toast" class="alert d-none ext-ad4ef29a" role="alert"
+      ></div>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">VPN Portal Users</h1>
+      <p class="ss-page-desc">Remote users who self-serve their OpenVPN profile at <code>/vpn-portal</code></p>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#vpuModal" data-action="h_3f30b5d1bf">
+        <i class="fa-solid fa-plus me-1"></i>Add Portal User
+      </button>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'servers' else '' }}" href="{{ url_for('vpn.openvpn') }}">Servers</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'portal' else '' }}" href="{{ url_for('vpn.openvpn_portal_users') }}">Portal Users</a></li>
+  </ul>
+
+  <!-- Portal exposure toggle -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div><div class="ss-card-title">Portal Exposure</div><div class="ss-card-subtitle">Enable the public self-service portal</div></div>
+    </div>
+    <div class="ss-card-body p-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="vpuEnabled">
+            <label class="form-check-label" for="vpuEnabled">Portal enabled</label>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Public hostname (optional)</label>
+          <input type="text" class="form-control" id="vpuHostname" placeholder="vpn.example.com">
+        </div>
+        <div class="col-md-4">
+          <button type="button" class="btn btn-primary" data-action="h_552d3b585a">
+            <i class="fa-solid fa-save me-1"></i>Save Exposure Settings
+          </button>
+        </div>
+      </div>
+      <p class="text-muted small mt-2 mb-0">When disabled, <code>/vpn-portal</code> returns a "portal disabled" page for everyone.</p>
+    </div>
+  </div>
+
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+      <div><div class="ss-card-title">Portal Users</div><div class="ss-card-subtitle">Each user is bound to a client certificate and a server</div></div>
+    </div>
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
+          <tr>
+            <th class="ext-16e59a0f">Username</th>
+            <th>Full name</th><th>Email</th><th>MFA</th>
+            <th>Server</th><th>Client cert</th><th>Status</th><th>Last login</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="vpuTable">
+          <tr><td class="ext-a9edf93a" colspan="9">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Portal User Modal -->
+<div class="modal fade" id="vpuModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="vpuModalTitle">Add Portal User</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="vpuEditId">
+        <div id="vpuError" class="alert alert-danger d-none"></div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Username</label>
+            <input type="text" class="form-control" id="vpuUsername">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Full name</label>
+            <input type="text" class="form-control" id="vpuFullName">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" class="form-control" id="vpuEmail">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" id="vpuPwLabel">Password (10+ chars)</label>
+            <input type="password" class="form-control" id="vpuPassword" autocomplete="new-password">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">OpenVPN Server</label>
+            <select class="form-select" id="vpuServer"><option value="">— select —</option></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Client Certificate</label>
+            <select class="form-select" id="vpuCert"><option value="">— select —</option></select>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch mt-4">
+              <input class="form-check-input" type="checkbox" id="vpuDisabled">
+              <label class="form-check-label" for="vpuDisabled">Account disabled</label>
+            </div>
+          </div>
+          <div class="col-md-6 ext-cb458930" id="vpuResetMfaWrap">
+            <div class="form-check form-switch mt-4">
+              <input class="form-check-input" type="checkbox" id="vpuResetMfa">
+              <label class="form-check-label" for="vpuResetMfa">Reset two-factor enrollment</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" data-action="h_46572fc200">Save User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const VPU_CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
+
+function vpuToast(msg, ok) {
+  const t = document.getElementById('vpu-toast');
+  t.className = 'alert alert-' + (ok ? 'success' : 'danger');
+  t.textContent = msg;
+  setTimeout(() => t.classList.add('d-none'), 4000);
+}
+
+async function loadPortalConfig() {
+  const r = await fetch('/vpn/api/portal/config');
+  const j = await r.json();
+  if (j.ok && j.config) {
+    document.getElementById('vpuEnabled').checked = !!j.config.enabled;
+    document.getElementById('vpuHostname').value = j.config.public_hostname || '';
+  }
+}
+
+async function savePortalConfig() {
+  const r = await fetch('/vpn/api/portal/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': VPU_CSRF},
+    body: JSON.stringify({
+      enabled: document.getElementById('vpuEnabled').checked,
+      public_hostname: document.getElementById('vpuHostname').value,
+    }),
+  });
+  const j = await r.json();
+  vpuToast(j.ok ? 'Exposure settings saved.' : (j.error || 'Save failed.'), j.ok);
+}
+
+async function loadServerAndCertOptions() {
+  // Servers
+  try {
+    const rs = await fetch('/vpn/api/openvpn/get-servers');
+    const js = await rs.json();
+    const sel = document.getElementById('vpuServer');
+    (js.servers || []).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = '#' + s.id + ' ' + (s.description || s.interface || '');
+      sel.appendChild(o);
+    });
+  } catch (e) {}
+  // Client certs
+  try {
+    const rc = await fetch('/vpn/api/certs?type=client');
+    const jc = await rc.json();
+    const sel = document.getElementById('vpuCert');
+    (jc.certs || jc.entries || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.name || c.common_name || ('cert #' + c.id);
+      sel.appendChild(o);
+    });
+  } catch (e) {}
+}
+
+async function loadPortalUsers() {
+  const r = await fetch('/vpn/api/portal/users');
+  const j = await r.json();
+  const tb = document.getElementById('vpuTable');
+  if (!j.ok || !(j.users || []).length) {
+    tb.innerHTML = '<tr><td class="ext-a9edf93a" colspan="9">No portal users yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML = j.users.map(u => `
+    <tr>
+      <td class="ext-ec6b5e99"><strong>${esc(u.username)}</strong></td>
+      <td>${esc(u.full_name || '-')}</td>
+      <td>${esc(u.email || '-')}</td>
+      <td>${u.totp_enrolled ? '<span class="badge bg-success">On</span>' : '<span class="badge bg-secondary">Off</span>'}</td>
+      <td>${u.ovpn_server_id ? ('#' + u.ovpn_server_id) : '<span class="text-muted">none</span>'}</td>
+      <td>${u.client_cert_id ? ('#' + u.client_cert_id) : '<span class="text-muted">none</span>'}</td>
+      <td>${u.disabled ? '<span class="badge bg-danger">Disabled</span>' : '<span class="badge bg-success">Active</span>'}</td>
+      <td>${esc(u.last_login_at || '—')}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" data-action="h_18ecfb8065"><i class="fa-solid fa-edit"></i></button>
+        <button class="btn btn-sm btn-danger" data-action="h_b53e6c6370"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function newPortalUser() {
+  document.getElementById('vpuModalTitle').textContent = 'Add Portal User';
+  document.getElementById('vpuEditId').value = '';
+  document.getElementById('vpuError').classList.add('d-none');
+  ['vpuUsername','vpuFullName','vpuEmail','vpuPassword'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('vpuServer').value = '';
+  document.getElementById('vpuCert').value = '';
+  document.getElementById('vpuDisabled').checked = false;
+  document.getElementById('vpuUsername').disabled = false;
+  document.getElementById('vpuPwLabel').textContent = 'Password (10+ chars)';
+  document.getElementById('vpuResetMfaWrap').style.display = 'none';
+}
+
+function editPortalUser(u) {
+  document.getElementById('vpuModalTitle').textContent = 'Edit Portal User';
+  document.getElementById('vpuEditId').value = u.id;
+  document.getElementById('vpuError').classList.add('d-none');
+  document.getElementById('vpuUsername').value = u.username;
+  document.getElementById('vpuUsername').disabled = true;
+  document.getElementById('vpuFullName').value = u.full_name || '';
+  document.getElementById('vpuEmail').value = u.email || '';
+  document.getElementById('vpuPassword').value = '';
+  document.getElementById('vpuPwLabel').textContent = 'New password (leave blank to keep)';
+  document.getElementById('vpuServer').value = u.ovpn_server_id || '';
+  document.getElementById('vpuCert').value = u.client_cert_id || '';
+  document.getElementById('vpuDisabled').checked = !!u.disabled;
+  document.getElementById('vpuResetMfaWrap').style.display = u.totp_enrolled ? '' : 'none';
+  document.getElementById('vpuResetMfa').checked = false;
+  new bootstrap.Modal(document.getElementById('vpuModal')).show();
+}
+
+async function savePortalUser() {
+  const id = document.getElementById('vpuEditId').value;
+  const payload = {
+    username:   document.getElementById('vpuUsername').value.trim(),
+    password:   document.getElementById('vpuPassword').value,
+    full_name:  document.getElementById('vpuFullName').value.trim(),
+    email:      document.getElementById('vpuEmail').value.trim(),
+    ovpn_server_id: document.getElementById('vpuServer').value || null,
+    client_cert_id: document.getElementById('vpuCert').value || null,
+    disabled:   document.getElementById('vpuDisabled').checked,
+    reset_mfa:  document.getElementById('vpuResetMfa').checked,
+  };
+  const url    = id ? ('/vpn/api/portal/users/' + id) : '/vpn/api/portal/users';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {
+    method,
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': VPU_CSRF},
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json();
+  if (j.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('vpuModal')).hide();
+    vpuToast('Portal user saved.', true);
+    loadPortalUsers();
+  } else {
+    const e = document.getElementById('vpuError');
+    e.textContent = j.error || 'Save failed.';
+    e.classList.remove('d-none');
+  }
+}
+
+async function deletePortalUser(id) {
+  if (!confirm('Delete this portal user?')) return;
+  const r = await fetch('/vpn/api/portal/users/' + id, {
+    method: 'DELETE', headers: {'X-CSRFToken': VPU_CSRF},
+  });
+  const j = await r.json();
+  vpuToast(j.ok ? 'Portal user deleted.' : (j.error || 'Delete failed.'), j.ok);
+  if (j.ok) loadPortalUsers();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadPortalConfig();
+  loadServerAndCertOptions();
+  loadPortalUsers();
+});
+</script>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_3f30b5d1bf'] = function (event, el) { newPortalUser() };
+  R['h_552d3b585a'] = function (event, el) { savePortalConfig() };
+  R['h_46572fc200'] = function (event, el) { savePortalUser() };
+  R['h_18ecfb8065'] = function (event, el) { editPortalUser(${JSON.stringify(u)}) };
+  R['h_b53e6c6370'] = function (event, el) { deletePortalUser(${u.id}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

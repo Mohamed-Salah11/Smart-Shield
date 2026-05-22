@@ -13,16 +13,16 @@
 
     <!-- Navigation Tabs -->
     <ul class="nav nav-tabs mb-3">
-        <li class="nav-item"><a href="#" class="nav-link active" onclick="openTab(event, 'interface-assignments')">Interface Assignments</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'interface-groups')">Interface Groups</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'wireless')">Wireless</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'vlans')">VLANs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'qinqs')">QinQs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'ppps')">PPPs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'gres')">GREs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'gifs')">GIFs</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'bridges')">Bridges</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" onclick="openTab(event, 'laggs')">LAGGs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link active" data-action="h_23cc335df8">Interface Assignments</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_c27bac4649">Interface Groups</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_83c41502b1">Wireless</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_d92964e019">VLANs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_46e8d4ffb4">QinQs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_87a65adb38">PPPs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_59c5d9b9fc">GREs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_4046607cb7">GIFs</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_45d516a511">Bridges</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-action="h_282075e6c4">LAGGs</a></li>
     </ul>
 
     <!-- Interface Assignments Tab -->
@@ -32,7 +32,7 @@
                 <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
                 <div><div class="ss-card-title">Interface Assignments</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -44,7 +44,7 @@
                         <tr>
                             <td><strong class="text-primary">WAN</strong></td>
                             <td>
-                                <select class="form-select" id="wanSelect" style="max-width: 350px;">
+                                <select class="form-select ext-893824e3" id="wanSelect">
                                     <option value="">-- loading ports --</option>
                                 </select>
                             </td>
@@ -53,10 +53,10 @@
                             <td><strong class="text-primary">LAN</strong></td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    <select class="form-select" id="lanSelect" style="max-width: 350px;">
+                                    <select class="form-select ext-893824e3" id="lanSelect">
                                         <option value="">-- loading ports --</option>
                                     </select>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteLANAssignment()"><i class="fas fa-trash-alt"></i> Delete</button>
+                                    <button class="btn btn-danger btn-sm" data-action="h_4f83b298a5"><i class="fas fa-trash-alt"></i> Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -65,19 +65,19 @@
             </div>
         </div>
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-primary" onclick="saveWANAssignment(); saveLANAssignment();"><i class="fas fa-save"></i> Save</button>
-            <button class="btn btn-success" id="addLanBtn" style="display: none;" onclick="addLANAssignment()"><i class="fas fa-plus"></i> Add LAN</button>
+            <button class="btn btn-primary" data-action="h_4cd6f5c957"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-success ext-9c766357" id="addLanBtn" data-action="h_76b054aafe"><i class="fas fa-plus"></i> Add LAN</button>
         </div>
     </div>
 
     <!-- Interface Groups Tab -->
-    <div id="interface-groups" class="tab-content" style="display: none;">
+    <div id="interface-groups" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-layer-group"></i></div>
                 <div><div class="ss-card-title">Interface Groups</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="interface-groups-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -92,18 +92,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('interface-group-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_8400d9e882"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- Wireless Tab -->
-    <div id="wireless" class="tab-content" style="display: none;">
+    <div id="wireless" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-wifi"></i></div>
                 <div><div class="ss-card-title">Wireless Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="wireless-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -118,18 +118,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('wireless-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_476ce712af"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- VLANs Tab -->
-    <div id="vlans" class="tab-content" style="display: none;">
+    <div id="vlans" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-sitemap"></i></div>
                 <div><div class="ss-card-title">VLAN Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="vlan-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -145,18 +145,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('vlan-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_73c9f3128c"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- QinQs Tab -->
-    <div id="qinqs" class="tab-content" style="display: none;">
+    <div id="qinqs" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-tags"></i></div>
                 <div><div class="ss-card-title">QinQ Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="qinq-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -172,18 +172,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('qinq-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_467065be15"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- PPPs Tab -->
-    <div id="ppps" class="tab-content" style="display: none;">
+    <div id="ppps" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-phone-flip"></i></div>
                 <div><div class="ss-card-title">PPP Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="ppp-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -199,18 +199,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('ppp-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_43e5d2e5d8"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- GREs Tab -->
-    <div id="gres" class="tab-content" style="display: none;">
+    <div id="gres" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-tunnel"></i></div>
                 <div><div class="ss-card-title">GRE Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="gre-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -226,18 +226,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('gre-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_cad7bceee4"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- GIFs Tab -->
-    <div id="gifs" class="tab-content" style="display: none;">
+    <div id="gifs" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-route"></i></div>
                 <div><div class="ss-card-title">GIF Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="gif-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -253,18 +253,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('gif-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_718d4b0a45"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- Bridges Tab -->
-    <div id="bridges" class="tab-content" style="display: none;">
+    <div id="bridges" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-bridge"></i></div>
                 <div><div class="ss-card-title">Bridge Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="bridge-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -279,18 +279,18 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openModal('bridge-modal')"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_af3d48c7fa"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
     <!-- LAGGs Tab -->
-    <div id="laggs" class="tab-content" style="display: none;">
+    <div id="laggs" class="tab-content ext-9c766357">
         <div class="ss-card">
             <div class="ss-card-head">
                 <div class="ss-card-icon"><i class="fa-solid fa-link"></i></div>
                 <div><div class="ss-card-title">LAGG Interfaces</div></div>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="ext-df74e8d8">
                 <table id="lagg-table" class="table table-striped mb-0">
                     <thead>
                         <tr>
@@ -305,19 +305,19 @@
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
-            <button class="btn btn-success" onclick="openLAGGModal()"><i class="fas fa-plus"></i> Add</button>
+            <button class="btn btn-success" data-action="h_71fc2dfd77"><i class="fas fa-plus"></i> Add</button>
         </div>
     </div>
 
 </div>
 
 <!-- Interface Group Modal -->
-<div id="interface-group-modal" class="modal" style="display: none;">
+<div id="interface-group-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Interface Group Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('interface-group-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_0df10af607"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -337,7 +337,7 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Group Members</label>
                     <div class="col-sm-9">
-                        <select multiple class="form-select" id="groupMembers" style="height: 100px;">
+                        <select multiple class="form-select ext-1a3a679d" id="groupMembers">
                             <option>WAN</option>
                             <option>LAN</option>
                         </select>
@@ -346,20 +346,20 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveInterfaceGroup()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('interface-group-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_cbe3ea6377"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_3c3ce039b2">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Wireless Modal -->
-<div id="wireless-modal" class="modal" style="display: none;">
+<div id="wireless-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Wireless Interface Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('wireless-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_8d50ff9d0d"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -389,20 +389,20 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveWirelessConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('wireless-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_0b381a8458"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_e8c68c36c9">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- VLAN Modal -->
-<div id="vlan-modal" class="modal" style="display: none;">
+<div id="vlan-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">VLAN Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('vlan-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_004de677ab"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -417,14 +417,14 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">VLAN Tag</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="vlanTag" value="1" style="max-width: 150px;">
+                        <input type="text" class="form-control ext-a2984eed" id="vlanTag" value="1">
                         <small class="text-muted">802.1Q VLAN tag (between 1 and 4094).</small>
                     </div>
                 </div>
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">VLAN Priority</label>
                     <div class="col-sm-9">
-                        <input type="text" class="form-control" id="vlanPriority" value="0" style="max-width: 150px;">
+                        <input type="text" class="form-control ext-a2984eed" id="vlanPriority" value="0">
                         <small class="text-muted">802.1Q VLAN Priority (between 0 and 7).</small>
                     </div>
                 </div>
@@ -437,20 +437,20 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveVLANConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('vlan-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_2b50b4bbfb"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_d7d53a2fb9">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- QinQ Modal -->
-<div id="qinq-modal" class="modal" style="display: none;">
+<div id="qinq-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">QinQ Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('qinq-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_d83c158c79"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -465,7 +465,7 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">First Level Tag</label>
                     <div class="col-sm-9">
-                        <input type="number" class="form-control" id="qinqFirstLevelTag" style="max-width: 150px;">
+                        <input type="number" class="form-control ext-a2984eed" id="qinqFirstLevelTag">
                         <small class="text-muted">This is the first level VLAN tag. On top of this are stacked the member VLANs defined below.</small>
                     </div>
                 </div>
@@ -492,26 +492,26 @@
                         <div id="qinqTagsContainer">
                             <input type="text" class="form-control qinq-tag-input mb-2">
                         </div>
-                        <button class="btn btn-success btn-sm" onclick="addQinQTagInput()"><i class="fas fa-plus"></i> Add Tag</button>
+                        <button class="btn btn-success btn-sm" data-action="h_12b639680a"><i class="fas fa-plus"></i> Add Tag</button>
                         <small class="text-muted d-block mt-2">Ranges can be specified (e.g., 2-3) or individual numbers.</small>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveQinQConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('qinq-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_7815b0845a"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_2564139c41">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- PPP Modal -->
-<div id="ppp-modal" class="modal" style="display: none;">
+<div id="ppp-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">PPP Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('ppp-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_91c96ddaae"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -528,7 +528,7 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Link Interface(s)</label>
                     <div class="col-sm-9">
-                        <select class="form-select" id="pppLinkInterfaces" multiple style="height: 80px;">
+                        <select class="form-select ext-468b999f" id="pppLinkInterfaces" multiple>
                             <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Select the interface for the PPP connection.</small>
@@ -559,10 +559,10 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Advanced Options</label>
                     <div class="col-sm-9">
-                        <button class="btn btn-info btn-sm" onclick="toggleAdvanced('ppp-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+                        <button class="btn btn-info btn-sm" data-action="h_3e038aafff"><i class="fas fa-cog"></i> Display Advanced</button>
                     </div>
                 </div>
-                <div id="ppp-advanced-fields" class="ss-card" style="display: none;">
+                <div id="ppp-advanced-fields" class="ss-card ext-9c766357">
                     <div class="ss-card-head">
                         <div class="ss-card-icon"><i class="fa-solid fa-gears"></i></div>
                         <div><div class="ss-card-title">Advanced Configuration</div></div>
@@ -576,20 +576,20 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="savePPPConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('ppp-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_f52a1233b4"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_a2c3e781a4">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- GRE Modal -->
-<div id="gre-modal" class="modal" style="display: none;">
+<div id="gre-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">GRE Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('gre-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_9f06109eaf"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -621,7 +621,7 @@
                     <div class="col-sm-9">
                         <div class="d-flex gap-2">
                             <input type="text" class="form-control" id="ipv4TunnelRemoteAddress">
-                            <select class="form-select" id="ipv4TunnelRemotePrefix" style="max-width: 100px;">
+                            <select class="form-select ext-4841c78e" id="ipv4TunnelRemotePrefix">
                                 <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
                             </select>
                         </div>
@@ -633,7 +633,7 @@
                     <div class="col-sm-9">
                         <div class="d-flex gap-2">
                             <input type="text" class="form-control" id="ipv4TunnelLocalAddress">
-                            <select class="form-select" id="ipv4TunnelLocalPrefix" style="max-width: 100px;">
+                            <select class="form-select ext-4841c78e" id="ipv4TunnelLocalPrefix">
                                 <option>32</option><option>31</option><option>30</option><option>29</option><option>28</option><option>27</option><option>26</option><option>25</option><option>24</option><option>23</option><option>22</option><option>21</option><option>20</option><option>19</option><option>18</option><option>17</option><option>16</option><option>15</option><option>14</option><option>13</option><option>12</option><option>11</option><option>10</option><option>9</option><option>8</option><option>7</option><option>6</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
                             </select>
                         </div>
@@ -645,7 +645,7 @@
                     <div class="col-sm-9">
                         <div class="d-flex gap-2">
                             <input type="text" class="form-control" id="ipv6TunnelRemoteAddress">
-                            <select class="form-select" id="ipv6TunnelRemotePrefix" style="max-width: 100px;">
+                            <select class="form-select ext-4841c78e" id="ipv6TunnelRemotePrefix">
                                 <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
                             </select>
                         </div>
@@ -657,7 +657,7 @@
                     <div class="col-sm-9">
                         <div class="d-flex gap-2">
                             <input type="text" class="form-control" id="ipv6TunnelLocalAddress">
-                            <select class="form-select" id="ipv6TunnelLocalPrefix" style="max-width: 100px;">
+                            <select class="form-select ext-4841c78e" id="ipv6TunnelLocalPrefix">
                                 <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
                             </select>
                         </div>
@@ -673,20 +673,20 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveGREConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('gre-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_0db166f1e9"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_73f9b26682">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- GIF Modal -->
-<div id="gif-modal" class="modal" style="display: none;">
+<div id="gif-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">GIF Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('gif-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_fa11ea652d"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
@@ -723,7 +723,7 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">GIF Tunnel Subnet</label>
                     <div class="col-sm-9">
-                        <select class="form-select" id="gifTunnelSubnet" style="max-width: 150px;">
+                        <select class="form-select ext-a2984eed" id="gifTunnelSubnet">
                             <option>128</option><option>64</option><option>48</option><option>32</option><option>16</option>
                         </select>
                         <small class="text-muted">The subnet is used for determining the network that is tunnelled.</small>
@@ -756,26 +756,26 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveGIFConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('gif-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_0bd29cfa12"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_b62712f6eb">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Bridge Modal -->
-<div id="bridge-modal" class="modal" style="display: none;">
+<div id="bridge-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Bridge Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('bridge-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_81a4d16988"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Member Interface(s)</label>
                     <div class="col-sm-9">
-                        <select multiple class="form-select" id="bridgeMemberInterfaces" style="height: 100px;">
+                        <select multiple class="form-select ext-1a3a679d" id="bridgeMemberInterfaces">
                             <option>WAN</option>
                             <option>LAN</option>
                         </select>
@@ -792,10 +792,10 @@
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Advanced Options</label>
                     <div class="col-sm-9">
-                        <button class="btn btn-info btn-sm" onclick="toggleAdvanced('bridge-advanced-fields')"><i class="fas fa-cog"></i> Display Advanced</button>
+                        <button class="btn btn-info btn-sm" data-action="h_3401f78152"><i class="fas fa-cog"></i> Display Advanced</button>
                     </div>
                 </div>
-                <div id="bridge-advanced-fields" class="ss-card" style="display: none;">
+                <div id="bridge-advanced-fields" class="ss-card ext-9c766357">
                     <div class="ss-card-head">
                         <div class="ss-card-icon"><i class="fa-solid fa-gears"></i></div>
                         <div><div class="ss-card-title">Advanced Configuration</div></div>
@@ -804,21 +804,21 @@
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Cache Size</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" id="bridgeCacheSize" placeholder="100" style="max-width: 150px;">
+                                <input type="text" class="form-control ext-a2984eed" id="bridgeCacheSize" placeholder="100">
                                 <small class="text-muted">Maximum number of addresses in the cache (default 100).</small>
                             </div>
                         </div>
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Cache Max Age</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" id="bridgeCacheMaxAge" placeholder="1200" style="max-width: 150px;">
+                                <input type="text" class="form-control ext-a2984eed" id="bridgeCacheMaxAge" placeholder="1200">
                                 <small class="text-muted">Maximum time (in seconds) that an address is stored in the cache (default 1200).</small>
                             </div>
                         </div>
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Span Interface(s)</label>
                             <div class="col-sm-9">
-                                <select multiple class="form-select" id="bridgeSpanInterfaces" style="height: 80px;">
+                                <select multiple class="form-select ext-468b999f" id="bridgeSpanInterfaces">
                                     <option>WAN</option>
                                     <option>LAN</option>
                                 </select>
@@ -828,7 +828,7 @@
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Edge Interface(s)</label>
                             <div class="col-sm-9">
-                                <select multiple class="form-select" id="bridgeEdgeInterfaces" style="height: 80px;">
+                                <select multiple class="form-select ext-468b999f" id="bridgeEdgeInterfaces">
                                     <option>WAN</option>
                                     <option>LAN</option>
                                 </select>
@@ -838,7 +838,7 @@
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">Auto Edge Interface(s)</label>
                             <div class="col-sm-9">
-                                <select multiple class="form-select" id="bridgeAutoEdgeInterfaces" style="height: 80px;">
+                                <select multiple class="form-select ext-468b999f" id="bridgeAutoEdgeInterfaces">
                                     <option>WAN</option>
                                     <option>LAN</option>
                                 </select>
@@ -848,7 +848,7 @@
                         <div class="mb-3 row">
                             <label class="col-sm-3 col-form-label fw-semibold">PTP Interface(s)</label>
                             <div class="col-sm-9">
-                                <select multiple class="form-select" id="bridgePTPInterfaces" style="height: 80px;">
+                                <select multiple class="form-select ext-468b999f" id="bridgePTPInterfaces">
                                     <option>WAN</option>
                                     <option>LAN</option>
                                 </select>
@@ -869,26 +869,26 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveBridgeConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('bridge-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_729b83cf1d"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_a842a10b4a">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- LAGG Modal -->
-<div id="lagg-modal" class="modal" style="display: none;">
+<div id="lagg-modal" class="modal ext-9c766357">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">LAGG Configuration</h5>
-                <button type="button" class="btn-close" onclick="closeModal('lagg-modal')"></button>
+                <button type="button" class="btn-close" data-action="h_0e83e9560c"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3 row">
                     <label class="col-sm-3 col-form-label fw-semibold">Parent Interface(s)</label>
                     <div class="col-sm-9">
-                        <select multiple class="form-select" id="laggParentInterfaces" style="height: 100px;">
+                        <select multiple class="form-select ext-1a3a679d" id="laggParentInterfaces">
                             <option value="">-- loading ports --</option>
                         </select>
                         <small class="text-muted">Choose the members that will be used for the link aggregation.</small>
@@ -916,14 +916,14 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" onclick="saveLAGGConfig()"><i class="fas fa-save"></i> Save</button>
-                <button class="btn btn-secondary" onclick="closeModal('lagg-modal')">Cancel</button>
+                <button class="btn btn-primary" data-action="h_00af9a63a7"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-secondary" data-action="h_67f9981bfb">Cancel</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 
 // ----------------------------
 // INTERFACE ASSIGNMENTS FUNCTIONS
@@ -1137,8 +1137,8 @@ function displayWirelessConfigs(configs) {
                 <td>${config.mode}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="editWirelessConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteWirelessConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-info" data-action="h_7b621aa96e"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_d63fc57148"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1258,8 +1258,8 @@ function displayVLANConfigs(configs) {
                 <td>${config.vlan_priority}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="editVLANConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteVLANConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-info" data-action="h_ebf7d3f10a"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_219b47dc06"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1400,8 +1400,8 @@ function displayQinQConfigs(configs) {
                 <td>${config.member_tags.join(', ')}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="editQinQConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteQinQConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-info" data-action="h_0e0f23b47c"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_0c3c51292a"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1608,8 +1608,8 @@ function displayInterfaceGroups(groups) {
                 <td>${group.description}</td>
                 <td>${group.members.join(', ')}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" onclick="editGroup(${group.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-info" data-action="h_71c27723a5"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_52942a1691"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1642,8 +1642,8 @@ function displayPPPConfigs(configs) {
                 <td>${config.description || ''}</td>
                 <td>${config.username || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="editPPPConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deletePPPConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-primary" data-action="h_4270da24ac"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_a75dc5cf12"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1794,8 +1794,8 @@ function displayGREConfigs(configs) {
                 <td>${config.gre_local_address || ''}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="editGREConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteGREConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-primary" data-action="h_8e2d1cdaa9"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_bef6afa103"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1937,8 +1937,8 @@ function displayGIFConfigs(configs) {
                 <td>${config.gif_tunnel_local_address || ''}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="editGIFConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteGIFConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-primary" data-action="h_89cdd6eeec"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_4f319d39da"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -2067,8 +2067,8 @@ function displayBridgeConfigs(configs) {
                 <td>${config.cache_size || '100'}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" onclick="editBridgeConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteBridgeConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button class="btn btn-sm btn-primary" data-action="h_20c1af7bf9"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn btn-sm btn-danger" data-action="h_261cf62f4a"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -2250,8 +2250,8 @@ function displayLAGGConfigs(configs) {
             <td>${config.aggregation_protocol}</td>
             <td>${config.description || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editLAGGConfig(${config.id})"><i class="fas fa-edit"></i> Edit</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteLAGGConfig(${config.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                <button class="btn btn-sm btn-primary" data-action="h_3c11eb101c"><i class="fas fa-edit"></i> Edit</button>
+                <button class="btn btn-sm btn-danger" data-action="h_24e5310000"><i class="fas fa-trash-alt"></i> Delete</button>
             </td>
         `;
     });
@@ -2462,7 +2462,7 @@ function saveInterfaceGroup() {
     }
 </script>
 
-<style>
+<style nonce="{{ csp_nonce() }}">
 /* Modal backdrop styling */
 .modal {
     position: fixed;
@@ -2540,3 +2540,82 @@ function saveInterfaceGroup() {
 </style>
 
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_23cc335df8'] = function (event, el) { openTab(event, 'interface-assignments') };
+  R['h_c27bac4649'] = function (event, el) { openTab(event, 'interface-groups') };
+  R['h_83c41502b1'] = function (event, el) { openTab(event, 'wireless') };
+  R['h_d92964e019'] = function (event, el) { openTab(event, 'vlans') };
+  R['h_46e8d4ffb4'] = function (event, el) { openTab(event, 'qinqs') };
+  R['h_87a65adb38'] = function (event, el) { openTab(event, 'ppps') };
+  R['h_59c5d9b9fc'] = function (event, el) { openTab(event, 'gres') };
+  R['h_4046607cb7'] = function (event, el) { openTab(event, 'gifs') };
+  R['h_45d516a511'] = function (event, el) { openTab(event, 'bridges') };
+  R['h_282075e6c4'] = function (event, el) { openTab(event, 'laggs') };
+  R['h_4f83b298a5'] = function (event, el) { deleteLANAssignment() };
+  R['h_4cd6f5c957'] = function (event, el) { saveWANAssignment(); saveLANAssignment(); };
+  R['h_76b054aafe'] = function (event, el) { addLANAssignment() };
+  R['h_8400d9e882'] = function (event, el) { openModal('interface-group-modal') };
+  R['h_476ce712af'] = function (event, el) { openModal('wireless-modal') };
+  R['h_73c9f3128c'] = function (event, el) { openModal('vlan-modal') };
+  R['h_467065be15'] = function (event, el) { openModal('qinq-modal') };
+  R['h_43e5d2e5d8'] = function (event, el) { openModal('ppp-modal') };
+  R['h_cad7bceee4'] = function (event, el) { openModal('gre-modal') };
+  R['h_718d4b0a45'] = function (event, el) { openModal('gif-modal') };
+  R['h_af3d48c7fa'] = function (event, el) { openModal('bridge-modal') };
+  R['h_71fc2dfd77'] = function (event, el) { openLAGGModal() };
+  R['h_0df10af607'] = function (event, el) { closeModal('interface-group-modal') };
+  R['h_cbe3ea6377'] = function (event, el) { saveInterfaceGroup() };
+  R['h_3c3ce039b2'] = function (event, el) { closeModal('interface-group-modal') };
+  R['h_8d50ff9d0d'] = function (event, el) { closeModal('wireless-modal') };
+  R['h_0b381a8458'] = function (event, el) { saveWirelessConfig() };
+  R['h_e8c68c36c9'] = function (event, el) { closeModal('wireless-modal') };
+  R['h_004de677ab'] = function (event, el) { closeModal('vlan-modal') };
+  R['h_2b50b4bbfb'] = function (event, el) { saveVLANConfig() };
+  R['h_d7d53a2fb9'] = function (event, el) { closeModal('vlan-modal') };
+  R['h_d83c158c79'] = function (event, el) { closeModal('qinq-modal') };
+  R['h_12b639680a'] = function (event, el) { addQinQTagInput() };
+  R['h_7815b0845a'] = function (event, el) { saveQinQConfig() };
+  R['h_2564139c41'] = function (event, el) { closeModal('qinq-modal') };
+  R['h_91c96ddaae'] = function (event, el) { closeModal('ppp-modal') };
+  R['h_3e038aafff'] = function (event, el) { toggleAdvanced('ppp-advanced-fields') };
+  R['h_f52a1233b4'] = function (event, el) { savePPPConfig() };
+  R['h_a2c3e781a4'] = function (event, el) { closeModal('ppp-modal') };
+  R['h_9f06109eaf'] = function (event, el) { closeModal('gre-modal') };
+  R['h_0db166f1e9'] = function (event, el) { saveGREConfig() };
+  R['h_73f9b26682'] = function (event, el) { closeModal('gre-modal') };
+  R['h_fa11ea652d'] = function (event, el) { closeModal('gif-modal') };
+  R['h_0bd29cfa12'] = function (event, el) { saveGIFConfig() };
+  R['h_b62712f6eb'] = function (event, el) { closeModal('gif-modal') };
+  R['h_81a4d16988'] = function (event, el) { closeModal('bridge-modal') };
+  R['h_3401f78152'] = function (event, el) { toggleAdvanced('bridge-advanced-fields') };
+  R['h_729b83cf1d'] = function (event, el) { saveBridgeConfig() };
+  R['h_a842a10b4a'] = function (event, el) { closeModal('bridge-modal') };
+  R['h_0e83e9560c'] = function (event, el) { closeModal('lagg-modal') };
+  R['h_00af9a63a7'] = function (event, el) { saveLAGGConfig() };
+  R['h_67f9981bfb'] = function (event, el) { closeModal('lagg-modal') };
+  R['h_7b621aa96e'] = function (event, el) { editWirelessConfig(${config.id}) };
+  R['h_d63fc57148'] = function (event, el) { deleteWirelessConfig(${config.id}) };
+  R['h_ebf7d3f10a'] = function (event, el) { editVLANConfig(${config.id}) };
+  R['h_219b47dc06'] = function (event, el) { deleteVLANConfig(${config.id}) };
+  R['h_0e0f23b47c'] = function (event, el) { editQinQConfig(${config.id}) };
+  R['h_0c3c51292a'] = function (event, el) { deleteQinQConfig(${config.id}) };
+  R['h_71c27723a5'] = function (event, el) { editGroup(${group.id}) };
+  R['h_52942a1691'] = function (event, el) { deleteGroup(${group.id}) };
+  R['h_4270da24ac'] = function (event, el) { editPPPConfig(${config.id}) };
+  R['h_a75dc5cf12'] = function (event, el) { deletePPPConfig(${config.id}) };
+  R['h_8e2d1cdaa9'] = function (event, el) { editGREConfig(${config.id}) };
+  R['h_bef6afa103'] = function (event, el) { deleteGREConfig(${config.id}) };
+  R['h_89cdd6eeec'] = function (event, el) { editGIFConfig(${config.id}) };
+  R['h_4f319d39da'] = function (event, el) { deleteGIFConfig(${config.id}) };
+  R['h_20c1af7bf9'] = function (event, el) { editBridgeConfig(${config.id}) };
+  R['h_261cf62f4a'] = function (event, el) { deleteBridgeConfig(${config.id}) };
+  R['h_3c11eb101c'] = function (event, el) { editLAGGConfig(${config.id}) };
+  R['h_24e5310000'] = function (event, el) { deleteLAGGConfig(${config.id}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

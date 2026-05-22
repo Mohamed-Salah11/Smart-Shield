@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style nonce="{{ csp_nonce() }}">
+.ch-grid       { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+                 gap:10px; margin-bottom:14px; }
+.ch-card       { background:var(--panel); border:1px solid var(--border-color);
+                 border-radius:10px; padding:12px 14px; }
+.ch-card.warn  { border-color:#f59e0b; }
+.ch-card.fail  { border-color:#ef4444; }
+.ch-name       { font-weight:700; font-size:.9rem; margin-bottom:4px; }
+.ch-row        { display:flex; justify-content:space-between; font-size:.8rem;
+                 padding:2px 0; color:var(--muted); }
+.ch-row b      { color:var(--text-color); font-weight:600; }
+.ch-err        { font-family:ui-monospace,Menlo,monospace; font-size:.72rem;
+                 color:#ef4444; word-break:break-word; margin-top:4px;
+                 padding:5px 8px; background:rgba(239,68,68,.08); border-radius:6px; }
+.ch-dlq-wrap   { background:var(--panel); border:1px solid var(--border-color);
+                 border-radius:10px; overflow:hidden; }
+.ch-dlq-head   { padding:10px 14px; background:var(--border-color-soft);
+                 font-weight:700; font-size:.85rem; }
+.ch-dlq-table  { width:100%; border-collapse:collapse; font-size:.78rem; }
+.ch-dlq-table th, .ch-dlq-table td { padding:6px 10px;
+                 border-bottom:1px solid var(--border-color); text-align:left;
+                 white-space:nowrap; }
+.ch-dlq-table th { background:var(--border-color-soft); font-size:.7rem;
+                 text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.ch-raw        { font-family:ui-monospace,Menlo,monospace; font-size:.72rem;
+                 white-space:pre-wrap; word-break:break-word; max-width:600px;
+                 max-height:120px; overflow:auto; color:var(--muted); }
+.ch-msg        { color:var(--muted); font-size:.8rem; padding:10px 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ext-75f111c7">
+  <h2 class="ext-1386d503">Collector Health</h2>
+  <span class="ch-msg" id="liveStatus">Loading…</span>
+</div>
+
+<div class="ch-grid" id="collectors"></div>
+
+<div class="ch-dlq-wrap">
+  <div class="ch-dlq-head">Dead-letter queue — recent parse failures</div>
+  <table class="ch-dlq-table">
+    <thead>
+      <tr><th>Time</th><th>Source</th><th>Reason</th><th>Raw payload</th></tr>
+    </thead>
+    <tbody id="dlqBody">
+      <tr><td colspan="4" class="ch-msg">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const CH_URL = "{{ url_for('status.api_collector_health') }}";
+
+function htmlEscape(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
+  ));
+}
+
+function ageHuman(ts) {
+  if (!ts) return "never";
+  const dt = new Date(ts);
+  if (isNaN(dt)) return ts;
+  const s = Math.floor((Date.now() - dt.getTime()) / 1000);
+  if (s < 60)    return s + "s ago";
+  if (s < 3600)  return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+}
+
+function renderCollectors(rows) {
+  if (!rows || !rows.length) {
+    document.getElementById("collectors").innerHTML =
+      '<div class="ch-msg">No collectors have reported yet. Generate some traffic to populate this page.</div>';
+    return;
+  }
+  document.getElementById("collectors").innerHTML = rows.map(c => {
+    const cls = c.last_error ? "fail"
+              : (c.events_dropped > 0) ? "warn" : "";
+    return `<div class="ch-card ${cls}">
+      <div class="ch-name">${htmlEscape(c.source_name)}
+        <span class="ext-387e0bc6">
+          ${htmlEscape(c.source_type || "")}
+        </span>
+      </div>
+      <div class="ch-row"><span>Collected</span><b>${(c.events_collected||0).toLocaleString()}</b></div>
+      <div class="ch-row"><span>Dropped</span><b class="ext-5dd52fcd">${(c.events_dropped||0).toLocaleString()}</b></div>
+      <div class="ch-row"><span>Last seen</span><b>${ageHuman(c.last_seen)}</b></div>
+      <div class="ch-row"><span>Last event</span><b>${ageHuman(c.last_event_ts)}</b></div>
+      <div class="ch-row"><span>Offset</span><b>${(c.offset||0).toLocaleString()}</b></div>
+      <div class="ch-row"><span>Restarts</span><b>${c.restart_count||0}</b></div>
+      ${c.last_error ? `<div class="ch-err">${htmlEscape(c.last_error)}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderDlq(rows) {
+  const tbody = document.getElementById("dlqBody");
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="ch-msg">No dead-letter rows — all parses successful so far.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(d => `
+    <tr>
+      <td>${htmlEscape((d.ts||"").replace("T"," ").slice(0,19))}</td>
+      <td>${htmlEscape(d.source_name||"")}<br><span class="ext-05a371bd">${htmlEscape(d.source_type||"")}</span></td>
+      <td>${htmlEscape(d.reason||"")}</td>
+      <td><div class="ch-raw">${htmlEscape(d.raw_payload||"")}</div></td>
+    </tr>`).join("");
+}
+
+async function load() {
+  try {
+    const r = await fetch(CH_URL, {credentials:"same-origin"});
+    if (!r.ok) {
+      document.getElementById("liveStatus").textContent = "Request failed: " + r.status;
+      return;
+    }
+    const d = await r.json();
+    renderCollectors(d.collectors || []);
+    renderDlq(d.dead_letter || []);
+    document.getElementById("liveStatus").textContent = "Updated " + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById("liveStatus").textContent = "Network error";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  load();
+  setInterval(load, 15000);
+});
+</script>
+{% endblock %}

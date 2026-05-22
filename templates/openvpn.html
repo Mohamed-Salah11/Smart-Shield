@@ -3,8 +3,8 @@
 {% block main %}
 <div class="container">
 
-  <div id="ovpn-toast" class="alert d-none" role="alert"
-       style="position:fixed;top:70px;right:20px;z-index:9999;min-width:320px;"></div>
+  <div id="ovpn-toast" class="alert d-none ext-ad4ef29a" role="alert"
+      ></div>
 
   <div class="ss-page-header">
     <div>
@@ -12,7 +12,7 @@
       <p class="ss-page-desc">Configure OpenVPN server instances</p>
     </div>
     <div class="d-flex gap-2">
-      <button type="button" class="btn btn-outline-success" onclick="applyOpenvpn()">
+      <button type="button" class="btn btn-outline-success" data-action="h_f6d3e76ab9">
         <i class="fa-solid fa-play me-1"></i>Apply &amp; Restart
       </button>
       <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#openvpnAddServerModal">
@@ -26,6 +26,7 @@
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a></li>
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a></li>
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'portal' else '' }}" href="{{ url_for('vpn.openvpn_portal_users') }}">Portal Users</a></li>
   </ul>
 
   <div class="ss-card">
@@ -38,17 +39,17 @@
         </button>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;">Interface</th>
+            <th class="ext-16e59a0f">Interface</th>
             <th>Protocol / Port</th><th>Tunnel Network</th>
             <th>Mode / Crypto</th><th>Description</th><th></th>
           </tr>
         </thead>
         <tbody id="openvpnServersTable">
-          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">Loading…</td></tr>
+          <tr><td class="ext-a9edf93a" colspan="6">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -65,7 +66,8 @@
 					aria-label="Close"></button>
 			</div>
 
-			<form method="post" action="#">
+			<form method="post" action="{{ url_for('vpn.openvpn_servers') }}">
+				<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 				<div class="modal-body">
 					<h6 class="openvpn-form-section-title">General Information</h6>
 					<div class="openvpn-form-section">
@@ -248,18 +250,19 @@
 
 						<div class="row g-3 align-items-start">
 							<div class="col-md-3">
-								<label for="serverCert" class="form-label fw-semibold">Server certificate</label>
+								<label for="serverCaCert" class="form-label fw-semibold">CA Certificate</label>
 							</div>
 							<div class="col-md-9">
-								<select id="serverCert" name="server_certificate" class="form-select">
-									<option value="" selected disabled>===== Server Certificates =====</option>
-									<option value="">GUI default (68e626ba9a349) (Server: Yes, In Use)</option>
-									<option value="" disabled>===== Non-Server Certificates =====</option>
+								<select id="serverCaCert" class="form-select mb-2">
+									<option value="">— Select CA Certificate —</option>
+								</select>
+								<label for="serverCert" class="form-label fw-semibold">Server Certificate</label>
+								<select id="serverCert" class="form-select">
+									<option value="">— Select Server Certificate —</option>
 								</select>
 								<div class="form-text">
-									Certificates known to be incompatible with use for OpenVPN are not included in this
-									list, such as certificates using incompatible ECDSA curves or weak digest
-									algorithms.
+									Manage certificates under <a href="/system/certificates" target="_blank">System → Certificates</a>.
+									After adding certs, reload this page to see them here.
 								</div>
 							</div>
 						</div>
@@ -910,53 +913,97 @@
 	</div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
+	function gv(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+	function gc(id) { const el = document.getElementById(id); return el ? el.checked : false; }
+	function getCsrfToken() {
+		const m = document.cookie.match(/csrf_token=([^;]+)/);
+		const el = document.querySelector('input[name=csrf_token]');
+		return m ? m[1] : (el ? el.value : '');
+	}
+
 	document.addEventListener('DOMContentLoaded', function () {
-		// Load servers on page load
 		loadOpenVPNServers();
+
+		// Load certificate dropdowns
+		fetch('/vpn/api/openvpn/certificates').then(r=>r.json()).then(j => {
+			const caSelect   = document.getElementById('serverCaCert');
+			const certSelect = document.getElementById('serverCert');
+			if (caSelect) {
+				caSelect.innerHTML = '<option value="">— Select CA Certificate —</option>';
+				(j.cas || []).forEach(c => caSelect.append(new Option(c.name, c.id)));
+			}
+			if (certSelect) {
+				certSelect.innerHTML = '<option value="">— Select Server Certificate —</option>';
+				(j.server_certs || []).forEach(c => certSelect.append(new Option(c.name, c.id)));
+			}
+		}).catch(() => {});
 
 		// Handle form submission
 		const form = document.querySelector('#openvpnAddServerModal form');
 		if (form) {
 			form.addEventListener('submit', function (e) {
 				e.preventDefault();
-
 				const formData = {
-					description: document.getElementById('ovpn_description').value,
-					disabled: document.getElementById('ovpn_disabled').checked,
-					server_mode: document.getElementById('serverMode').value,
-					device_mode: document.getElementById('deviceMode').value,
-					protocol: document.getElementById('protocol').value,
-					interface: document.getElementById('interface').value,
-					local_port: document.getElementById('ovpn_local_port').value,
-					tls_key: document.getElementById('ovpn_tls_key') ? document.getElementById('ovpn_tls_key').checked : false,
-					tls_key_auto: document.getElementById('ovpn_tls_key_auto') ? document.getElementById('ovpn_tls_key_auto').checked : false,
-					peer_ca: document.getElementById('ovpn_peer_ca') ? document.getElementById('ovpn_peer_ca').value : ''
+					description:   gv('ovpn_description'),
+					disabled:      gc('ovpn_disabled'),
+					server_mode:   gv('serverMode'),
+					device_mode:   gv('deviceMode'),
+					protocol:      gv('protocol'),
+					interface:     gv('interface'),
+					local_port:    parseInt(gv('ovpn_local_port')) || 1194,
+					tls_key:       gc('ovpn_tls_key'),
+					tls_key_auto:  gc('ovpn_tls_key_auto'),
+					peer_ca:       gv('ovpn_peer_ca'),
+					tunnel_network:          gv('ovpn_ipv4_tunnel_net'),
+					tunnel_network_v6:       gv('ovpn_ipv6_tunnel_net'),
+					local_network:           gv('ovpn_ipv4_local_nets'),
+					remote_network:          gv('ovpn_ipv4_remote_nets'),
+					redirect_gateway:        gc('ovpn_redirect_ipv4'),
+					max_clients:             parseInt(gv('ovpn_concurrent')) || null,
+					compression:             gv('allowCompression'),
+					inter_client_communication: gc('ovpn_interclient'),
+					duplicate_connection:    gc('ovpn_duplicate'),
+					dynamic_ip:              gc('ovpn_dynamic_ip'),
+					topology:                gv('topology'),
+					inactivity_timeout:      parseInt(gv('ovpn_inactivity')) || 300,
+					ping_method:             gv('pingMethod'),
+					ping_interval:           parseInt(gv('ovpn_ping_interval')) || 10,
+					ping_timeout:            parseInt(gv('ovpn_ping_timeout')) || 60,
+					custom_options:          gv('ovpn_custom_options'),
+					verbosity_level:         parseInt(gv('verbosityLevel')) || 1,
+					dh_parameter_length:     gv('dhLength'),
+					ecdh_curve:              gv('ecdhCurve'),
+					data_encryption_algorithms: gv('dataEncryption'),
+					fallback_data_encryption_algorithm: gv('fallbackEncryption'),
+					auth_digest_algorithm:   gv('authDigest'),
+					ca_id:         parseInt(gv('serverCaCert')) || null,
+					server_cert_id: parseInt(gv('serverCert')) || null,
 				};
 
 				const modalEl  = document.getElementById('openvpnAddServerModal');
-					const editId   = modalEl ? modalEl._editServerId : null;
-					const endpoint = editId ? `/vpn/api/openvpn/update-server/${editId}` : '/vpn/api/openvpn/save-server';
-					const method   = editId ? 'PUT' : 'POST';
+				const editId   = modalEl ? modalEl._editServerId : null;
+				const endpoint = editId ? `/vpn/api/openvpn/update-server/${editId}` : '/vpn/api/openvpn/save-server';
+				const method   = editId ? 'PUT' : 'POST';
 
-					fetch(endpoint, {
-						method,
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify(formData)
-					})
-					.then(response => response.json())
-					.then(data => {
-						if (data.status === 'success') {
-							if (modalEl) modalEl._editServerId = null;
-							const modal = bootstrap.Modal.getInstance(modalEl);
-							if (modal) modal.hide();
-							form.reset();
-							loadOpenVPNServers();
-						} else {
-							alert('Error: ' + (data.message || 'Unknown error'));
-						}
-					})
-					.catch(() => alert('Error saving OpenVPN server'));
+				fetch(endpoint, {
+					method,
+					headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+					body: JSON.stringify(formData)
+				})
+				.then(response => response.json())
+				.then(data => {
+					if (data.status === 'success') {
+						if (modalEl) modalEl._editServerId = null;
+						const modal = bootstrap.Modal.getInstance(modalEl);
+						if (modal) modal.hide();
+						form.reset();
+						loadOpenVPNServers();
+					} else {
+						alert('Error: ' + (data.message || 'Unknown error'));
+					}
+				})
+				.catch(() => alert('Error saving OpenVPN server'));
 			});
 		}
 	});
@@ -1001,15 +1048,15 @@
 				<td class="${statusClass}">${server.server_mode} / ${server.device_mode}</td>
 				<td class="${statusClass}">${server.description || '-'}</td>
 				<td>
-					<a href="/vpn/api/openvpn/generate-config/${server.id}"
+					<a href="/vpn/api/openvpn/generate-config/${server.id}?download=1"
 					   download="openvpn-server-${server.id}.conf"
 					   class="btn btn-sm btn-outline-secondary" title="Download .conf">
 						<i class="fas fa-download"></i>
 					</a>
-					<button class="btn btn-sm btn-primary" onclick="editServer(${server.id})" title="Edit">
+					<button class="btn btn-sm btn-primary" data-action="h_9f44af6f40" title="Edit">
 						<i class="fas fa-edit"></i>
 					</button>
-					<button class="btn btn-sm btn-danger" onclick="deleteServer(${server.id})" title="Delete">
+					<button class="btn btn-sm btn-danger" data-action="h_a708a5eabe" title="Delete">
 						<i class="fas fa-trash"></i>
 					</button>
 				</td>
@@ -1025,24 +1072,48 @@
 			if (data.status !== 'success') { alert('Could not load server: ' + (data.message || '')); return; }
 			const s = data.server;
 
-			// Populate the Add modal fields
 			const modal = document.getElementById('openvpnAddServerModal');
 			const titleEl = modal ? modal.querySelector('.modal-title') : null;
 			if (titleEl) titleEl.textContent = 'Edit OpenVPN Server';
 
-			const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-			const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-			setVal('ovpn_description', s.description);
-			setChk('ovpn_disabled',    s.disabled);
-			setVal('ovpn_server_mode', s.server_mode);
-			setVal('ovpn_device_mode', s.device_mode);
-			setVal('ovpn_protocol',    s.protocol);
-			setVal('ovpn_interface',   s.interface);
-			setVal('ovpn_local_port',  s.local_port);
-			setVal('ovpn_peer_ca',     s.peer_ca);
-			setChk('ovpn_tls_key_auto', s.tls_key_auto);
+			const sv = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+			const sc = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
 
-			// Tag the modal so the save handler knows it's an edit
+			sv('ovpn_description',    s.description);
+			sc('ovpn_disabled',       s.disabled);
+			sv('serverMode',          s.server_mode);
+			sv('deviceMode',          s.device_mode);
+			sv('protocol',            s.protocol);
+			sv('interface',           s.interface);
+			sv('ovpn_local_port',     s.local_port);
+			sv('ovpn_peer_ca',        s.peer_ca);
+			sc('ovpn_tls_key',        s.tls_key);
+			sc('ovpn_tls_key_auto',   s.tls_key_auto);
+			sv('ovpn_ipv4_tunnel_net', s.tunnel_network);
+			sv('ovpn_ipv6_tunnel_net', s.tunnel_network_v6);
+			sv('ovpn_ipv4_local_nets', s.local_network);
+			sv('ovpn_ipv4_remote_nets', s.remote_network);
+			sc('ovpn_redirect_ipv4',  s.redirect_gateway);
+			sv('ovpn_concurrent',     s.max_clients || '');
+			sv('allowCompression',    s.compression || 'refuse');
+			sc('ovpn_interclient',    s.inter_client_communication);
+			sc('ovpn_duplicate',      s.duplicate_connection);
+			sc('ovpn_dynamic_ip',     s.dynamic_ip);
+			sv('topology',            s.topology || 'subnet');
+			sv('ovpn_inactivity',     s.inactivity_timeout || 300);
+			sv('pingMethod',          s.ping_method || 'keepalive');
+			sv('ovpn_ping_interval',  s.ping_interval || 10);
+			sv('ovpn_ping_timeout',   s.ping_timeout || 60);
+			sv('ovpn_custom_options', s.custom_options || '');
+			sv('verbosityLevel',      s.verbosity_level ?? 1);
+			sv('dhLength',            s.dh_parameter_length || '2048');
+			sv('ecdhCurve',           s.ecdh_curve || 'default');
+			sv('dataEncryption',      s.data_encryption_algorithms || 'AES-256-GCM');
+			sv('fallbackEncryption',  s.fallback_data_encryption_algorithm || 'AES-256-CBC');
+			sv('authDigest',          s.auth_digest_algorithm || 'SHA256');
+			if (s.ca_id)          sv('serverCaCert', s.ca_id);
+			if (s.server_cert_id) sv('serverCert',   s.server_cert_id);
+
 			modal._editServerId = serverId;
 			new bootstrap.Modal(modal).show();
 		} catch (e) {
@@ -1096,3 +1167,15 @@
 </script>
 </div>
 {% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_f6d3e76ab9'] = function (event, el) { applyOpenvpn() };
+  R['h_9f44af6f40'] = function (event, el) { editServer(${server.id}) };
+  R['h_a708a5eabe'] = function (event, el) { deleteServer(${server.id}) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

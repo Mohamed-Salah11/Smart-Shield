@@ -40,7 +40,8 @@ _REDACT_KEYS = {"password", "secret", "key", "token", "psk", "auth", "credential
 
 def _default_app_log_path() -> str:
     if sys.platform.startswith("freebsd"):
-        return "/var/log/smart-shield/app.log"
+        from app.config import _ss_dir
+        return os.path.join(_ss_dir("/var/log"), "app.log")
     return "logs/app.log"
 
 

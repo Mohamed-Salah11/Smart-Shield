@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title">
+        <i class="fa-solid fa-diagram-project me-2 ext-035cc887"></i>Playbooks
+      </h1>
+      <p class="ss-page-desc">Trigger ordered automated steps when an event matches. A
+        playbook can <code>log</code> a custom event, <code>open_case</code>,
+        <code>block_ip</code> via PF, or <code>notify</code>. Any step with
+        <code>"approval_required": true</code> halts the run until an admin approves it.</p>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+        <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- Existing playbooks -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
+      <div>
+        <div class="ss-card-title">Playbooks</div>
+        <div class="ss-card-subtitle">Each one fires once per matching event (no recursion).</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if playbooks %}
+      <table class="table table-hover mb-0">
+        <thead class="ext-14203611">
+          <tr>
+            <th class="ps-4 py-2">Name</th>
+            <th class="py-2">Trigger</th>
+            <th class="py-2">Min severity</th>
+            <th class="py-2">Steps</th>
+            <th class="py-2">Status</th>
+            <th class="py-2 text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in playbooks %}
+          <tr>
+            <td class="ps-4 py-2"><strong>{{ p['name'] }}</strong><br><small class="text-muted">{{ p['description'] or '' }}</small></td>
+            <td class="py-2"><code>{{ p['trigger_category'] }}/{{ p['trigger_action'] }}</code></td>
+            <td class="py-2">{{ p['trigger_min_sev'] }}</td>
+            <td class="py-2 text-muted ext-1e28117f">
+              {{ p['steps']|length }} step{{ '' if p['steps']|length == 1 else 's' }}
+            </td>
+            <td class="py-2">
+              <span class="badge bg-{{ 'success' if p['enabled'] else 'secondary' }}">
+                {{ 'enabled' if p['enabled'] else 'disabled' }}
+              </span>
+            </td>
+            <td class="py-2 text-end pe-4">
+              <form class="ext-5677b988" method="POST" data-action-submit="h_c8c541196a">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="op" value="delete">
+                <input type="hidden" name="id" value="{{ p['id'] }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash-can"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-muted">No playbooks defined yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- New playbook -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-plus"></i></div>
+      <div>
+        <div class="ss-card-title">Add Playbook</div>
+        <div class="ss-card-subtitle">Define the trigger and the ordered step sequence.</div>
+      </div>
+    </div>
+    <div class="ss-card-body">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="op" value="save">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="name">Name *</label>
+            <input type="text" name="name" id="name" class="form-control" required>
+          </div>
+          <div class="ss-field ext-fd99b2a5">
+            <input type="checkbox" id="enabled" name="enabled" class="form-check-input ext-53896af7" checked>
+            <label class="ss-label ext-1386d503" for="enabled">Enabled</label>
+          </div>
+          <div class="ss-field ext-1b9b41ec">
+            <label class="ss-label" for="description">Description</label>
+            <input type="text" name="description" id="description" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="trigger_action">Trigger action</label>
+            <input type="text" name="trigger_action" id="trigger_action" class="form-control"
+                   value="correlation_match">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="trigger_category">Trigger category</label>
+            <input type="text" name="trigger_category" id="trigger_category" class="form-control"
+                   value="security">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="trigger_min_sev">Min severity</label>
+            <select name="trigger_min_sev" id="trigger_min_sev" class="form-select">
+              <option value="low">low</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
+              <option value="critical">critical</option>
+            </select>
+          </div>
+          <div class="ss-field ext-1b9b41ec">
+            <label class="ss-label" for="steps_json">Steps (JSON array)</label>
+            <textarea name="steps_json" id="steps_json" rows="8" class="form-control ext-760c65d2"
+                     
+                      placeholder='[
+  {"type": "notify", "args": {"message": "High-severity correlation match"}},
+  {"type": "open_case", "args": {"title": "Auto-opened from playbook"}},
+  {"type": "block_ip", "approval_required": true}
+]'></textarea>
+            <p class="ss-hint">Supported step types: <code>log</code>, <code>notify</code>,
+              <code>open_case</code>, <code>block_ip</code>. Set <code>approval_required</code>
+              to <code>true</code> on any step to require admin approval before continuing.</p>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary px-4 mt-2"><i class="fa-solid fa-plus me-1"></i> Save Playbook</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Recent runs -->
+  <div class="ss-card mb-5">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div>
+        <div class="ss-card-title">Recent Runs</div>
+        <div class="ss-card-subtitle">Approve any run that is awaiting a manual gate.</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if runs %}
+      <table class="table table-hover mb-0">
+        <thead class="ext-14203611">
+          <tr>
+            <th class="ps-4 py-2">Run #</th>
+            <th class="py-2">Playbook</th>
+            <th class="py-2">Trigger</th>
+            <th class="py-2">Started</th>
+            <th class="py-2">Status</th>
+            <th class="py-2 text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in runs %}
+          <tr>
+            <td class="ps-4 py-2">{{ r['id'] }}</td>
+            <td class="py-2">{{ r['playbook_name'] or '—' }}</td>
+            <td class="py-2 text-muted ext-1e28117f">
+              <code>{{ r['trigger_event_action'] }}</code> @ {{ r['trigger_event_ts'] or '—' }}
+            </td>
+            <td class="py-2 text-muted ext-1e28117f">{{ r['started_at'] }}</td>
+            <td class="py-2">
+              {% set sclass = {'done':'success','running':'info','awaiting_approval':'warning','failed':'danger','pending':'secondary'}.get(r['status'],'secondary') %}
+              <span class="badge bg-{{ sclass }}">{{ r['status'] }}</span>
+            </td>
+            <td class="py-2 text-end pe-4">
+              {% if r['status'] == 'awaiting_approval' %}
+              <form class="ext-5677b988" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="op" value="approve_run">
+                <input type="hidden" name="run_id" value="{{ r['id'] }}">
+                <button class="btn btn-sm btn-success"><i class="fa-solid fa-check"></i> Approve</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-muted">No playbook runs yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_c8c541196a'] = function (event, el) { return confirm('Delete this playbook?'); };
+})();
+</script>
+<!-- /inline-handlers:auto -->

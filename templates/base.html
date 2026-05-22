@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{ title if title else "Smart Shield" }}</title>
+    <title>{{ title if title else "SmartShield" }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ static_v('vendor/bootstrap/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ static_v('vendor/inter/inter.css') }}">
+    <link rel="stylesheet" href="{{ static_v('css/base.css') }}">
+    <link rel="stylesheet" href="{{ static_v('css/smartshield-system.css') }}">
+    <link rel="stylesheet" href="{{ static_v('css/ext-inline.css') }}">
+    <script src="{{ static_v('js/inline-handlers.js') }}"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <script>
+    <script nonce="{{ csp_nonce() }}">
     (function() {
         const token = "{{ csrf_token() }}";
         const originalFetch = window.fetch ? window.fetch.bind(window) : null;
@@ -35,9 +36,9 @@
 
 <!-- Desktop-only guard -->
 <div class="mobile-block-message">
-    <div class="icon"><i class="fa-solid fa-shield-halved" style="font-size:3.5rem;color:#00b4a0;"></i></div>
+    <div class="icon"><i class="fa-solid fa-shield-halved ext-561a591a"></i></div>
     <h1>Desktop Required</h1>
-    <p>Smart Shield is a professional network defense platform designed for desktop browsers. Please open this on a computer.</p>
+    <p>SmartShield is a professional network defense platform designed for desktop browsers. Please open this on a computer.</p>
 </div>
 
 <!-- ════════════════════════════════════════
@@ -52,12 +53,46 @@
 
         <!-- Brand (center) -->
         <a class="navbar-brand" href="{{ url_for('system.dashboard') }}">
-            <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield">
-            <span class="label">Smart Shield</span>
+            <img src="{{ static_v('images/SS.png') }}" alt="SmartShield">
+            <span class="label">SmartShield</span>
         </a>
 
         <!-- Right controls -->
         <ul class="navbar-nav ms-auto">
+            <!-- Appliance Console (superusers only, and only when the
+                 admin has flipped the terminal_enabled flag in System →
+                 Advanced → Admin Access). The console runs a real root
+                 shell — gating it here keeps even the entry point invisible
+                 by default. -->
+            {% if session.get('is_superuser') and terminal_enabled and terminal_enabled() %}
+            <li class="nav-item me-1 d-flex align-items-center">
+                <button data-action="h_3494fbf23b"
+                        title="Open Appliance Console"
+                        class="nav-link d-flex align-items-center gap-1 px-2 ext-eda3a2c4"
+                       
+                        data-action-mouseover="h_e4fb6d24fb"
+                        data-action-mouseout="h_c819892ba4">
+                    <i class="fa-solid fa-terminal ext-facfb27e"></i>
+                    <span class="ext-5ffb234a">Console</span>
+                </button>
+            </li>
+            {% endif %}
+            <!-- SOC Portal shortcut (visible when the portal is enabled in
+                 System → SOC Portal Settings). Opens /soc-portal/login in a
+                 new tab so the admin session keeps its separate state. -->
+            {% if soc_portal_enabled and soc_portal_enabled() %}
+            <li class="nav-item me-1 d-flex align-items-center">
+                <a href="/soc-portal/login" target="_blank" rel="noopener"
+                   title="Open SOC Team Portal"
+                   class="nav-link d-flex align-items-center gap-1 px-2 ext-79185bcf"
+                  
+                   data-action-mouseover="h_c5f96fa1d4"
+                   data-action-mouseout="h_bcd24499df">
+                    <i class="fa-solid fa-shield-halved ext-614b825d"></i>
+                    <span class="ext-3141c605">SOC Portal</span>
+                </a>
+            </li>
+            {% endif %}
             <!-- User dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#"
@@ -82,13 +117,18 @@
                     <li><a class="dropdown-item" href="{{ url_for('diagnostics.backup_restore', tab='restore') }}">
                         <i class="fa-solid fa-upload me-2 text-muted"></i>Restore Config
                     </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="refreshFirewall(event)">
+                    <li><a class="dropdown-item" href="#" data-action="h_6bc7ed345a">
                         <i class="fa-solid fa-shield-halved me-2 text-muted"></i>Refresh Firewall
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="{{ url_for('system.logout') }}">
-                        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Sign Out
-                    </a></li>
+                    <li>
+                        <form method="POST" action="{{ url_for('system.logout') }}" class="dropdown-item-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="dropdown-item text-danger dropdown-item-button">
+                                <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Sign Out
+                            </button>
+                        </form>
+                    </li>
                 </ul>
             </li>
         </ul>
@@ -106,16 +146,15 @@
         <!-- Sidebar header with brand + tagline -->
         <div class="sidebar-header">
             <a class="sidebar-brand" href="{{ url_for('system.dashboard') }}">
-                <img src="{{ url_for('static', filename='images/SS.png') }}" alt="Smart Shield" width="28" height="28">
-                <span class="label">Smart Shield</span>
+                <img src="{{ static_v('images/SS.png') }}" alt="SmartShield" width="28" height="28">
+                <span class="label">SmartShield</span>
             </a>
             <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">&times;</button>
         </div>
 
         <!-- Sidebar tagline strip -->
-        <div style="padding:6px 16px 10px;font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-                    color:rgba(0,180,160,.6);border-bottom:1px solid rgba(0,180,160,.1);display:flex;align-items:center;gap:6px;">
-            <i class="fa-solid fa-shield-halved" style="color:#00b4a0;font-size:.75rem;"></i>
+        <div class="ext-05e61e33">
+            <i class="fa-solid fa-shield-halved ext-77b82887"></i>
             Network Defense Platform
         </div>
 
@@ -125,49 +164,49 @@
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-layer-group sg-icon"></i>
-                    <span class="label">Platform</span>
+                    <span class="label">System Core</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('system.dashboard') }}">
-                        <i class="fa-solid fa-gauge-high fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Dashboard
+                        <i class="fa-solid fa-gauge-high fa-fw ext-4538ca8e"></i>
+                        Command Center
                     </a></li>
                     <li><a href="{{ url_for('system.general_setup') }}">
-                        <i class="fa-solid fa-sliders fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-sliders fa-fw ext-4538ca8e"></i>
                         Platform Settings
                     </a></li>
                     <li><a href="{{ url_for('system.admin_access') }}" data-match-pattern="/system/advanced,/system/admin-access">
-                        <i class="fa-solid fa-user-shield fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-user-shield fa-fw ext-4538ca8e"></i>
                         Security Hardening
                     </a></li>
                     <li><a href="{{ url_for('system.certificates') }}">
-                        <i class="fa-solid fa-certificate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-certificate fa-fw ext-4538ca8e"></i>
                         Certificates
                     </a></li>
                     <li><a href="{{ url_for('system.high_availability') }}">
-                        <i class="fa-solid fa-server fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-server fa-fw ext-4538ca8e"></i>
                         Cluster &amp; HA
                     </a></li>
                     <li><a href="{{ url_for('system.package_manager') }}">
-                        <i class="fa-solid fa-puzzle-piece fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-puzzle-piece fa-fw ext-4538ca8e"></i>
                         Extensions
                     </a></li>
                     <li><a href="{{ url_for('system.preflight') }}">
-                        <i class="fa-solid fa-stethoscope fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-stethoscope fa-fw ext-4538ca8e"></i>
                         Health Check
                     </a></li>
                     <li><a href="{{ url_for('routing.routing_index') }}">
-                        <i class="fa-solid fa-route fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-route fa-fw ext-4538ca8e"></i>
                         Routing
                     </a></li>
                     <li><a href="{{ url_for('system.setup_wizard') }}">
-                        <i class="fa-solid fa-wand-magic-sparkles fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-wand-magic-sparkles fa-fw ext-4538ca8e"></i>
                         Setup Assistant
                     </a></li>
                     {% if session.get('is_superuser') %}
                     <li><a href="{{ url_for('users.user_manager') }}">
-                        <i class="fa-solid fa-users fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-users fa-fw ext-4538ca8e"></i>
                         User Manager
                     </a></li>
                     {% endif %}
@@ -178,24 +217,24 @@
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-network-wired sg-icon"></i>
-                    <span class="label">Network</span>
+                    <span class="label">Network Fabric</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('interfaces.interfaces_lan') }}">
-                        <i class="fa-solid fa-ethernet fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-ethernet fa-fw ext-4538ca8e"></i>
                         LAN Interface
                     </a></li>
                     <li><a href="{{ url_for('interfaces.interfaces_wan') }}">
-                        <i class="fa-solid fa-globe fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-globe fa-fw ext-4538ca8e"></i>
                         WAN Interface
                     </a></li>
                     <li><a href="{{ url_for('interfaces.interfaces_assignments') }}">
-                        <i class="fa-solid fa-diagram-project fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-diagram-project fa-fw ext-4538ca8e"></i>
                         Port Mapping
                     </a></li>
                     <li><a href="{{ url_for('network_api.devices_page') }}">
-                        <i class="fa-solid fa-laptop-code fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-laptop-code fa-fw ext-4538ca8e"></i>
                         Devices
                     </a></li>
                 </ul>
@@ -205,32 +244,32 @@
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-shield-halved sg-icon"></i>
-                    <span class="label">Access Control</span>
+                    <span class="label">Shield Policy</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('firewall.rules') }}">
-                        <i class="fa-solid fa-list-check fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Rule Sets
+                        <i class="fa-solid fa-list-check fa-fw ext-4538ca8e"></i>
+                        Traffic Rules
                     </a></li>
                     <li><a href="{{ url_for('firewall.nat') }}">
-                        <i class="fa-solid fa-arrows-left-right fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        NAT &amp; Forwarding
+                        <i class="fa-solid fa-arrows-left-right fa-fw ext-4538ca8e"></i>
+                        Exposure Rules
                     </a></li>
                     <li><a href="{{ url_for('firewall.aliases') }}">
-                        <i class="fa-solid fa-tags fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Address Groups
+                        <i class="fa-solid fa-tags fa-fw ext-4538ca8e"></i>
+                        Address Objects
                     </a></li>
                     <li><a href="{{ url_for('firewall.schedules') }}">
-                        <i class="fa-solid fa-clock fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Time Policies
+                        <i class="fa-solid fa-clock fa-fw ext-4538ca8e"></i>
+                        Time Windows
                     </a></li>
                     <li><a href="{{ url_for('firewall.traffic_shaper') }}">
-                        <i class="fa-solid fa-gauge fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        QoS &amp; Shaping
+                        <i class="fa-solid fa-gauge fa-fw ext-4538ca8e"></i>
+                        Flow Priority
                     </a></li>
                     <li><a href="{{ url_for('firewall.virtual_ips') }}">
-                        <i class="fa-solid fa-circle-nodes fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-circle-nodes fa-fw ext-4538ca8e"></i>
                         Virtual Addresses
                     </a></li>
                 </ul>
@@ -240,72 +279,72 @@
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-server sg-icon"></i>
-                    <span class="label">Network Services</span>
+                    <span class="label">Service Engine</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('services.auto_config_backup') }}">
-                        <i class="fa-solid fa-floppy-disk fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-floppy-disk fa-fw ext-4538ca8e"></i>
                         Config Backup
                     </a></li>
                     <li><a href="{{ url_for('services.captive_portal') }}">
-                        <i class="fa-solid fa-door-open fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Captive Portal
+                        <i class="fa-solid fa-door-open fa-fw ext-4538ca8e"></i>
+                        Access Gateway
                     </a></li>
                     <li><a href="{{ url_for('services.dhcp_server') }}">
-                        <i class="fa-solid fa-ip fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-ip fa-fw ext-4538ca8e"></i>
                         DHCP Server
                     </a></li>
                     <li><a href="{{ url_for('services.dhcp_relay') }}">
-                        <i class="fa-solid fa-arrows-turn-to-dots fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-arrows-turn-to-dots fa-fw ext-4538ca8e"></i>
                         DHCP Relay
                     </a></li>
                     <li><a href="{{ url_for('services.dhcpv6_server') }}">
-                        <i class="fa-solid fa-6 fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-6 fa-fw ext-4538ca8e"></i>
                         DHCPv6 Server
                     </a></li>
                     <li><a href="{{ url_for('services.dhcpv6_relay') }}">
-                        <i class="fa-solid fa-arrows-turn-right fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-arrows-turn-right fa-fw ext-4538ca8e"></i>
                         DHCPv6 Relay
                     </a></li>
                     <li><a href="{{ url_for('services.dns_resolver') }}">
-                        <i class="fa-solid fa-magnifying-glass-location fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-magnifying-glass-location fa-fw ext-4538ca8e"></i>
                         DNS Resolver
                     </a></li>
                     <li><a href="{{ url_for('services.dns_forwarder') }}">
-                        <i class="fa-solid fa-share fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-share fa-fw ext-4538ca8e"></i>
                         DNS Forwarder
                     </a></li>
                     <li><a href="{{ url_for('services.dynamic_dns') }}">
-                        <i class="fa-solid fa-rotate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-rotate fa-fw ext-4538ca8e"></i>
                         Dynamic DNS
                     </a></li>
                     <li><a href="{{ url_for('services.igmp_proxy') }}">
-                        <i class="fa-solid fa-broadcast-tower fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-broadcast-tower fa-fw ext-4538ca8e"></i>
                         Multicast Proxy
                     </a></li>
                     <li><a href="{{ url_for('services.ntp') }}">
-                        <i class="fa-solid fa-clock-rotate-left fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-clock-rotate-left fa-fw ext-4538ca8e"></i>
                         NTP Server
                     </a></li>
                     <li><a href="{{ url_for('services.openvpn_server') }}">
-                        <i class="fa-solid fa-link-slash fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-link-slash fa-fw ext-4538ca8e"></i>
                         OpenVPN Server
                     </a></li>
                     <li><a href="{{ url_for('services.router_advertisement') }}">
-                        <i class="fa-solid fa-rss fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-rss fa-fw ext-4538ca8e"></i>
                         IPv6 Announcements
                     </a></li>
                     <li><a href="{{ url_for('services.snmp') }}">
-                        <i class="fa-solid fa-chart-bar fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-chart-bar fa-fw ext-4538ca8e"></i>
                         SNMP
                     </a></li>
                     <li><a href="{{ url_for('services.upnp_igd_pcp') }}">
-                        <i class="fa-solid fa-plug fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-plug fa-fw ext-4538ca8e"></i>
                         UPnP / PCP
                     </a></li>
                     <li><a href="{{ url_for('services.wake_on_lan') }}">
-                        <i class="fa-solid fa-power-off fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-power-off fa-fw ext-4538ca8e"></i>
                         Wake on LAN
                     </a></li>
                 </ul>
@@ -320,15 +359,15 @@
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('vpn.openvpn') }}">
-                        <i class="fa-solid fa-key fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-key fa-fw ext-4538ca8e"></i>
                         OpenVPN
                     </a></li>
                     <li><a href="{{ url_for('vpn.ipsec') }}">
-                        <i class="fa-solid fa-shield fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-shield fa-fw ext-4538ca8e"></i>
                         IPsec
                     </a></li>
                     <li><a href="{{ url_for('vpn.l2tp') }}">
-                        <i class="fa-solid fa-tunnel fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-tunnel fa-fw ext-4538ca8e"></i>
                         L2TP
                     </a></li>
                 </ul>
@@ -343,31 +382,56 @@
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('ids.ids_index') }}" data-match-pattern="/ids">
-                        <i class="fa-solid fa-shield-virus fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-shield-virus fa-fw ext-4538ca8e"></i>
                         IDS / IPS
                     </a></li>
                 </ul>
             </details>
 
+            <!-- ── Security Operations ── -->
+            {% if session.get('is_superuser') %}
+            <details class="side-group">
+                <summary>
+                    <i class="fa-solid fa-user-shield sg-icon"></i>
+                    <span class="label">Security Operations</span>
+                    <span class="chev">▾</span>
+                </summary>
+                <ul class="side-links">
+                    <li><a href="{{ url_for('system.soc_portal_settings') }}">
+                        <i class="fa-solid fa-sliders fa-fw ext-4538ca8e"></i>
+                        SOC Portal Control
+                    </a></li>
+                    <li><a href="{{ url_for('system.soc_recommendations_queue') }}">
+                        <i class="fa-solid fa-clipboard-check fa-fw ext-4538ca8e"></i>
+                        Response Recommendations
+                    </a></li>
+                    <li><a href="{{ url_for('system.mail_alerts_page') }}" data-match-pattern="/system/mail-alerts">
+                        <i class="fa-solid fa-envelope fa-fw ext-4538ca8e"></i>
+                        Mail Alerts
+                    </a></li>
+                </ul>
+            </details>
+            {% endif %}
+
             <!-- ── Content Policies ── -->
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-filter sg-icon"></i>
-                    <span class="label">Content Policies</span>
+                    <span class="label">Content Guard</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('filters.dns_filter_page') }}" data-match-pattern="/filters/dns">
-                        <i class="fa-solid fa-earth-americas fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        DNS Policy
+                        <i class="fa-solid fa-earth-americas fa-fw ext-4538ca8e"></i>
+                        DNS Guard
                     </a></li>
                     <li><a href="{{ url_for('filters.web_filter_page') }}" data-match-pattern="/filters/web">
-                        <i class="fa-solid fa-globe fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Web Policy
+                        <i class="fa-solid fa-globe fa-fw ext-4538ca8e"></i>
+                        Web Guard
                     </a></li>
                     <li><a href="{{ url_for('filters.app_filter_page') }}" data-match-pattern="/filters/app">
-                        <i class="fa-solid fa-mobile-screen fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        App Policy
+                        <i class="fa-solid fa-mobile-screen fa-fw ext-4538ca8e"></i>
+                        App Guard
                     </a></li>
                 </ul>
             </details>
@@ -376,41 +440,53 @@
             <details class="side-group">
                 <summary>
                     <i class="fa-solid fa-chart-line sg-icon"></i>
-                    <span class="label">Monitoring</span>
+                    <span class="label">Observability</span>
                     <span class="chev">▾</span>
                 </summary>
                 <ul class="side-links">
                     <li><a href="{{ url_for('status.carp_failover') }}">
-                        <i class="fa-solid fa-arrows-rotate fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-arrows-rotate fa-fw ext-4538ca8e"></i>
                         Failover Status
                     </a></li>
                     <li><a href="{{ url_for('status.gateways') }}">
-                        <i class="fa-solid fa-gateway fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-gateway fa-fw ext-4538ca8e"></i>
                         Gateways
                     </a></li>
                     <li><a href="{{ url_for('status.monitoring') }}">
-                        <i class="fa-solid fa-microchip fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-microchip fa-fw ext-4538ca8e"></i>
                         System Metrics
                     </a></li>
                     <li><a href="{{ url_for('status.queues') }}">
-                        <i class="fa-solid fa-layer-group fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-layer-group fa-fw ext-4538ca8e"></i>
                         QoS Queues
                     </a></li>
                     <li><a href="{{ url_for('status.traffic_graph') }}">
-                        <i class="fa-solid fa-wave-square fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-wave-square fa-fw ext-4538ca8e"></i>
                         Bandwidth Monitor
                     </a></li>
                     <li><a href="{{ url_for('status.mrtg_graphs') }}">
-                        <i class="fa-solid fa-chart-area fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-chart-area fa-fw ext-4538ca8e"></i>
                         Traffic History
                     </a></li>
                     <li><a href="{{ url_for('status.dhcp_leases') }}">
-                        <i class="fa-solid fa-list fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
+                        <i class="fa-solid fa-list fa-fw ext-4538ca8e"></i>
                         Active Leases
                     </a></li>
                     <li><a href="{{ url_for('status.system_logs') }}">
-                        <i class="fa-solid fa-terminal fa-fw" style="width:14px;opacity:.6;font-size:.8rem;"></i>
-                        Live Events
+                        <i class="fa-solid fa-terminal fa-fw ext-4538ca8e"></i>
+                        SmartShield Logs
+                    </a></li>
+                    <li><a href="{{ url_for('firewall_logs.page') }}">
+                        <i class="fa-solid fa-shield-halved fa-fw ext-4538ca8e"></i>
+                        Firewall Logs
+                    </a></li>
+                    <li><a href="{{ url_for('dns_logs.page') }}">
+                        <i class="fa-solid fa-globe fa-fw ext-4538ca8e"></i>
+                        DNS Logs
+                    </a></li>
+                    <li><a href="{{ url_for('status.collector_health_page') }}">
+                        <i class="fa-solid fa-heart-pulse fa-fw ext-4538ca8e"></i>
+                        Collector Health
                     </a></li>
                 </ul>
             </details>
@@ -430,181 +506,62 @@
 </div>
 
 <!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-(function() {
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+<script src="{{ static_v('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ static_v('js/base-chrome.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ static_v('js/common.js') }}"></script>
 
-    // Inject CSRF into all non-GET forms
-    document.querySelectorAll('form').forEach((form) => {
-        const method = (form.getAttribute('method') || 'GET').toUpperCase();
-        if (method === 'GET') return;
-        if (form.querySelector('input[name="csrf_token"]')) return;
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'csrf_token';
-        input.value = csrfToken || '';
-        form.appendChild(input);
-    });
+{% if session.get("is_superuser") %}
+<!-- ── SmartShield Live CLI Terminal (XTerm.js + WebSocket + PTY) ──────────── -->
+<link rel="stylesheet" href="{{ static_v('vendor/xterm/xterm.min.css') }}">
+<style nonce="{{ csp_nonce() }}">
+#ss-cli-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:2rem;}
+#ss-cli-overlay.d-none{display:none!important;}
+#ss-cli-panel{width:100%;max-width:1140px;height:62vh;min-height:360px;
+  background:#0d1117;border-radius:12px;
+  border:1px solid #30363d;
+  display:flex;flex-direction:column;box-shadow:0 4px 40px rgba(0,0,0,.6);}
+#ss-cli-header{background:#161b22;border-bottom:1px solid #30363d;
+  border-radius:12px 12px 0 0;padding:9px 16px;
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+#ss-cli-header .cli-title{font-family:ui-monospace,monospace;font-size:.82rem;
+  color:#8b949e;display:flex;align-items:center;gap:8px;}
+#ss-cli-header .cli-title .dot{width:12px;height:12px;border-radius:50%;}
+.dot-r{background:#ff5f56;}.dot-y{background:#ffbd2e;}.dot-g{background:#27c93f;}
+#ss-cli-header .cli-hdr-btns button{background:none;border:1px solid #30363d;color:#8b949e;
+  border-radius:5px;padding:3px 10px;font-size:.75rem;cursor:pointer;margin-left:6px;}
+#ss-cli-header .cli-hdr-btns button:hover{background:#30363d;color:#f0f6fc;}
+#ss-cli-term{flex:1;padding:6px 10px 4px;overflow:hidden;min-height:0;background:#0d1117;}
+#ss-cli-term .xterm{height:100%;}
+#ss-cli-term .xterm-viewport{background:#0d1117!important;border-radius:0;}
+#ss-cli-term .xterm-screen canvas{border-radius:0;}
+</style>
 
-    const appShell       = document.getElementById('appShell');
-    const sidebarToggle  = document.getElementById('sidebarToggle');
-    const sidebarClose   = document.getElementById('sidebarClose');
-    const sidebarBackdrop= document.getElementById('sidebarBackdrop');
+<div id="ss-cli-overlay" class="d-none" data-action="h_beb206d09e">
+  <div id="ss-cli-panel">
+    <div id="ss-cli-header">
+      <div class="cli-title">
+        <span class="dot dot-r"></span>
+        <span class="dot dot-y"></span>
+        <span class="dot dot-g"></span>
+        &nbsp;SmartShield Appliance Console &mdash; <span id="ss-cli-host">SmartShield</span>
+      </div>
+      <div class="cli-hdr-btns">
+        <button data-action="h_15615cca60"><i class="fa-solid fa-xmark"></i> Close</button>
+      </div>
+    </div>
+    <div id="ss-cli-term"></div>
+  </div>
+</div>
 
-    // Restore sidebar state
-    const sidebarState = localStorage.getItem('sidebarOpen');
-    if (sidebarState === 'false') {
-        appShell.classList.remove('sidebar-open');
-    } else {
-        appShell.classList.add('sidebar-open');
-    }
-
-    function openSidebar()  { appShell.classList.add('sidebar-open');    localStorage.setItem('sidebarOpen', 'true');  }
-    function closeSidebar() { appShell.classList.remove('sidebar-open'); localStorage.setItem('sidebarOpen', 'false'); }
-
-    if (sidebarToggle)   sidebarToggle.addEventListener('click', () => appShell.classList.contains('sidebar-open') ? closeSidebar() : openSidebar());
-    if (sidebarClose)    sidebarClose.addEventListener('click', closeSidebar);
-    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
-
-    // ── Accordion for sidebar groups ──
-    (function setupAccordion() {
-        const sideGroups = document.querySelectorAll('.side-group');
-        sideGroups.forEach(group => {
-            const summary = group.querySelector('summary');
-            const content = group.querySelector('.side-links');
-            if (!summary || !content) return;
-
-            content.style.overflow   = 'hidden';
-            content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out';
-            content.style.maxHeight  = group.hasAttribute('open') ? content.scrollHeight + 'px' : '0';
-            content.style.opacity    = group.hasAttribute('open') ? '1' : '0';
-
-            summary.addEventListener('click', function(e) {
-                e.preventDefault();
-                const isOpening = !group.hasAttribute('open');
-                if (isOpening) {
-                    sideGroups.forEach(other => {
-                        if (other !== group && other.hasAttribute('open')) {
-                            const oc = other.querySelector('.side-links');
-                            if (oc) { oc.style.maxHeight = '0'; oc.style.opacity = '0'; }
-                            setTimeout(() => other.removeAttribute('open'), 300);
-                        }
-                    });
-                    group.setAttribute('open', '');
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.opacity   = '1';
-                } else {
-                    content.style.maxHeight = '0';
-                    content.style.opacity   = '0';
-                    setTimeout(() => group.removeAttribute('open'), 300);
-                }
-            });
-        });
-    })();
-
-    // ── Highlight active menu item ──
-    (function highlightActiveMenu() {
-        const currentPath  = window.location.pathname.replace(/\/$/, '');
-        const sidebarLinks = document.querySelectorAll('.side-links a');
-        const sideGroups   = document.querySelectorAll('.side-group');
-
-        let bestMatch = null, bestMatchLength = 0;
-
-        sidebarLinks.forEach(link => {
-            let linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '');
-            const matchPatternAttr = link.getAttribute('data-match-pattern');
-            const matchPatterns    = matchPatternAttr ? matchPatternAttr.split(',') : [];
-
-            let isMatch = currentPath === linkPath ||
-                (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath + '/')) ||
-                (linkPath !== '' && linkPath !== '/' && currentPath.startsWith(linkPath));
-            let matchedLength = linkPath.length;
-
-            if (!isMatch && matchPatterns.length > 0) {
-                for (const pattern of matchPatterns) {
-                    const tp = pattern.trim();
-                    if (currentPath === tp || currentPath.startsWith(tp + '/') || currentPath.startsWith(tp)) {
-                        isMatch = true;
-                        matchedLength = Math.max(matchedLength, tp.length);
-                        break;
-                    }
-                }
-            }
-
-            if (isMatch && matchedLength > bestMatchLength) {
-                bestMatch       = link;
-                bestMatchLength = matchedLength;
-            }
-        });
-
-        const activeGroup = bestMatch ? bestMatch.closest('.side-group') : null;
-
-        sideGroups.forEach(group => {
-            const content = group.querySelector('.side-links');
-            const isActive = group === activeGroup;
-            if (isActive)  group.setAttribute('open', '');
-            else           group.removeAttribute('open');
-            if (content) {
-                content.style.transition = 'none';
-                content.style.maxHeight  = isActive ? content.scrollHeight + 'px' : '0';
-                content.style.opacity    = isActive ? '1' : '0';
-                requestAnimationFrame(() => { content.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out'; });
-            }
-        });
-
-        if (bestMatch) {
-            bestMatch.classList.add('active');
-        } else {
-            const firstGroup = document.querySelector('.side-group');
-            if (firstGroup) {
-                firstGroup.setAttribute('open', '');
-                const fc = firstGroup.querySelector('.side-links');
-                if (fc) {
-                    fc.style.transition = 'none';
-                    fc.style.maxHeight  = fc.scrollHeight + 'px';
-                    fc.style.opacity    = '1';
-                    requestAnimationFrame(() => { fc.style.transition = 'max-height 0.3s ease-out, opacity 0.3s ease-out'; });
-                }
-            }
-        }
-    })();
-})();
-
-// ── Theme loader ──
-(function() {
-    const html = document.documentElement;
-    try {
-        const userTheme = localStorage.getItem('userTheme');
-        if (userTheme) {
-            const t = JSON.parse(userTheme);
-            if (t['data-theme']) html.setAttribute('data-theme', t['data-theme']);
-            Object.entries(t).forEach(([v, val]) => {
-                if (v !== '_name' && v !== 'data-theme') html.style.setProperty(v, val);
-            });
-        }
-    } catch(e) {}
-})();
-
-// ── Display Advanced toggle (global) ──
-(function () {
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('[data-advanced]');
-        if (!btn) return;
-        const targetId = btn.dataset.advanced;
-        const panel = document.getElementById(targetId);
-        if (!panel) return;
-        const nowHidden = panel.classList.toggle('d-none');
-        const icon = '<i class="fa fa-gear me-1"></i>';
-        btn.innerHTML = nowHidden ? icon + 'Display Advanced' : icon + 'Hide Advanced';
-    });
-})();
-</script>
+<script src="{{ static_v('vendor/xterm/xterm.min.js') }}"></script>
+<script src="{{ static_v('vendor/xterm/xterm-addon-fit.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ static_v('js/base-cli.js') }}"></script>
+{% endif %}
 
 {% if session.get("user_id") %}
 <!-- ── SmartShield AI Chatbot ─────────────────────────────────────────────── -->
-<style>
+<style nonce="{{ csp_nonce() }}">
 #ss-chat-fab{position:fixed;bottom:24px;right:24px;z-index:8888;width:52px;height:52px;
   border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;
   justify-content:center;font-size:1.25rem;cursor:pointer;
@@ -652,9 +609,12 @@
   padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;}
 .ss-action-cancel:hover{background:#dc2626;}
 .ss-action-status{font-size:.78rem;color:var(--muted);font-style:italic;}
+#ss-chat-panel.ss-minimized #ss-chat-messages,
+#ss-chat-panel.ss-minimized #ss-chat-footer{display:none!important;}
+#ss-chat-panel.ss-minimized{height:auto!important;border-radius:10px;}
 </style>
 
-<button id="ss-chat-fab" onclick="ssChatToggle()" title="SmartShield AI">
+<button id="ss-chat-fab" data-action="h_0567cc294c" title="SmartShield AI">
   <i class="fa-solid fa-robot"></i>
 </button>
 
@@ -662,163 +622,25 @@
   <div id="ss-chat-header">
     <span><i class="fa-solid fa-robot me-1"></i> SmartShield AI</span>
     <div class="hdr-btns">
-      <button onclick="ssChatClear()" title="New conversation"><i class="fa-solid fa-rotate"></i></button>
-      <button onclick="ssChatToggle()" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      <button data-action="h_6bb38134c0" title="New conversation"><i class="fa-solid fa-rotate"></i></button>
+      <button data-action="h_a4d25ebe3c" title="Minimize"><i class="fa-solid fa-minus"></i></button>
+      <button data-action="h_1881743d8e" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
   <div id="ss-chat-messages"></div>
   <div id="ss-chat-footer">
     <textarea id="ss-chat-input" rows="2"
       placeholder="Ask about firewall rules, logs, threats, security…"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ssChatSend();}"></textarea>
-    <button id="ss-chat-send" onclick="ssChatSend()">
+      data-action-keydown="h_1c601fe57e"></textarea>
+    <button id="ss-chat-send" data-action="h_579f5fa2cb">
       <i class="fa-solid fa-paper-plane"></i>
     </button>
   </div>
 </div>
 
-<script>
-(function(){
-  let _open = false;
-  let _msgs = [];   // message history in OpenAI format
-
-  function _esc(t) {
-    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function _addMsg(text, cls) {
-    const el = document.createElement('div');
-    el.className = 'ss-cm ' + cls;
-    el.innerHTML = _esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-    const box = document.getElementById('ss-chat-messages');
-    box.appendChild(el);
-    el.scrollIntoView({behavior:'smooth', block:'end'});
-    return el;
-  }
-
-  function _addActionCard(action) {
-    const card = document.createElement('div');
-    card.className = 'ss-action-card';
-    card.dataset.action = JSON.stringify(action);
-    card.innerHTML =
-      '<div class="ss-action-summary"><i class="fa-solid fa-shield-halved"></i> ' + _esc(action.summary) + '</div>' +
-      '<div class="ss-action-detail">' + _esc(action.detail) + '</div>' +
-      '<div class="ss-action-btns">' +
-        '<button class="ss-action-approve" onclick="ssChatApprove(this)"><i class="fa-solid fa-check"></i> Approve</button>' +
-        '<button class="ss-action-cancel"  onclick="ssChatCancel(this)"><i class="fa-solid fa-xmark"></i> Cancel</button>' +
-      '</div>';
-    const box = document.getElementById('ss-chat-messages');
-    box.appendChild(card);
-    card.scrollIntoView({behavior:'smooth', block:'end'});
-  }
-
-  window.ssChatApprove = async function(btn) {
-    const card   = btn.closest('.ss-action-card');
-    const action = JSON.parse(card.dataset.action);
-    card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status">Applying…</span>';
-    try {
-      const res = await fetch('/chatbot/api/approve_action', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: action, approved: true}),
-      });
-      let data;
-      try { data = await res.json(); }
-      catch(_) { data = {ok: false, reply: 'Server returned a non-JSON response (status ' + res.status + ').'}; }
-      card.remove();
-      if (data.ok) {
-        _msgs.push({role: 'assistant', content: data.reply});
-        _addMsg(data.reply, 'b');
-      } else {
-        _addMsg('⚠ ' + (data.reply || data.message || 'Action failed.'), 's');
-      }
-    } catch(e) {
-      card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status" style="color:#ef4444">Error: ' + _esc(e.message) + '</span>';
-    }
-  };
-
-  window.ssChatCancel = function(btn) {
-    const card = btn.closest('.ss-action-card');
-    card.remove();
-    _addMsg('Action cancelled.', 's');
-    _msgs.push({role: 'user', content: 'I changed my mind — please cancel that action.'});
-  };
-
-  window.ssChatToggle = function() {
-    _open = !_open;
-    document.getElementById('ss-chat-panel').classList.toggle('d-none', !_open);
-    if (_open && _msgs.length === 0) {
-      _addMsg("Hi! I'm SmartShield AI. Ask me about your firewall rules, logs, active threats, connected devices, or any security question.", 'b');
-    }
-    if (_open) document.getElementById('ss-chat-input').focus();
-  };
-
-  window.ssChatClear = function() {
-    _msgs = [];
-    document.getElementById('ss-chat-messages').innerHTML = '';
-    _addMsg("Conversation cleared. How can I help?", 'b');
-  };
-
-  window.ssChatSend = async function() {
-    const inp  = document.getElementById('ss-chat-input');
-    const text = (inp.value || '').trim();
-    if (!text) return;
-    inp.value = '';
-
-    _addMsg(text, 'u');
-    _msgs.push({role:'user', content: text});
-
-    const box = document.getElementById('ss-chat-messages');
-    const thinking = document.createElement('div');
-    thinking.className = 'ss-thinking';
-    thinking.textContent = 'SmartShield AI is thinking…';
-    box.appendChild(thinking);
-    thinking.scrollIntoView({behavior:'smooth', block:'end'});
-
-    const sendBtn = document.getElementById('ss-chat-send');
-    sendBtn.disabled = true;
-
-    try {
-      const res = await fetch('/chatbot/api/chat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({messages: _msgs}),
-      });
-      thinking.remove();
-
-      let data;
-      try {
-        data = await res.json();
-      } catch(_) {
-        if (res.status === 401 || res.redirected) {
-          _addMsg('⚠ Session expired. Please refresh the page and log in again.', 's');
-        } else {
-          _addMsg('⚠ Server error (HTTP ' + res.status + '). Please try again.', 's');
-        }
-        return;
-      }
-
-      if (data.ok) {
-        _msgs = data.messages;
-        _addMsg(data.reply, 'b');
-        if (data.pending_action) {
-          _addActionCard(data.pending_action);
-        }
-      } else {
-        _addMsg('⚠ ' + (data.message || 'Unknown error'), 's');
-      }
-    } catch(e) {
-      thinking.remove();
-      _addMsg('⚠ Could not reach the server. Check your connection and try again.', 's');
-    } finally {
-      sendBtn.disabled = false;
-      inp.focus();
-    }
-  };
-})();
-</script>
+<script nonce="{{ csp_nonce() }}" src="{{ static_v('js/base-chatbot.js') }}"></script>
 {% endif %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 function refreshFirewall(e) {
     e.preventDefault();
     fetch('/firewall/api/apply', { method: 'POST' })
@@ -829,3 +651,28 @@ function refreshFirewall(e) {
 </script>
 </body>
 </html>
+
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_3494fbf23b'] = function (event, el) { ssCLIToggle() };
+  R['h_e4fb6d24fb'] = function (event, el) { this.style.background='rgba(248,113,113,.18)' };
+  R['h_c819892ba4'] = function (event, el) { this.style.background='rgba(248,113,113,.08)' };
+  R['h_c5f96fa1d4'] = function (event, el) { this.style.background='rgba(0,180,160,.18)' };
+  R['h_bcd24499df'] = function (event, el) { this.style.background='rgba(0,180,160,.08)' };
+  R['h_6bc7ed345a'] = function (event, el) { refreshFirewall(event) };
+  R['h_beb206d09e'] = function (event, el) { if(event.target===this)ssCLIClose() };
+  R['h_15615cca60'] = function (event, el) { ssCLIClose() };
+  R['h_0567cc294c'] = function (event, el) { ssChatToggle() };
+  R['h_6bb38134c0'] = function (event, el) { ssChatClear() };
+  R['h_a4d25ebe3c'] = function (event, el) { ssChatMinimize() };
+  R['h_1881743d8e'] = function (event, el) { ssChatToggle() };
+  R['h_1c601fe57e'] = function (event, el) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ssChatSend();} };
+  R['h_579f5fa2cb'] = function (event, el) { ssChatSend() };
+  R['h_6c0f76dfd7'] = function (event, el) { ssChatApprove(this) };
+  R['h_379fbd0539'] = function (event, el) { ssChatCancel(this) };
+})();
+</script>
+<!-- /inline-handlers:auto -->

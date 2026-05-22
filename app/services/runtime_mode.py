@@ -13,6 +13,11 @@ import sys
 
 _log = logging.getLogger(__name__)
 
+_WEAK_SECRET_MARKERS = {
+    "change-me", "replace-this", "changeme", "secret", "dev", "test",
+    "flask-secret", "insecure", "please-change", "",
+}
+
 
 def is_freebsd() -> bool:
     return sys.platform.startswith("freebsd")
@@ -89,8 +94,11 @@ def startup_warnings() -> list:
 
     # ── Secrets encryption key ─────────────────────────────────────────────
 
-    if not os.getenv("SMARTSHIELD_MASTER_KEY"):
-        msg   = "SMARTSHIELD_MASTER_KEY is not set — a key will be auto-generated."
+    from app.secret_store import has_master_key
+
+    if not has_master_key():
+        msg   = ("No master key found (SMARTSHIELD_MASTER_KEY unset and no key "
+                 "file present) — a key will be auto-generated.")
         level = "critical" if mode == "live" else "warning"
         if mode == "live":
             msg += (
@@ -103,11 +111,7 @@ def startup_warnings() -> list:
 
     if mode == "live":
         secret_key = os.getenv("SECRET_KEY", "")
-        _weak_markers = {
-            "change-me", "replace-this", "changeme", "secret", "dev", "test",
-            "flask-secret", "insecure", "please-change",
-        }
-        if any(m in secret_key.lower() for m in _weak_markers) or len(secret_key) < 24:
+        if any(m in secret_key.lower() for m in _WEAK_SECRET_MARKERS) or len(secret_key) < 24:
             warnings.append({
                 "level":   "critical",
                 "feature": "admin_security",
@@ -137,7 +141,15 @@ def startup_warnings() -> list:
 
         # ── Env file permissions check ─────────────────────────────────────
         import stat
-        env_path = "/usr/local/etc/smart-shield/smart-shield.env"
+        from app.config import _ss_dir
+        env_dir = _ss_dir("/usr/local/etc")
+        # `smartshield.env` is the canonical filename; check the legacy
+        # `smart-shield.env` if the canonical one does not exist.
+        env_path = os.path.join(env_dir, "smartshield.env")
+        if not os.path.exists(env_path):
+            legacy_env = os.path.join(env_dir, "smart-shield.env")
+            if os.path.exists(legacy_env):
+                env_path = legacy_env
         if sys.platform.startswith("freebsd") and os.path.exists(env_path):
             _mode = os.stat(env_path).st_mode
             if _mode & stat.S_IROTH:
@@ -149,11 +161,7 @@ def startup_warnings() -> list:
 
         # ── SECRET_KEY exact-match weak-value check ────────────────────────
         _secret = os.getenv("SECRET_KEY", "")
-        _WEAK = {
-            "change-me", "replace-this", "changeme", "secret", "dev", "test",
-            "flask-secret", "insecure", "please-change", "",
-        }
-        if sys.platform.startswith("freebsd") and _secret.lower() in _WEAK:
+        if sys.platform.startswith("freebsd") and _secret.lower() in _WEAK_SECRET_MARKERS:
             warnings.append({
                 "feature": "secret_key_default",
                 "level":   "critical",

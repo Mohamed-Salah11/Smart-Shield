@@ -29,6 +29,7 @@
   <div class="card-header bg-dark text-white">New Access List</div>
   <div class="card-body">
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div class="row mb-3">
         <label class="col-sm-3 col-form-label">Access List name</label>
@@ -41,7 +42,7 @@
       <div class="row mb-3">
         <label class="col-sm-3 col-form-label">Action</label>
         <div class="col-sm-9">
-          <select name="action" class="form-select" style="max-width:320px;">
+          <select name="action" class="form-select ext-f758c5d0">
             <option>Allow</option>
             <option>Deny</option>
             <option>Refuse</option>
@@ -50,12 +51,12 @@
             <option>Refuse Nonlocal</option>
           </select>
           <div class="mt-2">
-            <p><strong style="color:green;">Deny:</strong> Stops queries from hosts within the netblock defined below.</p>
-            <p><strong style="color:green;">Refuse:</strong> Stops queries from hosts within the netblock defined below, but sends a DNS rcode REFUSED error message back to the client.</p>
-            <p><strong style="color:green;">Allow:</strong> Allow queries from hosts within the netblock defined below.</p>
-            <p><strong style="color:green;">Allow Snoop:</strong> Allow recursive and nonrecursive access from hosts within the netblock defined below. Used for cache snooping and ideally should only be configured for the administrative host.</p>
-            <p><strong style="color:green;">Deny Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Messages that are disallowed are dropped.</p>
-            <p><strong style="color:green;">Refuse Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Sends a DNS rcode REFUSED error message back to the client for messages that are disallowed.</p>
+            <p><strong class="ext-49468721">Deny:</strong> Stops queries from hosts within the netblock defined below.</p>
+            <p><strong class="ext-49468721">Refuse:</strong> Stops queries from hosts within the netblock defined below, but sends a DNS rcode REFUSED error message back to the client.</p>
+            <p><strong class="ext-49468721">Allow:</strong> Allow queries from hosts within the netblock defined below.</p>
+            <p><strong class="ext-49468721">Allow Snoop:</strong> Allow recursive and nonrecursive access from hosts within the netblock defined below. Used for cache snooping and ideally should only be configured for the administrative host.</p>
+            <p><strong class="ext-49468721">Deny Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Messages that are disallowed are dropped.</p>
+            <p><strong class="ext-49468721">Refuse Nonlocal:</strong> Allow only authoritative local-data queries from hosts within the netblock defined below. Sends a DNS rcode REFUSED error message back to the client for messages that are disallowed.</p>
           </div>
         </div>
       </div>

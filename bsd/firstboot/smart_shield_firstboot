@@ -2,99 +2,195 @@
 #
 # smart_shield_firstboot
 # ----------------------
-# First-boot setup script for the Smart Shield appliance.
-# Runs once at boot via /usr/local/etc/rc.d/ or rc.local if a sentinel file
-# is absent, then creates the sentinel so it never runs again.
+# First-boot setup for the Smart Shield FreeBSD appliance image.
 #
-# Usage (rc.d integration):
-#   Place this script at /usr/local/libexec/smart_shield_firstboot
-#   and call it from the rc.d service below, OR add to /etc/rc.local:
-#     [ -x /usr/local/libexec/smart_shield_firstboot ] && \
-#         /usr/local/libexec/smart_shield_firstboot
+# Use case: when shipping a pre-built FreeBSD VM/USB image where install.sh
+# has ALREADY run on the build host, this script runs once on the operator's
+# first boot to (a) regenerate per-appliance secrets, (b) make sure runtime
+# directories exist with the canonical root:wheel ownership the rest of the
+# stack expects, and (c) start the service so the operator hits the wizard
+# at the LAN IP on first browser visit.
 #
-# What it does:
-#   1. Creates required directories with correct ownership
-#   2. Copies example rc.conf snippets if rc.conf is minimal
-#   3. Sets the hostname from smart-shield config (if configured)
-#   4. Enables PF and IP forwarding in rc.conf
-#   5. Starts Smart Shield service for the first time
-#   6. Writes the sentinel file to prevent re-running
+# This script is NOT a substitute for install.sh — install.sh writes the
+# venv, sudoers, nginx config, etc. firstboot only fixes per-instance state
+# that must NOT be baked into the shared image (SECRET_KEY, master.key,
+# self-signed cert if missing, sentinel file).
+#
+# Install (typically from install.sh §5):
+#   install -m 0555 bsd/firstboot/smart_shield_firstboot \
+#       /usr/local/libexec/smart_shield_firstboot
+#
+# rc.d wiring is optional — the image builder is expected to call this
+# directly from an early-boot job or /etc/rc.local. Example:
+#
+#   [ -x /usr/local/libexec/smart_shield_firstboot ] && \
+#       /usr/local/libexec/smart_shield_firstboot
+#
+# What this script does:
+#   1. Skips if the sentinel file already exists.
+#   2. Creates canonical Smart Shield runtime dirs (root:wheel, mode 0755).
+#   3. Writes a per-appliance SECRET_KEY/master.key if absent or still on
+#      the build-host placeholder.
+#   4. Stages the conservative network defaults (dry-run, no live apply) so
+#      the wizard owns the first PF/network apply.
+#   5. Enables required rc.conf flags (pf, pflog, gateway, smart_shield).
+#   6. Starts smart_shield so the LAN IP serves the wizard on first hit.
+#   7. Writes the sentinel so subsequent boots skip immediately.
+#
+# Fv11 review §P0-03 — this script previously chowned everything to www:www
+# and only logged "service smart_shield start" without running it. Both have
+# been corrected to match the root-runtime model in bsd/install.sh.
 
-set -e
+set -eu
 
-SENTINEL="/var/db/smart-shield/.firstboot_done"
-SS_DIR="/var/db/smart-shield"
-LOG_DIR="/var/log/smart-shield"
-CONF_DIR="/usr/local/etc/smart-shield"
-RCD="/usr/local/etc/rc.d"
+# ── Canonical paths (must match bsd/install.sh and app/config.py) ───────────
+APP_ROOT="/usr/local/share/smartshield"
+ETC_DIR="/usr/local/etc/smartshield"
+DATA_DIR="/var/db/smartshield"
+LOG_DIR="/var/log/smartshield"
+RUN_DIR="/var/run/smartshield"
+SENTINEL="${DATA_DIR}/.firstboot_done"
+ENV_FILE="${ETC_DIR}/smartshield.env"
+MASTER_KEY_FILE="${ETC_DIR}/master.key"
 SVCNAME="smart_shield"
-USER="www"
 
-log() { echo "[firstboot] $*"; logger -t smart_shield_firstboot "$*"; }
+log() {
+    echo "[firstboot] $*"
+    logger -t smart_shield_firstboot "$*" 2>/dev/null || true
+}
 
-# Already ran — exit immediately.
-if [ -f "$SENTINEL" ]; then
-    log "Sentinel found — skipping first-boot setup."
+# Refuse to run as anyone but root. firstboot writes /etc/rc.conf flags and
+# starts a service — both require root, and silently doing nothing as a
+# regular user would leave the operator confused about why the wizard isn't
+# reachable.
+if [ "$(id -u)" -ne 0 ]; then
+    log "ERROR: must run as root (current uid=$(id -u))"
+    exit 1
+fi
+
+# Already ran — exit immediately (idempotent guard).
+if [ -f "${SENTINEL}" ]; then
+    log "Sentinel found at ${SENTINEL} — skipping first-boot setup."
     exit 0
 fi
 
 log "=== Smart Shield first-boot setup starting ==="
 
-# ── 1. Create required directories ──────────────────────────────────────────
-for DIR in "$SS_DIR" "$LOG_DIR" "$CONF_DIR" \
-           "$SS_DIR/backups" "$SS_DIR/uploads/profile_pictures"; do
-    if [ ! -d "$DIR" ]; then
-        mkdir -p "$DIR"
-        log "Created $DIR"
+# ── 1. Create / repair runtime directories ──────────────────────────────────
+# Everything Smart Shield owns runs as root:wheel under the canonical
+# `smartshield` (no hyphen) prefix. This matches install.sh §2 and
+# app/config.py path resolution.
+for dir in \
+    "${APP_ROOT}" \
+    "${ETC_DIR}" \
+    "${DATA_DIR}" \
+    "${DATA_DIR}/uploads/profile_pictures" \
+    "${LOG_DIR}" \
+    "${RUN_DIR}"
+do
+    if [ ! -d "${dir}" ]; then
+        install -d -m 0755 -o root -g wheel "${dir}"
+        log "Created ${dir}"
+    else
+        chown root:wheel "${dir}" 2>/dev/null || true
+        chmod 0755 "${dir}" 2>/dev/null || true
     fi
-    chown "$USER":www "$DIR" 2>/dev/null || true
-    chmod 750 "$DIR"
 done
 
-# ── 2. Ensure PF is enabled in /etc/rc.conf ─────────────────────────────────
-if ! grep -q "^pf_enable=" /etc/rc.conf 2>/dev/null; then
-    log "Enabling PF in /etc/rc.conf"
-    sysrc pf_enable="YES"
-fi
-if ! grep -q "^pflog_enable=" /etc/rc.conf 2>/dev/null; then
-    sysrc pflog_enable="YES"
-fi
+# ── 2. Generate per-appliance env file if missing ────────────────────────────
+# The image MAY ship a template env file. If so, leave it alone — the build
+# host has already filled in non-secret defaults. If the env file is missing
+# entirely (or still contains a placeholder secret key), generate one now so
+# the same image deployed across many appliances gets unique secrets.
+_gen_hex32() {
+    python3 -c 'import secrets; print(secrets.token_hex(32))' 2>/dev/null \
+        || openssl rand -hex 32 2>/dev/null
+}
 
-# ── 3. Enable IP forwarding ──────────────────────────────────────────────────
-if ! grep -q "^gateway_enable=" /etc/rc.conf 2>/dev/null; then
-    log "Enabling IP forwarding in /etc/rc.conf"
-    sysrc gateway_enable="YES"
-fi
-
-# ── 4. Enable Smart Shield rc.d service ─────────────────────────────────────
-if [ -f "$RCD/$SVCNAME" ]; then
-    sysrc ${SVCNAME}_enable="YES" 2>/dev/null || true
-    log "Enabled $SVCNAME in rc.conf"
-fi
-
-# ── 5. Copy default .env if not present ─────────────────────────────────────
-ENV_FILE="/usr/local/etc/smart-shield/smart-shield.env"
-ENV_EXAMPLE="/usr/local/share/smart-shield/.env.example"
-if [ ! -f "$ENV_FILE" ] && [ -f "$ENV_EXAMPLE" ]; then
-    cp "$ENV_EXAMPLE" "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
-    log "Copied default .env — edit $ENV_FILE to set SECRET_KEY and other settings."
-fi
-
-# ── 6. Generate a random SECRET_KEY if the default placeholder is still set ──
-if [ -f "$ENV_FILE" ]; then
-    if grep -q "CHANGE_ME\|please-change\|replace-this" "$ENV_FILE" 2>/dev/null; then
-        NEW_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || \
-                  openssl rand -hex 32)
-        sed -i '' "s|^SECRET_KEY=.*|SECRET_KEY=${NEW_KEY}|" "$ENV_FILE"
-        log "Generated new SECRET_KEY in $ENV_FILE"
+if [ ! -f "${ENV_FILE}" ]; then
+    log "Env file missing — generating ${ENV_FILE}"
+    SECRET="$(_gen_hex32)"
+    if [ -z "${SECRET}" ]; then
+        log "ERROR: could not generate SECRET_KEY (python3 + secrets or openssl required)"
+        exit 1
+    fi
+    install -m 0600 -o root -g wheel /dev/null "${ENV_FILE}"
+    cat > "${ENV_FILE}" <<EOF
+SECRET_KEY=${SECRET}
+FLASK_DEBUG=0
+SMARTSHIELD_DB_PATH=${DATA_DIR}/data.db
+SMARTSHIELD_CONFIG_PATH=${ETC_DIR}/config.json
+SMARTSHIELD_UPLOAD_DIR=${DATA_DIR}/uploads/profile_pictures
+SMARTSHIELD_AUDIT_LOG_PATH=${LOG_DIR}/audit.log
+SMARTSHIELD_ENABLE_NETWORK_APPLY=0
+SMARTSHIELD_NETWORK_DRY_RUN=1
+ABUSECH_AUTH_KEY=
+ABUSECH_DRY_RUN=1
+GROQ_API_KEY=
+EOF
+    chmod 0600 "${ENV_FILE}"
+    log "Generated env file with fresh SECRET_KEY (mode 0600)"
+elif grep -qE '^SECRET_KEY=(CHANGE_ME|please-change|replace-this|changeme)' "${ENV_FILE}" 2>/dev/null; then
+    log "Replacing placeholder SECRET_KEY in ${ENV_FILE}"
+    NEW_KEY="$(_gen_hex32)"
+    if [ -n "${NEW_KEY}" ]; then
+        # BSD sed requires the empty arg after -i for in-place edits with no backup.
+        sed -i '' "s|^SECRET_KEY=.*|SECRET_KEY=${NEW_KEY}|" "${ENV_FILE}"
+        log "Generated fresh SECRET_KEY"
+    else
+        log "WARN: could not generate replacement SECRET_KEY — leaving placeholder in place"
     fi
 fi
 
-# ── 7. Write sentinel ────────────────────────────────────────────────────────
-echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$SENTINEL"
-chmod 444 "$SENTINEL"
+# Lock down env file permissions even if it pre-existed.
+chown root:wheel "${ENV_FILE}" 2>/dev/null || true
+chmod 0600 "${ENV_FILE}" 2>/dev/null || true
+
+# ── 3. Generate per-appliance master.key if missing ─────────────────────────
+# Used by app/secret_store.py to wrap configuration secrets. Like SECRET_KEY,
+# this MUST be unique per appliance and never baked into the image.
+if [ ! -f "${MASTER_KEY_FILE}" ]; then
+    if python3 -c "import os,base64; open('${MASTER_KEY_FILE}','wb').write(base64.b64encode(os.urandom(32))+b'\n')" 2>/dev/null; then
+        chown root:wheel "${MASTER_KEY_FILE}" 2>/dev/null || true
+        chmod 0600 "${MASTER_KEY_FILE}" 2>/dev/null || true
+        log "Generated ${MASTER_KEY_FILE} (mode 0600)"
+    else
+        log "WARN: could not generate master.key — app will auto-generate on first start"
+    fi
+fi
+
+# ── 4. Enable required rc.conf flags ────────────────────────────────────────
+# These are idempotent — sysrc rewrites if absent, leaves alone if matching.
+sysrc pf_enable="YES"           >/dev/null 2>&1 || log "WARN: sysrc pf_enable failed"
+sysrc pflog_enable="YES"        >/dev/null 2>&1 || log "WARN: sysrc pflog_enable failed"
+sysrc gateway_enable="YES"      >/dev/null 2>&1 || log "WARN: sysrc gateway_enable failed"
+sysrc ipv6_gateway_enable="YES" >/dev/null 2>&1 || true
+sysrc unbound_enable="YES"      >/dev/null 2>&1 || true
+sysrc nginx_enable="YES"        >/dev/null 2>&1 || true
+sysrc ntpd_enable="YES"         >/dev/null 2>&1 || true
+sysrc ${SVCNAME}_enable="YES"   >/dev/null 2>&1 || log "WARN: sysrc ${SVCNAME}_enable failed"
+log "rc.conf flags written (pf, gateway, smart_shield)"
+
+# ── 5. Start the smart_shield service ──────────────────────────────────────
+# Previous version of this script only LOGGED the start command without
+# running it (§P0-03). Run it for real so the wizard is reachable on first
+# boot. service is allowed to fail (e.g. no /etc/rc.d entry yet) — the
+# operator can re-run with `service smart_shield start` from the console.
+if [ -f /usr/local/etc/rc.d/${SVCNAME} ] || [ -f /etc/rc.d/${SVCNAME} ]; then
+    if service "${SVCNAME}" start 2>/dev/null; then
+        log "service ${SVCNAME} started"
+    else
+        log "WARN: service ${SVCNAME} did not start cleanly — check ${LOG_DIR}/"
+    fi
+else
+    log "WARN: rc.d script for ${SVCNAME} not found — skipping service start"
+fi
+
+# ── 6. Write sentinel ────────────────────────────────────────────────────────
+date -u +%Y-%m-%dT%H:%M:%SZ > "${SENTINEL}"
+chmod 0444 "${SENTINEL}"
+chown root:wheel "${SENTINEL}" 2>/dev/null || true
 
 log "=== Smart Shield first-boot setup complete ==="
-log "Start the service with: service smart_shield start"
+log "Open the appliance LAN IP in a browser to reach the setup wizard."
 exit 0

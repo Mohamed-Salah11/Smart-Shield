@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartShield Setup — Claim Appliance</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <style nonce="{{ csp_nonce() }}">
+    body { background: #1a1d23; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; }
+    .wizard-wrap { max-width: 560px; margin: 80px auto; padding: 0 20px; }
+    .wizard-header { text-align: center; margin-bottom: 32px; }
+    .wizard-header h1 { font-size: 1.8rem; color: #4fc3f7; margin-bottom: 8px; }
+    .card { background: #23262d; border-radius: 8px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 6px; font-weight: 500; color: #bdbdbd; }
+    input { width: 100%; padding: 10px 14px; background: #1a1d23; color: #e0e0e0;
+            border: 1px solid #444; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #4fc3f7; }
+    .hint { font-size: 0.8rem; color: #777; margin-top: 8px; line-height: 1.5; }
+    .btn-primary { width: 100%; padding: 12px; background: #4fc3f7; color: #1a1d23;
+                   border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    .btn-primary:hover { background: #81d4fa; }
+    .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; display: none; }
+    .alert-danger { background: #b71c1c; color: #ffcdd2; }
+  </style>
+</head>
+<body>
+<div class="wizard-wrap">
+  <div class="wizard-header">
+    <img class="ext-fa3e1c7d" src="/static/images/SS.png" alt="SmartShield" height="48">
+    <h1>Claim this appliance</h1>
+  </div>
+  <div class="card">
+    <div class="alert alert-danger" id="claim-alert"></div>
+    <div class="form-group">
+      <label for="token">Setup claim token</label>
+      <input type="text" id="token" autocomplete="off" placeholder="Paste the token shown on the console">
+      <div class="hint">
+        On first boot the appliance printed a one-time setup token to the local
+        console (keyboard/serial). Enter it here to begin configuration. The
+        token is consumed once setup completes.
+      </div>
+    </div>
+    <button class="btn-primary" id="claim-btn">Continue to setup</button>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+  const CSRF_TOKEN = "{{ csrf_token() }}";
+  const alertBox = document.getElementById("claim-alert");
+  function showError(msg) { alertBox.textContent = msg; alertBox.style.display = "block"; }
+
+  async function submitClaim() {
+    const token = document.getElementById("token").value.trim();
+    if (!token) { showError("Enter the setup claim token."); return; }
+    const btn = document.getElementById("claim-btn");
+    btn.disabled = true;
+    try {
+      const r = await fetch("/setup/api/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF_TOKEN },
+        body: JSON.stringify({ token }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok && body.ok) {
+        window.location.href = "/setup/";
+      } else {
+        showError(body.message || "Invalid setup claim token.");
+      }
+    } catch (e) {
+      showError("Network error. Please try again.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById("claim-btn").addEventListener("click", submitClaim);
+  document.getElementById("token").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitClaim(); }
+  });
+</script>
+</body>
+</html>

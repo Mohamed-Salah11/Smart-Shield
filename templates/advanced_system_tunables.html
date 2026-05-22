@@ -29,28 +29,28 @@
     </div>
 
     <div class="ss-card-body pb-0">
-      <div class="alert" style="background:var(--primary-soft);border:1px solid var(--primary);border-radius:8px;padding:12px 16px;font-size:.85rem;margin-bottom:16px;">
-        <i class="fa-solid fa-circle-info me-2" style="color:var(--primary);"></i>
+      <div class="alert ext-51354ad9">
+        <i class="fa-solid fa-circle-info me-2 ext-035cc887"></i>
         <strong>Note:</strong> These options are intended for advanced users only. Incorrect values can destabilize the system.
       </div>
     </div>
 
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;">Tunable Name</th>
+            <th class="ext-16e59a0f">Tunable Name</th>
             <th>Description</th>
             <th>Value</th>
-            <th style="width:70px;"></th>
+            <th class="ext-f95ebd2a"></th>
           </tr>
         </thead>
         <tbody>
           {% for tunable in tunables %}
           <tr>
-            <td style="padding:8px 14px;"><code style="font-size:.8rem;color:var(--primary);">{{ tunable.name }}</code></td>
+            <td class="ext-ec6b5e99"><code class="ext-c11712ba">{{ tunable.name }}</code></td>
             <td>{{ tunable.description }}</td>
-            <td><span style="font-family:monospace;font-size:.8rem;background:var(--border-color-soft);padding:2px 8px;border-radius:4px;">{{ tunable.value }}</span></td>
+            <td><span class="ext-3c290c50">{{ tunable.value }}</span></td>
             <td>
               <a href="{{ url_for('system.advanced_system_tunables_edit', index=tunable.id) }}" class="btn btn-sm btn-primary">
                 <i class="fa-solid fa-pen"></i>
@@ -58,7 +58,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted);">No system tunables configured</td></tr>
+          <tr><td class="ext-a9edf93a" colspan="4">No system tunables configured</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title">
+        <i class="fa-solid fa-file-lines me-2 ext-035cc887"></i>SOC Reports
+      </h1>
+      <p class="ss-page-desc">Generate executive and compliance roll-ups from the events store,
+        inventory and risk scores. Reports are self-contained HTML — use your browser's print
+        dialog to save a PDF copy.</p>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+        <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-plus"></i></div>
+      <div>
+        <div class="ss-card-title">Generate Report</div>
+        <div class="ss-card-subtitle">Choose the type and time window.</div>
+      </div>
+    </div>
+    <div class="ss-card-body">
+      <form method="POST" class="d-flex gap-2 flex-wrap align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="ss-field">
+          <label class="ss-label" for="report_type">Report</label>
+          <select id="report_type" name="report_type" class="form-select ext-c1c4e59e">
+            {% for t in types %}
+            <option value="{{ t }}">{{ t.replace('_',' ').title() }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label" for="period">Window</label>
+          <select id="period" name="period" class="form-select ext-a629a35a">
+            <option value="7d">Last 7 days</option>
+            <option value="30d" selected>Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+          </select>
+        </div>
+        <button class="btn btn-primary"><i class="fa-solid fa-bolt me-1"></i> Generate</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="ss-card mb-5">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div>
+        <div class="ss-card-title">Previous Reports</div>
+        <div class="ss-card-subtitle">Open or download any historical report.</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if reports %}
+      <table class="table table-hover mb-0">
+        <thead class="ext-14203611">
+          <tr>
+            <th class="ps-4 py-2">#</th>
+            <th class="py-2">Type</th>
+            <th class="py-2">Window</th>
+            <th class="py-2">Generated</th>
+            <th class="py-2">By</th>
+            <th class="py-2 text-end pe-4">Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reports %}
+          <tr>
+            <td class="ps-4 py-2">{{ r['id'] }}</td>
+            <td class="py-2">{{ r['report_type'].replace('_',' ').title() }}</td>
+            <td class="py-2 text-muted ext-1e28117f">
+              {{ r['period_start'] }} → {{ r['period_end'] }}
+            </td>
+            <td class="py-2 text-muted ext-1e28117f">{{ r['generated_at'] }}</td>
+            <td class="py-2 text-muted ext-1e28117f">{{ r['generated_by'] }}</td>
+            <td class="py-2 text-end pe-4">
+              <a class="btn btn-sm btn-primary" target="_blank"
+                 href="{{ url_for('system.report_view', report_id=r['id']) }}">
+                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-muted">No reports generated yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
