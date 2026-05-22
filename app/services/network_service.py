@@ -108,7 +108,17 @@ def run_command(
                       read-only collectors (e.g. `pfctl -s states` polling).
     """
     if _network_dry_run_enabled():
-        return CommandResult(command=cmd, returncode=0, stdout="", stderr="")
+        # Surface dry-run explicitly so upstream callers (setup verification,
+        # interface apply) can detect that no live work was done. Previously
+        # this returned empty stdout, which was indistinguishable from a real
+        # successful no-output command — letting setup report success without
+        # any network state having actually changed.
+        return CommandResult(
+            command=cmd,
+            returncode=0,
+            stdout="[DRY-RUN] " + " ".join(redact_command(cmd)),
+            stderr="",
+        )
 
     redacted = redact_command(cmd) if _audit else None
 
@@ -817,17 +827,38 @@ def normalize_interface_payload(data, interface_type):
     }
 
 
+def is_network_dry_run() -> bool:
+    """Public accessor for the dry-run flag (used by routes/setup.py)."""
+    return _network_dry_run_enabled()
+
+
+def _verify_default_route() -> bool:
+    """Return True iff the kernel routing table currently has an IPv4 default route."""
+    try:
+        r = run_command(["netstat", "-rn", "-f", "inet"], check=False, timeout_seconds=5)
+    except Exception:
+        return False
+    for line in (r.stdout or "").splitlines():
+        parts = line.split()
+        if parts and parts[0] == "default":
+            return True
+    return False
+
+
 def _kick_dhcp_client(iface: str) -> dict:
     """
     Bring *iface* up and request a DHCP lease using whichever client is present.
-    FreeBSD 13 ships /sbin/dhclient; FreeBSD 14 ships dhcpcd. Failures are
-    non-fatal — the lease can arrive seconds later, so we report ok=True with
-    a "pending" message rather than blocking the wizard.
+    FreeBSD 13 ships /sbin/dhclient; FreeBSD 14 ships dhcpcd. The lease may
+    arrive seconds later. We report:
+      - ok=True (lease acquired and default route confirmed)
+      - ok="pending" (lease/route not yet visible — caller treats as warning)
+      - ok=False (no client found OR dhclient returned non-zero)
     """
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": f"{iface}: dhcp skipped (non-FreeBSD)"}
 
     import shutil
+    import time
     dhcp_bin = shutil.which("dhclient") or shutil.which("dhcpcd")
     if not dhcp_bin:
         return {
@@ -840,17 +871,41 @@ def _kick_dhcp_client(iface: str) -> dict:
         pass
     try:
         r = run_command([dhcp_bin, iface], check=False, timeout_seconds=15)
-        if r.returncode == 0:
-            return {"ok": True, "message": f"{iface}: DHCP lease requested via {dhcp_bin}"}
+    except Exception as exc:
         return {
-            "ok": True,
+            "ok": False,
+            "pending": True,
+            "message": f"{iface}: DHCP client error: {exc}",
+        }
+
+    if r.returncode != 0:
+        return {
+            "ok": False,
+            "pending": True,
             "message": (
-                f"{iface}: {dhcp_bin} returned rc={r.returncode}; lease pending "
-                f"({(r.stderr or r.stdout or '').strip()[:160]})"
+                f"{iface}: {dhcp_bin} returned rc={r.returncode}: "
+                f"{(r.stderr or r.stdout or '').strip()[:200]}"
             ),
         }
-    except Exception as exc:
-        return {"ok": True, "message": f"{iface}: DHCP client error: {exc} (lease pending)"}
+
+    # Best-effort wait for the default route — dhclient backgrounds so the
+    # route may take a moment to appear. Short bounded retry.
+    for _ in range(3):
+        if _verify_default_route():
+            return {
+                "ok": True,
+                "message": f"{iface}: DHCP lease acquired via {dhcp_bin} (default route confirmed)",
+            }
+        time.sleep(1)
+
+    return {
+        "ok": True,
+        "pending": True,
+        "message": (
+            f"{iface}: DHCP lease requested via {dhcp_bin}; default route not yet "
+            f"visible — setup gating will treat this as a warning"
+        ),
+    }
 
 
 def apply_interface_config(conn) -> dict:
@@ -881,11 +936,13 @@ def apply_interface_config(conn) -> dict:
         gateway = (row["ipv4_upstream_gateway"] or "").strip()
         mode    = (row["ipv4_config_type"] or "static").lower()
 
+        # Router mode requires real interfaces — missing assignment / address /
+        # mode is a hard failure rather than a silently-skipped success.
         if not iface:
             results.append({
                 "iface": label,
-                "ok": True,
-                "message": f"{label}: skipped (no interface assigned)",
+                "ok": False,
+                "message": f"{label}: no interface assigned (required for router mode)",
             })
             continue
 
@@ -893,8 +950,15 @@ def apply_interface_config(conn) -> dict:
             if not cidr:
                 results.append({
                     "iface": label,
-                    "ok": True,
-                    "message": f"{label}: skipped (static mode but no address set)",
+                    "ok": False,
+                    "message": f"{label}: static mode requires an IPv4 address (CIDR)",
+                })
+                continue
+            if label == "WAN" and not gateway:
+                results.append({
+                    "iface": label,
+                    "ok": False,
+                    "message": f"{label}: static WAN requires an upstream gateway",
                 })
                 continue
             r = apply_interface_with_rollback(iface, cidr, gateway)
@@ -925,8 +989,8 @@ def apply_interface_config(conn) -> dict:
 
         results.append({
             "iface": label,
-            "ok": True,
-            "message": f"{label}: skipped (unknown mode={mode})",
+            "ok": False,
+            "message": f"{label}: unknown ipv4_config_type={mode!r}",
         })
 
     overall_ok = all(r["ok"] for r in results)

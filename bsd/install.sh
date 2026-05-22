@@ -169,56 +169,6 @@ for f in requirements.txt wsgi.py app/__init__.py bsd/rc.d/smart_shield; do
 done
 info "Source tree validated at ${SRC_ROOT}"
 
-# ─── Deploy source tree to APP_ROOT ───────────────────────────────────────────
-# Wave I: the installer used to assume the operator had already copied the
-# project to ${APP_ROOT}.  That left the install half-broken when an admin
-# ran it from /root/Smart-Shield-Fv5/ (unzipped) or any path other than
-# /usr/local/share/smartshield.  Now we rsync (or tar-pipe) the source tree
-# into APP_ROOT every time, skipping the copy iff SRC_ROOT == APP_ROOT.
-#
-# Excludes:
-#   * .git / .venv / __pycache__ / *.pyc  — never deploy build artefacts
-#   * tests/                              — production appliance has no tests
-#   * *.md                                — docs live in the source repo
-# Runtime state (DB, logs, certs, generated configs) lives outside APP_ROOT
-# (/var/db, /usr/local/etc, /var/log, /var/run) so this copy never clobbers
-# operator data.
-if [ "${SRC_ROOT}" = "${APP_ROOT}" ]; then
-    info "SRC_ROOT == APP_ROOT (${APP_ROOT}) — no source-deploy needed"
-else
-    info "Deploying source tree: ${SRC_ROOT} → ${APP_ROOT}"
-    install -d -m 0755 "${APP_ROOT}"
-    if command -v rsync >/dev/null 2>&1; then
-        rsync -a --delete \
-            --exclude '.git' \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            --exclude '*.pyc' \
-            --exclude 'tests' \
-            --exclude '*.md' \
-            --exclude 'data.db' \
-            "${SRC_ROOT}/" "${APP_ROOT}/" \
-            && info "rsync deploy complete." \
-            || fatal "rsync failed during source deploy"
-    else
-        # Fallback: tar pipe. No --delete equivalent so a stale file removed
-        # from the source tree may linger in APP_ROOT — acceptable for the
-        # rsync-less edge case.
-        warn "rsync not available — falling back to tar (no stale-file pruning)."
-        ( cd "${SRC_ROOT}" && tar \
-            --exclude '.git' \
-            --exclude '.venv' \
-            --exclude '__pycache__' \
-            --exclude 'tests' \
-            --exclude '*.md' \
-            --exclude 'data.db' \
-            -cf - . ) | ( cd "${APP_ROOT}" && tar -xf - ) \
-            && info "tar deploy complete." \
-            || fatal "tar deploy failed"
-    fi
-    chown -R root:wheel "${APP_ROOT}" 2>/dev/null || true
-fi
-
 section "1. Package Installation"
 
 info "Updating pkg repository..."
@@ -316,11 +266,14 @@ _have_bin() {
     done
     return 1
 }
+# Note: strongSwan is probed via `swanctl` only. Modern strongSwan on FreeBSD
+# dropped the legacy `ipsec` starter script, so checking a bare `ipsec` here
+# printed a misleading "MISSING: ipsec" even when strongSwan was fully present.
 for bin in \
   pfctl ifconfig route netstat arp ndp sockstat sysrc service sysctl \
   kldload kldstat dmesg pgrep pkill dnctl tcpdump \
   unbound unbound-checkconf unbound-control dhcpd \
-  openvpn ipsec swanctl mpd5 suricata suricata-update \
+  openvpn swanctl mpd5 suricata suricata-update \
   mrtg kea-dhcp6 miniupnpd igmpproxy ddclient nsupdate dig nginx \
   ntpd ntpq bsnmpd rtadvd curl openssl; do
     if _have_bin "$bin"; then
@@ -344,6 +297,63 @@ fi
 # and installed into the project venv in section 4 — no system-Python install here.
 # suricata-update is also installed into the venv in section 5c after the venv exists,
 # so it gets reliable dependency resolution and avoids the system pkg_resources fragility.
+
+# ─── Deploy source tree to APP_ROOT ───────────────────────────────────────────
+# Wave I: the installer used to assume the operator had already copied the
+# project to ${APP_ROOT}.  That left the install half-broken when an admin
+# ran it from /root/Smart-Shield-Fv5/ (unzipped) or any path other than
+# /usr/local/share/smartshield.  Now we rsync (or tar-pipe) the source tree
+# into APP_ROOT every time, skipping the copy iff SRC_ROOT == APP_ROOT.
+#
+# Ordering: this runs AFTER §1 (so rsync — a critical pkg — is installed and we
+# get a proper --delete prune instead of the tar fallback) and AFTER the
+# validate-only short-circuit (so validate-only never writes APP_ROOT, honouring
+# its "no filesystem writes" contract). Nothing between §1 and here touches
+# APP_ROOT, so the move is behaviour-safe.
+#
+# Excludes:
+#   * .git / .venv / __pycache__ / *.pyc  — never deploy build artefacts
+#   * tests/                              — production appliance has no tests
+#   * *.md                                — docs live in the source repo
+# Runtime state (DB, logs, certs, generated configs) lives outside APP_ROOT
+# (/var/db, /usr/local/etc, /var/log, /var/run) so this copy never clobbers
+# operator data.
+section "1c. Deploy Source Tree"
+if [ "${SRC_ROOT}" = "${APP_ROOT}" ]; then
+    info "SRC_ROOT == APP_ROOT (${APP_ROOT}) — no source-deploy needed"
+else
+    info "Deploying source tree: ${SRC_ROOT} → ${APP_ROOT}"
+    install -d -m 0755 "${APP_ROOT}"
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude 'tests' \
+            --exclude '*.md' \
+            --exclude 'data.db' \
+            "${SRC_ROOT}/" "${APP_ROOT}/" \
+            && info "rsync deploy complete." \
+            || fatal "rsync failed during source deploy"
+    else
+        # Fallback: tar pipe. No --delete equivalent so a stale file removed
+        # from the source tree may linger in APP_ROOT — acceptable for the
+        # rsync-less edge case (e.g. prepare mode, where pkg install is a no-op).
+        warn "rsync not available — falling back to tar (no stale-file pruning)."
+        ( cd "${SRC_ROOT}" && tar \
+            --exclude '.git' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude 'tests' \
+            --exclude '*.md' \
+            --exclude 'data.db' \
+            -cf - . ) | ( cd "${APP_ROOT}" && tar -xf - ) \
+            && info "tar deploy complete." \
+            || fatal "tar deploy failed"
+    fi
+    chown -R root:wheel "${APP_ROOT}" 2>/dev/null || true
+fi
 
 section "2. Directory Creation"
 
@@ -1569,6 +1579,48 @@ fi
 printf "\n${BOLD}Smart Shield installation complete.${NC}\n"
 printf "  Mode: "; printf "${MODE_LINE}\n\n"
 
+# Loud router-readiness warning when install finished without going live. Without
+# this, an operator can finish install.sh and not realize that PF/NAT/routing
+# are NOT actually applied — the appliance will not route any traffic until the
+# env flag is flipped and services are restarted.
+if [ "${DEPLOY_LIVE:-0}" -ne 1 ]; then
+    printf "${YELLOW}${BOLD}"
+    printf "============================================================\n"
+    printf " ROUTER WARNING — LIVE NETWORK APPLY IS OFF\n"
+    printf "============================================================${NC}\n"
+    printf "  This appliance will ${BOLD}NOT route traffic${NC} until live mode\n"
+    printf "  is enabled. To go live:\n"
+    printf "    1. Edit ${ENV_FILE} and set:\n"
+    printf "         SMARTSHIELD_ENABLE_NETWORK_APPLY=1\n"
+    printf "         SMARTSHIELD_NETWORK_DRY_RUN=0\n"
+    printf "    2. Restart Smart Shield:\n"
+    printf "         service smart_shield restart\n"
+    printf "    3. Re-run setup Step 4 (Apply) from the web UI to load PF/NAT.\n\n"
+fi
+
+# ── First-boot setup claim token ──────────────────────────────────────────────
+# The rc.d prestart (smart_shield_prestart) generates a one-time claim token on
+# a fresh, unclaimed appliance and prints it ONLY to /dev/console. An operator
+# running install.sh over SSH never sees that console, so surface it here too.
+# rc.d remains the single source of truth — we only read the file it created
+# (mode 0600; readable because install.sh runs as root).
+CLAIM_TOKEN_FILE="${DATA_DIR}/setup_claim_token"
+CLAIM_TOKEN=""
+if [ -f "${CLAIM_TOKEN_FILE}" ]; then
+    CLAIM_TOKEN="$(tr -d '[:space:]' < "${CLAIM_TOKEN_FILE}" 2>/dev/null || true)"
+fi
+if [ -n "${CLAIM_TOKEN}" ]; then
+    printf "${BOLD}━━━ Setup Claim Token ━━━${NC}\n"
+    printf "The first-boot wizard is protected by this one-time token (shown once):\n\n"
+    printf "    ${GREEN}%s${NC}\n\n" "${CLAIM_TOKEN}"
+    printf "Enter it at https://%s when prompted, to claim this appliance.\n" "${LAN_IP}"
+    printf "It is consumed automatically once setup completes.\n\n"
+elif [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+    warn "No setup claim token at ${CLAIM_TOKEN_FILE} — appliance may already be claimed."
+    warn "  If setup is not yet done, the token is (re)generated and printed to the"
+    warn "  console on the next 'service smart_shield start'."
+fi
+
 cat << EOF
 Next steps:
   1. Confirm the daemon is up (started automatically above):
@@ -1577,7 +1629,7 @@ Next steps:
   2. Open the web UI (HTTPS, LAN only) and complete the setup wizard:
        https://${LAN_IP}
        (Accept the self-signed certificate warning — replace with a CA cert for production.)
-       You will be redirected to the setup wizard; create your admin account in step 3.
+       Enter the setup claim token shown above, then create your admin account in step 3.
 
   3. Check the Preflight page in the web UI:
        System → Preflight Check

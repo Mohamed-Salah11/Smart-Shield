@@ -48,6 +48,14 @@
         }
     };
 
+    // Shared `data-action="confirm-delete" data-confirm="…"` handler. Returning
+    // false makes the delegator preventDefault (cancels the surrounding form
+    // submit / link navigation) — see the dispatch() return-value handling below.
+    registry["confirm-delete"] = function (event, el) {
+        var msg = (el && el.dataset && el.dataset.confirm) || "Are you sure?";
+        if (!window.confirm(msg)) return false;
+    };
+
     registry.closeOnBackdrop = function (event, el) {
         // Only fire when the click was on the backdrop itself, not children.
         if (event.target !== el) return;
@@ -60,7 +68,8 @@
     // ── Delegator ───────────────────────────────────────────────────────────
     var EVENTS = [
         "click", "change", "submit", "input", "focus", "blur",
-        "keydown", "keyup", "keypress", "mouseover", "mouseout"
+        "keydown", "keyup", "keypress", "mouseover", "mouseout",
+        "dblclick", "contextmenu", "mousedown", "mouseup"
     ];
 
     function dispatch(eventName) {
@@ -75,7 +84,17 @@
                     if (actionId) {
                         var fn = registry[actionId];
                         if (typeof fn === "function") {
-                            fn.call(node, event, node);
+                            // Honor the legacy `return false` convention: an inline
+                            // handler such as `onsubmit="return confirm(...)"` cancels
+                            // the default action (and propagation) when it returns false.
+                            var result = fn.call(node, event, node);
+                            if (result === false) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (typeof event.stopImmediatePropagation === "function") {
+                                    event.stopImmediatePropagation();
+                                }
+                            }
                         }
                         return;
                     }

@@ -232,13 +232,21 @@ _LISTEN_RE = re.compile(
 
 def _to_validation_variant(text: str) -> str:
     """
-    Rewrite every ``listen <ip>:<port> ...;`` to a unique loopback
-    unprivileged port. ``nginx -t`` actually opens listen sockets, so
+    Rewrite every ``listen <ip>:<port> ...;`` to a unique unprivileged port
+    on ``127.0.0.1``. ``nginx -t`` actually opens listen sockets, so
     validating the real LAN-IP-bound config returns EADDRNOTAVAIL whenever
     that IP is not currently on an interface (install before §6b plumbs
     it, or a wizard LAN-IP change before apply_interface_config runs).
     The on-disk config written by apply_nginx is unchanged — only the
     transient text fed to ``nginx -t`` uses these loopback substitutes.
+
+    All substitutes stay on ``127.0.0.1`` and differ only by port. FreeBSD
+    binds only ``127.0.0.1`` to lo0 by default (unlike Linux, where the whole
+    127.0.0.0/8 is loopback), so the earlier scheme of incrementing the last
+    octet — 127.0.0.2, 127.0.0.3 … for repeated listens on a port — failed
+    with EADDRNOTAVAIL on the second listen. Incrementing the port instead
+    keeps every socket bindable while remaining unique (no ``duplicate
+    listen`` / ``default_server`` conflicts).
     """
     seen: dict[int, int] = {}
 
@@ -246,7 +254,7 @@ def _to_validation_variant(text: str) -> str:
         port = int(m.group("port"))
         base = {80: 8080, 443: 8443}.get(port, port + 8000)
         seen[base] = seen.get(base, -1) + 1
-        return f'{m.group("lead")}listen 127.0.0.{1 + seen[base]}:{base}{m.group("rest")};'
+        return f'{m.group("lead")}listen 127.0.0.1:{base + seen[base]}{m.group("rest")};'
 
     return _LISTEN_RE.sub(_swap, text)
 

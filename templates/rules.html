@@ -769,10 +769,10 @@
                         <td>${rule.schedule || '-'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" data-action="h_42543c538b" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" data-action="h_fa29e5c9f2" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" data-action="h_6991531096"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" data-action="h_2838ac5e44"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="floating" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="floating" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="floating" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="floating" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -804,10 +804,10 @@
                         <td>${rule.dest_port || '*'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" data-action="h_913e6c2bb2" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" data-action="h_0d565bbd0a" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" data-action="h_82e6804508"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" data-action="h_8f04a05bba"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="wan" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="wan" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="wan" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="wan" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -837,10 +837,10 @@
                         <td>${rule.destination || 'any'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" data-action="h_15b7163988" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" data-action="h_bb41e41da6" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" data-action="h_9c2e2a3c17"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" data-action="h_2c92398686"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="lan" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="lan" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="lan" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="lan" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -970,7 +970,7 @@
     }
 </script>
 {% endblock %}
-
+{% block scripts %}{{ super() }}
 <!-- inline-handlers:auto -->
 <script nonce="{{ csp_nonce() }}">
 /* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
@@ -989,18 +989,11 @@
   R['h_f507b004a3'] = function (event, el) { _syncPortFields('lan_protocol','lan_source_port','lan_dest_port') };
   R['h_06c27d2e5d'] = function (event, el) { showPortPicker(this,'lan_source_port') };
   R['h_7eb90aa1c6'] = function (event, el) { showPortPicker(this,'lan_dest_port') };
-  R['h_42543c538b'] = function (event, el) { moveRule('floating', ${rule.id}, 'up') };
-  R['h_fa29e5c9f2'] = function (event, el) { moveRule('floating', ${rule.id}, 'down') };
-  R['h_6991531096'] = function (event, el) { editRule('floating', ${rule.id}) };
-  R['h_2838ac5e44'] = function (event, el) { deleteRule('floating', ${rule.id}) };
-  R['h_913e6c2bb2'] = function (event, el) { moveRule('wan', ${rule.id}, 'up') };
-  R['h_0d565bbd0a'] = function (event, el) { moveRule('wan', ${rule.id}, 'down') };
-  R['h_82e6804508'] = function (event, el) { editRule('wan', ${rule.id}) };
-  R['h_8f04a05bba'] = function (event, el) { deleteRule('wan', ${rule.id}) };
-  R['h_15b7163988'] = function (event, el) { moveRule('lan', ${rule.id}, 'up') };
-  R['h_bb41e41da6'] = function (event, el) { moveRule('lan', ${rule.id}, 'down') };
-  R['h_9c2e2a3c17'] = function (event, el) { editRule('lan', ${rule.id}) };
-  R['h_2c92398686'] = function (event, el) { deleteRule('lan', ${rule.id}) };
+  R['rule-move']   = function (event, el) { moveRule(el.dataset.tab, el.dataset.id, el.dataset.dir); };
+  R['rule-edit']   = function (event, el) { editRule(el.dataset.tab, el.dataset.id); };
+  R['rule-delete'] = function (event, el) { deleteRule(el.dataset.tab, el.dataset.id); };
 })();
 </script>
 <!-- /inline-handlers:auto -->
+{% endblock %}
+

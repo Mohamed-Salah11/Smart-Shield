@@ -93,12 +93,12 @@
               <form method="POST" action="{{ url_for('soc_portal.recommendation_review', rec_id=r['id']) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="decision" value="approve">
-                <button class="btn btn-sm btn-primary" title="Endorse and send to Core">Endorse</button>
+                <button type="submit" class="btn btn-sm btn-primary" title="Endorse and send to Core">Endorse</button>
               </form>
               <form method="POST" action="{{ url_for('soc_portal.recommendation_review', rec_id=r['id']) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="decision" value="reject">
-                <button class="btn btn-sm btn-secondary" title="Reject">Reject</button>
+                <button type="submit" class="btn btn-sm btn-secondary" title="Reject">Reject</button>
               </form>
             </div>
             {% else %}

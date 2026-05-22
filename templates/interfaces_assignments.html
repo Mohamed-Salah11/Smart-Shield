@@ -1137,8 +1137,8 @@ function displayWirelessConfigs(configs) {
                 <td>${config.mode}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" data-action="h_7b621aa96e"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_d63fc57148"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-info" data-action="iface-wireless-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-wireless-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1258,8 +1258,8 @@ function displayVLANConfigs(configs) {
                 <td>${config.vlan_priority}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" data-action="h_ebf7d3f10a"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_219b47dc06"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-info" data-action="iface-vlan-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-vlan-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1400,8 +1400,8 @@ function displayQinQConfigs(configs) {
                 <td>${config.member_tags.join(', ')}</td>
                 <td>${config.description}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" data-action="h_0e0f23b47c"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_0c3c51292a"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-info" data-action="iface-qinq-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-qinq-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1608,8 +1608,8 @@ function displayInterfaceGroups(groups) {
                 <td>${group.description}</td>
                 <td>${group.members.join(', ')}</td>
                 <td>
-                    <button class="btn btn-sm btn-info" data-action="h_71c27723a5"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_52942a1691"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-info" data-action="iface-group-edit" data-id="${group.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-group-delete" data-id="${group.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1642,8 +1642,8 @@ function displayPPPConfigs(configs) {
                 <td>${config.description || ''}</td>
                 <td>${config.username || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" data-action="h_4270da24ac"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_a75dc5cf12"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-action="iface-ppp-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-ppp-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1794,8 +1794,8 @@ function displayGREConfigs(configs) {
                 <td>${config.gre_local_address || ''}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" data-action="h_8e2d1cdaa9"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_bef6afa103"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-action="iface-gre-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-gre-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -1937,8 +1937,8 @@ function displayGIFConfigs(configs) {
                 <td>${config.gif_tunnel_local_address || ''}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" data-action="h_89cdd6eeec"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_4f319d39da"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-action="iface-gif-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-gif-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -2067,8 +2067,8 @@ function displayBridgeConfigs(configs) {
                 <td>${config.cache_size || '100'}</td>
                 <td>${config.description || ''}</td>
                 <td>
-                    <button class="btn btn-sm btn-primary" data-action="h_20c1af7bf9"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="h_261cf62f4a"><i class="fas fa-trash-alt"></i> Delete</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-action="iface-bridge-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" data-action="iface-bridge-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
                 </td>
             </tr>
         `;
@@ -2250,8 +2250,8 @@ function displayLAGGConfigs(configs) {
             <td>${config.aggregation_protocol}</td>
             <td>${config.description || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-primary" data-action="h_3c11eb101c"><i class="fas fa-edit"></i> Edit</button>
-                <button class="btn btn-sm btn-danger" data-action="h_24e5310000"><i class="fas fa-trash-alt"></i> Delete</button>
+                <button type="button" class="btn btn-sm btn-primary" data-action="iface-lagg-edit" data-id="${config.id}"><i class="fas fa-edit"></i> Edit</button>
+                <button type="button" class="btn btn-sm btn-danger" data-action="iface-lagg-delete" data-id="${config.id}"><i class="fas fa-trash-alt"></i> Delete</button>
             </td>
         `;
     });
@@ -2540,7 +2540,7 @@ function saveInterfaceGroup() {
 </style>
 
 {% endblock %}
-
+{% block scripts %}{{ super() }}
 <!-- inline-handlers:auto -->
 <script nonce="{{ csp_nonce() }}">
 /* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
@@ -2598,24 +2598,26 @@ function saveInterfaceGroup() {
   R['h_0e83e9560c'] = function (event, el) { closeModal('lagg-modal') };
   R['h_00af9a63a7'] = function (event, el) { saveLAGGConfig() };
   R['h_67f9981bfb'] = function (event, el) { closeModal('lagg-modal') };
-  R['h_7b621aa96e'] = function (event, el) { editWirelessConfig(${config.id}) };
-  R['h_d63fc57148'] = function (event, el) { deleteWirelessConfig(${config.id}) };
-  R['h_ebf7d3f10a'] = function (event, el) { editVLANConfig(${config.id}) };
-  R['h_219b47dc06'] = function (event, el) { deleteVLANConfig(${config.id}) };
-  R['h_0e0f23b47c'] = function (event, el) { editQinQConfig(${config.id}) };
-  R['h_0c3c51292a'] = function (event, el) { deleteQinQConfig(${config.id}) };
-  R['h_71c27723a5'] = function (event, el) { editGroup(${group.id}) };
-  R['h_52942a1691'] = function (event, el) { deleteGroup(${group.id}) };
-  R['h_4270da24ac'] = function (event, el) { editPPPConfig(${config.id}) };
-  R['h_a75dc5cf12'] = function (event, el) { deletePPPConfig(${config.id}) };
-  R['h_8e2d1cdaa9'] = function (event, el) { editGREConfig(${config.id}) };
-  R['h_bef6afa103'] = function (event, el) { deleteGREConfig(${config.id}) };
-  R['h_89cdd6eeec'] = function (event, el) { editGIFConfig(${config.id}) };
-  R['h_4f319d39da'] = function (event, el) { deleteGIFConfig(${config.id}) };
-  R['h_20c1af7bf9'] = function (event, el) { editBridgeConfig(${config.id}) };
-  R['h_261cf62f4a'] = function (event, el) { deleteBridgeConfig(${config.id}) };
-  R['h_3c11eb101c'] = function (event, el) { editLAGGConfig(${config.id}) };
-  R['h_24e5310000'] = function (event, el) { deleteLAGGConfig(${config.id}) };
+  R['iface-wireless-edit']   = function (event, el) { editWirelessConfig(el.dataset.id); };
+  R['iface-wireless-delete'] = function (event, el) { deleteWirelessConfig(el.dataset.id); };
+  R['iface-vlan-edit']       = function (event, el) { editVLANConfig(el.dataset.id); };
+  R['iface-vlan-delete']     = function (event, el) { deleteVLANConfig(el.dataset.id); };
+  R['iface-qinq-edit']       = function (event, el) { editQinQConfig(el.dataset.id); };
+  R['iface-qinq-delete']     = function (event, el) { deleteQinQConfig(el.dataset.id); };
+  R['iface-group-edit']      = function (event, el) { editGroup(el.dataset.id); };
+  R['iface-group-delete']    = function (event, el) { deleteGroup(el.dataset.id); };
+  R['iface-ppp-edit']        = function (event, el) { editPPPConfig(el.dataset.id); };
+  R['iface-ppp-delete']      = function (event, el) { deletePPPConfig(el.dataset.id); };
+  R['iface-gre-edit']        = function (event, el) { editGREConfig(el.dataset.id); };
+  R['iface-gre-delete']      = function (event, el) { deleteGREConfig(el.dataset.id); };
+  R['iface-gif-edit']        = function (event, el) { editGIFConfig(el.dataset.id); };
+  R['iface-gif-delete']      = function (event, el) { deleteGIFConfig(el.dataset.id); };
+  R['iface-bridge-edit']     = function (event, el) { editBridgeConfig(el.dataset.id); };
+  R['iface-bridge-delete']   = function (event, el) { deleteBridgeConfig(el.dataset.id); };
+  R['iface-lagg-edit']       = function (event, el) { editLAGGConfig(el.dataset.id); };
+  R['iface-lagg-delete']     = function (event, el) { deleteLAGGConfig(el.dataset.id); };
 })();
 </script>
 <!-- /inline-handlers:auto -->
+{% endblock %}
+

@@ -187,7 +187,20 @@ def static_route_edit(route_id=None):
             flash("Destination network is required.", "danger")
             return redirect(request.url)
 
+        # On edit: capture the previous destination/gateway so we can delete the
+        # old kernel route before installing the new one. Skipping this would
+        # leave stale routes in the kernel table when an admin edits a route.
+        old_destination = None
+        old_gateway     = None
         if route_id:
+            old = conn.execute("""
+                SELECT sr.destination, g.gateway
+                FROM static_routes sr LEFT JOIN gateways g ON sr.gateway_id=g.id
+                WHERE sr.id=?
+            """, (route_id,)).fetchone()
+            if old:
+                old_destination = old["destination"]
+                old_gateway     = old["gateway"]
             conn.execute("""
                 UPDATE static_routes SET disabled=?, destination=?, gateway_id=?, description=?
                 WHERE id=?
@@ -200,18 +213,39 @@ def static_route_edit(route_id=None):
 
         conn.commit()
 
-        # Apply on FreeBSD if enabled and not disabled
-        if not disabled and sys.platform.startswith("freebsd") and gateway_id:
-            try:
-                from app.services.network_service import run_command
-                cur = conn.cursor()
-                cur.execute("SELECT gateway FROM gateways WHERE id=?", (gateway_id,))
-                gw_row = cur.fetchone()
-                if gw_row:
-                    run_command(["route", "-n", "add", "-net",
-                                 destination, gw_row["gateway"]], check=False)
-            except Exception:
-                pass
+        # Apply on FreeBSD: delete the stale route if changed, then add the
+        # new one. Errors are surfaced to the UI via flash() instead of
+        # silently swallowed, so admins see when the OS rejected the change.
+        route_errors = []
+        if sys.platform.startswith("freebsd"):
+            from app.services.network_service import run_command
+            if route_id and old_destination and old_gateway and (
+                old_destination != destination or
+                # gateway changed if the new resolved gw differs; check below
+                True
+            ):
+                try:
+                    run_command(["route", "-n", "delete", "-net",
+                                 old_destination, old_gateway], check=False)
+                except Exception as exc:
+                    route_errors.append(f"delete old route failed: {exc}")
+            if not disabled and gateway_id:
+                try:
+                    gw_row = conn.execute(
+                        "SELECT gateway FROM gateways WHERE id=?", (gateway_id,)
+                    ).fetchone()
+                    if gw_row:
+                        r = run_command(["route", "-n", "add", "-net",
+                                         destination, gw_row["gateway"]], check=False)
+                        if r.returncode != 0:
+                            route_errors.append(
+                                f"add route failed: "
+                                f"{(r.stderr or r.stdout or '').strip()}"
+                            )
+                except Exception as exc:
+                    route_errors.append(f"add route raised: {exc}")
+        for msg in route_errors:
+            flash(msg, "warning")
 
         log_event(category="system", action="static_route_save",
                   remote_addr=request.remote_addr,
@@ -233,22 +267,31 @@ def static_route_edit(route_id=None):
 @login_required
 def static_route_delete(route_id):
     conn = get_db()
-    # Remove from OS if FreeBSD
-    if sys.platform.startswith("freebsd"):
+    # Capture destination/gateway BEFORE deleting the DB row so we can also
+    # remove it from the kernel routing table. Errors are surfaced to the UI
+    # rather than silently swallowed — admins need to know if the OS still
+    # has the route after the DB delete.
+    row = conn.execute("""
+        SELECT sr.destination, g.gateway
+        FROM static_routes sr LEFT JOIN gateways g ON sr.gateway_id=g.id
+        WHERE sr.id=?
+    """, (route_id,)).fetchone()
+
+    if sys.platform.startswith("freebsd") and row and row["gateway"]:
         try:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT sr.destination, g.gateway
-                FROM static_routes sr LEFT JOIN gateways g ON sr.gateway_id=g.id
-                WHERE sr.id=?
-            """, (route_id,))
-            row = cur.fetchone()
-            if row and row["gateway"]:
-                from app.services.network_service import run_command
-                run_command(["route", "-n", "delete", "-net",
+            from app.services.network_service import run_command
+            r = run_command(["route", "-n", "delete", "-net",
                              row["destination"], row["gateway"]], check=False)
-        except Exception:
-            pass
+            if r.returncode != 0:
+                flash(
+                    f"Route {row['destination']} via {row['gateway']} could not "
+                    f"be removed from the kernel: "
+                    f"{(r.stderr or r.stdout or '').strip()}",
+                    "warning",
+                )
+        except Exception as exc:
+            flash(f"OS route delete failed: {exc}", "warning")
+
     conn.execute("DELETE FROM static_routes WHERE id=?", (route_id,))
     conn.commit()
     log_event(category="system", action="static_route_delete",

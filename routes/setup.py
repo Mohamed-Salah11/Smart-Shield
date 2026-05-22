@@ -673,26 +673,77 @@ def api_step4_apply():
     except Exception as exc:
         results.append({"step": "mrtg", "ok": False, "details": str(exc)})
 
-    # End-to-end verification: are the things the admin actually needs working
-    # (LAN IP applied, default route present, forwarding on, PF enabled, NAT
-    # rule loaded, DNS+nginx listening) live on the appliance? Reports
-    # actionable warnings without blocking wizard completion — the admin can
-    # still finish, then fix issues from the dashboard.
+    # End-to-end verification: LAN IP applied, default route present, forwarding
+    # on, PF enabled, NAT rule loaded, DNS+nginx listening. The router-critical
+    # checks (lan_ip_ok, forwarding_ok, pf_enabled, nat_present) gate setup
+    # completion — the wizard MUST NOT report success if the appliance can't
+    # actually route. A still-pending WAN DHCP lease is treated as a warning
+    # rather than a hard block so DHCP WANs can finish setup.
     verification = _wizard_verify(conn)
     results.append({"step": "verify", "ok": verification.get("ok", False),
                     "details": verification})
 
-    # Only require the three network steps; MRTG + verify are advisory and
-    # must not block wizard completion.
+    # Reject dry-run as a real apply: refuse to mark setup complete when
+    # SMARTSHIELD_NETWORK_DRY_RUN=1 — no live routing happened.
+    try:
+        from app.services.network_service import is_network_dry_run
+        dry_run = is_network_dry_run()
+    except Exception:
+        dry_run = False
+
+    # Critical routing checks gate completion (B4). DHCP-pending downgrade: if
+    # WAN is DHCP and the lease/route hasn't appeared yet, default_route_ok
+    # becomes a non-blocking warning rather than a hard failure.
+    iface_details = next(
+        (r.get("details") for r in results if r.get("step") == "interfaces"),
+        None,
+    )
+    wan_dhcp_pending = False
+    if isinstance(iface_details, str) and "lease" in iface_details.lower():
+        wan_dhcp_pending = "pending" in iface_details.lower()
+    # apply_interface_config may also have surfaced a per-iface 'pending' flag
+    # via the iface_result dict (see network_service._kick_dhcp_client).
+    try:
+        wan_dhcp_pending = wan_dhcp_pending or any(
+            (d.get("pending") for d in (iface_result.get("details") or []))
+        )
+    except Exception:
+        pass
+
+    # On non-FreeBSD (dev/CI) _wizard_verify reports skipped=True and we can't
+    # actually probe the kernel — fall back to trusting the apply steps.
+    verify_skipped = bool(verification.get("skipped"))
+    critical_ok = verify_skipped or all([
+        verification.get("lan_ip_ok"),
+        verification.get("forwarding_ok"),
+        verification.get("pf_enabled"),
+        verification.get("nat_present"),
+    ])
+    route_ok = verify_skipped or verification.get("default_route_ok") or wan_dhcp_pending
+
     _REQUIRED = {"rc_conf", "interfaces", "services"}
-    overall_ok = all(r.get("ok", False) for r in results if r.get("step") in _REQUIRED)
+    base_ok = all(r.get("ok", False) for r in results if r.get("step") in _REQUIRED)
+    overall_ok = base_ok and critical_ok and route_ok and not dry_run
+
+    if dry_run:
+        verification.setdefault("messages", []).append(
+            "Network dry-run is enabled (SMARTSHIELD_NETWORK_DRY_RUN=1); "
+            "no live routing was applied. Set live mode in smartshield.env "
+            "and re-run setup."
+        )
+    if wan_dhcp_pending and not verification.get("default_route_ok"):
+        verification.setdefault("messages", []).append(
+            "WAN DHCP lease pending — default route not yet visible (warning, "
+            "not blocking)."
+        )
+
     if overall_ok:
         _mark_setup_complete(conn)
 
     return jsonify({
         "ok": overall_ok,
         "message": "Setup complete! Redirecting to dashboard." if overall_ok
-                   else "Setup finished with warnings — check results.",
+                   else "Setup cannot complete — routing is not live. See verify details.",
         "results": results,
         "redirect": url_for("system.dashboard") if overall_ok else None,
     })

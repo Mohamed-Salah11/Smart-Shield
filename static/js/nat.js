@@ -268,10 +268,10 @@ async function loadPortForwardRules() {
                     <td>${rule.redirect_port || '*'}</td>
                     <td>${rule.description || ''}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" data-action="h_0fbcde06c6" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                        <button class="btn btn-sm btn-secondary" data-action="h_7162808e7c" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                        <button class="btn btn-sm btn-primary" data-action="h_5a7ce1b908"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" data-action="h_0d0827d18d"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="pf" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="pf" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="nat-edit" data-tab="pf" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="nat-delete" data-tab="pf" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                     </td>
                 `;
                 pfTbody.appendChild(row);
@@ -299,10 +299,10 @@ async function load1to1Rules() {
                     <td>${rule.destination_address || '*'}</td>
                     <td>${rule.description || ''}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" data-action="h_766d1b7002" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                        <button class="btn btn-sm btn-secondary" data-action="h_d735c6a140" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                        <button class="btn btn-sm btn-primary" data-action="h_fe4d659b55"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" data-action="h_519b992dbe"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="1to1" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="1to1" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="nat-edit" data-tab="1to1" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="nat-delete" data-tab="1to1" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                     </td>
                 `;
                 oneToOneTbody.appendChild(row);
@@ -334,10 +334,10 @@ async function loadOutboundRules() {
                     <td>${rule.static_port ? 'Yes' : 'No'}</td>
                     <td>${rule.description || ''}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" data-action="h_04481f8579" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                        <button class="btn btn-sm btn-secondary" data-action="h_5b971f0700" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                        <button class="btn btn-sm btn-primary" data-action="h_d018f71fab"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" data-action="h_c08b966052"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="outbound" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="outbound" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="nat-edit" data-tab="outbound" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="nat-delete" data-tab="outbound" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                     </td>
                 `;
                 outboundTbody.appendChild(row);
@@ -454,10 +454,10 @@ async function loadNptRules() {
                     <td>${rule.dst_prefix || ''}</td>
                     <td>${rule.description || ''}</td>
                     <td>
-                        <button class="btn btn-sm btn-secondary" data-action="h_6441535b5a" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                        <button class="btn btn-sm btn-secondary" data-action="h_1443e8f728" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                        <button class="btn btn-sm btn-primary" data-action="h_b1042e58b7"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" data-action="h_7b8feced85"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="npt" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="nat-move" data-tab="npt" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                        <button type="button" class="btn btn-sm btn-primary" data-action="nat-edit" data-tab="npt" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-sm btn-danger" data-action="nat-delete" data-tab="npt" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                     </td>
                 `;
                 nptTbody.appendChild(row);
@@ -467,6 +467,14 @@ async function loadNptRules() {
         console.error('Error loading NPt rules:', error);
     }
 }
+
+// ── Delegated row-action handlers (CSP-safe; rows are rendered here) ─────────
+(function () {
+    var R = window.SSActions || (window.SSActions = {});
+    R['nat-move']   = function (event, el) { moveNatRule(el.dataset.tab, el.dataset.id, el.dataset.dir); };
+    R['nat-edit']   = function (event, el) { editNatRule(el.dataset.tab, el.dataset.id); };
+    R['nat-delete'] = function (event, el) { deleteNatRule(el.dataset.tab, el.dataset.id); };
+})();
 
 // Load all NAT rules on page load
 loadPortForwardRules();
