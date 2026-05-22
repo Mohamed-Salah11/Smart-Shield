@@ -27,10 +27,14 @@ def _fallback_rewrite(text: str) -> str:
     seen: dict[int, int] = {}
 
     def _swap(m: "re.Match[str]") -> str:
+        # Keep every substitute on 127.0.0.1 (the only address FreeBSD binds to
+        # lo0 by default) and make repeated listens unique by port. Incrementing
+        # the last octet instead (127.0.0.2, …) failed with EADDRNOTAVAIL on the
+        # second listen during `nginx -t`.
         port = int(m.group("port"))
         base = {80: 8080, 443: 8443}.get(port, port + 8000)
         seen[base] = seen.get(base, -1) + 1
-        return f'{m.group("lead")}listen 127.0.0.{1 + seen[base]}:{base}{m.group("rest")};'
+        return f'{m.group("lead")}listen 127.0.0.1:{base + seen[base]}{m.group("rest")};'
 
     return listen_re.sub(_swap, text)
 

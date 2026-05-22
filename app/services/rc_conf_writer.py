@@ -405,20 +405,45 @@ def apply_static_routes(conn) -> dict:
         except Exception as exc:
             errors.append(f"{dst} via {gw}: {exc}")
 
-    # Also persist to rc.conf.local as static_routes entries
+    # Persist to rc.conf.local using valid FreeBSD syntax. FreeBSD requires named
+    # routes in `static_routes` plus a `route_<name>` variable per entry:
+    #
+    #   static_routes="ssroute0 ssroute1"
+    #   route_ssroute0="-net 10.10.0.0/24 192.168.1.254"
+    #   route_ssroute1="-net 172.16.0.0/16 192.168.1.254"
+    #
+    # Entries are wrapped in BEGIN/END markers so admin-managed routes that live
+    # outside our block are never clobbered on update.
+    _STATIC_BEGIN = "# SMARTSHIELD_STATIC_ROUTES_BEGIN"
+    _STATIC_END   = "# SMARTSHIELD_STATIC_ROUTES_END"
     try:
-        route_lines = " ".join(
-            f'"-net {r["destination"]} {r["gateway"]}"' for r in routes
+        names: list[str] = []
+        defs:  list[str] = []
+        for idx, r in enumerate(routes):
+            name = f"ssroute{idx}"
+            names.append(name)
+            defs.append(f'route_{name}="-net {r["destination"]} {r["gateway"]}"')
+        new_block = (
+            _STATIC_BEGIN + "\n"
+            + f'static_routes="{" ".join(names)}"\n'
+            + ("\n".join(defs) + "\n" if defs else "")
+            + _STATIC_END + "\n"
         )
+
         existing = ""
         if os.path.exists(_RC_CONF_LOCAL):
             with open(_RC_CONF_LOCAL) as fh:
                 existing = fh.read()
-        # Replace or append static_routes line
-        if 'static_routes=' in existing:
-            existing = re.sub(r'^static_routes=.*$', f'static_routes="{route_lines}"', existing, flags=re.MULTILINE)
+        marker_re = re.compile(
+            re.escape(_STATIC_BEGIN) + r".*?" + re.escape(_STATIC_END) + r"\n?",
+            re.DOTALL,
+        )
+        if marker_re.search(existing):
+            existing = marker_re.sub(new_block, existing)
         else:
-            existing += f'\nstatic_routes="{route_lines}"\n'
+            if existing and not existing.endswith("\n"):
+                existing += "\n"
+            existing += new_block
         with open(_RC_CONF_LOCAL, "w") as fh:
             fh.write(existing)
     except OSError:

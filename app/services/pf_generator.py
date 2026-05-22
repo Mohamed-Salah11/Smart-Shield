@@ -1318,6 +1318,34 @@ def get_pf_status() -> dict:
 # 9. Write + reload (with rollback on failure)
 # ---------------------------------------------------------------------------
 
+def _validate_pf_macros(conn) -> tuple:
+    """
+    Verify WAN/LAN/LAN_NET resolve to non-empty, valid values BEFORE we generate
+    a pf.conf. Without this, generate_pf_conf silently falls back to em0/em1/
+    192.168.1.0/24 placeholders and we end up loading NAT rules against
+    interfaces that don't exist on this appliance.
+    """
+    lan_rows = _rows(conn, "SELECT assigned_port, ipv4_address FROM lan_config LIMIT 1")
+    wan_rows = _rows(conn, "SELECT assigned_port FROM wan_config LIMIT 1")
+
+    lan_iface = (lan_rows[0].get("assigned_port") or "").strip() if lan_rows else ""
+    wan_iface = (wan_rows[0].get("assigned_port") or "").strip() if wan_rows else ""
+    lan_cidr  = (lan_rows[0].get("ipv4_address")  or "").strip() if lan_rows else ""
+
+    if not wan_iface:
+        return False, "PF macros: WAN interface is unassigned. Set it in Interfaces → WAN."
+    if not lan_iface:
+        return False, "PF macros: LAN interface is unassigned. Set it in Interfaces → LAN."
+    if not lan_cidr:
+        return False, "PF macros: LAN network is unset. Configure a LAN IPv4 address (CIDR)."
+    try:
+        import ipaddress as _ip
+        _ip.ip_interface(lan_cidr).network  # parse — raises if malformed
+    except Exception as exc:
+        return False, f"PF macros: LAN network {lan_cidr!r} is not a valid CIDR: {exc}"
+    return True, ""
+
+
 def reload_pf_rules(conn) -> dict:
     """
     Generate pf.conf from DB, validate, write, and reload PF.
@@ -1327,6 +1355,14 @@ def reload_pf_rules(conn) -> dict:
     Returns ``{"ok": bool, "message": str, "conf": str}``.
     On non-FreeBSD generates the conf but does not touch the filesystem.
     """
+    # The router-mode macro check (B9) fires only when we're about to apply to
+    # a live FreeBSD kernel — on non-FreeBSD (dev/CI) we still generate the
+    # conf for testing/preview using the existing default fallbacks.
+    if sys.platform.startswith("freebsd"):
+        macros_ok, macros_err = _validate_pf_macros(conn)
+        if not macros_ok:
+            return {"ok": False, "message": macros_err, "conf": ""}
+
     conf_text = generate_pf_conf(conn)
 
     # Step 0 — static section-order check (runs on all platforms; catches
