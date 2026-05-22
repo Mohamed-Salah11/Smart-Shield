@@ -949,13 +949,36 @@ def get_ids_status(conn=None) -> dict:
         except Exception:
             pass
 
+    # Signature-coverage gauge. Counts real rule actions only (alert/drop/
+    # reject/pass) so include-files and comments do not inflate the apparent
+    # coverage. A running suricata with 0 signatures is the failure mode we
+    # warn about in install.sh (§Fv12 P1-02): the daemon happily starts on an
+    # empty ruleset and the UI must not call that state "ready".
+    signatures_loaded = 0
+    try:
+        if os.path.exists(_SURICATA_UPDATE_RULES):
+            with open(_SURICATA_UPDATE_RULES, "r", errors="replace") as f:
+                for line in f:
+                    head = line[:8]
+                    if (head.startswith("alert ") or head.startswith("drop ")
+                            or head.startswith("reject ") or head.startswith("pass ")):
+                        signatures_loaded += 1
+    except Exception:
+        signatures_loaded = 0
+
+    if not signatures_loaded:
+        message = "Running, NO signatures loaded" if running else "Stopped, NO signatures loaded"
+    else:
+        message = "Running" if running else "Stopped"
+
     return {
         "ok": True,
         "running": running,
         "mode": mode,
-        "message": "Running" if running else "Stopped",
+        "message": message,
         "alerts_today": alerts_today,
         "cfg_enabled": cfg_enabled,
+        "signatures_loaded": signatures_loaded,
     }
 
 

@@ -1538,22 +1538,54 @@ ON static_leases(mac_address)
 
     # Indexed event store — every audit event is mirrored here for fast,
     # indexed queries; the audit.log file remains the durable forensic record.
+    #
+    # The full post-v34 column set is created here on fresh installs so the
+    # first log_event() write at startup does not race the ALTER TABLE in
+    # migration v34. Legacy DBs created before this change still rely on
+    # _migration_v34 to add the same columns (it uses ADD COLUMN IF NOT
+    # EXISTS semantics via a PRAGMA pre-check).
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS events (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts          TEXT NOT NULL,
-        severity    TEXT DEFAULT 'info',
-        category    TEXT,
-        action      TEXT,
-        username    TEXT,
-        remote_addr TEXT,
-        details     TEXT
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts              TEXT NOT NULL,
+        severity        TEXT DEFAULT 'info',
+        category        TEXT,
+        action          TEXT,
+        username        TEXT,
+        remote_addr     TEXT,
+        details         TEXT,
+        event_uuid      TEXT,
+        source_type     TEXT,
+        source_name     TEXT,
+        src_ip          TEXT,
+        src_port        INTEGER,
+        dst_ip          TEXT,
+        dst_port        INTEGER,
+        protocol        TEXT,
+        interface       TEXT,
+        direction       TEXT,
+        hostname        TEXT,
+        mac             TEXT,
+        domain          TEXT,
+        url             TEXT,
+        rule_id         TEXT,
+        rule_name       TEXT,
+        policy_id       TEXT,
+        policy_name     TEXT,
+        mitre_tactic    TEXT,
+        mitre_technique TEXT,
+        soc_origin      INTEGER DEFAULT 0,
+        raw             TEXT
     )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_ts       ON events(ts)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_category ON events(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_action   ON events(action)")
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_uuid "
+        "ON events(event_uuid)"
+    )
 
     # Correlation rules — drive correlation_engine.py (Phase 23)
     cursor.execute("""

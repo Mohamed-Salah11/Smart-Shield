@@ -118,6 +118,7 @@ def add_certificate():
 
 @system_bp.route("/api/certificates/<int:cert_id>/revoke", methods=["POST"])
 @login_required
+@superuser_required
 def api_revoke_cert(cert_id):
     from app.services.cert_manager import revoke_cert
     conn   = get_db()
@@ -195,6 +196,7 @@ def api_get_cert(cert_id):
 
 @system_bp.route("/api/certificates/<int:cert_id>", methods=["DELETE"])
 @login_required
+@superuser_required
 def api_delete_cert(cert_id):
     from app.services.cert_manager import delete_cert
     conn   = get_db()

@@ -179,7 +179,21 @@
       <div class="ids-kpi-val">{{ rulesets|selectattr('enabled')|list|length }}</div>
       <div class="ids-kpi-lbl">Active Rulesets</div>
     </div>
+    <div class="ids-kpi">
+      <div class="ids-kpi-val {{ 'is-stopped' if (status.signatures_loaded or 0) == 0 else '' }}">
+        {{ status.signatures_loaded or 0 }}
+      </div>
+      <div class="ids-kpi-lbl">Signatures</div>
+    </div>
   </div>
+  {% if (status.signatures_loaded or 0) == 0 %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mt-2 mb-2">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span>Suricata is installed but no signatures are loaded — IDS has
+    <strong>no detection coverage</strong>. Click <strong>Update Rules</strong>
+    on the Rulesets tab before relying on IDS/IPS alerts.</span>
+  </div>
+  {% endif %}
 
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="idsTabs">

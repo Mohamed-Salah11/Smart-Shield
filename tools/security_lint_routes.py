@@ -105,6 +105,29 @@ _PUBLIC_DECORATORS = frozenset({
 # HTTP methods that mutate state and therefore require an auth declaration.
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
+# High-risk endpoint patterns — routes that match any of these regexes against
+# the function name must carry @superuser_required (or an explicit
+# @api_permission_required that delegates to superuser). The base auth check
+# above guarantees the route has *some* gate; this stricter check makes sure
+# the destructive ones aren't reachable by every authenticated admin.
+_HIGH_RISK_FUNC_PATTERNS = (
+    re.compile(r"factory_reset"),
+    re.compile(r"^(reboot|halt|shutdown|poweroff)\b"),
+    re.compile(r"(^|_)(revoke|delete)_cert"),
+    re.compile(r"(^|_)package_install\b"),
+    re.compile(r"(^|_)terminal_ticket\b"),
+    re.compile(r"(^|_)pf_(apply|rollback|reload)\b"),
+    re.compile(r"(^|_)interface_apply\b"),
+)
+
+# Decorators that satisfy the high-risk check.
+_HIGH_RISK_DECORATORS = frozenset({
+    "superuser_required",
+    "api_permission_required",
+    "reauth_required_form",
+    "reauth_required",
+})
+
 
 @dataclass
 class Violation:
@@ -249,6 +272,33 @@ def _scan_file(path: Path, blueprint_prefix: str, exempt_prefixes: tuple,
                 "(expected one of: @browser_api_required, @machine_api_required, "
                 "@login_required + @api_permission_required, @require_api_scope, "
                 "@public_route, or HMAC verification in body)"
+            ),
+        ))
+
+    # Second pass: high-risk endpoints must additionally carry one of the
+    # decorators in _HIGH_RISK_DECORATORS. Done as a second walk so the
+    # "missing any auth" violations above are surfaced first; a route can
+    # generate at most one violation per pass.
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        methods = _iter_route_methods(node) & _MUTATING_METHODS
+        if not methods:
+            continue
+        if not any(p.search(node.name) for p in _HIGH_RISK_FUNC_PATTERNS):
+            continue
+        dec_names = set(_iter_decorator_names(node))
+        if dec_names & _HIGH_RISK_DECORATORS:
+            continue
+        violations.append(Violation(
+            file=str(path),
+            line=node.lineno,
+            func=node.name,
+            methods=tuple(sorted(methods)),
+            reason=(
+                "high-risk endpoint missing strict gate "
+                "(expected @superuser_required, @api_permission_required, "
+                "or @reauth_required_form)"
             ),
         ))
     return violations

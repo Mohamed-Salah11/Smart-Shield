@@ -58,25 +58,39 @@ fi
 # Noninteractive override: lab automation can pre-set SMARTSHIELD_INSTALL_MODE
 # (live|dry) and SMARTSHIELD_NONINTERACTIVE=1 to skip prompts entirely.
 printf "\n${BOLD}━━━ Deployment Mode ━━━${NC}\n"
-printf "  ${GREEN}live${NC}  — Apply real PF rules, interface config, and service control.\n"
-printf "  ${YELLOW}dry${NC}   — Prepare-only: installs files, the venv, sudoers, nginx config,\n"
-printf "          rc.conf staging, and SSL cert generation, but does NOT mutate live PF\n"
-printf "          rules, change active interface state, load kernel modules, start/stop\n"
-printf "          services, or write sysctl. Filesystem state IS modified — re-running\n"
-printf "          install.sh in dry mode is the documented contract (Fv11 review §P1-03).\n"
+printf "  ${GREEN}live${NC}          — Apply real PF rules, interface config, and service control.\n"
+printf "  ${YELLOW}prepare${NC}       — Install files, venv, sudoers, nginx config, rc.conf staging, and\n"
+printf "                  SSL cert generation, but do NOT mutate live PF rules, change\n"
+printf "                  interface state, load kernel modules, start/stop services, or write\n"
+printf "                  sysctl. Filesystem state IS modified — re-running install.sh in\n"
+printf "                  prepare mode is the documented contract (Fv11 review §P1-03).\n"
+printf "  ${YELLOW}validate-only${NC} — Run packaging + preflight checks only. No filesystem writes,\n"
+printf "                  no pkg install, no venv build. Use to gate CI.\n"
+# Resolve install mode. Back-compat: SMARTSHIELD_INSTALL_MODE=dry → prepare.
+_MODE_RAW="${SMARTSHIELD_INSTALL_MODE:-}"
 if [ "${SMARTSHIELD_NONINTERACTIVE:-0}" = "1" ]; then
-    case "${SMARTSHIELD_INSTALL_MODE:-dry}" in
-        live) DEPLOY_LIVE=1; info "Live mode selected (noninteractive)." ;;
-        *)    DEPLOY_LIVE=0; info "Dry-run mode selected (noninteractive)." ;;
+    case "${_MODE_RAW:-prepare}" in
+        live)                        INSTALL_MODE=live ;;
+        prepare|dry|"")              INSTALL_MODE=prepare ;;
+        validate-only|validate|check) INSTALL_MODE=validate-only ;;
+        *) fatal "Unknown SMARTSHIELD_INSTALL_MODE='${_MODE_RAW}' (expected live|prepare|validate-only)" ;;
     esac
+    info "Install mode: ${INSTALL_MODE} (noninteractive)."
 else
-    printf "${YELLOW}[?]${NC} Enable LIVE network apply now? [y/N]: "
-    read -r _LIVE_ANS
-    case "${_LIVE_ANS}" in
-        [Yy]|[Yy][Ee][Ss]) DEPLOY_LIVE=1; info "Live mode selected." ;;
-        *)                  DEPLOY_LIVE=0; info "Dry-run mode selected — safe for initial testing." ;;
+    printf "${YELLOW}[?]${NC} Mode? [live/prepare/validate-only, default=prepare]: "
+    read -r _MODE_ANS
+    case "${_MODE_ANS:-prepare}" in
+        live|LIVE)                            INSTALL_MODE=live ;;
+        validate-only|validate|check)         INSTALL_MODE=validate-only ;;
+        *)                                    INSTALL_MODE=prepare ;;
     esac
+    info "Install mode: ${INSTALL_MODE}"
 fi
+
+case "${INSTALL_MODE}" in
+    live)          DEPLOY_LIVE=1 ;;
+    prepare|validate-only) DEPLOY_LIVE=0 ;;
+esac
 DRY_RUN_VAL=$([ "${DEPLOY_LIVE}" -eq 1 ] && echo 0 || echo 1)
 
 # Phase 5.1 — wrap commands that touch live system state. In dry-run we print
@@ -103,6 +117,21 @@ stage_write() {
         printf "${YELLOW}[DRY-RUN]${NC} would write %s (stdin discarded)\n" "$1"
         cat > /dev/null
     fi
+}
+
+# secret_is_weak <value> — returns 0 (true) when the given SECRET_KEY value
+# is empty, known-bad, or shorter than 32 chars. Used by §3 to detect a stale
+# env file shipping the .env.example placeholder.
+secret_is_weak() {
+    _s="$1"
+    case "${_s}" in
+        ""|changeme|change-me|replace-this-with-a-long-random-secret\
+          |dev|development|default|secret|smartshield|smart-shield)
+            return 0 ;;
+    esac
+    _len=$(printf '%s' "${_s}" | wc -c | tr -d ' ')
+    [ "${_len}" -lt 32 ] && return 0
+    return 1
 }
 
 # set_env_key <key> <value> <file> — replace or add a KEY=VALUE line in an
@@ -204,7 +233,7 @@ run_live pkg update -q
 #   * OPTIONAL_PKGS  — feature dependencies. Same best-effort policy, but
 #                      missing packages directly disable a Smart Shield
 #                      feature (IDS, VPN, UPnP, etc.).
-CRITICAL_PKGS="python3 sqlite3 ca_root_nss unbound isc-dhcp44-server nginx pkgconf curl bind-tools tcpdump"
+CRITICAL_PKGS="python3 sqlite3 ca_root_nss unbound isc-dhcp44-server nginx pkgconf curl bind-tools tcpdump rsync"
 OPERATOR_PKGS="git nano"
 OPTIONAL_PKGS="openvpn strongswan suricata mrtg kea mpd5 miniupnpd igmpproxy ddclient sudo"
 
@@ -253,6 +282,24 @@ for _opkg in ${OPTIONAL_PKGS}; do
 done
 if [ -n "${MISSING_OPTIONAL}" ]; then
     warn "Optional packages NOT installed:${MISSING_OPTIONAL}"
+fi
+
+# ─── validate-only short-circuit ──────────────────────────────────────────────
+# In validate-only mode we stop here without touching /etc, /var, /usr/local
+# directory state. The preflight Python tools run against SRC_ROOT instead
+# of APP_ROOT so CI can gate a release on them without a populated install.
+if [ "${INSTALL_MODE}" = "validate-only" ]; then
+    section "Validate-only preflight"
+    if [ -x "${SRC_ROOT}/tools/release_check.py" ] && command -v python3 >/dev/null 2>&1; then
+        ( cd "${SRC_ROOT}" && python3 tools/release_check.py ) \
+            || fatal "release_check.py failed (validate-only)"
+    fi
+    if [ -f "${SRC_ROOT}/tools/check_routes.py" ] && command -v python3 >/dev/null 2>&1; then
+        ( cd "${SRC_ROOT}" && python3 tools/check_routes.py ) \
+            || warn "check_routes.py failed (validate-only)"
+    fi
+    info "validate-only run complete — no filesystem state was modified."
+    exit 0
 fi
 
 # Verify the full set of system + service binaries the app calls or exposes as
@@ -474,6 +521,21 @@ if [ ! -f /etc/pf.conf ]; then
     info "Created: /etc/pf.conf (minimal bootstrap — wizard will replace)"
 fi
 
+# ─── Legacy-path migration ────────────────────────────────────────────────────
+# Phase 11 renamed every runtime dir from `smart-shield` to `smartshield`.
+# If the operator is upgrading an old install, move the directory contents
+# into the canonical paths so the rest of the installer (and the app) only
+# has to think about `smartshield`. Idempotent — exits cleanly when nothing
+# is to do.
+if [ "${DEPLOY_LIVE:-0}" -eq 1 ] && [ -x "$(command -v python3 2>/dev/null)" ]; then
+    if [ -f "${SRC_ROOT}/tools/migrate_legacy_paths.py" ]; then
+        python3 "${SRC_ROOT}/tools/migrate_legacy_paths.py" --apply \
+            | sed 's/^/    /' || true
+    fi
+else
+    printf "${YELLOW}[DRY-RUN]${NC} python3 tools/migrate_legacy_paths.py --apply\n"
+fi
+
 section "3. Environment Configuration"
 
 ENV_FILE="${ETC_DIR}/smartshield.env"
@@ -514,6 +576,9 @@ SMARTSHIELD_UPLOAD_DIR=/var/db/smartshield/uploads/profile_pictures
 SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smartshield/audit.log
 SMARTSHIELD_ENABLE_NETWORK_APPLY=${DEPLOY_LIVE}
 SMARTSHIELD_NETWORK_DRY_RUN=${DRY_RUN_VAL}
+# Root-equivalent web terminal — disabled by default (rc.d runs as root, so
+# any opened terminal is a root session). Flip to 1 only on trusted LANs.
+SMARTSHIELD_TERMINAL_ENABLED=0
 # Abuse.ch threat intelligence — set your Auth-Key from https://abuse.ch/
 ABUSECH_AUTH_KEY=
 ABUSECH_DRY_RUN=1
@@ -526,6 +591,33 @@ EOF
 else
     info "Env file already exists: ${ENV_FILE}"
     chmod 0600 "${ENV_FILE}"
+
+    # P0-04: an existing env file may carry the .env.example placeholder
+    # ("replace-this-with-a-long-random-secret") or another weak SECRET_KEY.
+    # Detect and rotate the key in place so production never boots with the
+    # template default.
+    CURRENT_SECRET="$(awk -F= '$1=="SECRET_KEY"{print substr($0, index($0,"=")+1)}' \
+        "${ENV_FILE}" 2>/dev/null | tail -1)"
+    if secret_is_weak "${CURRENT_SECRET}"; then
+        NEW_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || true)
+        if [ -z "${NEW_SECRET}" ]; then
+            fatal "SECRET_KEY in ${ENV_FILE} is weak and python3 token_hex is unavailable to rotate it."
+        fi
+        if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+            set_env_key SECRET_KEY "${NEW_SECRET}" "${ENV_FILE}"
+            # Sanity re-read — if the rotation somehow produced another weak
+            # value (impossible with token_hex, but cheap insurance), abort
+            # rather than silently shipping a half-fixed install.
+            VERIFY_SECRET="$(awk -F= '$1=="SECRET_KEY"{print substr($0, index($0,"=")+1)}' \
+                "${ENV_FILE}" 2>/dev/null | tail -1)"
+            if secret_is_weak "${VERIFY_SECRET}"; then
+                fatal "SECRET_KEY is still weak after repair; refusing production install."
+            fi
+            info "Weak SECRET_KEY detected in ${ENV_FILE} — rotated to a fresh 64-char token."
+        else
+            warn "Weak SECRET_KEY detected in ${ENV_FILE} — would rotate (skipped in dry-run)."
+        fi
+    fi
 fi
 
 # Prompt for ABUSECH_AUTH_KEY if not already set in the env file
@@ -668,11 +760,15 @@ if command -v suricata >/dev/null 2>&1; then
         warn "  suricata-update missing — IDS will only have the placeholder ruleset until this is fixed."
     fi
     if [ -s /var/lib/suricata/rules/suricata.rules ]; then
-        _rule_lines="$(grep -cE '^[a-z]' /var/lib/suricata/rules/suricata.rules 2>/dev/null || echo 0)"
+        # Count only real rule actions (alert/drop/reject/pass) so include
+        # files and comments do not inflate the apparent coverage.
+        _rule_lines="$(grep -cE '^(alert|drop|reject|pass) ' /var/lib/suricata/rules/suricata.rules 2>/dev/null || echo 0)"
         if [ "${_rule_lines}" -gt 10 ]; then
             info "  rules file: ${_rule_lines} signatures loaded"
+        elif [ "${_rule_lines}" -gt 0 ]; then
+            warn "  rules file present but sparse (${_rule_lines} signatures). Click 'Update Rules' in the IDS page before enabling IPS."
         else
-            warn "  rules file present but near-empty (${_rule_lines} signatures). Click 'Update Rules' in the IDS page before enabling IPS."
+            warn "  rules file present but contains NO active signatures. Run suricata-update before enabling IDS/IPS."
         fi
     else
         warn "  rules file is empty — IDS has NO signature coverage yet. Operator must run suricata-update before enabling IDS/IPS."
@@ -747,15 +843,30 @@ fi
 # Probe the critical third-party imports separately so the failure log points
 # at the actual missing module (pip check only flags *conflicts*, not e.g. a
 # successfully-installed-but-unimportable cryptography wheel).
-if ! "${VENV}/bin/python" - <<'PY'
+if ! APP_ROOT="${APP_ROOT}" "${VENV}/bin/python" - <<'PY'
+import json
+import os
 import sys
-for mod in ("flask", "cryptography", "flask_socketio", "werkzeug", "jinja2"):
+# Single source of truth — keep this list in sync with requirements.txt by
+# editing app/manifests/python_runtime.json instead of duplicating it here.
+manifest_path = os.path.join(os.environ.get("APP_ROOT", ""),
+                             "app", "manifests", "python_runtime.json")
+try:
+    with open(manifest_path, "r") as f:
+        modules = json.load(f).get("imports") or []
+except Exception as exc:
+    sys.stderr.write(f"[FATAL] cannot read {manifest_path}: {exc}\n")
+    sys.exit(1)
+if not modules:
+    sys.stderr.write("[FATAL] python_runtime.json has empty imports list\n")
+    sys.exit(1)
+for mod in modules:
     try:
         __import__(mod)
     except Exception as exc:
         sys.stderr.write(f"[FATAL] cannot import {mod}: {exc}\n")
         sys.exit(1)
-print("dependency import check ok")
+print(f"dependency import check ok ({len(modules)} modules)")
 PY
 then
     fatal "Required Python module missing — see error above. Aborting install."
@@ -806,6 +917,20 @@ if [ -f "${FB_SRC}" ]; then
     info "Installed: ${FB_DEST}"
 else
     warn "First-boot script not found at ${FB_SRC}"
+fi
+
+# rc.d wrapper for the firstboot script. Only useful on appliance images
+# where install.sh runs on the build host and the operator boots the VM/USB
+# without re-running install.sh. The wrapper checks a sentinel file and
+# disables itself after a successful first run, so subsequent boots are a
+# no-op. We stage the rcvar but leave it OFF by default — image builders
+# explicitly opt-in with `sysrc smart_shield_firstboot_enable=YES` in their
+# build pipeline.
+FB_RCD_SRC="${APP_ROOT}/bsd/rc.d/smart_shield_firstboot"
+FB_RCD_DEST="/usr/local/etc/rc.d/smart_shield_firstboot"
+if [ -f "${FB_RCD_SRC}" ]; then
+    install -m 0555 "${FB_RCD_SRC}" "${FB_RCD_DEST}"
+    info "Installed firstboot rc.d wrapper: ${FB_RCD_DEST}"
 fi
 
 # Console recovery menu
@@ -1104,11 +1229,11 @@ if [ "${LAN_IP}" != "127.0.0.1" ] && ! ifconfig 2>/dev/null | grep -qw "${LAN_IP
 fi
 
 NGINX_CONF_VALIDATE="$(mktemp)"
-sed -e "s|listen      ${LAN_IP_ESC}:80;|listen      127.0.0.1:8080;|" \
-    -e "s|listen      ${LAN_IP_ESC}:443 ssl;|listen      127.0.0.1:8443 ssl;|" \
-    -e "s|listen      127.0.0.1:80;|# (validation: dedup loopback :80)|" \
-    -e "s|listen      127.0.0.1:443 ssl;|# (validation: dedup loopback :443)|" \
-    "${NGINX_CONF_TMP}" > "${NGINX_CONF_VALIDATE}"
+# Reuse the same regex-based rewriter the runtime wizard uses
+# (app/services/nginx_writer._to_validation_variant) so default_server,
+# multi-IP, and future listen-directive variants are all handled.
+"${PYBIN}" "${APP_ROOT}/tools/nginx_validation_variant.py" \
+    < "${NGINX_CONF_TMP}" > "${NGINX_CONF_VALIDATE}"
 
 if [ ! -x /usr/local/sbin/nginx ]; then
     warn "nginx binary missing at /usr/local/sbin/nginx — installing config unvalidated; nginx will validate on first start."
@@ -1338,6 +1463,16 @@ section "6c. Always-On Service Start"
 # the sysrc writes earlier in this script.
 if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
     for _svc in unbound ntpd nginx; do
+        # nginx binds ${LAN_IP}:{80,443}; starting it before §6b plumbs the
+        # interface yields a silent EADDRNOTAVAIL. Skip with a clear note so
+        # the operator can finish the LAN setup and start nginx manually.
+        if [ "${_svc}" = "nginx" ] && [ "${LAN_IP}" != "127.0.0.1" ]; then
+            if ! ifconfig "${LAN_IFACE}" 2>/dev/null | grep -qw "${LAN_IP}"; then
+                warn "  nginx start skipped — ${LAN_IP} not yet on ${LAN_IFACE}."
+                warn "       Assign LAN IP, then run: service nginx start"
+                continue
+            fi
+        fi
         if service "${_svc}" status >/dev/null 2>&1; then
             info "  ${_svc} already running"
         else

@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# FreeBSD rc.d wrapper for /usr/local/libexec/smart_shield_firstboot.
+# Runs the first-boot recovery script once per appliance image and then
+# stays silent forever after, gated on the sentinel file the firstboot
+# script writes when it finishes successfully.
+#
+# Enable on appliance images:
+#   sysrc smart_shield_firstboot_enable=YES
+#
+# PROVIDE: smart_shield_firstboot
+# REQUIRE: NETWORKING smart_shield
+# KEYWORD: shutdown
+#
+
+. /etc/rc.subr
+
+name="smart_shield_firstboot"
+rcvar="${name}_enable"
+
+load_rc_config "${name}"
+
+: ${smart_shield_firstboot_enable:="NO"}
+: ${smart_shield_firstboot_bin:="/usr/local/libexec/smart_shield_firstboot"}
+: ${smart_shield_firstboot_sentinel:="/var/db/smartshield/.firstboot_done"}
+
+start_cmd="${name}_start"
+stop_cmd=":"
+
+smart_shield_firstboot_start()
+{
+    if [ -f "${smart_shield_firstboot_sentinel}" ]; then
+        # Sentinel set on prior successful run — disable the rcvar so future
+        # boots skip the load_rc_config dance entirely.
+        sysrc "${rcvar}=NO" >/dev/null 2>&1 || true
+        return 0
+    fi
+
+    if [ ! -x "${smart_shield_firstboot_bin}" ]; then
+        echo "${name}: ${smart_shield_firstboot_bin} not present or not executable" >&2
+        return 1
+    fi
+
+    # The firstboot binary writes the sentinel itself; we just invoke it.
+    "${smart_shield_firstboot_bin}"
+    _rc=$?
+
+    # If firstboot completed cleanly the sentinel will now exist — turn the
+    # rcvar off so the next boot is a no-op.
+    if [ -f "${smart_shield_firstboot_sentinel}" ]; then
+        sysrc "${rcvar}=NO" >/dev/null 2>&1 || true
+    fi
+
+    return ${_rc}
+}
+
+run_rc_command "$1"
