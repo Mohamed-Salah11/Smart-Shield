@@ -46,7 +46,10 @@ def _save_service_state(key_name, value):
 @services_bp.route("/")
 @login_required
 def services_home():
-    return render_template("services.html")
+    # services.html is a placeholder stub — redirect to the DHCP server
+    # page (the most-used services sub-route) so the Services nav lands
+    # on a working screen.
+    return redirect(url_for("services.dhcp_server"))
 
 
 # ----------------------------

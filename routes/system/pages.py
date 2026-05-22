@@ -129,7 +129,7 @@ def upgrade():
 @system_bp.route("/help")
 @login_required
 def help_page():
-    return render_template("help.html")
+    return render_placeholder("help.html")
 
 
 # ----------------------------

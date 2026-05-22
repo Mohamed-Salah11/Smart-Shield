@@ -36,7 +36,7 @@ except ImportError:
 from app import audit_log as audit_log_module
 from app import database as database_module
 from app.audit_log import log_event
-from app.auth_utils import login_required, superuser_required, reauth_required
+from app.auth_utils import login_required, superuser_required, reauth_required, feature_unfinished
 from app.uploads import get_upload_dir
 
 diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
@@ -1006,6 +1006,7 @@ def arp_table():
 
 @diagnostics_bp.route("/authentication")
 @login_required
+@feature_unfinished
 def authentication():
     return render_template("authentication.html")
 
@@ -1295,6 +1296,7 @@ def api_dns_lookup():
 
 @diagnostics_bp.route("/edit-file")
 @login_required
+@feature_unfinished
 def edit_file():
     return render_template("edit_file.html")
 

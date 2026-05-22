@@ -135,19 +135,23 @@ def preflight_api():
 @system_bp.route("/setup-wizard")
 @login_required
 def setup_wizard():
-    return render_template("setup_wizard.html")
+    # Legacy setup wizard — redirect to the canonical first-boot wizard at
+    # /setup so operators land on one supported flow. The old template
+    # (setup_wizard.html) is no longer rendered.
+    from flask import redirect, url_for
+    return redirect(url_for("setup.wizard_index"))
 
 
 @system_bp.route("/setup-wizard/step/<int:step>")
 @login_required
 def setup_wizard_step(step):
-    if step in range(2, 11):
-        return render_template(f"setup_wizard_step{step}.html")
-    return "Invalid wizard step", 404
+    from flask import redirect, url_for
+    return redirect(url_for("setup.wizard_index"))
 
 
 @system_bp.route("/api/setup-wizard/general", methods=["POST"])
 @login_required
+@superuser_required
 def api_setup_wizard_general():
     import os as _os
     data = request.get_json(force=True) or {}
@@ -167,6 +171,7 @@ def api_setup_wizard_general():
 
 @system_bp.route("/api/setup-wizard/time", methods=["POST"])
 @login_required
+@superuser_required
 def api_setup_wizard_time():
     import os as _os
     data = request.get_json(force=True) or {}

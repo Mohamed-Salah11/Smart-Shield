@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, request, session, jsonify, flash
 from app.database import get_db
-from app.auth_utils import login_required, superuser_required
+from app.auth_utils import login_required, superuser_required, feature_unfinished
 from app.audit_log import tail_events, log_event
 import json, os
 import sys
@@ -262,43 +262,56 @@ def logout():
 # HELP PAGES
 # ----------------------------
 
+# Placeholder admin pages — gated behind SMARTSHIELD_ENABLE_UNFINISHED_PAGES.
+# Each template is a 6-line stub today; enable the env var on a dev box to
+# wire up real content without exposing half-finished pages in production.
 @system_bp.route("/docs")
+@feature_unfinished
 def docs():
     return render_template("docs.html")
 
 @system_bp.route("/about")
+@feature_unfinished
 def about():
     return render_template("about.html")
 
 @system_bp.route("/bug")
+@feature_unfinished
 def bug():
     return render_template("bug.html")
 
 @system_bp.route("/forum")
+@feature_unfinished
 def forum():
     return render_template("forum.html")
 
 @system_bp.route("/freebsd")
+@feature_unfinished
 def freebsd():
     return render_template("freebsd.html")
 
 @system_bp.route("/smart-shield-book")
+@feature_unfinished
 def smart_shield_book():
     return render_template("smart_shield_book.html")
 
 @system_bp.route("/paid-support")
+@feature_unfinished
 def paid_support():
     return render_template("paid_support.html")
 
 @system_bp.route("/survey")
+@feature_unfinished
 def survey():
     return render_template("survey.html")
 
 @system_bp.route("/upgrade")
+@feature_unfinished
 def upgrade():
     return render_template("upgrade.html")
 
 @system_bp.route("/help")
+@feature_unfinished
 def help_page():
     return render_template("help.html")
 
@@ -880,6 +893,7 @@ def add_certificate():
 
 @system_bp.route("/api/certificates/<int:cert_id>/revoke", methods=["POST"])
 @login_required
+@superuser_required
 def api_revoke_cert(cert_id):
     from app.services.cert_manager import revoke_cert
     conn   = get_db()
@@ -957,6 +971,7 @@ def api_get_cert(cert_id):
 
 @system_bp.route("/api/certificates/<int:cert_id>", methods=["DELETE"])
 @login_required
+@superuser_required
 def api_delete_cert(cert_id):
     from app.services.cert_manager import delete_cert
     conn   = get_db()

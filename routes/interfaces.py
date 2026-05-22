@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for
 import sqlite3
 from app.auth_utils import login_required
 from app.api_auth import api_permission_required
@@ -16,12 +16,14 @@ interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
 @interfaces_bp.route("/")
 @login_required
 def interfaces_home():
-    return render_template("interfaces.html")
+    # interfaces.html is a placeholder stub; the Assignments page is the
+    # real landing screen for the Interfaces section.
+    return redirect(url_for("interfaces.interfaces_assignments"))
 
 @interfaces_bp.route("/interfaces")
 @login_required
 def interfaces():
-    return render_template("interfaces.html")
+    return redirect(url_for("interfaces.interfaces_assignments"))
 
 
 # ----------------------------
@@ -37,6 +39,8 @@ def interfaces_assignments():
 @login_required
 def available_ports():
     """Return physical NICs for assignment dropdowns."""
+    import sys
+    is_freebsd = sys.platform.startswith("freebsd")
     try:
         from app.services.network_service import list_physical_nics
 
@@ -67,13 +71,24 @@ def available_ports():
                 "media": media,
             })
 
+        # P2-06: on FreeBSD, an empty result means real detection failed —
+        # fail loud rather than mask the issue with em0/em1 fake data.
+        # On non-FreeBSD (dev box), surface the em0/em1 stub data but flag
+        # it as dev_mode so the UI can render a "DEV / DEMO DATA" badge.
+        dev_mode = False
         if not ports:
+            if is_freebsd:
+                return jsonify({
+                    "status": "error",
+                    "message": "No network interfaces detected. Check ifconfig -l output.",
+                }), 503
+            dev_mode = True
             ports = [
                 {"name": "em0", "label": "em0", "ether": "", "status": "", "media": ""},
                 {"name": "em1", "label": "em1", "ether": "", "status": "", "media": ""},
             ]
 
-        return jsonify({"status": "success", "ports": ports})
+        return jsonify({"status": "success", "ports": ports, "dev_mode": dev_mode})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 400
 

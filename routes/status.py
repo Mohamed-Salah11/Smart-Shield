@@ -982,6 +982,7 @@ def api_pf_preview():
 
 @status_bp.route("/api/pf/rollback", methods=["POST"])
 @login_required
+@superuser_required
 def api_pf_rollback():
     """Restore the last known-good pf.conf."""
     from app.database import get_db

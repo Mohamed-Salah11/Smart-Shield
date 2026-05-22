@@ -371,6 +371,14 @@ def _feature_mode(feature: Feature) -> str:
     if missing_cmds:
         return "unavailable"
 
+    # Required services — having the binary on PATH is not enough; the rc.d
+    # wrapper must exist or the feature has no way to start/stop the daemon.
+    # This catches the case where a pkg is uninstalled but its binary lingers
+    # under /usr/local/bin (e.g. from a venv-installed CLI of the same name).
+    missing_svcs = [s for s in feature.required_services if not _service_present(s)]
+    if missing_svcs:
+        return "unavailable"
+
     # Special env-key checks
     if feature.key == "threat_intel" and not os.getenv("ABUSECH_AUTH_KEY", "").strip():
         return "degraded"

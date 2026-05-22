@@ -6,7 +6,11 @@ from routes.services._common import _load_service_state, _save_service_state  # 
 @services_bp.route("/")
 @login_required
 def services_home():
-    return render_template("services.html")
+    # services.html is a placeholder stub — redirect to the DHCP server
+    # page (the most-used services sub-route) so the Services nav lands
+    # on a working screen.
+    from flask import redirect, url_for
+    return redirect(url_for("services.dhcp_server"))
 
 
 # ----------------------------

@@ -32,6 +32,11 @@ load_rc_config "${name}"
 # The service runs as root. Privileged commands (pfctl, service, sysrc, etc.)
 # are executed directly. sudo remains installed as a fallback for non-root
 # deployments.
+#
+# Security consequence: the web terminal feature gives root-equivalent shell
+# access to anyone who can authenticate as a superuser. It is disabled by
+# default (SMARTSHIELD_TERMINAL_ENABLED=0 in smartshield.env). Enable it
+# only on trusted networks and after MFA is configured for every superuser.
 # App root where run.py/wsgi.py live in deployed system.
 : ${smart_shield_app_root:="/usr/local/share/smartshield"}
 # Environment file containing SECRET_KEY and DB path vars.

@@ -126,12 +126,40 @@ _EVENT_COLS = (
     "mitre_tactic, mitre_technique, soc_origin, raw"
 )
 
+# Legacy 7-column shape, used as a fallback when log_event() runs against a
+# DB whose `events` table has not yet been migrated to v34. The mirror write
+# then loses the normalized columns but the audit.log file still has the full
+# detail, so dashboards keep working.
+_EVENT_LEGACY_COLS = (
+    "ts, severity, category, action, username, remote_addr, details"
+)
+
 # Subset selected by readers that only care about the legacy NDJSON shape.
 # Keeping this distinct from _EVENT_COLS lets us add more normalized columns
 # later without touching every reader.
 _EVENT_READ_COLS = (
     "ts, severity, category, action, username, remote_addr, details, event_uuid"
 )
+
+
+def _events_columns(conn) -> set:
+    """Return the set of column names currently on the `events` table.
+
+    Used by log_event() to choose between the modern 28-column INSERT and
+    the legacy 7-column INSERT during the brief window where a pre-v34 DB
+    has not yet been upgraded. Returns an empty set on any error so the
+    caller falls through to its own swallow-everything handler.
+    """
+    try:
+        return {str(r[1]) for r in conn.execute("PRAGMA table_info(events)").fetchall()}
+    except Exception:
+        return set()
+
+
+# Module-level guard so a sustained DB-mirror failure logs a single warning
+# instead of one traceback per audit event. The full traceback is kept on
+# the first hit; subsequent failures within the same process are silent.
+_DB_MIRROR_WARNED = False
 
 
 def _truncate_raw(value, limit: int = 4096):
@@ -269,42 +297,64 @@ def log_event(category: str, action: str, username=None, remote_addr=None,
     conn = _events_db()
     if conn is not None:
         try:
-            conn.execute(
-                f"INSERT INTO events ({_EVENT_COLS}) VALUES ("
-                "?,?,?,?,?,?,?,"          # ts, severity, category, action,
-                                          # username, remote_addr, details
-                "?,?,?,?,?,?,?,"          # event_uuid, source_type,
-                                          # source_name, src_ip, src_port,
-                                          # dst_ip, dst_port
-                "?,?,?,?,?,?,?,"          # protocol, interface, direction,
-                                          # hostname, mac, domain, url
-                "?,?,?,?,?,?,?,?)",       # rule_id, rule_name, policy_id,
-                                          # policy_name, mitre_tactic,
-                                          # mitre_technique, soc_origin, raw
-                (
-                    ts, severity, category, action, entry["username"],
-                    entry["remote_addr"],
-                    json.dumps(entry["details"], ensure_ascii=True),
-                    event_uuid,
-                    norm["source_type"], norm["source_name"],
-                    norm["src_ip"], norm["src_port"],
-                    norm["dst_ip"], norm["dst_port"],
-                    norm["protocol"], norm["interface"], norm["direction"],
-                    norm["hostname"], norm["mac"],
-                    norm["domain"], norm["url"],
-                    norm["rule_id"], norm["rule_name"],
-                    norm["policy_id"], norm["policy_name"],
-                    norm["mitre_tactic"], norm["mitre_technique"],
-                    norm["soc_origin"], norm["raw"],
-                ),
-            )
+            cols = _events_columns(conn)
+            if "event_uuid" in cols:
+                conn.execute(
+                    f"INSERT INTO events ({_EVENT_COLS}) VALUES ("
+                    "?,?,?,?,?,?,?,"          # ts, severity, category, action,
+                                              # username, remote_addr, details
+                    "?,?,?,?,?,?,?,"          # event_uuid, source_type,
+                                              # source_name, src_ip, src_port,
+                                              # dst_ip, dst_port
+                    "?,?,?,?,?,?,?,"          # protocol, interface, direction,
+                                              # hostname, mac, domain, url
+                    "?,?,?,?,?,?,?,?)",       # rule_id, rule_name, policy_id,
+                                              # policy_name, mitre_tactic,
+                                              # mitre_technique, soc_origin, raw
+                    (
+                        ts, severity, category, action, entry["username"],
+                        entry["remote_addr"],
+                        json.dumps(entry["details"], ensure_ascii=True),
+                        event_uuid,
+                        norm["source_type"], norm["source_name"],
+                        norm["src_ip"], norm["src_port"],
+                        norm["dst_ip"], norm["dst_port"],
+                        norm["protocol"], norm["interface"], norm["direction"],
+                        norm["hostname"], norm["mac"],
+                        norm["domain"], norm["url"],
+                        norm["rule_id"], norm["rule_name"],
+                        norm["policy_id"], norm["policy_name"],
+                        norm["mitre_tactic"], norm["mitre_technique"],
+                        norm["soc_origin"], norm["raw"],
+                    ),
+                )
+            else:
+                # Pre-v34 DB — fall back to the legacy 7-column INSERT so the
+                # mirror still works during the brief window before migration
+                # v34 ALTER TABLEs the new columns in. Normalized fields are
+                # dropped here; the audit.log file above retains them.
+                conn.execute(
+                    f"INSERT INTO events ({_EVENT_LEGACY_COLS}) VALUES "
+                    "(?,?,?,?,?,?,?)",
+                    (
+                        ts, severity, category, action, entry["username"],
+                        entry["remote_addr"],
+                        json.dumps(entry["details"], ensure_ascii=True),
+                    ),
+                )
             conn.commit()
         except Exception:
             # The JSONL file write above is the durability guarantee; the
-            # indexed-DB mirror is a query convenience. Failing it must not
-            # block the audit, but a sustained miss means dashboards stop
-            # showing recent events — surface it at WARNING (Fv11 §P1-07).
-            logger.warning("events DB mirror insert failed", exc_info=True)
+            # indexed-DB mirror is a query convenience. Log the first miss
+            # at WARNING with traceback (Fv11 §P1-07), then stay quiet for
+            # the rest of the process so repeated failures don't drown the
+            # log during release_check.py / runtime_preflight.py.
+            global _DB_MIRROR_WARNED
+            if not _DB_MIRROR_WARNED:
+                logger.warning("events DB mirror insert failed", exc_info=True)
+                _DB_MIRROR_WARNED = True
+            else:
+                logger.debug("events DB mirror insert failed", exc_info=True)
         finally:
             try:
                 conn.close()

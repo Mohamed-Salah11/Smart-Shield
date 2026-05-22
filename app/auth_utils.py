@@ -1,10 +1,27 @@
+import os
 from datetime import datetime, timezone
 from functools import wraps
-from flask import session, redirect, url_for, request, render_template, jsonify, flash
+from flask import session, redirect, url_for, request, render_template, jsonify, flash, abort
 from app.db_utils import db_cursor
 
 
 ALWAYS_ALLOWED_ENDPOINTS = {"system.dashboard", "system.logout"}
+
+
+def feature_unfinished(view_func):
+    """Gate a placeholder/WIP route behind SMARTSHIELD_ENABLE_UNFINISHED_PAGES.
+
+    Returns 404 when the env var is unset or not "1", so production
+    appliances do not surface stub admin pages to operators. Set
+    SMARTSHIELD_ENABLE_UNFINISHED_PAGES=1 in smartshield.env to opt-in
+    during UI development on the same appliance.
+    """
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        if os.environ.get("SMARTSHIELD_ENABLE_UNFINISHED_PAGES", "") != "1":
+            abort(404)
+        return view_func(*args, **kwargs)
+    return wrapped
 
 
 def _is_api_path(path):

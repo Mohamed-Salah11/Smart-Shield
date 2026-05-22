@@ -1,6 +1,6 @@
 import sqlite3
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from app.database import get_db
 from app.auth_utils import login_required
 from app.api_auth import api_permission_required
@@ -63,7 +63,9 @@ firewall_bp = Blueprint("firewall", __name__, url_prefix="/firewall")
 @firewall_bp.route("/")
 @login_required
 def firewall_home():
-    return render_template("firewall.html")
+    # firewall.html is a placeholder stub; redirect to the real Rules page
+    # so the "Firewall" nav link lands on a working screen.
+    return redirect(url_for("firewall.rules"))
 
 
 # ----------------------------
