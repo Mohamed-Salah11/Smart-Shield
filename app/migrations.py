@@ -1249,16 +1249,22 @@ def _migration_v34(conn):
         except (TypeError, ValueError):
             return None
 
-    offset = 0
+    # Paginate strictly by id (WHERE id > last_id). Rows whose details JSON
+    # carries none of the normalized keys are backfilled to NULL again and would
+    # otherwise keep matching the IS NULL predicate forever — when >= one full
+    # batch of them exists, the old "re-select by predicate" loop never made
+    # progress and spun indefinitely. Advancing by id guarantees termination.
+    last_id = 0
     batch = 2000
     while True:
         rows = conn.execute(
             "SELECT id, details FROM events "
-            "WHERE source_type IS NULL AND src_ip IS NULL "
+            "WHERE id > ? "
+            "  AND source_type IS NULL AND src_ip IS NULL "
             "  AND dst_ip IS NULL AND domain IS NULL "
             "  AND rule_id IS NULL "
             "ORDER BY id LIMIT ?",
-            (batch,),
+            (last_id, batch),
         ).fetchall()
         if not rows:
             break
@@ -1294,8 +1300,9 @@ def _migration_v34(conn):
                 _pick(d, "raw", "raw_line"),
                 row[0],
             ))
-        if not updates:
-            break
+        # Advance the cursor past this batch BEFORE the update so rows that stay
+        # all-NULL after backfill are never re-selected.
+        last_id = rows[-1][0]
         conn.executemany(
             "UPDATE events SET "
             "  source_type = ?, source_name = ?, "
@@ -1969,15 +1976,11 @@ def run_migrations(conn) -> list:
     return applied
 
 
-def _log_migration_event(message: str):
+def _log_migration_event(message: str) -> None:
+    # Stdlib logging only. Writing to the audit log here would open a second
+    # DB connection during schema-mutating transactions and deadlock against
+    # the in-memory SQLite DB used by tests.
     try:
-        from app.audit_log import log_event
-        log_event(
-            category="system",
-            action="db_migration",
-            username="system",
-            remote_addr="",
-            details={"message": message},
-        )
-    except Exception:
         _log.info("[migrations] %s", message)
+    except Exception:
+        pass

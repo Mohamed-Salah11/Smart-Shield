@@ -10,17 +10,6 @@ import sys
 from datetime import datetime, timezone
 
 
-def render_placeholder(template_name: str):
-    """Render a placeholder/unfinished page when explicitly enabled, otherwise
-    return 404. Centralizes the gate so every unfinished route shares the same
-    behavior — flip ``SMARTSHIELD_ENABLE_UNFINISHED_PAGES=1`` in the env file
-    to expose them in development."""
-    if not current_app.config.get("ENABLE_UNFINISHED_PAGES"):
-        abort(404)
-    return render_template(template_name)
-
-
-
 GENERAL_SETUP_DEFAULTS = {
     "hostname": "Smart Shield",
     "domain": "home.arpa",

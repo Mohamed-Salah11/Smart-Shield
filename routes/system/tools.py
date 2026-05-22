@@ -205,18 +205,6 @@ def api_setup_wizard_time():
 
 
 # ----------------------------
-# COPYRIGHT PAGE
-# ----------------------------
-
-@system_bp.route("/copyright", methods=["GET", "POST"])
-@login_required
-def copyright_page():
-    if request.method == "POST":
-        return redirect(url_for("system.dashboard"))
-    return render_template("copyright.html")
-
-
-# ----------------------------
 # SYSTEM UPDATE PAGE
 # ----------------------------
 
