@@ -143,7 +143,8 @@ async function runSearch(id) {
   var out = document.getElementById('run-result-' + id);
   out.textContent = 'Running…';
   try {
-    var r = await fetch('/soc-portal/api/saved-searches/' + id + '/run', {
+    var url = {{ url_for('soc_portal.api_saved_search_run', sid=0)|tojson }}.replace(/\/0\/run$/, '/' + id + '/run');
+    var r = await fetch(url, {
       method: 'POST',
       headers: {'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content},
     });

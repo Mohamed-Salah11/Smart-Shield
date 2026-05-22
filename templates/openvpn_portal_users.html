@@ -136,6 +136,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 const VPU_CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
+const VPU_USERS_URL = {{ url_for('vpn.vpn_portal_users_list')|tojson }};
 
 function vpuToast(msg, ok) {
   const t = document.getElementById('vpu-toast');
@@ -194,7 +195,7 @@ async function loadServerAndCertOptions() {
 }
 
 async function loadPortalUsers() {
-  const r = await fetch('/vpn/api/portal/users');
+  const r = await fetch(VPU_USERS_URL);
   const j = await r.json();
   const tb = document.getElementById('vpuTable');
   if (!j.ok || !(j.users || []).length) {
@@ -270,7 +271,7 @@ async function savePortalUser() {
     disabled:   document.getElementById('vpuDisabled').checked,
     reset_mfa:  document.getElementById('vpuResetMfa').checked,
   };
-  const url    = id ? ('/vpn/api/portal/users/' + id) : '/vpn/api/portal/users';
+  const url    = id ? (VPU_USERS_URL + '/' + id) : VPU_USERS_URL;
   const method = id ? 'PUT' : 'POST';
   const r = await fetch(url, {
     method,
@@ -291,7 +292,7 @@ async function savePortalUser() {
 
 async function deletePortalUser(id) {
   if (!confirm('Delete this portal user?')) return;
-  const r = await fetch('/vpn/api/portal/users/' + id, {
+  const r = await fetch(VPU_USERS_URL + '/' + id, {
     method: 'DELETE', headers: {'X-CSRFToken': VPU_CSRF},
   });
   const j = await r.json();

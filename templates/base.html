@@ -204,10 +204,30 @@
                         <i class="fa-solid fa-wand-magic-sparkles fa-fw ext-4538ca8e"></i>
                         Setup Assistant
                     </a></li>
+                    <li><a href="{{ url_for('system.theme_editor') }}">
+                        <i class="fa-solid fa-palette fa-fw ext-4538ca8e"></i>
+                        Theme Editor
+                    </a></li>
+                    <li><a href="{{ url_for('system.update_page') }}">
+                        <i class="fa-solid fa-cloud-arrow-down fa-fw ext-4538ca8e"></i>
+                        System Update
+                    </a></li>
+                    <li><a href="{{ url_for('system.notifications') }}">
+                        <i class="fa-solid fa-bell fa-fw ext-4538ca8e"></i>
+                        Notifications
+                    </a></li>
                     {% if session.get('is_superuser') %}
                     <li><a href="{{ url_for('users.user_manager') }}">
                         <i class="fa-solid fa-users fa-fw ext-4538ca8e"></i>
                         User Manager
+                    </a></li>
+                    <li><a href="{{ url_for('system.api_tokens') }}">
+                        <i class="fa-solid fa-key fa-fw ext-4538ca8e"></i>
+                        API Tokens
+                    </a></li>
+                    <li><a href="{{ url_for('system.reports') }}">
+                        <i class="fa-solid fa-file-lines fa-fw ext-4538ca8e"></i>
+                        Reports
                     </a></li>
                     {% endif %}
                 </ul>
@@ -409,6 +429,14 @@
                         <i class="fa-solid fa-envelope fa-fw ext-4538ca8e"></i>
                         Mail Alerts
                     </a></li>
+                    <li><a href="{{ url_for('system.playbooks') }}">
+                        <i class="fa-solid fa-robot fa-fw ext-4538ca8e"></i>
+                        Playbooks
+                    </a></li>
+                    <li><a href="{{ url_for('system.inventory') }}">
+                        <i class="fa-solid fa-boxes-stacked fa-fw ext-4538ca8e"></i>
+                        Asset Inventory
+                    </a></li>
                 </ul>
             </details>
             {% endif %}
@@ -488,6 +516,20 @@
                         <i class="fa-solid fa-heart-pulse fa-fw ext-4538ca8e"></i>
                         Collector Health
                     </a></li>
+                    <li><a href="{{ url_for('status.filter_reload') }}">
+                        <i class="fa-solid fa-arrows-rotate fa-fw ext-4538ca8e"></i>
+                        Filter Reload
+                    </a></li>
+                    {% if session.get('is_superuser') %}
+                    <li><a href="{{ url_for('status.log_forwarding_settings') }}">
+                        <i class="fa-solid fa-share-from-square fa-fw ext-4538ca8e"></i>
+                        Log Forwarding
+                    </a></li>
+                    <li><a href="{{ url_for('status.correlation_rules') }}">
+                        <i class="fa-solid fa-diagram-project fa-fw ext-4538ca8e"></i>
+                        Correlation Rules
+                    </a></li>
+                    {% endif %}
                 </ul>
             </details>
 

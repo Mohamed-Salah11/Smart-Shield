@@ -1621,6 +1621,101 @@ elif [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
     warn "  console on the next 'service smart_shield start'."
 fi
 
+# ── Post-install readiness summary ─────────────────────────────────────────
+# One glanceable table so the operator immediately sees what is in place and
+# what still needs attention. Best-effort: every probe is guarded and never
+# aborts the installer. Only FAIL (a required item, or a present-but-broken
+# service config) increments POSTCHECK_FAILS; SKIP/NO are informational and do
+# not (e.g. LAN IP not yet on an interface is expected in prepare mode).
+POSTCHECK_FAILS=0
+pc() {
+    _st="$1"; _lbl="$2"; _dt="${3:-}"
+    case "$_st" in
+        OK|YES)  _c="${GREEN}" ;;
+        FAIL)    _c="${RED}"; POSTCHECK_FAILS=$((POSTCHECK_FAILS + 1)) ;;
+        NO|SKIP) _c="${YELLOW}" ;;
+        *)       _c="${NC}" ;;
+    esac
+    printf "  ${_c}%-4s${NC} %-22s %s\n" "$_st" "$_lbl" "$_dt"
+}
+
+printf "\n${BOLD}━━━ Post-install Check ━━━${NC}\n"
+
+# Python venv (required)
+_py="${VENV}/bin/python"
+[ -x "$_py" ] || _py="${VENV}/bin/python3"
+if [ -x "$_py" ]; then pc OK "Python venv" "${VENV}"; else pc FAIL "Python venv" "missing at ${VENV}"; fi
+
+# Flask import (required)
+if [ -x "$_py" ] && "$_py" -c "import flask" >/dev/null 2>&1; then
+    pc OK "Flask import" "$("$_py" -c 'import flask; print("v"+flask.__version__)' 2>/dev/null)"
+else
+    pc FAIL "Flask import" "venv python cannot import flask"
+fi
+
+# rc.d service script (required)
+if [ -f /usr/local/etc/rc.d/smart_shield ]; then pc OK "rc.d script"; else pc FAIL "rc.d script" "not installed"; fi
+
+# smart_shield_enable rcvar (informational)
+_sse="$(sysrc -n smart_shield_enable 2>/dev/null || echo '')"
+if [ "$_sse" = "YES" ] || [ "$_sse" = "yes" ]; then pc YES "smart_shield_enable"; else pc NO "smart_shield_enable" "sysrc smart_shield_enable=YES"; fi
+
+# nginx config (FAIL only if nginx is present but its config is broken)
+if command -v nginx >/dev/null 2>&1; then
+    if nginx -t >/dev/null 2>&1; then pc OK "nginx config"; else pc FAIL "nginx config" "nginx -t failed"; fi
+else
+    pc SKIP "nginx config" "nginx not installed"
+fi
+
+# pfctl syntax
+if command -v pfctl >/dev/null 2>&1 && [ -f /etc/pf.conf ]; then
+    if pfctl -nf /etc/pf.conf >/dev/null 2>&1; then pc OK "pfctl syntax"; else pc FAIL "pfctl syntax" "pfctl -nf /etc/pf.conf failed"; fi
+else
+    pc SKIP "pfctl syntax" "pfctl or /etc/pf.conf absent"
+fi
+
+# unbound config
+if command -v unbound-checkconf >/dev/null 2>&1; then
+    if unbound-checkconf >/dev/null 2>&1; then pc OK "unbound config"; else pc FAIL "unbound config" "unbound-checkconf failed"; fi
+else
+    pc SKIP "unbound config" "unbound-checkconf absent"
+fi
+
+# dhcpd config (ISC)
+if command -v dhcpd >/dev/null 2>&1 && [ -f /usr/local/etc/dhcpd.conf ]; then
+    if dhcpd -t -cf /usr/local/etc/dhcpd.conf >/dev/null 2>&1; then pc OK "dhcpd config"; else pc FAIL "dhcpd config" "dhcpd -t failed"; fi
+else
+    pc SKIP "dhcpd config" "dhcpd or config absent"
+fi
+
+# suricata config
+_suri_yaml="/usr/local/etc/suricata/suricata.yaml"
+if command -v suricata >/dev/null 2>&1 && [ -f "$_suri_yaml" ]; then
+    if suricata -T -c "$_suri_yaml" >/dev/null 2>&1; then pc OK "suricata config"; else pc FAIL "suricata config" "suricata -T failed"; fi
+else
+    pc SKIP "suricata config" "suricata or yaml absent"
+fi
+
+# suricata-update (optional)
+if [ -x "${VENV}/bin/suricata-update" ] || command -v suricata-update >/dev/null 2>&1; then
+    pc OK "suricata-update"
+else
+    pc SKIP "suricata-update" "not installed (optional)"
+fi
+
+# LAN IP present on an interface (informational — expected NO in prepare mode)
+if ifconfig 2>/dev/null | grep -qw "${LAN_IP}"; then pc YES "LAN IP present" "${LAN_IP}"; else pc NO "LAN IP present" "${LAN_IP} not on any iface yet"; fi
+
+# IPv4 forwarding (informational)
+if [ "$(sysctl -n net.inet.ip.forwarding 2>/dev/null || echo 0)" = "1" ]; then pc YES "forwarding enabled"; else pc NO "forwarding enabled" "net.inet.ip.forwarding=0"; fi
+
+printf "\n"
+if [ "${POSTCHECK_FAILS}" -eq 0 ]; then
+    info "Post-install check: all required items OK."
+else
+    warn "Post-install check: ${POSTCHECK_FAILS} required item(s) need attention (see FAIL above)."
+fi
+
 cat << EOF
 Next steps:
   1. Confirm the daemon is up (started automatically above):

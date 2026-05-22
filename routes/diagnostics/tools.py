@@ -49,15 +49,6 @@ def api_dns_lookup():
 # FILE EDITOR
 # --------------------------------------------------
 
-@diagnostics_bp.route("/edit-file")
-@login_required
-def edit_file():
-    from flask import abort, current_app
-    if not current_app.config.get("ENABLE_UNFINISHED_PAGES"):
-        abort(404)
-    return render_template("edit_file.html")
-
-
 # --------------------------------------------------
 # FACTORY DEFAULTS
 # --------------------------------------------------
@@ -357,16 +348,6 @@ def api_ping():
         return jsonify({"ok": r.returncode == 0, "lines": lines, "host": host})
     except Exception as e:
         return jsonify({"ok": False, "message": str(e), "lines": []})
-
-
-# --------------------------------------------------
-# REBOOT SYSTEM
-# --------------------------------------------------
-
-@diagnostics_bp.route("/reboot")
-@login_required
-def reboot():
-    return render_template("reboot.html")
 
 
 # --------------------------------------------------

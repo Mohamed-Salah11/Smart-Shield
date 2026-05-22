@@ -25,15 +25,6 @@ def arp_table():
 # AUTHENTICATION TEST PAGE
 # --------------------------------------------------
 
-@diagnostics_bp.route("/authentication")
-@login_required
-def authentication():
-    from flask import abort, current_app
-    if not current_app.config.get("ENABLE_UNFINISHED_PAGES"):
-        abort(404)
-    return render_template("authentication.html")
-
-
 # --------------------------------------------------
 # BACKUP & RESTORE
 # --------------------------------------------------

@@ -177,6 +177,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 const MA_CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
+const MA_RECIPIENTS_URL = {{ url_for('system.mail_alerts_recipients_list')|tojson }};
 
 function maToast(msg, ok) {
   const t = document.getElementById('ma-toast');
@@ -204,7 +205,7 @@ function maConfigPayload() {
 }
 
 async function maSaveConfig() {
-  const r = await fetch('/system/api/mail-alerts/config', {
+  const r = await fetch({{ url_for('system.mail_alerts_save_config')|tojson }}, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
     body: JSON.stringify(maConfigPayload()),
@@ -222,7 +223,7 @@ async function maSendTest() {
   const payload = maConfigPayload();
   payload.to = document.getElementById('ma_test_to').value;
   maToast('Sending test email…', true);
-  const r = await fetch('/system/api/mail-alerts/test', {
+  const r = await fetch({{ url_for('system.mail_alerts_test')|tojson }}, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
     body: JSON.stringify(payload),
@@ -237,7 +238,7 @@ function maEsc(s) {
 }
 
 async function maLoadRecipients() {
-  const r = await fetch('/system/api/mail-alerts/recipients');
+  const r = await fetch(MA_RECIPIENTS_URL);
   const j = await r.json();
   const tb = document.getElementById('ma_recipients_table');
   if (!j.ok || !(j.recipients || []).length) {
@@ -260,7 +261,7 @@ async function maLoadRecipients() {
 async function maAddUser() {
   const uid = document.getElementById('ma_user_select').value;
   if (!uid) { maToast('Pick a user first.', false); return; }
-  const r = await fetch('/system/api/mail-alerts/recipients', {
+  const r = await fetch(MA_RECIPIENTS_URL, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
     body: JSON.stringify({user_id: uid}),
@@ -273,7 +274,7 @@ async function maAddUser() {
 async function maAddEmail() {
   const email = document.getElementById('ma_email_input').value.trim();
   if (!email) { maToast('Enter an email address.', false); return; }
-  const r = await fetch('/system/api/mail-alerts/recipients', {
+  const r = await fetch(MA_RECIPIENTS_URL, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
     body: JSON.stringify({email: email}),
@@ -285,7 +286,7 @@ async function maAddEmail() {
 
 async function maDeleteRecipient(id) {
   if (!confirm('Remove this recipient?')) return;
-  const r = await fetch('/system/api/mail-alerts/recipients/' + id, {
+  const r = await fetch(MA_RECIPIENTS_URL + '/' + id, {
     method: 'DELETE', headers: {'X-CSRFToken': MA_CSRF},
   });
   const j = await r.json();

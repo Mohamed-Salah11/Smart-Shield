@@ -37,10 +37,10 @@
     <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
-            <a class="nav-link" href="/system/user-manager">Users</a>
+            <a class="nav-link" href="{{ url_for('users.user_manager') }}">Users</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link active" href="/system/user-manager/groups">Groups</a>
+            <a class="nav-link active" href="{{ url_for('users.group_manager') }}">Groups</a>
         </li>
     </ul>
 
@@ -93,7 +93,7 @@
                                     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGroupModal{{ g.id }}" title="Edit Group">
                                         <i class="fa-solid fa-pen me-1"></i>Edit
                                     </button>
-                                    <form class="ext-2d150e54" method="POST" action="/system/user-manager/delete-group/{{ g.id }}" data-action-submit="h_4e806cfa11">
+                                    <form class="ext-2d150e54" method="POST" action="{{ url_for('users.delete_group', group_id=g.id) }}" data-action-submit="h_4e806cfa11">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Group">
                                             <i class="fa-solid fa-trash me-1"></i>Delete
@@ -106,7 +106,7 @@
                         <!-- Edit Group Modal -->
                         <div class="modal fade" id="editGroupModal{{ g.id }}" tabindex="-1">
                             <div class="modal-dialog">
-                                <form method="POST" action="/system/user-manager/edit-group/{{ g.id }}">
+                                <form method="POST" action="{{ url_for('users.edit_group', group_id=g.id) }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <div class="modal-content">
                                         <div class="modal-header">
@@ -153,7 +153,7 @@
                                                 <h6 class="mb-0"><i class="fa-solid fa-user-plus me-2"></i>Add Member</h6>
                                             </div>
                                             <div class="card-body">
-                                                <form method="POST" action="/system/user-manager/group/{{ g.id }}/add-member" class="row g-3 align-items-end">
+                                                <form method="POST" action="{{ url_for('users.add_group_member', group_id=g.id) }}" class="row g-3 align-items-end">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <div class="col-md-8">
                                                         <label class="form-label">Select User</label>
@@ -192,7 +192,7 @@
                         <!-- Permissions Modal -->
                         <div class="modal fade permissions-modal" id="permissionsModal{{ g.id }}" tabindex="-1" data-group-id="{{ g.id }}">
                             <div class="modal-dialog modal-xl">
-                                <form method="POST" action="/system/user-manager/group/{{ g.id }}/permissions">
+                                <form method="POST" action="{{ url_for('users.set_group_permissions', group_id=g.id) }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <div class="modal-content">
                                         <div class="modal-header">
@@ -305,7 +305,7 @@
 <!-- Add Group Modal -->
 <div class="modal fade" id="addGroupModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <form method="POST" action="/system/user-manager/add-group">
+        <form method="POST" action="{{ url_for('users.add_group') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="modal-content">
                 <div class="modal-header">
@@ -379,6 +379,10 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
+// Endpoint templates rendered from Flask (sentinel id 0 substituted at call time)
+const GROUP_MEMBERS_TMPL = {{ url_for('users.list_group_members', group_id=0)|tojson }};
+const REMOVE_MEMBER_TMPL = {{ url_for('users.remove_group_member', group_id=0, user_id=0)|tojson }};
+
 // Load members when modal is shown
 document.addEventListener('DOMContentLoaded', function() {
     {% for g in groups %}
@@ -395,7 +399,7 @@ function loadGroupMembers(groupId) {
     const listContainer = document.getElementById('membersList' + groupId);
     const loadingDiv = document.getElementById('loadingMembers' + groupId);
     
-    fetch('/system/user-manager/group/' + groupId + '/members')
+    fetch(GROUP_MEMBERS_TMPL.replace('/group/0/members', '/group/' + groupId + '/members'))
         .then(response => response.json())
         .then(data => {
             if (data.members.length === 0) {
@@ -410,7 +414,7 @@ function loadGroupMembers(groupId) {
                                 <strong>${member.username}</strong>
                                 ${member.full_name ? '<span class="text-muted ms-2">(' + member.full_name + ')</span>' : ''}
                             </div>
-                            <form class="ext-2d150e54" method="POST" action="/system/user-manager/group/${groupId}/remove-member/${member.id}">
+                            <form class="ext-2d150e54" method="POST" action="${REMOVE_MEMBER_TMPL.replace('/group/0/remove-member/0', '/group/' + groupId + '/remove-member/' + member.id)}">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger btn-sm" data-action="h_90120fd5a9">
                                     <i class="fa-solid fa-user-minus"></i>

@@ -1,6 +1,6 @@
 from routes.system import system_bp
 from routes.system._common import *  # noqa: F401,F403
-from routes.system._common import _general_config_path, _config_bool, _load_general_config, _safe_count, _build_dashboard_payload, render_placeholder  # noqa: F401
+from routes.system._common import _general_config_path, _config_bool, _load_general_config, _safe_count, _build_dashboard_payload  # noqa: F401
 
 
 @system_bp.route("/")
@@ -70,66 +70,6 @@ def logout():
     )
     session.clear()
     return redirect(url_for("auth.login"))
-
-
-# ----------------------------
-# HELP PAGES
-# ----------------------------
-# Fv11 review §P1-01: every /system/* route must require an authenticated
-# admin session. These are appliance help/about/upgrade pages that previously
-# rendered without `@login_required`, which leaked the product version and UI
-# structure to anonymous LAN clients. Public-facing landing pages live under
-# /portal/* and /static/, not /system/*.
-
-@system_bp.route("/docs")
-@login_required
-def docs():
-    return render_placeholder("docs.html")
-
-@system_bp.route("/about")
-@login_required
-def about():
-    return render_placeholder("about.html")
-
-@system_bp.route("/bug")
-@login_required
-def bug():
-    return render_placeholder("bug.html")
-
-@system_bp.route("/forum")
-@login_required
-def forum():
-    return render_placeholder("forum.html")
-
-@system_bp.route("/freebsd")
-@login_required
-def freebsd():
-    return render_placeholder("freebsd.html")
-
-@system_bp.route("/smart-shield-book")
-@login_required
-def smart_shield_book():
-    return render_template("smart_shield_book.html")
-
-@system_bp.route("/paid-support")
-@login_required
-def paid_support():
-    return render_template("paid_support.html")
-
-@system_bp.route("/survey")
-@login_required
-def survey():
-    return render_placeholder("survey.html")
-
-@system_bp.route("/upgrade")
-@login_required
-def upgrade():
-    return render_placeholder("upgrade.html")
-
-@system_bp.route("/help")
-@login_required
-def help_page():
-    return render_placeholder("help.html")
 
 
 # ----------------------------

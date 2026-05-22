@@ -1078,7 +1078,7 @@ function saveLANAssignment() {
 
 function deleteLANAssignment() {
     if (confirm('Are you sure you want to delete the LAN assignment?')) {
-        fetch('/interfaces/delete-interface-assignment/LAN', {
+        fetch('{{ url_for('interfaces.delete_interface_assignment', interface_type='LAN') }}', {
             method: 'DELETE'
         })
         .then(response => response.json())

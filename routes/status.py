@@ -51,14 +51,6 @@ def dhcp_leases():
 # DHCPv6 LEASES (IPv6)
 # --------------------------------------------------
 
-@status_bp.route("/dhcpv6-leases")
-@login_required
-def dhcpv6_leases():
-    if not current_app.config.get("ENABLE_UNFINISHED_PAGES"):
-        abort(404)
-    return render_template("dhcpv6_leases.html")
-
-
 # --------------------------------------------------
 # FILTER RELOAD STATUS
 # --------------------------------------------------
