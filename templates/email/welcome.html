@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f0f2f5;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:32px 16px;">
+<tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%;
+ background:#ffffff;border-radius:16px;overflow:hidden;
+ box-shadow:0 2px 8px rgba(0,0,0,.06),0 16px 48px rgba(0,0,0,.08);
+ font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+
+  <!-- Header (brand-matching: same burgundy gradient as security alerts) -->
+  <tr><td style="background:#5a0a0a;background:linear-gradient(135deg,#5a0a0a,#7f1010,#5a0a0a);padding:20px 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td width="44" style="vertical-align:middle;">
+        <img src="cid:ss-logo" width="44" height="44" alt="SmartShield"
+             style="display:block;border:0;border-radius:6px;">
+      </td>
+      <td style="padding-left:12px;vertical-align:middle;">
+        <div style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;">SmartShield</div>
+        <div style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;">Security Operations</div>
+      </td>
+      <td align="right" style="vertical-align:middle;">
+        <span style="display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.28);border-radius:999px;padding:4px 12px;color:rgba(255,255,255,0.92);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Welcome</span>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Status banner (mirrors the severity banner in alerts) -->
+  <tr><td style="background:#ecfdf5;border-bottom:1px solid #e5e7eb;padding:10px 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:middle;">
+        <span style="display:inline-block;background:#ffffff;color:#047857;
+          border:1.5px solid #047857;border-radius:999px;padding:3px 10px;
+          font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#047857;margin-right:6px;vertical-align:middle;"></span>
+          Ready
+        </span>
+        <span style="margin-left:10px;color:#047857;font-size:13px;font-weight:700;vertical-align:middle;">Appliance installed &mdash; claim required</span>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:24px 28px 8px;">
+    <div style="font-size:20px;font-weight:700;color:#111827;letter-spacing:-0.01em;line-height:1.2;margin:0 0 6px;">Welcome to SmartShield</div>
+    <div style="font-size:12px;color:#6b7280;margin:0 0 18px;line-height:1.5;">Your appliance is installed and reachable. Use the one-time claim code below to open the first-run setup wizard.</div>
+
+    <!-- Info strip (mirrors the "Detected at" strip in alerts) -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;"><tr>
+      <td width="44" style="padding:12px 0 12px 14px;vertical-align:middle;">
+        <div style="width:32px;height:32px;background:#ecfdf5;border-radius:6px;text-align:center;line-height:32px;color:#047857;font-size:16px;font-weight:700;">&#x2713;</div>
+      </td>
+      <td style="padding:12px;vertical-align:middle;">
+        <div style="font-size:10px;color:#6b7280;font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Appliance LAN IP</div>
+        <div style="font-family:Consolas,Menlo,monospace;font-size:12px;color:#111827;font-weight:700;margin-top:2px;">{{ lan_ip }}</div>
+      </td>
+      <td align="right" style="padding:12px 14px 12px 0;vertical-align:middle;">
+        <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #047857;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Online</span>
+      </td>
+    </tr></table>
+
+    <!-- Info cards (mirrors the 2-up info grid in alerts) -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;"><tr>
+      <td valign="top" style="padding:6px;width:50%;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;">
+          <tr><td style="padding:12px 14px;">
+            <div style="font-size:11px;color:#6b7280;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">Wizard URL</div>
+            <div style="font-size:14px;color:#111827;font-weight:600;word-break:break-all;">
+              <span style="font-family:Consolas,Menlo,monospace;font-size:12px;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;">{{ setup_url }}</span>
+            </div>
+          </td></tr>
+        </table>
+      </td>
+      <td valign="top" style="padding:6px;width:50%;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;">
+          <tr><td style="padding:12px 14px;">
+            <div style="font-size:11px;color:#6b7280;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">Validity</div>
+            <div style="font-size:14px;color:#111827;font-weight:600;">One-time use &middot; consumed by wizard</div>
+          </td></tr>
+        </table>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Claim-code callout (mirrors the disposition/auto-mitigation accent-border panel in alerts) -->
+  <tr><td style="padding:0 24px 12px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border-left:4px solid #047857;border-radius:8px;"><tr><td style="padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:#047857;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Setup Claim Code</div>
+      <div style="font-family:Consolas,Menlo,monospace;font-size:18px;font-weight:700;color:#0f172a;word-break:break-all;letter-spacing:.5px;background:#ffffff;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;">{{ claim_token }}</div>
+      <div style="font-size:12px;color:#374151;margin-top:8px;line-height:1.5;">
+        <span style="color:#6b7280;font-weight:600;">How to use:</span>
+        open the wizard URL above, paste this code when prompted, then create the first admin account.
+      </div>
+    </td></tr></table>
+  </td></tr>
+
+  <!-- CTA button -->
+  <tr><td style="padding:0 24px 18px;" align="center">
+    <table cellpadding="0" cellspacing="0"><tr>
+      <td style="background:#5a0a0a;background:linear-gradient(135deg,#5a0a0a,#7f1010);border-radius:8px;">
+        <a href="{{ setup_url }}" target="_blank"
+           style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:.02em;">
+          Open the Setup Wizard &nbsp;&rarr;
+        </a>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Footer (identical to security-alert footer) -->
+  <tr><td style="background:#f0f2f5;border-top:1px solid #e5e7eb;padding:16px 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:11px;color:#6b7280;font-weight:600;">
+        <span style="color:#e8400a;">&#x1F6E1;</span> SmartShield &middot; Security Operations
+      </td>
+      <td align="right" style="font-size:11px;color:#9ca3af;">
+        Automated &middot; do not reply
+      </td>
+    </tr></table>
+    <div style="font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
+      Sent by SmartShield from {{ support_email }} &mdash; do not reply directly to this email.
+    </div>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>

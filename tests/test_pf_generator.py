@@ -88,7 +88,11 @@ class TestGeneratePfConf:
         conf = generate_pf_conf(conn)
         assert "nat on $WAN from $LAN_NET to any -> ($WAN)" in conf
 
-    def test_no_default_masquerade_when_outbound_nat_exists(self, fresh_conn):
+    def test_default_masquerade_always_present_even_with_explicit_outbound(self, fresh_conn):
+        # The default masquerade must always be emitted as a safety net.
+        # Explicit outbound rules are written below it and still take
+        # precedence via PF's last-match-wins semantics, so LAN clients
+        # never lose internet just because an admin added a NAT rule.
         from app.services.pf_generator import generate_pf_conf
         fresh_conn.execute(
             "INSERT INTO nat_outbound (disabled, interface, src_address, dst_address, nat_address)"
@@ -96,8 +100,25 @@ class TestGeneratePfConf:
         )
         fresh_conn.commit()
         conf = generate_pf_conf(fresh_conn)
-        # Should not have the default masquerade line when explicit outbound rules exist
-        assert "LAN_NET to any -> ($WAN)" not in conf
+        assert "nat on $WAN from $LAN_NET to any -> ($WAN)" in conf
+        # Explicit user rule must still appear (and PF last-match means it wins)
+        default_idx  = conf.index("nat on $WAN from $LAN_NET")
+        explicit_idx = conf.index("nat on em0 from 192.168.1.0/24")
+        assert explicit_idx > default_idx, "explicit outbound rule must come AFTER the default for last-match override"
+
+    def test_outbound_nat_translates_symbolic_wan_interface(self, fresh_conn):
+        # The NAT UI stores interface as the symbolic 'WAN'/'LAN'. PF only
+        # accepts real interface names — the generator must translate.
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute(
+            "INSERT INTO nat_outbound (disabled, interface, src_address, dst_address, nat_address)"
+            " VALUES (0, 'WAN', '192.168.1.0/24', 'any', '')"
+        )
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "nat on em0 from 192.168.1.0/24 to any -> (em0)" in conf
+        # The raw symbol must not leak into pf.conf — pfctl would reject it.
+        assert "nat on WAN from" not in conf
 
     def test_pppoe_wan_uses_tun0(self, fresh_conn):
         from app.services.pf_generator import generate_pf_conf

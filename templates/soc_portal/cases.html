@@ -158,7 +158,7 @@ async function submitNewCase() {
     description: document.getElementById('nc-desc').value.trim(),
     severity:    document.getElementById('nc-severity').value,
   };
-  if (!payload.title) { alert('Title is required.'); return; }
+  if (!payload.title) { SOC.toast('Title is required.', 'error'); return; }
   const r = await fetch('/soc-portal/cases/open', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -168,7 +168,7 @@ async function submitNewCase() {
   if (data.ok) {
     window.location.href = `/soc-portal/cases/${data.case_id}`;
   } else {
-    alert(data.message || 'Failed to open case.');
+    SOC.toast(data.message || 'Failed to open case.', 'error');
   }
 }
 </script>

@@ -5,9 +5,11 @@
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
     <h2 class="ext-5d54ff35">
-      <span class="live-dot"></span> Live Alert Feed
+      Live Alert Feed
+      <span id="alerts-live-chip"></span>
+      <span id="alerts-hidden-badge-host" class="ms-2"></span>
     </h2>
-    <p class="ext-6609c206">Security events — auto-refreshing every 10 seconds</p>
+    <p class="ext-6609c206">Security events — auto-refreshing every 3 seconds. Tip: press <span class="soc-kbd">/</span> to focus search, <span class="soc-kbd">?</span> for shortcuts.</p>
   </div>
   <div class="d-flex gap-2 align-items-center">
     <select id="filter-cat" class="form-select form-select-sm ext-0e0264e7">
@@ -22,7 +24,7 @@
     <input type="text" id="filter-ip" class="form-control form-control-sm ext-0e0264e7" placeholder="Source IP…"
           >
     <input type="text" id="filter-search" class="form-control form-control-sm ext-008d9e6c" placeholder="Search…"
-          >
+           data-soc-search>
     <button class="btn-soc-secondary ext-4ddbe905" data-action="h_a6ba7141cd">
       <i class="fa-solid fa-rotate"></i> Refresh
     </button>
@@ -163,26 +165,43 @@ function timeFmt(ts) {
 }
 
 // Splunk-style detail groups. Each `kind:"ioc"` field gets a copy button.
+// Every column returned by api_alerts() should be reachable here so SOC
+// analysts have full capture for investigation; anything not surfaced is
+// still in the raw-JSON <details> below.
 const DETAIL_GROUPS = [
-  { title: 'Event',       fields: [['timestamp','Time'],['category','Category'],
-                                   ['action','Action'],['severity','Severity'],
-                                   ['effective_severity','Effective severity']] },
-  { title: 'Signature',   fields: [['signature','Rule'],['mitre_tactic','MITRE tactic'],
-                                   ['sig_category','Class'],['gid','GID'],['sid','SID']] },
-  { title: 'Source',      fields: [['src_ip','IP','ioc'],['src_port','Port'],
-                                   ['hostname','Hostname'],['mac','MAC','ioc']] },
-  { title: 'Destination', fields: [['dest_ip','IP','ioc'],['dest_port','Port'],
-                                   ['proto','Protocol']] },
-  { title: 'HTTP',        fields: [['http_method','Method'],['http_status','Status'],
-                                   ['http_url','URL','ioc'],['http_host','Host','ioc'],
-                                   ['http_hostname','Hostname','ioc'],
-                                   ['http_agent','User-Agent']] },
-  { title: 'TLS',         fields: [['tls_sni','SNI','ioc']] },
-  { title: 'File',        fields: [['filename','Filename'],['extension','Extension'],
-                                   ['mime','MIME'],['magic','Magic'],['size','Size'],
-                                   ['md5','MD5','ioc'],['sha256','SHA-256','ioc'],
-                                   ['state','State']] },
-  { title: 'User',        fields: [['username','Username'],['remote_addr','Remote IP','ioc']] },
+  { title: 'Event',          fields: [['event_uuid','Event UUID','ioc'],
+                                      ['timestamp','Time'],['category','Category'],
+                                      ['action','Action'],['severity','Severity'],
+                                      ['effective_severity','Effective severity'],
+                                      ['source_type','Source type'],
+                                      ['source_name','Source name']] },
+  { title: 'Signature',      fields: [['signature','Rule'],
+                                      ['mitre_tactic','MITRE tactic'],
+                                      ['mitre_technique','MITRE technique'],
+                                      ['sig_category','Class'],
+                                      ['gid','GID'],['sid','SID'],
+                                      ['rule_id','Rule ID'],
+                                      ['rule_name','Rule name']] },
+  { title: 'Network policy', fields: [['interface','Interface'],
+                                      ['direction','Direction'],
+                                      ['policy_id','Policy ID'],
+                                      ['policy_name','Policy name']] },
+  { title: 'Source',         fields: [['src_ip','IP','ioc'],['src_port','Port'],
+                                      ['hostname','Hostname'],['mac','MAC','ioc']] },
+  { title: 'Destination',    fields: [['dest_ip','IP','ioc'],['dest_port','Port'],
+                                      ['proto','Protocol'],
+                                      ['domain','Domain','ioc'],
+                                      ['url','URL','ioc']] },
+  { title: 'HTTP',           fields: [['http_method','Method'],['http_status','Status'],
+                                      ['http_url','URL','ioc'],['http_host','Host','ioc'],
+                                      ['http_hostname','Hostname','ioc'],
+                                      ['http_agent','User-Agent']] },
+  { title: 'TLS',            fields: [['tls_sni','SNI','ioc']] },
+  { title: 'File',           fields: [['filename','Filename'],['extension','Extension'],
+                                      ['mime','MIME'],['magic','Magic'],['size','Size'],
+                                      ['md5','MD5','ioc'],['sha256','SHA-256','ioc'],
+                                      ['state','State']] },
+  { title: 'User',           fields: [['username','Username'],['remote_addr','Remote IP','ioc']] },
 ];
 
 function fieldRow(label, value, kind) {
@@ -265,7 +284,8 @@ async function assignAlert(sel, eventUuid, eventKey, eventAction) {
       }),
     });
     const data = await r.json();
-    if (!data.ok) { alert(data.message || 'Assignment failed.'); loadAlerts(); return; }
+    if (!data.ok) { SOC.toast(data.message || 'Assignment failed.', 'error'); loadAlerts(); return; }
+    SOC.toast(sel.value ? 'Assigned to ' + sel.options[sel.selectedIndex].text : 'Unassigned.', 'success');
     // Reflect into the in-memory model so the next refresh does not flicker.
     // Match by event_uuid first; fall back to timestamp for any pre-v34 row.
     const a = allAlerts.find(x =>
@@ -278,7 +298,7 @@ async function assignAlert(sel, eventUuid, eventKey, eventAction) {
         : null;
     }
   } catch {
-    alert('Assignment request failed.');
+    SOC.toast('Assignment request failed.', 'error');
     loadAlerts();
   }
 }
@@ -294,9 +314,11 @@ async function loadAnalysts() {
 function renderRows(data) {
   const tbody = document.getElementById('alert-tbody');
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="soc-empty"><i class="fa-solid fa-shield-check"></i><br>No alerts matching filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="soc-empty"><i class="fa-solid fa-shield-check"></i><div>No alerts matching filters</div></div></td></tr>';
     return;
   }
+  const keys = data.map(e => e.event_uuid || ((e.timestamp || '') + '|' + (e.action || '')));
+  const newKeys = SOC.diffNewKeys('liveAlerts', keys);
   tbody.innerHTML = data.map((e, idx) => {
     const ts   = e.timestamp || '';
     const cat  = (e.category || '').toLowerCase();
@@ -315,14 +337,18 @@ function renderRows(data) {
       ? `<a class="ext-00d74da7" href="/soc-portal/cases/${aa.case_id}">#${aa.case_id}</a>`
       : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${htmlEscape(ts)}" data-action-name="${htmlEscape(act)}">+ Case</button>`;
     const detailPanel = renderDetailPanel(e);
-    return `<tr class="alert-row ext-b202c6d4" data-idx="${idx}" data-action="alert-row-toggle">
+    const ipCell = (ip && ip !== '—')
+      ? `<a href="#" data-soc-pivot-ip="${htmlEscape(ip)}" title="Filter by ${htmlEscape(ip)}">${htmlEscape(ip)}</a>`
+      : '—';
+    const enterCls = newKeys.has(keys[idx]) ? ' soc-row-enter' : '';
+    return `<tr class="alert-row ext-b202c6d4${enterCls}" data-idx="${idx}" data-action="alert-row-toggle">
       <td class="soc-mono ext-6c660c40">${timeFmt(ts)}</td>
       <td>${sevBadge}</td>
       <td><span class="ext-179624b7">${cat}</span></td>
       <td class="ext-15e075a4" title="${htmlEscape(act)}">${htmlEscape(act)}</td>
       <td class="soc-mono ext-f01908f1" title="${htmlEscape(det)}">${htmlEscape(det)}</td>
       <td class="ext-76b0e39b">${htmlEscape(user)}</td>
-      <td class="ext-76b0e39b">${htmlEscape(ip)}</td>
+      <td class="ext-76b0e39b">${ipCell}</td>
       <td>${statusBadge}</td>
       <td>${caseLink}</td>
       <td>${assignCell(e, ts)}</td>
@@ -355,8 +381,26 @@ function applyFilters() {
 async function loadAlerts() {
   try {
     const r = await fetch('/soc-portal/api/alerts?limit=200');
-    allAlerts = await r.json();
+    const fresh = await r.json();
+    // If the page is hidden, accumulate new-event count in the badge so the
+    // analyst sees what they missed when they come back.
+    if (document.visibilityState === 'hidden' && allAlerts.length) {
+      const prevKeys = new Set(allAlerts.map(e =>
+        e.event_uuid || ((e.timestamp || '') + '|' + (e.action || ''))
+      ));
+      let added = 0;
+      for (const e of fresh) {
+        const k = e.event_uuid || ((e.timestamp || '') + '|' + (e.action || ''));
+        if (!prevKeys.has(k)) added++;
+      }
+      if (added > 0) {
+        const host = document.getElementById('alerts-hidden-badge-host');
+        if (host && host._socAddHidden) host._socAddHidden(added);
+      }
+    }
+    allAlerts = fresh;
     applyFilters();
+    SOC.markUpdated(document.getElementById('alerts-live-chip'));
   } catch {
     document.getElementById('alert-tbody').innerHTML =
       '<tr><td colspan="10" class="text-center ext-a729d7fe">Failed to load alerts</td></tr>';
@@ -377,15 +421,15 @@ async function submitCase() {
     severity:     document.getElementById('case-severity').value,
     source_event: document.getElementById('case-source-event').value,
   };
-  if (!payload.title) { alert('Title is required.'); return; }
+  if (!payload.title) { SOC.toast('Title is required.', 'error'); return; }
   const r = await fetch('/soc-portal/cases/open', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const data = await r.json();
   if (data.ok) {
     caseModal.hide();
     loadAlerts();
-    alert(`Case #${data.case_id} opened.`);
+    SOC.toast(`Case #${data.case_id} opened.`, 'success');
   } else {
-    alert(data.message || 'Failed to open case.');
+    SOC.toast(data.message || 'Failed to open case.', 'error');
   }
 }
 
@@ -393,8 +437,24 @@ document.getElementById('filter-cat').addEventListener('change', applyFilters);
 document.getElementById('filter-ip').addEventListener('input', applyFilters);
 document.getElementById('filter-search').addEventListener('input', applyFilters);
 
+// Click-to-pivot: any data-soc-pivot-ip link drops the IP into the filter
+// box and re-renders. Delegated so it survives every loadAlerts() rerender.
+document.getElementById('alert-tbody').addEventListener('click', function(e) {
+  const link = e.target.closest('[data-soc-pivot-ip]');
+  if (!link) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const ipField = document.getElementById('filter-ip');
+  ipField.value = link.dataset.socPivotIp;
+  applyFilters();
+});
+
+SOC.bindLiveChip(document.getElementById('alerts-live-chip'));
+SOC.bindHiddenBadge(document.getElementById('alerts-hidden-badge-host'));
+window.socRefresh = () => loadAnalysts().then(loadAlerts);
+
 loadAnalysts().then(loadAlerts);
-setInterval(() => loadAnalysts().then(loadAlerts), 10000);
+setInterval(() => loadAnalysts().then(loadAlerts), 3000);
 
 // ── IOC lookup ───────────────────────────────────────────────────────────
 function escapeHtml(s) {

@@ -39,6 +39,15 @@ import time
 from email.message import EmailMessage
 
 
+# Built-in mail account used when the operator hasn't configured one in the
+# UI. Lets a fresh install send alerts immediately. Either column-level
+# value in `mail_alerts_config` (smtp_username / smtp_app_password) takes
+# precedence if set, so an admin can still override via the Mail Alerts UI
+# without editing this file. See `get_config()` below.
+_DEFAULT_SMTP_USERNAME     = "SmartShieldAlerts@gmail.com"
+_DEFAULT_SMTP_APP_PASSWORD = "ytnmnzbthtqphepz"
+
+
 # Severity ranking — matches app/services/playbooks.py:_SEV_ORDER.
 _SEV_ORDER = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
@@ -154,7 +163,13 @@ def _hour_counter(conn) -> dict:
 # ---------------------------------------------------------------------------
 
 def get_config(conn) -> dict:
-    """Read the singleton config row; decrypt the app password."""
+    """Read the singleton config row; decrypt the app password.
+
+    When the DB row's smtp_username or smtp_app_password is blank, fall back
+    to the built-in defaults at the top of this module so a fresh install
+    can send mail without any GUI configuration. Any value the admin saves
+    via the Mail Alerts UI still wins — the fallback only fills the gap.
+    """
     row = conn.execute("SELECT * FROM mail_alerts_config WHERE id = 1").fetchone()
     if not row:
         return {}
@@ -166,6 +181,11 @@ def get_config(conn) -> dict:
             cfg["smtp_app_password"] = decrypt_secret(enc) or ""
         except Exception:
             cfg["smtp_app_password"] = ""
+
+    if not (cfg.get("smtp_username") or "").strip():
+        cfg["smtp_username"] = _DEFAULT_SMTP_USERNAME
+    if not (cfg.get("smtp_app_password") or "").strip():
+        cfg["smtp_app_password"] = _DEFAULT_SMTP_APP_PASSWORD
     return cfg
 
 

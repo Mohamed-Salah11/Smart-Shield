@@ -680,6 +680,22 @@ if ! grep -q "^GROQ_API_KEY=.\+" "${ENV_FILE}" 2>/dev/null; then
     fi
 fi
 
+# Optional: email address to receive the setup claim code.
+# Skipped silently in non-interactive installs and in non-live modes (no point
+# emailing a code for an appliance that isn't actually being commissioned).
+# The actual send happens at the end of install.sh, after the claim token file
+# exists and the console banner has already printed the code.
+ADMIN_WELCOME_EMAIL=""
+if [ "${SMARTSHIELD_NONINTERACTIVE:-0}" != "1" ] && [ "${INSTALL_MODE}" = "live" ]; then
+    printf "\n${BOLD}━━━ Optional: Email the setup claim code ━━━${NC}\n"
+    printf "If you enter an address, the one-time claim code that unlocks the\n"
+    printf "first-run wizard will be emailed there. The same code is also\n"
+    printf "printed on screen when install.sh finishes — email is just a\n"
+    printf "convenience (handy if you're SSH'd in over a small terminal).\n"
+    printf "${YELLOW}[?]${NC} Admin email (press Enter to skip): "
+    read -r ADMIN_WELCOME_EMAIL
+fi
+
 CONFIG_FILE="${ETC_DIR}/config.json"
 CONFIG_EXAMPLE="${APP_ROOT}/config.example.json"
 if [ ! -f "${CONFIG_FILE}" ] && [ -f "${CONFIG_EXAMPLE}" ]; then
@@ -1631,6 +1647,23 @@ elif [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
     warn "No setup claim token at ${CLAIM_TOKEN_FILE} — appliance may already be claimed."
     warn "  If setup is not yet done, the token is (re)generated and printed to the"
     warn "  console on the next 'service smart_shield start'."
+fi
+
+# ── Optional: email the claim code to the address collected in §3 ───────────
+# Runs only when the operator typed an address at the install-time prompt AND
+# the token file actually contains a code. The console output above still
+# carries the code regardless, so a mail failure never blocks the operator.
+if [ -n "${ADMIN_WELCOME_EMAIL}" ] && [ -s "${CLAIM_TOKEN_FILE}" ]; then
+    printf "${BOLD}━━━ Sending welcome email ━━━${NC}\n"
+    if "${VENV}/bin/python3" "${APP_ROOT}/tools/send_welcome_email.py" \
+            --to "${ADMIN_WELCOME_EMAIL}" \
+            --lan-ip "${LAN_IP}" \
+            --token-file "${CLAIM_TOKEN_FILE}"; then
+        : # script prints its own success line
+    else
+        warn "Welcome email to ${ADMIN_WELCOME_EMAIL} failed — the claim code above is still valid."
+    fi
+    printf "\n"
 fi
 
 # ── IPS-mode hint ─────────────────────────────────────────────────────────────

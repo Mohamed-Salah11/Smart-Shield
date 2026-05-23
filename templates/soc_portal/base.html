@@ -256,6 +256,97 @@
       animation: pulse 1.5s infinite;
       margin-right: 5px;
     }
+    .soc-live-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .75rem;
+      color: var(--soc-muted);
+      padding: .15rem .55rem;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--soc-border);
+      border-radius: 999px;
+    }
+
+    /* ── Toast notifications ─────────────────────────────────── */
+    #soc-toast-host {
+      position: fixed;
+      top: 72px;
+      right: 1rem;
+      z-index: 1080;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      max-width: 420px;
+      pointer-events: none;
+    }
+    .soc-toast {
+      background: var(--soc-card);
+      color: var(--soc-text);
+      border: 1px solid var(--soc-border);
+      border-left: 3px solid var(--soc-accent);
+      border-radius: 8px;
+      padding: .65rem .9rem;
+      font-size: .875rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,.45);
+      transform: translateX(120%);
+      transition: transform .2s ease-out;
+      pointer-events: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .soc-toast--in { transform: translateX(0); }
+    .soc-toast--success { border-left-color: var(--soc-success); }
+    .soc-toast--error   { border-left-color: var(--soc-danger); }
+    .soc-toast--info    { border-left-color: var(--soc-accent); }
+
+    /* ── Skeleton shimmer ────────────────────────────────────── */
+    @keyframes socShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .soc-skeleton {
+      background: linear-gradient(90deg, var(--soc-card) 25%, var(--soc-border) 50%, var(--soc-card) 75%);
+      background-size: 200% 100%;
+      animation: socShimmer 1.4s infinite;
+      border-radius: 6px;
+      color: transparent !important;
+      min-height: 1em;
+    }
+
+    /* ── Row insertion highlight + KPI flash ─────────────────── */
+    @keyframes socRowEnter {
+      0%   { background-color: rgba(0,180,160,.22); }
+      100% { background-color: transparent; }
+    }
+    .soc-row-enter { animation: socRowEnter 1.5s ease-out; }
+
+    /* ── New-since-hidden badge ──────────────────────────────── */
+    .soc-new-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .72rem;
+      font-weight: 700;
+      background: var(--soc-accent);
+      color: #fff;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+      margin-left: .5rem;
+      cursor: pointer;
+    }
+
+    /* ── Keyboard-shortcut hints ─────────────────────────────── */
+    .soc-kbd {
+      display: inline-block;
+      padding: .1rem .4rem;
+      font-size: .75rem;
+      font-family: 'Courier New', monospace;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--soc-border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      color: var(--soc-text);
+    }
+    .soc-shortcut-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid var(--soc-border); }
+    .soc-shortcut-row:last-child { border-bottom: 0; }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -379,7 +470,174 @@
     return _orig(resource, init);
   };
 })();
+
+/* ── SOC.* polish kit — toasts, live chip, row diff, shortcuts ─────────── */
+window.SOC = window.SOC || {};
+
+SOC.toast = function(msg, kind /* 'success'|'error'|'info' */) {
+  let host = document.getElementById('soc-toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'soc-toast-host';
+    document.body.appendChild(host);
+  }
+  const t = document.createElement('div');
+  t.className = 'soc-toast soc-toast--' + (kind || 'info');
+  t.textContent = msg;
+  host.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('soc-toast--in'));
+  setTimeout(() => {
+    t.classList.remove('soc-toast--in');
+    setTimeout(() => t.remove(), 250);
+  }, 4000);
+};
+
+SOC.markUpdated = function(el) {
+  if (el) el.dataset.updatedAt = String(Date.now());
+};
+
+SOC.bindLiveChip = function(el) {
+  if (!el || el.dataset.socLiveChip === '1') return;
+  el.dataset.socLiveChip = '1';
+  el.classList.add('soc-live-chip');
+  el.innerHTML = '<span class="live-dot"></span><span data-soc-chip-text>Live · Updated just now</span>';
+  setInterval(() => {
+    const t = parseInt(el.dataset.updatedAt || '0', 10);
+    if (!t) return;
+    const s = Math.round((Date.now() - t) / 1000);
+    const txt = el.querySelector('[data-soc-chip-text]');
+    if (txt) txt.textContent = 'Live · Updated ' + (s < 5 ? 'just now' : s + 's ago');
+  }, 1000);
+  SOC.markUpdated(el);
+};
+
+/* Diff a list of rows by key vs the previous render. Returns the set of
+   keys that are new this round; caller adds .soc-row-enter to those rows. */
+SOC.diffNewKeys = function(stateKey, currentKeys) {
+  SOC._diff = SOC._diff || {};
+  const prev = SOC._diff[stateKey];
+  const cur  = new Set(currentKeys);
+  SOC._diff[stateKey] = cur;
+  if (!prev) return new Set();          // first render — no animation
+  const newOnes = new Set();
+  cur.forEach(k => { if (!prev.has(k)) newOnes.add(k); });
+  return newOnes;
+};
+
+/* New-since-hidden badge — attach to a host element; tracks count while
+   document.visibilityState === 'hidden', clears on visibilitychange. */
+SOC.bindHiddenBadge = function(hostEl) {
+  if (!hostEl || hostEl.dataset.socHidden === '1') return;
+  hostEl.dataset.socHidden = '1';
+  let count = 0;
+  let badge = null;
+  function render() {
+    if (count > 0 && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'soc-new-badge';
+      badge.innerHTML = '<i class="fa-solid fa-arrow-up"></i><span></span>';
+      badge.title = 'New since you looked away — click to clear';
+      badge.addEventListener('click', () => { count = 0; render(); });
+      hostEl.appendChild(badge);
+    }
+    if (badge) {
+      if (count <= 0) { badge.remove(); badge = null; }
+      else badge.querySelector('span').textContent = '+' + count + ' new';
+    }
+  }
+  hostEl._socAddHidden = function(n) {
+    if (document.visibilityState === 'hidden') { count += n; render(); }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { count = 0; render(); }
+  });
+};
+
+/* Global keyboard shortcuts.
+   Skips when typing in inputs / textareas / contenteditable. */
+(function() {
+  const PAGES = {
+    d: '{{ url_for("soc_portal.dashboard") }}',
+    a: '{{ url_for("soc_portal.alerts") }}',
+    c: '{{ url_for("soc_portal.cases") }}',
+    r: '{{ url_for("soc_portal.recommendations") }}',
+    s: '{{ url_for("soc_portal.saved_searches") }}',
+    {% if soc_tier in ('L2','L3') %}i: '{{ url_for("soc_portal.threat_intel") }}',{% endif %}
+    {% if soc_tier == 'L3' %}x: '{{ url_for("soc_portal.actions") }}',{% endif %}
+  };
+  let gPrefix = false;
+  let gTimer  = null;
+  function isTyping(e) {
+    const t = e.target;
+    if (!t) return false;
+    const tag = (t.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (t.isContentEditable) return true;
+    return false;
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (isTyping(e)) return;
+    const k = e.key;
+    if (gPrefix) {
+      gPrefix = false;
+      clearTimeout(gTimer);
+      const dest = PAGES[k.toLowerCase()];
+      if (dest) { e.preventDefault(); window.location.href = dest; }
+      return;
+    }
+    if (k === 'g') {
+      gPrefix = true;
+      gTimer = setTimeout(() => { gPrefix = false; }, 1200);
+      return;
+    }
+    if (k === 'r') {
+      if (typeof window.socRefresh === 'function') {
+        e.preventDefault(); window.socRefresh();
+      }
+      return;
+    }
+    if (k === '/') {
+      const s = document.querySelector('[data-soc-search]');
+      if (s) { e.preventDefault(); s.focus(); }
+      return;
+    }
+    if (k === '?') {
+      e.preventDefault();
+      const m = document.getElementById('socShortcutsModal');
+      if (m && window.bootstrap) new bootstrap.Modal(m).show();
+    }
+  });
+})();
 </script>
+
+<!-- ── Keyboard shortcuts modal (injected once for every SOC page) ───── -->
+<div class="modal fade" id="socShortcutsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background: var(--soc-card); color: var(--soc-text); border: 1px solid var(--soc-border);">
+      <div class="modal-header" style="border-bottom: 1px solid var(--soc-border);">
+        <h5 class="modal-title"><i class="fa-solid fa-keyboard me-2"></i>Keyboard shortcuts</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="soc-shortcut-row"><span>Refresh current page</span><span><span class="soc-kbd">r</span></span></div>
+        <div class="soc-shortcut-row"><span>Focus search</span><span><span class="soc-kbd">/</span></span></div>
+        <div class="soc-shortcut-row"><span>Go to Dashboard</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">d</span></span></div>
+        <div class="soc-shortcut-row"><span>Go to Alert Queue</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">a</span></span></div>
+        <div class="soc-shortcut-row"><span>Go to Cases</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">c</span></span></div>
+        {% if soc_tier in ('L2','L3') %}
+        <div class="soc-shortcut-row"><span>Go to Threat Intel</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">i</span></span></div>
+        {% endif %}
+        <div class="soc-shortcut-row"><span>Go to Recommendations</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">r</span></span></div>
+        <div class="soc-shortcut-row"><span>Go to Saved Searches</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">s</span></span></div>
+        {% if soc_tier == 'L3' %}
+        <div class="soc-shortcut-row"><span>Go to Quick Actions</span><span><span class="soc-kbd">g</span> <span class="soc-kbd">x</span></span></div>
+        {% endif %}
+        <div class="soc-shortcut-row"><span>This help</span><span><span class="soc-kbd">?</span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% block extra_js %}{% endblock %}
 </body>
