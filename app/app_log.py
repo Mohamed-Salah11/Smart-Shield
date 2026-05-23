@@ -12,8 +12,8 @@ Both write NDJSON (newline-delimited JSON) to separate log files.
 
 Log rotation
 ------------
-On FreeBSD, newsyslog handles rotation via /etc/newsyslog.conf.d/.
-See bsd/etc/newsyslog.conf.d/smart-shield.conf for the recommended config.
+On FreeBSD, newsyslog handles rotation via /usr/local/etc/newsyslog.d/.
+See bsd/etc/newsyslog.d/smartshield.conf for the recommended config.
 The log file is reopened on each write so rotation (rename+recreate) is
 handled transparently without the app needing a SIGHUP.
 
@@ -40,7 +40,8 @@ _REDACT_KEYS = {"password", "secret", "key", "token", "psk", "auth", "credential
 
 def _default_app_log_path() -> str:
     if sys.platform.startswith("freebsd"):
-        return "/var/log/smart-shield/app.log"
+        from app.config import _ss_dir
+        return os.path.join(_ss_dir("/var/log"), "app.log")
     return "logs/app.log"
 
 

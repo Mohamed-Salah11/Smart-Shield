@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 .page-card { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:var(--shadow-soft); }
 .page-title { font-size:1.15rem;font-weight:700;color:var(--text-color);margin:0 0 4px; }
 .page-sub   { font-size:.82rem;color:var(--muted);margin:0; }
@@ -41,13 +41,15 @@
 <div class="container-fluid py-4 px-4">
 
   <div class="page-card">
-    <p class="page-title">DNS Filter</p>
-    <p class="page-sub">Blocked domains are redirected to the Smart Shield block/login page. Blocking a zone covers all subdomains automatically.</p>
+    <p class="page-title">DNS Guard</p>
+    <p class="page-sub">Blocked domains are redirected to the SmartShield block/login page. Blocking a zone covers all subdomains automatically.</p>
   </div>
 
+  {% include '_content_policy_mode.html' %}
+
   <div class="toolbar">
-    <button class="btn btn-sm btn-primary" onclick="openModal('addModal')">Add Rule</button>
-    <button class="btn btn-sm btn-success" onclick="applyFilter()">Apply to Unbound</button>
+    <button class="btn btn-sm btn-primary" data-action="h_122e182556">Add Rule</button>
+    <button class="btn btn-sm btn-success" data-action="h_d3c90c8779">Apply to Unbound</button>
   </div>
 
   <div class="card shadow-sm">
@@ -55,40 +57,40 @@
       <table class="ftbl">
         <thead>
           <tr>
-            <th style="width:40px;">On</th>
+            <th class="ext-93de2d4b">On</th>
             <th>Domain / Zone</th>
             <th>Action</th>
             <th>Category</th>
             <th>Description</th>
-            <th style="width:110px;">Actions</th>
+            <th class="ext-1a30558f">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rules %}
           <tr id="row-{{ r.id }}"
               data-domain="{{ r.domain }}"
-              data-action="{{ r.action }}"
+              data-rule-action="{{ r.action }}"
               data-redirect="{{ r.redirect_ip or '' }}"
               data-category="{{ r.category }}"
               data-description="{{ r.description or '' }}">
             <td>
               <label class="sw">
                 <input type="checkbox" {% if r.enabled %}checked{% endif %}
-                  onchange="toggleRule({{ r.id }}, this.checked)">
+                  data-action-change="rule-toggle" data-id="{{ r.id }}">
                 <span class="sw-track"><span class="sw-thumb"></span></span>
               </label>
             </td>
             <td class="mono">{{ r.domain }}</td>
             <td><span class="badge-action badge-{{ r.action }}">{{ 'Redirect to block page' if r.action == 'block' else ('Allow whitelist only' if r.action == 'allow' else r.action) }}</span></td>
             <td><span class="badge-cat">{{ r.category }}</span></td>
-            <td style="color:var(--muted);font-size:.78rem;">{{ r.description or '—' }}</td>
+            <td class="ext-6e862a35">{{ r.description or '—' }}</td>
             <td>
-              <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
-                onclick="openEdit({{ r.id }})" title="Edit">
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
+                data-action="rule-edit" data-id="{{ r.id }}" title="Edit">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger py-0 px-2"
-                onclick="deleteRule({{ r.id }})">Delete</button>
+              <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                data-action="rule-delete" data-id="{{ r.id }}">Delete</button>
             </td>
           </tr>
           {% else %}
@@ -140,7 +142,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="submitAdd()">Add Rule</button>
+        <button type="button" class="btn btn-primary" data-action="h_e03f86795f">Add Rule</button>
       </div>
     </div>
   </div>
@@ -186,7 +188,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+        <button type="button" class="btn btn-primary" data-action="h_ba8f126572">Save Changes</button>
       </div>
     </div>
   </div>
@@ -194,7 +196,7 @@
 
 <div id="toast"></div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
@@ -263,7 +265,7 @@ function openEdit(id) {
   if (!row) return;
   document.getElementById('e-id').value = id;
   document.getElementById('e-domain').value = row.dataset.domain || '';
-  const action = row.dataset.action || 'block';
+  const action = row.dataset.ruleAction || 'block';
   document.getElementById('e-action').value = action === 'redirect' ? 'block' : action;
   document.getElementById('e-category').value = row.dataset.category || 'custom';
   document.getElementById('e-description').value = row.dataset.description || '';
@@ -284,7 +286,7 @@ async function submitEdit() {
     const row = document.getElementById(`row-${id}`);
     if (row) {
       row.dataset.domain = domain;
-      row.dataset.action = action;
+      row.dataset.ruleAction = action;
       row.dataset.category = category;
       row.dataset.description = description;
       row.cells[1].textContent = domain;
@@ -298,3 +300,21 @@ async function submitEdit() {
 }
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_122e182556'] = function (event, el) { openModal('addModal') };
+  R['h_d3c90c8779'] = function (event, el) { applyFilter() };
+  R['rule-toggle'] = function (event, el) { toggleRule(el.dataset.id, el.checked); };
+  R['rule-edit']   = function (event, el) { openEdit(el.dataset.id); };
+  R['rule-delete'] = function (event, el) { deleteRule(el.dataset.id); };
+  R['h_e03f86795f'] = function (event, el) { submitAdd() };
+  R['h_ba8f126572'] = function (event, el) { submitEdit() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

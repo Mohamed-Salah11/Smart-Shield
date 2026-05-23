@@ -22,11 +22,11 @@
       <div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
       <div><div class="ss-card-title">CARP Status</div><div class="ss-card-subtitle">Green = MASTER — active node handling traffic</div></div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;">Interface</th>
+            <th class="ext-16e59a0f">Interface</th>
             <th>Virtual IP</th>
             <th>Status</th>
             <th>VHID</th>
@@ -38,16 +38,16 @@
           {% if carp_interfaces %}
           {% for iface in carp_interfaces %}
           <tr>
-            <td style="padding:8px 14px;font-weight:500;">{{ iface.name }}</td>
-            <td style="font-family:monospace;font-size:.8rem;">{{ iface.vip }}</td>
+            <td class="ext-92501b52">{{ iface.name }}</td>
+            <td class="ext-7abe10da">{{ iface.vip }}</td>
             <td>
               {% if iface.status == 'MASTER' %}
-              <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(0,180,160,.1);color:var(--success);border:1px solid var(--success);border-radius:20px;font-size:.75rem;font-weight:600;">
-                <span style="width:7px;height:7px;background:var(--success);border-radius:50%;"></span>MASTER
+              <span class="ext-56fcdb70">
+                <span class="ext-7e91510e"></span>MASTER
               </span>
               {% else %}
-              <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:rgba(255,193,7,.1);color:#e6a817;border:1px solid #e6a817;border-radius:20px;font-size:.75rem;font-weight:600;">
-                <span style="width:7px;height:7px;background:#e6a817;border-radius:50%;"></span>BACKUP
+              <span class="ext-164e90df">
+                <span class="ext-96e31c10"></span>BACKUP
               </span>
               {% endif %}
             </td>
@@ -59,7 +59,7 @@
           </tr>
           {% endfor %}
           {% else %}
-          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);">No CARP interfaces defined</td></tr>
+          <tr><td class="ext-a9edf93a" colspan="6">No CARP interfaces defined</td></tr>
           {% endif %}
         </tbody>
       </table>

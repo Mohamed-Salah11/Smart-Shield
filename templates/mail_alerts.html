@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div class="container">
+
+  <div id="ma-toast" class="alert d-none ext-ad4ef29a" role="alert"
+      ></div>
+
+  <div class="ss-page-header">
+    <div>
+      <h1 class="ss-page-title">Mail Alerts</h1>
+      <p class="ss-page-desc">Email security alerts to selected users via a Gmail app password</p>
+    </div>
+  </div>
+
+  <!-- ── Gmail SMTP ─────────────────────────────────────────────── -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-envelope"></i></div>
+      <div><div class="ss-card-title">Gmail SMTP</div>
+        <div class="ss-card-subtitle">Sign in with a Gmail address and an app password</div></div>
+    </div>
+    <div class="ss-card-body p-3">
+      <div class="alert alert-info py-2 ext-1e28117f">
+        <i class="fa-solid fa-circle-info me-1"></i>
+        A Gmail <strong>app password</strong> is required — not your normal password.
+        In your Google Account: <em>Security → 2-Step Verification → App passwords</em>.
+        Generate one, then paste the 16-character value below.
+      </div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">SMTP host</label>
+          <input type="text" class="form-control" id="ma_host"
+                 value="{{ cfg.smtp_host or 'smtp.gmail.com' }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Port</label>
+          <input type="number" class="form-control" id="ma_port"
+                 value="{{ cfg.smtp_port or 587 }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Security</label>
+          <select class="form-select" id="ma_security">
+            <option value="starttls" {{ 'selected' if (cfg.smtp_security or 'starttls') == 'starttls' else '' }}>STARTTLS (587)</option>
+            <option value="ssl" {{ 'selected' if cfg.smtp_security == 'ssl' else '' }}>SSL/TLS (465)</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">From name</label>
+          <input type="text" class="form-control" id="ma_from_name"
+                 value="{{ cfg.from_name or 'SmartShield' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Gmail address (SMTP username)</label>
+          <input type="email" class="form-control" id="ma_username"
+                 value="{{ cfg.smtp_username or '' }}" placeholder="you@gmail.com">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">App password</label>
+          <input type="password" class="form-control" id="ma_password"
+                 placeholder="{{ '•••••••• (leave blank to keep)' if has_password else '16-character app password' }}"
+                 autocomplete="new-password">
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-3 align-items-end">
+        <div>
+          <label class="form-label fw-semibold mb-1">Send a test email to</label>
+          <input type="email" class="form-control ext-8ed2b264" id="ma_test_to"
+                 value="{{ cfg.smtp_username or '' }}">
+        </div>
+        <button type="button" class="btn btn-outline-primary" data-action="h_f9d6495182">
+          <i class="fa-solid fa-paper-plane me-1"></i>Send Test
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Alert filter ──────────────────────────────────────────── -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-filter"></i></div>
+      <div><div class="ss-card-title">Alert Filter</div>
+        <div class="ss-card-subtitle">Which events generate an email, and how often</div></div>
+    </div>
+    <div class="ss-card-body p-3">
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="ma_enabled"
+               {{ 'checked' if cfg.enabled else '' }}>
+        <label class="form-check-label" for="ma_enabled">Mail alerts enabled</label>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Minimum severity</label>
+          <select class="form-select" id="ma_min_severity">
+            {% for s in ['info','low','medium','high','critical'] %}
+            <option value="{{ s }}" {{ 'selected' if (cfg.min_severity or 'high') == s else '' }}>{{ s|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Cooldown (minutes)</label>
+          <input type="number" min="0" class="form-control" id="ma_cooldown"
+                 value="{{ cfg.cooldown_minutes if cfg.cooldown_minutes is not none else 10 }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Max emails / hour</label>
+          <input type="number" min="0" class="form-control" id="ma_cap"
+                 value="{{ cfg.max_per_hour if cfg.max_per_hour is not none else 20 }}">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label fw-semibold">Categories</label>
+          <div class="d-flex flex-wrap gap-3" id="ma_categories">
+            {% set selected_cats = (cfg.category_filter or '').split(',') | map('trim') | list %}
+            {% for c in ['security','ids','firewall','vpn','system','network','session','connection','file_download','privileged','alert'] %}
+            <div class="form-check">
+              <input class="form-check-input ma-cat" type="checkbox" value="{{ c }}"
+                     id="ma_cat_{{ c }}" {{ 'checked' if c in selected_cats else '' }}>
+              <label class="form-check-label" for="ma_cat_{{ c }}">{{ c }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <small class="text-muted">Leave all unchecked to alert on every category.</small>
+        </div>
+      </div>
+      <button type="button" class="btn btn-success mt-3" data-action="h_d7ad452f5b">
+        <i class="fa-solid fa-save me-1"></i>Save Settings
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Recipients ────────────────────────────────────────────── -->
+  <div class="ss-card">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-users"></i></div>
+      <div><div class="ss-card-title">Recipients</div>
+        <div class="ss-card-subtitle">Everyone here receives every alert that passes the filter</div></div>
+    </div>
+    <div class="ss-card-body p-3">
+      <div class="row g-2 mb-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Add a user</label>
+          <select class="form-select" id="ma_user_select">
+            <option value="">— select a user —</option>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="button" class="btn btn-outline-secondary w-100" data-action="h_f97ca6212a">
+            <i class="fa-solid fa-plus me-1"></i>Add user
+          </button>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Or add an email address</label>
+          <input type="email" class="form-control" id="ma_email_input" placeholder="someone@example.com">
+        </div>
+        <div class="col-md-2">
+          <button type="button" class="btn btn-outline-secondary w-100" data-action="h_6f5f1537b8">
+            <i class="fa-solid fa-plus me-1"></i>Add email
+          </button>
+        </div>
+      </div>
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
+            <tr><th class="ext-16e59a0f">Recipient</th><th>Email</th><th>Type</th><th></th></tr>
+          </thead>
+          <tbody id="ma_recipients_table">
+            <tr><td class="ext-5306663a" colspan="4">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+const MA_CSRF = document.querySelector('meta[name=csrf-token]')?.content || '';
+const MA_RECIPIENTS_URL = {{ url_for('system.mail_alerts_recipients_list')|tojson }};
+
+function maToast(msg, ok) {
+  const t = document.getElementById('ma-toast');
+  t.className = 'alert alert-' + (ok ? 'success' : 'danger');
+  t.textContent = msg;
+  t.classList.remove('d-none');
+  setTimeout(() => t.classList.add('d-none'), 5000);
+}
+
+function maConfigPayload() {
+  const cats = Array.from(document.querySelectorAll('.ma-cat:checked')).map(c => c.value);
+  return {
+    enabled:        document.getElementById('ma_enabled').checked,
+    smtp_host:      document.getElementById('ma_host').value,
+    smtp_port:      document.getElementById('ma_port').value,
+    smtp_security:  document.getElementById('ma_security').value,
+    smtp_username:  document.getElementById('ma_username').value,
+    smtp_app_password: document.getElementById('ma_password').value,
+    from_name:      document.getElementById('ma_from_name').value,
+    min_severity:   document.getElementById('ma_min_severity').value,
+    category_filter: cats.join(','),
+    cooldown_minutes: document.getElementById('ma_cooldown').value,
+    max_per_hour:   document.getElementById('ma_cap').value,
+  };
+}
+
+async function maSaveConfig() {
+  const r = await fetch({{ url_for('system.mail_alerts_save_config')|tojson }}, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
+    body: JSON.stringify(maConfigPayload()),
+  });
+  const j = await r.json();
+  if (j.ok) {
+    document.getElementById('ma_password').value = '';
+    maToast('Settings saved.', true);
+  } else {
+    maToast(j.error || 'Save failed.', false);
+  }
+}
+
+async function maSendTest() {
+  const payload = maConfigPayload();
+  payload.to = document.getElementById('ma_test_to').value;
+  maToast('Sending test email…', true);
+  const r = await fetch({{ url_for('system.mail_alerts_test')|tojson }}, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json();
+  maToast(j.message || (j.ok ? 'Test sent.' : 'Test failed.'), j.ok);
+}
+
+function maEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function maLoadRecipients() {
+  const r = await fetch(MA_RECIPIENTS_URL);
+  const j = await r.json();
+  const tb = document.getElementById('ma_recipients_table');
+  if (!j.ok || !(j.recipients || []).length) {
+    tb.innerHTML = '<tr><td class="ext-5306663a" colspan="4">No recipients yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML = j.recipients.map(rc => {
+    const isUser = !!rc.user_id;
+    const name = isUser ? (rc.user_username || ('user #' + rc.user_id)) : (rc.label || '—');
+    const email = isUser ? (rc.user_email || '(no email set)') : (rc.email || '');
+    return `<tr>
+      <td class="ext-ec6b5e99"><strong>${maEsc(name)}</strong></td>
+      <td>${maEsc(email)}</td>
+      <td>${isUser ? '<span class="badge bg-info">User</span>' : '<span class="badge bg-secondary">Address</span>'}</td>
+      <td><button type="button" class="btn btn-sm btn-danger" data-action="ma-delete-recipient" data-id="${rc.id}"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function maAddUser() {
+  const uid = document.getElementById('ma_user_select').value;
+  if (!uid) { maToast('Pick a user first.', false); return; }
+  const r = await fetch(MA_RECIPIENTS_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
+    body: JSON.stringify({user_id: uid}),
+  });
+  const j = await r.json();
+  if (j.ok) { document.getElementById('ma_user_select').value = ''; maLoadRecipients(); }
+  else maToast(j.error || 'Add failed.', false);
+}
+
+async function maAddEmail() {
+  const email = document.getElementById('ma_email_input').value.trim();
+  if (!email) { maToast('Enter an email address.', false); return; }
+  const r = await fetch(MA_RECIPIENTS_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': MA_CSRF},
+    body: JSON.stringify({email: email}),
+  });
+  const j = await r.json();
+  if (j.ok) { document.getElementById('ma_email_input').value = ''; maLoadRecipients(); }
+  else maToast(j.error || 'Add failed.', false);
+}
+
+async function maDeleteRecipient(id) {
+  if (!confirm('Remove this recipient?')) return;
+  const r = await fetch(MA_RECIPIENTS_URL + '/' + id, {
+    method: 'DELETE', headers: {'X-CSRFToken': MA_CSRF},
+  });
+  const j = await r.json();
+  if (j.ok) maLoadRecipients();
+  else maToast(j.error || 'Delete failed.', false);
+}
+
+document.addEventListener('DOMContentLoaded', maLoadRecipients);
+</script>
+{% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_f9d6495182'] = function (event, el) { maSendTest() };
+  R['h_d7ad452f5b'] = function (event, el) { maSaveConfig() };
+  R['h_f97ca6212a'] = function (event, el) { maAddUser() };
+  R['h_6f5f1537b8'] = function (event, el) { maAddEmail() };
+  R['ma-delete-recipient'] = function (event, el) { maDeleteRecipient(el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

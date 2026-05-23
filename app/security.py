@@ -17,10 +17,12 @@ def get_csrf_token():
 
 
 def _request_csrf_token():
+    # Accept tokens only from the X-CSRF-Token header or the form body.
+    # Query-string tokens are NOT accepted: URLs leak through access logs,
+    # browser history, and Referer headers.
     return (
         request.headers.get(CSRF_HEADER_NAME)
         or request.form.get("csrf_token")
-        or request.args.get("csrf_token")
     )
 
 

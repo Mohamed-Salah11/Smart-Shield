@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Shield Setup — Step 4: Apply</title>
+  <title>SmartShield Setup — Step 4: Apply</title>
   <link rel="stylesheet" href="/static/css/base.css">
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     body { background: #1a1d23; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; }
     .wizard-wrap { max-width: 640px; margin: 60px auto; padding: 0 20px; }
     .wizard-header { text-align: center; margin-bottom: 40px; }
@@ -45,8 +45,8 @@
 <body>
 <div class="wizard-wrap">
   <div class="wizard-header">
-    <img src="/static/images/SS.png" alt="Smart Shield" height="48" style="margin-bottom:12px">
-    <h1>Smart Shield Setup</h1>
+    <img class="ext-fa3e1c7d" src="/static/images/SS.png" alt="SmartShield" height="48">
+    <h1>SmartShield Setup</h1>
   </div>
 
   <div class="step-indicator">
@@ -57,8 +57,8 @@
   </div>
 
   <div class="card">
-    <h2 style="margin-top:0; color:#e0e0e0;">Step 4 — Apply Configuration</h2>
-    <p style="color:#9e9e9e; margin-bottom:20px;">
+    <h2 class="ext-c20e3183">Step 4 — Apply Configuration</h2>
+    <p class="ext-fdc435a4">
       Review your settings, then click <strong>Apply &amp; Finish</strong> to write
       the configuration and start all services.
     </p>
@@ -80,17 +80,17 @@
 
     <div class="done-banner" id="done-banner">
       <h3>🎉 Setup Complete!</h3>
-      <p>Smart Shield is now configured. Redirecting to the dashboard…</p>
+      <p>SmartShield is now configured. Redirecting to the dashboard…</p>
     </div>
 
-    <button class="btn-secondary" id="btn-back" onclick="window.location.href='/setup/step3'">← Back</button>
-    <button class="btn-primary" id="btn-apply" onclick="applyConfig()">
+    <button class="btn-secondary" id="btn-back">← Back</button>
+    <button class="btn-primary" id="btn-apply">
       ✓ Apply &amp; Finish
     </button>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   const CSRF_TOKEN = "{{ csrf_token() }}";
 async function applyConfig() {
   document.getElementById('btn-apply').disabled = true;
@@ -154,6 +154,9 @@ async function applyConfig() {
     document.getElementById('btn-back').disabled  = false;
   }
 }
+
+document.getElementById('btn-back').addEventListener('click', () => { window.location.href = '/setup/step3'; });
+document.getElementById('btn-apply').addEventListener('click', applyConfig);
 </script>
 </body>
 </html>

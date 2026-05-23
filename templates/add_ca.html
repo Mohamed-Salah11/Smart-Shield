@@ -6,11 +6,12 @@
     <div class="ss-page-header"><div><h1 class="ss-page-title">Add Certificate Authority</h1><p class="ss-page-desc">Create or import a CA certificate</p></div></div>
 
     <form method="POST" action="{{ url_for('system.add_ca') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Internal Certificate Authority Section -->
         <div class="ss-card">
             <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-building-columns"></i></div><div><div class="ss-card-title">Internal Certificate Authority</div></div></div>
-            <div class="ss-card-body" style="padding: 20px;">
+            <div class="ss-card-body ext-23a20082">
 
                 <div class="mb-3 row align-items-center">
                     <label for="key_type" class="col-sm-3 col-form-label fw-semibold">Key Type</label>

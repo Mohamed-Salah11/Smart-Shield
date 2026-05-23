@@ -1,0 +1,117 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Response Recommendations{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">Response Recommendations</h2>
+    <p class="ext-6609c206">
+      File a recommended firewall response. SmartShield Core admin reviews and applies it —
+      the SOC Portal never changes firewall state directly.
+    </p>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category in ['error','danger'] else category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- File a recommendation -->
+<div class="soc-card">
+  <div class="soc-card-head">
+    <div>
+      <div class="soc-card-title">File a Recommendation</div>
+      <div class="soc-card-subtitle">Proposes a firewall action for Core approval</div>
+    </div>
+  </div>
+  <div class="soc-card-body">
+    <form method="POST" action="{{ url_for('soc_portal.recommendation_create') }}" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-3">
+        <label class="form-label">Action</label>
+        <select name="action_type" class="form-select" required>
+          <option value="block_ip">Block IP</option>
+          <option value="unblock_ip">Unblock IP</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Target IP</label>
+        <input type="text" name="target_value" class="form-control" placeholder="1.2.3.4" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Severity</label>
+        <select name="severity" class="form-select">
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+          <option value="info">Info</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Reason</label>
+        <input type="text" name="reason" class="form-control" placeholder="Why this action is recommended">
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane me-1"></i>File Recommendation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Recommendations list -->
+<div class="soc-card">
+  <div class="soc-card-head">
+    <div><div class="soc-card-title">Recommendations</div></div>
+  </div>
+  <div class="soc-card-body ext-57ce1f1b">
+    {% if recs %}
+    <table class="soc-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Action</th><th>Target</th><th>Severity</th><th>Status</th>
+          <th>Filed by</th><th>Created</th><th>Review</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recs %}
+        <tr>
+          <td>{{ r['id'] }}</td>
+          <td>{{ r['action_type'] }}</td>
+          <td><code>{{ r['target_value'] }}</code></td>
+          <td><span class="badge-sev {{ r['severity'] }}">{{ r['severity'] }}</span></td>
+          <td>{{ r['status'] }}</td>
+          <td>{{ r['created_by'] or '—' }}</td>
+          <td class="ext-9fb8e23e">{{ r['created_at'] }}</td>
+          <td>
+            {% if r['status'] == 'pending' and tier in ('L2','L3') %}
+            <div class="d-flex gap-1">
+              <form method="POST" action="{{ url_for('soc_portal.recommendation_review', rec_id=r['id']) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="decision" value="approve">
+                <button type="submit" class="btn btn-sm btn-primary" title="Endorse and send to Core">Endorse</button>
+              </form>
+              <form method="POST" action="{{ url_for('soc_portal.recommendation_review', rec_id=r['id']) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="decision" value="reject">
+                <button type="submit" class="btn btn-sm btn-secondary" title="Reject">Reject</button>
+              </form>
+            </div>
+            {% else %}
+            <span class="ext-a729d7fe">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="ext-e5c48d14">No recommendations filed yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

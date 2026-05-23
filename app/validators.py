@@ -134,6 +134,52 @@ def validate_port_list(value: str, *, allow_empty: bool = True) -> str:
     return v
 
 
+def normalize_ports(value: str, *, allow_empty: bool = True) -> str:
+    """Validate and canonicalize a port string for PF rule generation.
+
+    Accepts: ``"80"``, ``"80,443"``, ``"1000-2000"``, ``"1000:2000"``,
+    comma-separated mixes, and whitespace-padded variants.
+    Returns: comma-joined, PF-canonical form using ``:`` for ranges
+    (e.g. ``"1000:2000"``). The PF rule generator can splice the
+    returned string straight into a ``{ ... }`` port list.
+
+    Raises ``ValueError`` for empty (unless ``allow_empty``), out-of-range
+    ports, descending ranges, non-numeric tokens, or any token that contains
+    shell/PF metacharacters such as space, ``;`` or rule keywords.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        if allow_empty:
+            return ""
+        raise ValueError("Port value is required")
+
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if not parts:
+        if allow_empty:
+            return ""
+        raise ValueError("Port value is required")
+
+    normalized: list[str] = []
+    for part in parts:
+        # Reject embedded whitespace or non-port characters early — without
+        # this, a string like "80 pass all" would slip through as two tokens.
+        if not re.match(r"^\d+([:\-]\d+)?$", part):
+            raise ValueError(f"Invalid port token: {part!r}")
+        if "-" in part or ":" in part:
+            sep = ":" if ":" in part else "-"
+            lo_s, hi_s = part.split(sep, 1)
+            lo, hi = int(lo_s), int(hi_s)
+            if not (1 <= lo <= hi <= 65535):
+                raise ValueError(f"Invalid port range: {part!r}")
+            normalized.append(f"{lo}:{hi}")
+        else:
+            port = int(part)
+            if not (1 <= port <= 65535):
+                raise ValueError(f"Port {port} out of range 1-65535")
+            normalized.append(str(port))
+    return ",".join(normalized)
+
+
 # ── Protocol ──────────────────────────────────────────────────────────────────
 
 _VALID_PROTOCOLS = frozenset({
@@ -164,6 +210,23 @@ def validate_interface_name(value: str, *, allow_empty: bool = True) -> str:
         raise ValueError("Interface name is required")
     if not _IFACE_RE.match(v):
         raise ValueError(f"Invalid interface name: {v!r}")
+    return v
+
+
+# ── MAC address ──────────────────────────────────────────────────────────────
+
+_MAC_RE = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
+
+
+def validate_mac(value: str, *, allow_empty: bool = True) -> str:
+    """Validate a MAC address in xx:xx:xx:xx:xx:xx format (case-insensitive)."""
+    v = (value or "").strip().lower()
+    if not v:
+        if allow_empty:
+            return v
+        raise ValueError("MAC address is required")
+    if not _MAC_RE.match(v):
+        raise ValueError(f"Invalid MAC address: {value!r} (expected xx:xx:xx:xx:xx:xx)")
     return v
 
 

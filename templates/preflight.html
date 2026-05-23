@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 .pf-section { margin-bottom: 24px; }
 .pf-row {
   display: flex;
@@ -69,7 +69,7 @@
       {% endif %}
     </div>
     {% if not overall_ok and report.missing_required %}
-    <div style="font-size:.82rem;color:var(--secondary);">
+    <div class="ext-22befaf1">
       Missing: <strong>{{ report.missing_required | join(', ') }}</strong>
     </div>
     {% endif %}
@@ -87,8 +87,8 @@
         <span class="pf-icon {% if d.ok %}pf-ok{% else %}pf-err{% endif %}">
           <i class="fa-solid fa-{{ 'check' if d.ok else 'xmark' }}"></i>
         </span>
-        <div style="flex:1;min-width:0;">
-          <div class="pf-name" style="font-family:ui-monospace,monospace;font-size:.82rem;">{{ d.path }}</div>
+        <div class="ext-89bd09bd">
+          <div class="pf-name ext-01152d77">{{ d.path }}</div>
           {% if d.error %}<div class="pf-meta pf-err">{{ d.error }}</div>{% endif %}
         </div>
         {% if not d.ok %}
@@ -115,7 +115,7 @@
         <div class="ss-card-icon"><i class="fa-solid fa-wrench"></i></div>
         <div><div class="ss-card-title">Tool / Package Checks</div></div>
         <div class="ss-card-actions">
-          <span style="font-size:.78rem;color:var(--muted);">
+          <span class="ext-eac8f080">
             {{ report.tools|selectattr('present')|list|length }} / {{ report.tools|length }} present
           </span>
         </div>
@@ -125,7 +125,7 @@
         <span class="pf-icon {% if t.present %}pf-ok{% elif t.optional %}pf-warn{% else %}pf-err{% endif %}">
           <i class="fa-solid fa-{{ 'check' if t.present else 'xmark' }}"></i>
         </span>
-        <div style="flex:1;min-width:0;">
+        <div class="ext-89bd09bd">
           <div class="pf-name">{{ t.name }}</div>
           <div class="pf-meta">{{ t.description }}</div>
         </div>
@@ -157,18 +157,18 @@
       </div>
       <div class="ss-card-body">
         {% if missing %}
-        <p class="text-muted mb-2" style="font-size:.85rem;"><strong>Required packages (must install):</strong></p>
+        <p class="text-muted mb-2 ext-1e28117f"><strong>Required packages (must install):</strong></p>
         <pre>pkg update
 pkg install -y {% for t in missing %}{% if t.pkg and 'pip' not in t.pkg %}{{ t.pkg }} {% endif %}{% endfor %}
 </pre>
         {% endif %}
         {% if missing_opt %}
-        <p class="text-muted mb-2 mt-3" style="font-size:.85rem;"><strong>Optional packages (install as needed):</strong></p>
+        <p class="text-muted mb-2 mt-3 ext-1e28117f"><strong>Optional packages (install as needed):</strong></p>
         <pre>pkg install -y {% for t in missing_opt %}{% if t.pkg and 'pip' not in t.pkg %}{{ t.pkg }} {% endif %}{% endfor %}
 </pre>
         {% endif %}
-        <p class="text-muted mb-2 mt-3" style="font-size:.85rem;"><strong>Python packages (via pip inside venv):</strong></p>
-        <pre>cd /usr/local/share/smart-shield
+        <p class="text-muted mb-2 mt-3 ext-1e28117f"><strong>Python packages (via pip inside venv):</strong></p>
+        <pre>cd /usr/local/share/smartshield
 python3 -m venv .venv
 . .venv/bin/activate
 pip install --upgrade pip

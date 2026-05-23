@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for
 import sqlite3
 from app.auth_utils import login_required
 from app.api_auth import api_permission_required
@@ -16,12 +16,14 @@ interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
 @interfaces_bp.route("/")
 @login_required
 def interfaces_home():
-    return render_template("interfaces.html")
+    # interfaces.html is a placeholder stub; the Assignments page is the
+    # real landing screen for the Interfaces section.
+    return redirect(url_for("interfaces.interfaces_assignments"))
 
 @interfaces_bp.route("/interfaces")
 @login_required
 def interfaces():
-    return render_template("interfaces.html")
+    return redirect(url_for("interfaces.interfaces_assignments"))
 
 
 # ----------------------------
@@ -37,6 +39,8 @@ def interfaces_assignments():
 @login_required
 def available_ports():
     """Return physical NICs for assignment dropdowns."""
+    import sys
+    is_freebsd = sys.platform.startswith("freebsd")
     try:
         from app.services.network_service import list_physical_nics
 
@@ -67,13 +71,24 @@ def available_ports():
                 "media": media,
             })
 
+        # P2-06: on FreeBSD, an empty result means real detection failed —
+        # fail loud rather than mask the issue with em0/em1 fake data.
+        # On non-FreeBSD (dev box), surface the em0/em1 stub data but flag
+        # it as dev_mode so the UI can render a "DEV / DEMO DATA" badge.
+        dev_mode = False
         if not ports:
+            if is_freebsd:
+                return jsonify({
+                    "status": "error",
+                    "message": "No network interfaces detected. Check ifconfig -l output.",
+                }), 503
+            dev_mode = True
             ports = [
                 {"name": "em0", "label": "em0", "ether": "", "status": "", "media": ""},
                 {"name": "em1", "label": "em1", "ether": "", "status": "", "media": ""},
             ]
 
-        return jsonify({"status": "success", "ports": ports})
+        return jsonify({"status": "success", "ports": ports, "dev_mode": dev_mode})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 400
 
@@ -96,14 +111,14 @@ def get_interface_groups():
         ]
         return jsonify({'status': 'success', 'data': groups_list})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
     
 @interfaces_bp.route("/save-interface-group", methods=['POST'])
 @api_permission_required("api.network.edit")
 def save_interface_group():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         name = (data.get('groupName') or '').strip()
         errs = [] if name else ["Group name is required"]
         if errs:
@@ -148,7 +163,7 @@ def get_interface_group(group_id):
 @api_permission_required("api.network.edit")
 def update_interface_group(group_id):
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         name = (data.get('groupName') or '').strip()
         errs = [] if name else ["Group name is required"]
         if errs:
@@ -201,14 +216,14 @@ def get_interface_assignments():
         ]
         return jsonify({'status': 'success', 'data': assignments_list})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-interface-assignment", methods=['POST'])
 @api_permission_required("api.network.edit")
 def save_interface_assignment():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         iface_type = (data.get('interfaceType') or '').strip().upper()
         net_port   = (data.get('networkPort') or '').strip()
 
@@ -308,14 +323,14 @@ def get_wireless_configs():
         ]
         return jsonify({'status': 'success', 'data': configs_list})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-wireless-config", methods=['POST'])
 @api_permission_required("api.network.edit")
 def save_wireless_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO wireless_configs (parent_interface, mode, description) 
@@ -324,7 +339,7 @@ def save_wireless_config():
         conn.commit()
         return jsonify({'status': 'success', 'message': 'Wireless config saved'})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/get-wireless-config/<int:config_id>", methods=['GET'])
@@ -351,7 +366,7 @@ def get_wireless_config(config_id):
 @api_permission_required("api.network.edit")
 def update_wireless_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE wireless_configs SET parent_interface = ?, mode = ?, description = ? WHERE id = ?''',
@@ -398,14 +413,14 @@ def get_vlan_configs():
         ]
         return jsonify({'status': 'success', 'data': configs_list})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-vlan-config", methods=['POST'])
 @api_permission_required("api.network.edit")
 def save_vlan_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO vlan_configs (parent_interface, vlan_tag, vlan_priority, description) 
@@ -414,7 +429,7 @@ def save_vlan_config():
         conn.commit()
         return jsonify({'status': 'success', 'message': 'VLAN config saved'})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/get-vlan-config/<int:config_id>", methods=['GET'])
@@ -442,7 +457,7 @@ def get_vlan_config(config_id):
 @api_permission_required("api.network.edit")
 def update_vlan_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE vlan_configs SET parent_interface = ?, vlan_tag = ?, vlan_priority = ?, description = ? WHERE id = ?''',
@@ -490,14 +505,14 @@ def get_qinq_configs():
         ]
         return jsonify({'status': 'success', 'data': configs_list})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/save-qinq-config", methods=['POST'])
 @api_permission_required("api.network.edit")
 def save_qinq_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO qinq_configs (parent_interface, first_level_tag, add_to_groups, description, member_tags) 
@@ -506,7 +521,7 @@ def save_qinq_config():
         conn.commit()
         return jsonify({'status': 'success', 'message': 'QinQ config saved'})
     except Exception as e:
-        print(f"Error: {str(e)}")
+        current_app.logger.exception("interfaces: %s", e)
         return jsonify({'status': 'error', 'message': str(e)}), 400
 
 @interfaces_bp.route("/get-qinq-config/<int:config_id>", methods=['GET'])
@@ -535,7 +550,7 @@ def get_qinq_config(config_id):
 @api_permission_required("api.network.edit")
 def update_qinq_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE qinq_configs SET parent_interface = ?, first_level_tag = ?, add_to_groups = ?, description = ?, member_tags = ? WHERE id = ?''',
@@ -589,7 +604,7 @@ def get_ppp_configs():
 @api_permission_required("api.network.edit")
 def save_ppp_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO ppp_configs (link_type, link_interfaces, description, username, password, dial_on_demand)
@@ -627,7 +642,7 @@ def get_ppp_config(config_id):
 @api_permission_required("api.network.edit")
 def update_ppp_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE ppp_configs SET link_type = ?, link_interfaces = ?, description = ?, username = ?, password = ?, dial_on_demand = ? WHERE id = ?''',
@@ -688,7 +703,7 @@ def get_gre_configs():
 @api_permission_required("api.network.edit")
 def save_gre_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO gre_configs (parent_interface, gre_remote_address, gre_local_address, ipv4_tunnel_remote_address, ipv4_tunnel_remote_prefix, ipv4_tunnel_local_address, ipv4_tunnel_local_prefix, ipv6_tunnel_remote_address, ipv6_tunnel_remote_prefix, ipv6_tunnel_local_address, ipv6_tunnel_local_prefix, description)
@@ -732,7 +747,7 @@ def get_gre_config(config_id):
 @api_permission_required("api.network.edit")
 def update_gre_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE gre_configs SET parent_interface = ?, gre_remote_address = ?, gre_local_address = ?, ipv4_tunnel_remote_address = ?, ipv4_tunnel_remote_prefix = ?, ipv4_tunnel_local_address = ?, ipv4_tunnel_local_prefix = ?, ipv6_tunnel_remote_address = ?, ipv6_tunnel_remote_prefix = ?, ipv6_tunnel_local_address = ?, ipv6_tunnel_local_prefix = ?, description = ? WHERE id = ?''',
@@ -789,7 +804,7 @@ def get_gif_configs():
 @api_permission_required("api.network.edit")
 def save_gif_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO gif_configs (parent_interface, gif_remote_address, gif_tunnel_local_address, gif_tunnel_remote_address, gif_tunnel_subnet, ecn_friendly_behavior, outer_source_filtering, description)
@@ -829,7 +844,7 @@ def get_gif_config(config_id):
 @api_permission_required("api.network.edit")
 def update_gif_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE gif_configs SET parent_interface = ?, gif_remote_address = ?, gif_tunnel_local_address = ?, gif_tunnel_remote_address = ?, gif_tunnel_subnet = ?, ecn_friendly_behavior = ?, outer_source_filtering = ?, description = ? WHERE id = ?''',
@@ -887,7 +902,7 @@ def get_bridge_configs():
 @api_permission_required("api.network.edit")
 def save_bridge_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO bridge_configs (member_interfaces, description, cache_size, cache_max_age, span_interfaces, edge_interfaces, auto_edge_interfaces, ptp_interfaces, sticky_ports)
@@ -928,7 +943,7 @@ def get_bridge_config(config_id):
 @api_permission_required("api.network.edit")
 def update_bridge_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE bridge_configs SET member_interfaces = ?, description = ?, cache_size = ?, cache_max_age = ?, span_interfaces = ?, edge_interfaces = ?, auto_edge_interfaces = ?, ptp_interfaces = ?, sticky_ports = ? WHERE id = ?''',
@@ -980,7 +995,7 @@ def get_lagg_configs():
 @api_permission_required("api.network.edit")
 def save_lagg_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO lagg_configs (parent_interfaces, aggregation_protocol, description) 
@@ -1016,7 +1031,7 @@ def get_lagg_config(config_id):
 @api_permission_required("api.network.edit")
 def update_lagg_config(config_id):
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE lagg_configs SET parent_interfaces = ?, aggregation_protocol = ?, description = ? WHERE id = ?''',
@@ -1084,7 +1099,7 @@ def get_wan_config():
 @api_permission_required("api.network.edit")
 def save_wan_config():
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         encrypted_password = encrypt_secret(data.get('password')) if data.get('password') else None
         conn = get_db()
         cursor = conn.cursor()
@@ -1165,7 +1180,7 @@ def get_lan_config():
 @api_permission_required("api.network.edit")
 def save_lan_config():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''UPDATE lan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
@@ -1181,6 +1196,12 @@ def save_lan_config():
             res = apply_interface_config(conn)
             bsd_applied = res.get("ok", False)
             bsd_message = res.get("message", "")
+            # Regenerate nginx only AFTER the interface holds the new LAN IP,
+            # so `service nginx reload` does not fail with EADDRNOTAVAIL.
+            if bsd_applied:
+                from app.services.nginx_writer import apply_nginx
+                nginx_res = apply_nginx(conn)
+                bsd_message = f"{bsd_message} | nginx: {nginx_res.get('message', '')}"
         except Exception as exc:
             bsd_message = str(exc)
         return jsonify({'status': 'success', 'message': 'Config saved',

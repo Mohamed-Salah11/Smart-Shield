@@ -1,0 +1,29 @@
+{% extends "vpn_portal/base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="vp-card">
+  <h1>Sign in</h1>
+  <p class="subtitle">Use your VPN portal credentials. Need access? Contact your administrator.</p>
+
+  {% if error %}<div class="alert-vp-danger mb-3">{{ error }}</div>{% endif %}
+
+  <form method="POST" autocomplete="on">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label class="form-label" for="username">Username</label>
+      <input id="username" name="username" type="text" class="form-control"
+             autocomplete="username" required autofocus>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="password">Password</label>
+      <input id="password" name="password" type="password" class="form-control"
+             autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn btn-vp w-100">
+      <i class="fas fa-right-to-bracket"></i> Sign in
+    </button>
+  </form>
+
+  <p class="vp-meta">After five failed attempts your account is locked for 15 minutes.</p>
+</div>
+{% endblock %}

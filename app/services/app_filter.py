@@ -27,9 +27,12 @@ generate_app_filter_pf_rules(conn)          -> str          # for pf_generator
 apply_app_filter(conn)                      -> dict
 """
 
+import logging
 import sys
 
-from app.services.content_policy import get_block_page_ip
+from app.services.content_policy import get_block_page_ip, normalize_action, normalize_domain
+
+_log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +80,11 @@ APP_SIGNATURES = {
     "youtube": {
         "name": "YouTube",
         "category": "streaming",
-        "domains": "youtube.com,youtu.be,ytimg.com,googlevideo.com,yt3.ggpht.com",
+        # youtubei.googleapis.com / youtube.googleapis.com host the YouTube API
+        # endpoints the mobile and desktop clients hit before video metadata
+        # loads. Without those entries, blocking only the *.youtube.com names
+        # still lets the app fetch search/recommendations via googleapis.com.
+        "domains": "youtube.com,youtu.be,ytimg.com,googlevideo.com,yt3.ggpht.com,youtubei.googleapis.com,youtube.googleapis.com",
         "ports": "",
         "protocol": "tcp+udp",
     },
@@ -291,19 +298,18 @@ def toggle_app_filter_rule(conn, rule_id: int, enabled: bool) -> None:
 
 def _hot_remove_domain(domain: str) -> None:
     """Remove a single domain zone from live Unbound (FreeBSD only, best-effort)."""
-    import sys
     if not sys.platform.startswith("freebsd"):
         return
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_zone_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("app_filter: hot-remove local_zone failed for %r: %s", domain, exc)
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_data_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("app_filter: hot-remove local_data failed for %r: %s", domain, exc)
 
 
 def delete_app_filter_rule(conn, rule_id: int) -> None:
@@ -326,10 +332,9 @@ def delete_app_filter_rule(conn, rule_id: int) -> None:
 def generate_app_filter_dns_zones(conn) -> list:
     """
     Return Unbound server-block lines for app filter DNS blocking.
-    Consumed by dns_writer.generate_unbound_conf().
 
-    Redirects blocked app domains to Smart Shield's LAN IP so the browser hits
-    the /portal/block page. Falls back to always_nxdomain if no LAN IP is set.
+    DEPRECATED for the apply path — see ``dns_filter.generate_dns_filter_zones``
+    for the rationale. Kept only for ``filter_conflicts.get_filter_preview``.
     """
     block_ip = get_block_page_ip(conn)
 
@@ -341,20 +346,17 @@ def generate_app_filter_dns_zones(conn) -> list:
     """)
     lines = []
     for rule in rules:
-        action = (rule.get("action") or "block").lower()
+        # Canonicalize so legacy "block"/"allow" rows and any new canonical
+        # values both route into the same branches.
+        action = normalize_action(rule.get("action"))
         for raw in (rule.get("domains") or "").split(","):
-            domain = raw.strip().lower().lstrip("*.").strip(".")
+            domain = normalize_domain(raw)
             if not domain:
                 continue
             fqdn = domain + "."
-            if action == "block":
-                if block_ip:
-                    lines.append(f'    local-zone: "{fqdn}" redirect')
-                    lines.append(f'    local-data: "{fqdn} A {block_ip}"')
-                else:
-                    lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
-            elif action == "allow":
-                # "Allow whitelist only" — block for everyone; whitelist_view overrides.
+            # block_all and allow_whitelist_only both emit a default block —
+            # whitelist_view transparent overrides re-allow the whitelist tier.
+            if action in ("block_all", "allow_whitelist_only"):
                 if block_ip:
                     lines.append(f'    local-zone: "{fqdn}" redirect')
                     lines.append(f'    local-data: "{fqdn} A {block_ip}"')
@@ -368,24 +370,45 @@ def generate_app_filter_dns_overrides(conn) -> list:
     Return local-zone transparent overrides for 'allow whitelist only' app DNS rules.
     Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
     """
+    # Match any "allow_whitelist_only" rule — covers both the canonical value
+    # and the legacy "allow" the UI used to write before normalize_action landed.
     rules = _rows(conn, """
         SELECT domains FROM filter_app_rules
-        WHERE action='allow' AND block_dns=1 AND enabled=1
+        WHERE LOWER(COALESCE(action,'')) IN ('allow', 'allow_whitelist_only')
+          AND block_dns=1 AND enabled=1
     """)
     lines = []
     for rule in rules:
         for raw in (rule.get("domains") or "").split(","):
-            domain = raw.strip().lower().lstrip("*.").strip(".")
+            domain = normalize_domain(raw)
             if domain:
                 lines.append(f'    local-zone: "{domain}." transparent')
     return lines
 
 
-def generate_app_filter_pf_rules(conn) -> str:
+def generate_app_filter_pf_rules(conn, lan_iface: str = "") -> str:
     """
-    Return PF block rules for app filter port-based blocking.
-    Consumed by pf_generator.generate_pf_conf().
+    Return PF block rules for app-filter port-based blocking. Consumed by
+    pf_generator.generate_pf_conf().
+
+    The rules are scoped to ingress traffic on the LAN interface so they
+    only affect Smart Shield's downstream clients — WAN-side traffic and
+    inter-VLAN traffic on other interfaces are not impacted. When the LAN
+    interface cannot be determined (e.g. development host with no LAN
+    assignment yet) the rules are emitted without an interface scope so
+    they still match in dry-run validation.
     """
+    if not lan_iface:
+        try:
+            row = conn.execute(
+                "SELECT assigned_port FROM lan_config LIMIT 1"
+            ).fetchone()
+            lan_iface = ((row["assigned_port"] if row else "") or "").strip()
+        except Exception:
+            lan_iface = ""
+
+    iface_scope = f"in log quick on {lan_iface}" if lan_iface else "in log quick"
+
     rules = _rows(conn, """
         SELECT app_name, ports, protocol, action
         FROM filter_app_rules
@@ -394,11 +417,11 @@ def generate_app_filter_pf_rules(conn) -> str:
     """)
     lines = []
     for rule in rules:
-        action = (rule.get("action") or "block").lower()
-        if action == "block":
+        action = normalize_action(rule.get("action"))
+        if action == "block_all":
             src_excl = "!<admin_bypass_clients>"
-        elif action == "allow":
-            # "Allow whitelist only" — block non-whitelisted devices only.
+        elif action == "allow_whitelist_only":
+            # Block non-whitelisted devices only.
             src_excl = "!<device_whitelist>"
         else:
             continue
@@ -422,10 +445,10 @@ def generate_app_filter_pf_rules(conn) -> str:
         port_list = "{ " + " ".join(parts) + " }"
         lines.append(f"# {app_name}")
         if protocol == "tcp+udp":
-            lines.append(f"block quick proto tcp from {src_excl} to any port {port_list}")
-            lines.append(f"block quick proto udp from {src_excl} to any port {port_list}")
+            lines.append(f"block {iface_scope} proto tcp from {src_excl} to any port {port_list}")
+            lines.append(f"block {iface_scope} proto udp from {src_excl} to any port {port_list}")
         else:
-            lines.append(f"block quick proto {protocol} from {src_excl} to any port {port_list}")
+            lines.append(f"block {iface_scope} proto {protocol} from {src_excl} to any port {port_list}")
 
     if not lines:
         return ""
@@ -437,22 +460,19 @@ def generate_app_filter_pf_rules(conn) -> str:
 # ---------------------------------------------------------------------------
 
 def apply_app_filter(conn) -> dict:
-    """Regenerate unbound.conf (DNS blocking) and pf.conf (port blocking), then reload both."""
+    """Regenerate unbound.conf (DNS blocking) and pf.conf (port blocking),
+    then reload both. Both halves go through their validate/rollback
+    pipelines so a malformed app-filter rule cannot break the appliance.
+    """
     results = []
     ok = True
 
     try:
-        from app.services.dns_writer import write_unbound_conf
-        dns_result = write_unbound_conf(conn)
+        from app.services.dns_writer import apply_unbound
+        dns_result = apply_unbound(conn)
         results.append(f"DNS: {dns_result['message']}")
         if not dns_result["ok"]:
             ok = False
-        elif sys.platform.startswith("freebsd"):
-            from app.services.service_manager import service_action
-            r = service_action("unbound", "reload")
-            results.append(f"Unbound reload: {r['message']}")
-            if not r["ok"]:
-                ok = False
     except Exception as exc:
         results.append(f"DNS apply error: {exc}")
         ok = False

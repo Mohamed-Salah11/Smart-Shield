@@ -1,0 +1,146 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Threat Intelligence{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">Threat Intelligence</h2>
+    <p class="ext-6609c206">Live feed status from abuse.ch and active IDS rulesets</p>
+  </div>
+  <button class="btn-soc-secondary" data-action="h_08923d4f69">
+    <i class="fa-solid fa-rotate me-1"></i> Refresh
+  </button>
+</div>
+
+<!-- Feed Status KPIs -->
+<div id="feed-kpis" class="soc-kpi-grid">
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-58991e18" id="ti-feeds-enabled">—</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-rss me-1"></i> Threat Feeds</div>
+  </div>
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-fe726ce2" id="ti-ruleset-count">—</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-list-check me-1"></i> Active Rulesets</div>
+  </div>
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-822b5ada" id="ti-last-updated">—</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-clock me-1"></i> Last Updated</div>
+  </div>
+</div>
+
+<!-- Threat Feeds -->
+<div class="soc-card mb-4">
+  <div class="soc-card-head">
+    <i class="fa-solid fa-biohazard ext-6c0fabf5"></i>
+    <div>
+      <div class="soc-card-title">abuse.ch Threat Feeds</div>
+      <div class="soc-card-subtitle">URLhaus · MalwareBazaar · ThreatFox — updated every 4 hours</div>
+    </div>
+  </div>
+  <div class="soc-card-body">
+    <div class="row g-3" id="abuse-ch-cards">
+      <div class="col-md-4">
+        <div class="ext-9df81006">
+          <div class="ext-2d857ec4">
+            <i class="fa-solid fa-link me-1"></i> URLhaus
+          </div>
+          <p class="ext-7c13afb9">Malicious URLs distributing malware — actively blocked via PF alias.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="ext-05507912">
+          <div class="ext-77600e26">
+            <i class="fa-solid fa-bug me-1"></i> MalwareBazaar
+          </div>
+          <p class="ext-7c13afb9">Malware sample C2 infrastructure IPs — used to enrich IDS alerts.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="ext-bc337146">
+          <div class="ext-9e6e10f3">
+            <i class="fa-solid fa-crosshairs me-1"></i> ThreatFox
+          </div>
+          <p class="ext-7c13afb9">IOCs (IPs, domains, hashes) mapped to malware families and campaigns.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IDS Rulesets -->
+<div class="soc-card">
+  <div class="soc-card-head">
+    <i class="fa-solid fa-shield-halved ext-e07b2ee9"></i>
+    <div>
+      <div class="soc-card-title">IDS/IPS Rulesets</div>
+      <div class="soc-card-subtitle">Active Suricata detection rules</div>
+    </div>
+  </div>
+  <div class="soc-card-body p-0">
+    <table class="soc-table" id="ruleset-table">
+      <thead>
+        <tr>
+          <th>Ruleset Name</th>
+          <th class="ext-ee0435f7">Status</th>
+          <th>Source URL</th>
+        </tr>
+      </thead>
+      <tbody id="ruleset-tbody">
+        <tr><td colspan="3" class="text-center py-3 ext-a729d7fe">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+
+<script nonce="{{ csp_nonce() }}">
+async function loadFeeds() {
+  try {
+    const r = await fetch('/soc-portal/api/threat-feeds');
+    const d = await r.json();
+
+    document.getElementById('ti-feeds-enabled').textContent = d.threat_feeds_enabled ? 'Enabled' : 'Disabled';
+    document.getElementById('ti-feeds-enabled').style.color  = d.threat_feeds_enabled ? 'var(--soc-success)' : 'var(--soc-danger)';
+
+    const active = (d.rulesets || []).filter(r => r.enabled).length;
+    document.getElementById('ti-ruleset-count').textContent = `${active} / ${(d.rulesets||[]).length}`;
+
+    if (d.last_updated) {
+      try {
+        document.getElementById('ti-last-updated').textContent = new Date(d.last_updated).toLocaleString();
+      } catch { document.getElementById('ti-last-updated').textContent = d.last_updated; }
+    }
+
+    const tbody = document.getElementById('ruleset-tbody');
+    if (!d.rulesets || !d.rulesets.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="soc-empty">No rulesets configured</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.rulesets.map(rs => `<tr>
+      <td class="ext-1e29eefb">${rs.name}</td>
+      <td>
+        <span class="ext-5cb45d86">
+          ${rs.enabled ? '● Active' : '○ Disabled'}
+        </span>
+      </td>
+      <td class="ext-f5cf6105">${rs.url||'—'}</td>
+    </tr>`).join('');
+  } catch {
+    document.getElementById('ruleset-tbody').innerHTML =
+      '<tr><td colspan="3" class="text-center ext-a729d7fe">Failed to load feed data</td></tr>';
+  }
+}
+loadFeeds();
+</script>
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_08923d4f69'] = function (event, el) { loadFeeds() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}

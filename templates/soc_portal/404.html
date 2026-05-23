@@ -1,0 +1,12 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Not Found{% endblock %}
+{% block content %}
+<div class="soc-empty ext-51b71953">
+  <i class="fa-solid fa-magnifying-glass ext-ea498639"></i>
+  <h3 class="ext-af4ab7e5">Not Found</h3>
+  <p class="ext-a729d7fe">The case or resource you're looking for doesn't exist.</p>
+  <a href="{{ url_for('soc_portal.cases') }}" class="btn-soc-secondary ext-065da35a">
+    <i class="fa-solid fa-arrow-left me-1"></i> Back to Cases
+  </a>
+</div>
+{% endblock %}

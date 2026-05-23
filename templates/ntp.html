@@ -7,21 +7,21 @@
       <h1 class="ss-page-title">NTP Server</h1>
       <p class="ss-page-desc" id="page-desc">Time synchronization service configuration</p>
     </div>
-    <button type="button" class="btn btn-primary" onclick="saveNtp()">
+    <button type="button" class="btn btn-primary" data-action="h_b590551e84">
       <i class="fa-solid fa-check me-1"></i>Save &amp; Apply
     </button>
   </div>
 
   <!-- Tabs -->
   <ul class="nav nav-tabs mb-4">
-    <li class="nav-item"><a class="nav-link active" id="tab-settings"  href="#" onclick="showTab('settings');  return false;">Settings</a></li>
-    <li class="nav-item"><a class="nav-link"        id="tab-acls"      href="#" onclick="showTab('acls');      return false;">ACLs</a></li>
-    <li class="nav-item"><a class="nav-link"        id="tab-status"    href="#" onclick="showTab('status');    return false;">Status</a></li>
-    <li class="nav-item"><a class="nav-link"        id="tab-serialgps" href="#" onclick="showTab('serialgps'); return false;">Serial GPS</a></li>
-    <li class="nav-item"><a class="nav-link"        id="tab-pps"       href="#" onclick="showTab('pps');       return false;">PPS</a></li>
+    <li class="nav-item"><a class="nav-link active" id="tab-settings"  href="#" data-action="h_a334bc0480">Settings</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-acls"      href="#" data-action="h_d77096f3d5">ACLs</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-status"    href="#" data-action="h_84f09da6de">Status</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-serialgps" href="#" data-action="h_d9e19a905e">Serial GPS</a></li>
+    <li class="nav-item"><a class="nav-link"        id="tab-pps"       href="#" data-action="h_edf5190d28">PPS</a></li>
   </ul>
 
-  <div id="ntp-toast" class="alert d-none" role="alert" style="position:fixed;top:70px;right:20px;z-index:9999;min-width:320px;"></div>
+  <div id="ntp-toast" class="alert d-none ext-ad4ef29a" role="alert"></div>
 
   <!-- ── SETTINGS TAB ── -->
   <div id="content-settings">
@@ -53,7 +53,7 @@
           <p class="ss-hint mb-2">Configure 3–5 servers for reliable synchronization</p>
           <div id="serverList"></div>
           <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addServerRow()">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_f551b2c18b">
               <i class="fa-solid fa-plus me-1"></i>Add Time Server
             </button>
           </div>
@@ -67,7 +67,7 @@
         <div><div class="ss-card-title">Advanced Configuration</div></div>
       </div>
       <div class="ss-card-body">
-        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+        <div class="ss-field-grid ss-field-grid-3 ext-3019698e">
           <div class="ss-field">
             <label class="ss-label">Max Candidate Pool Peers</label>
             <input type="number" name="max_peers" value="5" class="form-control">
@@ -140,7 +140,7 @@
   </div>
 
   <!-- ── ACLs TAB ── -->
-  <div id="content-acls" style="display:none;">
+  <div class="ext-cb458930" id="content-acls">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-lock"></i></div>
@@ -162,7 +162,7 @@
         <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
         <div><div class="ss-card-title">Allowed Networks</div><div class="ss-card-subtitle">Networks explicitly permitted to query this NTP server</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-success btn-sm" onclick="addNetworkRow()">
+          <button type="button" class="btn btn-success btn-sm" data-action="h_62fc771cf5">
             <i class="fa-solid fa-plus me-1"></i>Add Network
           </button>
         </div>
@@ -177,27 +177,27 @@
         <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
         <div><div class="ss-card-title">Custom Access Rules</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-success btn-sm" onclick="addCustomAclRow()">
+          <button type="button" class="btn btn-success btn-sm" data-action="h_4d1dab4da2">
             <i class="fa-solid fa-plus me-1"></i>Add Rule
           </button>
         </div>
       </div>
-      <div class="ss-card-body" style="padding:0;">
-        <div style="overflow-x:auto;">
-          <table class="table table-hover mb-0" style="font-size:.85rem;">
-            <thead style="background:var(--border-color-soft);">
-              <tr><th style="padding:10px 14px;">Network / CIDR</th><th>KOD</th><th>nomodify</th><th>noquery</th><th>noserve</th><th>nopeer</th><th>notrap</th><th></th></tr>
+      <div class="ss-card-body ext-57ce1f1b">
+        <div class="ext-df74e8d8">
+          <table class="table table-hover mb-0 ext-1e28117f">
+            <thead class="ext-4c3186f1">
+              <tr><th class="ext-16e59a0f">Network / CIDR</th><th>KOD</th><th>nomodify</th><th>noquery</th><th>noserve</th><th>nopeer</th><th>notrap</th><th></th></tr>
             </thead>
             <tbody id="custom-acls-table">
               <tr>
-                <td style="padding:8px 14px;"><input type="text" name="network_cidr_new" placeholder="e.g. 192.168.1.0/24" class="form-control form-control-sm" style="max-width:200px;"></td>
+                <td class="ext-ec6b5e99"><input type="text" name="network_cidr_new" placeholder="e.g. 192.168.1.0/24" class="form-control form-control-sm ext-3831ac5f"></td>
                 <td><input type="checkbox" name="new_kod"></td>
                 <td><input type="checkbox" name="new_nomodify"></td>
                 <td><input type="checkbox" name="new_noquery"></td>
                 <td><input type="checkbox" name="new_noserve"></td>
                 <td><input type="checkbox" name="new_nopeer"></td>
                 <td><input type="checkbox" name="new_notrap"></td>
-                <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()"><i class="fa-solid fa-trash"></i></button></td>
+                <td><button type="button" class="btn btn-danger btn-sm" data-action="h_172e802c20"><i class="fa-solid fa-trash"></i></button></td>
               </tr>
             </tbody>
           </table>
@@ -207,23 +207,23 @@
   </div>
 
   <!-- ── STATUS TAB ── -->
-  <div id="content-status" style="display:none;">
+  <div class="ext-cb458930" id="content-status">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
         <div><div class="ss-card-title">NTP Peer Status</div><div class="ss-card-subtitle">Live synchronization data from ntpq -p (auto-refreshes every 30 s)</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadNtpStatus()">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_12fdc8771a">
             <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh
           </button>
         </div>
       </div>
-      <div class="ss-card-body" style="padding:0;">
-        <div style="overflow-x:auto;">
-          <table class="table table-hover mb-0" style="font-size:.85rem;" id="peer-table">
-            <thead style="background:var(--border-color-soft);">
+      <div class="ss-card-body ext-57ce1f1b">
+        <div class="ext-df74e8d8">
+          <table class="table table-hover mb-0 ext-1e28117f" id="peer-table">
+            <thead class="ext-4c3186f1">
               <tr>
-                <th style="padding:10px 14px;">Flag</th>
+                <th class="ext-16e59a0f">Flag</th>
                 <th>Remote</th>
                 <th>RefID</th>
                 <th>St</th>
@@ -245,14 +245,14 @@
   </div>
 
   <!-- ── SERIAL GPS TAB ── -->
-  <div id="content-serialgps" style="display:none;">
+  <div class="ext-cb458930" id="content-serialgps">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-satellite"></i></div>
         <div><div class="ss-card-title">Serial GPS Reference Clock</div><div class="ss-card-subtitle">Use a serial GPS as a stratum-0 time source</div></div>
       </div>
       <div class="ss-card-body">
-        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+        <div class="ss-field-grid ss-field-grid-3 ext-3019698e">
           <div class="ss-field">
             <label class="ss-label">GPS Type</label>
             <select name="gps_type" class="form-select">
@@ -299,14 +299,14 @@
   </div>
 
   <!-- ── PPS TAB ── -->
-  <div id="content-pps" style="display:none;">
+  <div class="ext-cb458930" id="content-pps">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-wave-square"></i></div>
         <div><div class="ss-card-title">PPS Reference Clock</div><div class="ss-card-subtitle">Pulse Per Second signal from radio time receivers</div></div>
       </div>
       <div class="ss-card-body">
-        <div class="ss-field-grid ss-field-grid-3" style="margin-bottom:20px;">
+        <div class="ss-field-grid ss-field-grid-3 ext-3019698e">
           <div class="ss-field">
             <label class="ss-label">Fudge Time</label>
             <input type="text" name="pps_fudge_time" placeholder="0.0" class="form-control">
@@ -338,11 +338,11 @@
   </div>
 
   <div class="ss-save-bar">
-    <button type="button" class="btn btn-primary px-4" onclick="saveNtp()"><i class="fa-solid fa-check me-1"></i>Save &amp; Apply</button>
+    <button type="button" class="btn btn-primary px-4" data-action="h_4d0583b62b"><i class="fa-solid fa-check me-1"></i>Save &amp; Apply</button>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -381,7 +381,7 @@ function addServerRow(value) {
   row.innerHTML =
     '<input type="text" class="form-control ntp-server" value="' + esc(value) + '"' +
     ' placeholder="e.g. 0.freebsd.pool.ntp.org">' +
-    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'div\').remove()">' +
+    '<button type="button" class="btn btn-sm btn-outline-danger" data-action="ntp-remove-row">' +
     '<i class="fa fa-minus"></i></button>';
   list.appendChild(row);
 }
@@ -408,7 +408,7 @@ function addNetworkRow(value) {
   row.innerHTML =
     '<input type="text" class="form-control ntp-network" value="' + esc(value) + '"' +
     ' placeholder="e.g. 192.168.1.0/24">' +
-    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'div\').remove()">' +
+    '<button type="button" class="btn btn-sm btn-outline-danger" data-action="ntp-remove-row">' +
     '<i class="fa fa-minus"></i></button>';
   list.appendChild(row);
 }
@@ -416,7 +416,7 @@ function addNetworkRow(value) {
 // ── Load settings ────────────────────────────────────────────────────────────
 async function loadNtpSettings() {
   try {
-    const r = await fetch('/api/ntp');
+    const r = await fetch('/services/api/ntp');
     const d = await r.json();
     if (!d.ok) { renderServers([]); renderNetworks([]); return; }
     const s = d.settings || {};
@@ -453,7 +453,7 @@ async function saveNtp() {
   };
 
   try {
-    const r = await fetch('/api/ntp', {
+    const r = await fetch('/services/api/ntp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -468,7 +468,7 @@ async function saveNtp() {
 // ── Peer status ──────────────────────────────────────────────────────────────
 async function loadNtpStatus() {
   try {
-    const r = await fetch('/api/ntp/status');
+    const r = await fetch('/services/api/ntp/status');
     const d = await r.json();
     renderPeerTable(d.peers || []);
   } catch(e) {
@@ -492,7 +492,7 @@ function renderPeerTable(peers) {
     }
     const flagClass = flag === '*' ? 'text-success fw-bold' : flag === '+' ? 'text-primary' : 'text-muted';
     return '<tr>' +
-      '<td class="' + flagClass + '" style="padding:8px 14px;">' + esc(flag) + '</td>' +
+      '<td class="' + flagClass + ' ext-ec6b5e99">' + esc(flag) + '</td>' +
       '<td>' + esc(host) + '</td>' +
       '<td>' + esc(p.refid) + '</td>' +
       '<td>' + esc(p.stratum) + '</td>' +
@@ -511,14 +511,14 @@ function addCustomAclRow() {
   const tbody = document.getElementById('custom-acls-table');
   const tr = document.createElement('tr');
   tr.innerHTML =
-    '<td style="padding:8px 14px;"><input type="text" name="network_cidr[]" placeholder="e.g. 10.0.0.0/8" class="form-control form-control-sm" style="max-width:200px;"></td>' +
+    '<td class="ext-ec6b5e99"><input type="text" name="network_cidr[]" placeholder="e.g. 10.0.0.0/8" class="form-control form-control-sm ext-3831ac5f"></td>' +
     '<td><input type="checkbox" name="acl_kod[]"></td>' +
     '<td><input type="checkbox" name="acl_nomodify[]" checked></td>' +
     '<td><input type="checkbox" name="acl_noquery[]"></td>' +
     '<td><input type="checkbox" name="acl_noserve[]"></td>' +
     '<td><input type="checkbox" name="acl_nopeer[]" checked></td>' +
     '<td><input type="checkbox" name="acl_notrap[]" checked></td>' +
-    '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()"><i class="fa-solid fa-trash"></i></button></td>';
+    '<td><button type="button" class="btn btn-danger btn-sm" data-action="ntp-remove-row-tr"><i class="fa-solid fa-trash"></i></button></td>';
   tbody.appendChild(tr);
 }
 
@@ -539,3 +539,28 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_b590551e84'] = function (event, el) { saveNtp() };
+  R['h_a334bc0480'] = function (event, el) { showTab('settings');  return false; };
+  R['h_d77096f3d5'] = function (event, el) { showTab('acls');      return false; };
+  R['h_84f09da6de'] = function (event, el) { showTab('status');    return false; };
+  R['h_d9e19a905e'] = function (event, el) { showTab('serialgps'); return false; };
+  R['h_edf5190d28'] = function (event, el) { showTab('pps');       return false; };
+  R['h_f551b2c18b'] = function (event, el) { addServerRow() };
+  R['h_62fc771cf5'] = function (event, el) { addNetworkRow() };
+  R['h_4d1dab4da2'] = function (event, el) { addCustomAclRow() };
+  R['h_172e802c20'] = function (event, el) { this.closest('tr').remove() };
+  R['h_12fdc8771a'] = function (event, el) { loadNtpStatus() };
+  R['h_4d0583b62b'] = function (event, el) { saveNtp() };
+  R['ntp-remove-row']    = function (event, el) { var n = el.closest('div'); if (n) n.remove(); };
+  R['ntp-remove-row-tr'] = function (event, el) { var n = el.closest('tr'); if (n) n.remove(); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

@@ -1,69 +1,79 @@
-import ipaddress
 import json
 import os
-import socket
-import time
-from urllib.parse import urlencode
 
-# Load .env before config.py class bodies evaluate their os.getenv() calls.
+# Load environment variables before config.py class bodies evaluate their
+# os.getenv() calls. Two sources, first wins (override=False on the second):
+#   1. SMARTSHIELD_ENV_FILE (defaults to the FreeBSD appliance env file).
+#      This is the production source of truth installed by bsd/install.sh.
+#   2. The repo-root .env, for development checkouts and tests.
 from dotenv import load_dotenv
-load_dotenv()
 
-from flask import Flask, g, redirect, request, session, url_for
+_DEFAULT_APPLIANCE_ENV_FILE = "/usr/local/etc/smartshield/smartshield.env"
+_appliance_env_file = os.getenv("SMARTSHIELD_ENV_FILE", _DEFAULT_APPLIANCE_ENV_FILE)
+if _appliance_env_file and os.path.exists(_appliance_env_file):
+    load_dotenv(_appliance_env_file, override=False)
+load_dotenv(override=False)
+
+from flask import Flask, g
 from .database import init_db
 from .config import get_config
-from .security import get_csrf_token, validate_csrf_or_abort
-from .audit_log import log_event
-from .uploads import profile_picture_url
-
-_SENSITIVE_KEY_MARKERS = {
-    "password",
-    "secret",
-    "token",
-    "key",
-    "psk",
-    "auth",
-    "cookie",
-}
 
 
-def _humanize_endpoint(endpoint: str):
-    if not endpoint:
-        return ""
-    return endpoint.replace(".", " / ").replace("_", " ").title()
+def _load_version_info() -> dict:
+    """Load version.json from repo root if present. Falls back to a minimal
+    stub so callers can rely on the keys being defined."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(here, "version.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {"name": "Smart Shield", "version": "unknown", "build": "unknown"}
 
 
-def _is_sensitive_key(key: str):
-    lowered = (key or "").strip().lower()
-    return any(marker in lowered for marker in _SENSITIVE_KEY_MARKERS)
+VERSION_INFO = _load_version_info()
+__version__ = VERSION_INFO.get("version", "unknown")
 
 
-def _safe_payload_keys():
-    data = request.get_json(silent=True)
-    if isinstance(data, dict):
-        keys = []
-        for key in sorted(data.keys()):
-            if _is_sensitive_key(str(key)):
-                continue
-            keys.append(str(key))
-            if len(keys) >= 12:
-                break
-        return keys
-    if isinstance(data, list):
-        return [f"<list:{len(data)}>"]
-    return []
+# Blueprint prefixes whose endpoints are wholly machine-auth (API tokens or
+# pre-auth captive-portal HTTP) and therefore cannot carry a session-bound
+# CSRF token. `network_api.` used to live here but it serves browser-session
+# admin endpoints (host whitelist, policy-exempt, etc.) — those now require
+# CSRF like any other admin mutation.
+#
+# NOTE: tools/security_lint_routes.py parses these two constants out of THIS
+# file by name. Keep them defined here as plain literals.
+CSRF_EXEMPT_ENDPOINT_PREFIXES = (
+    "hec.",
+    "portal.",
+)
+
+# Named machine-auth endpoints that don't sit under a wholly-machine blueprint.
+# These authenticate via HMAC / Bearer token at the handler level and can't
+# present a browser CSRF token. Each entry MUST validate its own auth.
+CSRF_EXEMPT_ENDPOINTS = frozenset({
+    "vpn.openvpn_hook",
+})
 
 
-def _activity_summary(is_api_request: bool, method: str, path: str, endpoint: str):
-    endpoint_label = _humanize_endpoint(endpoint)
-    if is_api_request:
-        if endpoint_label:
-            return f"{method} API call: {endpoint_label}"
-        return f"{method} API call: {path}"
+def is_machine_authenticated_request() -> bool:
+    """True when the current request has authenticated via a non-browser
+    mechanism (API token or HMAC). The CSRF guard uses this to skip the
+    session-bound CSRF check for machine callers; route handlers remain
+    responsible for the actual auth check.
 
-    if endpoint_label:
-        return f"Viewed page: {endpoint_label}"
-    return f"Viewed page: {path}"
+    Note: Flask's CSRF before_request runs before per-route auth decorators,
+    so this only returns True when an earlier hook has explicitly stamped
+    ``g.api_token_authenticated`` or ``g.hmac_authenticated``. Endpoints
+    relying on this should set the flag in a request hook registered ahead
+    of ``_csrf_guard`` (or be marked ``_is_machine_api`` so the guard can
+    recognise them statically).
+    """
+    if getattr(g, "api_token_authenticated", False):
+        return True
+    if getattr(g, "hmac_authenticated", False):
+        return True
+    return False
 
 
 def create_app():
@@ -88,278 +98,28 @@ def create_app():
             "SECRET_KEY is not set. Create a .env file (see .env.example) and set SECRET_KEY."
         )
 
-    @app.after_request
-    def add_security_headers(response):
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        # Only add HSTS on HTTPS responses
-        if request.is_secure:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        return response
+    # ── Request/response middleware ──────────────────────────────────────────
+    # Registration order below defines before_request execution order, and is
+    # kept identical to the original monolithic factory:
+    #   1. CSP nonce            (security_headers)
+    #   2. CSRF guard           (csrf)
+    #   3. content/captive      (captive_middleware)
+    #   4. session timeout      (audit_middleware)
+    #   5. request timing       (audit_middleware)
+    #   6. periodic expiry      (audit_middleware)
+    # after_request: audit runs before the security-header writer (reverse
+    # registration order), matching the original.
+    from .security_headers import register_security_headers
+    from .csrf import register_csrf
+    from .captive_middleware import register_captive_middleware
+    from .audit_middleware import register_audit_middleware
 
-    @app.before_request
-    def _csrf_guard():
-        validate_csrf_or_abort()
+    register_security_headers(app)
+    register_csrf(app)
+    register_captive_middleware(app)
+    register_audit_middleware(app)
 
-    @app.before_request
-    def _intercept_content_filter_blocked():
-        """
-        When content policy blocks a domain, Unbound returns the LAN IP.
-        The browser then connects here with Host: <blocked-domain>. Catch that
-        and redirect to the block page so the user can authenticate or stay blocked.
-        """
-        # Logged-in admin sessions pass straight through
-        if session.get("user_id"):
-            return None
-
-        # Portal, static assets, auth, and setup routes are always reachable
-        if request.path.startswith(
-            ("/portal", "/static", "/login", "/logout", "/setup")
-        ):
-            return None
-
-        # Extract bare hostname from the Host header (strip port)
-        raw_host = request.headers.get("Host") or ""
-        host = raw_host.split(":")[0].strip().lower()
-        if not host:
-            return None
-
-        # Direct IP access (e.g. http://192.168.1.1/) — not a DNS redirect
-        try:
-            ipaddress.ip_address(host)
-            return None
-        except ValueError:
-            pass
-
-        # Our own device hostname — not a DNS redirect
-        try:
-            own = {"localhost", socket.gethostname().lower(), socket.getfqdn().lower()}
-            if host in own:
-                return None
-        except Exception:
-            pass
-
-        try:
-            from .database import get_db
-            from .services.content_policy import (
-                has_active_captive_session,
-                has_active_content_policy,
-                is_admin_bypass_session,
-                is_blocked_domain,
-            )
-
-            conn = get_db()
-
-            # ── Captive portal mode ───────────────────────────────────────────────
-            # When captive portal is enabled, every HTTP request that arrives here
-            # with a non-local Host header was PF-redirected from an unauthenticated
-            # client on port 80.  Send them to the portal login page.  This also
-            # covers OS captive-portal probes (Firefox detectportal, Chrome 204,
-            # Apple CNA) so browsers show a "Sign in to network" popup automatically.
-            import json as _cp_json
-            from .services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
-            _cp_row = conn.execute(
-                "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
-            ).fetchone()
-            if _cp_row:
-                _cp_cfg = _cp_json.loads(_cp_row["value_json"])
-                if _cp_cfg.get("enabled", False):
-                    if not has_active_captive_session(conn, request.remote_addr or ""):
-                        _portal_ip   = (_cp_cfg.get("portal_ip") or _default_portal_ip(conn)).strip()
-                        _portal_port = int(_cp_cfg.get("portal_port") or _CP_REDIRECT_PORT)
-                        _query = urlencode({"url": request.url})
-                        return redirect(f"http://{_portal_ip}:{_portal_port}/portal/?{_query}")
-                    # Client is authenticated — fall through to content-policy check
-
-            if not has_active_content_policy(conn):
-                return None
-            if is_admin_bypass_session(conn, request.remote_addr or ""):
-                return None
-            if has_active_captive_session(conn, request.remote_addr or ""):
-                if is_blocked_domain(conn, host):
-                    # Authenticated user hitting a DNS-blocked domain.
-                    # Try a one-shot redirect after 3 s (lets the 5 s Unbound TTL expire).
-                    # sessionStorage prevents an auto-retry loop on repeated visits —
-                    # if DNS still returns LAN IP the user gets a manual "Open" button.
-                    orig_url = request.url
-                    safe_host = host.replace("'", "").replace('"', "")
-                    safe_url  = orig_url.replace("'", "%27").replace('"', "%22")
-                    ss_key    = f"ss_bridge_{safe_host}"
-                    bridge = (
-                        '<!DOCTYPE html><html><head><meta charset="utf-8">'
-                        '<title>Connecting — Smart Shield</title>'
-                        '<style>'
-                        '*{box-sizing:border-box;margin:0;padding:0}'
-                        'body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,sans-serif;'
-                        'display:flex;align-items:center;justify-content:center;height:100vh}'
-                        '.box{text-align:center;max-width:400px;padding:40px 32px;background:#1e293b;'
-                        'border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5)}'
-                        'h2{color:#4ade80;font-size:1.2rem;margin-bottom:10px}'
-                        'p{color:#94a3b8;font-size:.88rem;margin:8px 0 20px;line-height:1.55}'
-                        'a.btn{display:inline-block;padding:10px 24px;background:#1e3a5f;color:#fff;'
-                        'border-radius:6px;font-size:.9rem;font-weight:700;text-decoration:none}'
-                        'a.btn:hover{background:#2d5a8f}'
-                        '.sub{font-size:.74rem;color:#475569;margin-top:14px}'
-                        '</style></head><body><div class="box">'
-                        '<h2>&#x2714; Session Active</h2>'
-                        f'<p>Your device is authenticated. Loading <strong>{safe_host}</strong>…</p>'
-                        f'<a href="{safe_url}" class="btn">Open {safe_host}</a>'
-                        '<div class="sub">If the site doesn&rsquo;t load, it may be restricted '
-                        'by content policy for your account.</div>'
-                        '</div>'
-                        '<script>'
-                        f'if(!sessionStorage.getItem("{ss_key}")){{'
-                        f'sessionStorage.setItem("{ss_key}","1");'
-                        f'setTimeout(function(){{window.location.href="{safe_url}";}},3000);}}'
-                        '</script>'
-                        '</body></html>'
-                    )
-                    from flask import make_response as _mkr
-                    resp = _mkr(bridge, 200)
-                    resp.headers["Content-Type"] = "text/html; charset=utf-8"
-                    return resp
-                return None
-            if not is_blocked_domain(conn, host):
-                return None
-        except Exception:
-            return None
-
-        query = urlencode({"policy": "content", "domain": host, "url": request.url})
-        # Redirect directly to the captive portal (standard hotel/airport WiFi pattern).
-        # This avoids the popup-opener approach and works reliably across browsers.
-        try:
-            import json as _json
-            from app.services.captive_portal import _default_portal_ip, _CP_REDIRECT_PORT
-            _cp_row = conn.execute(
-                "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
-            ).fetchone()
-            _cp_cfg = _json.loads(_cp_row["value_json"]) if _cp_row else {}
-            _portal_ip   = (_cp_cfg.get("portal_ip") or _default_portal_ip(conn)).strip()
-            _portal_port = int(_cp_cfg.get("portal_port") or _CP_REDIRECT_PORT)
-            portal_url = f"http://{_portal_ip}:{_portal_port}/portal/?{query}"
-        except Exception:
-            portal_url = f"/portal/?{query}"
-
-        from flask import redirect as _redir
-        return _redir(portal_url)
-
-    @app.before_request
-    def _enforce_session_timeout():
-        """Expire idle sessions after PERMANENT_SESSION_LIFETIME seconds."""
-        if not session.get("user_id"):
-            return
-        idle_limit = app.config.get("PERMANENT_SESSION_LIFETIME", 3600)
-        if isinstance(idle_limit, int):
-            pass
-        else:
-            try:
-                idle_limit = int(idle_limit.total_seconds())
-            except Exception:
-                idle_limit = 3600
-        last_active = session.get("_last_active", 0)
-        now = time.time()
-        if last_active and (now - last_active) > idle_limit:
-            session.clear()
-            if request.path.startswith("/api/") or "/api/" in request.path:
-                from flask import jsonify as _jsonify
-                return _jsonify({"ok": False, "message": "Session expired due to inactivity."}), 401
-            return redirect(url_for("auth.login"))
-        session["_last_active"] = now
-        session.permanent = True
-
-    @app.before_request
-    def _request_timing_start():
-        g.request_start_time = time.perf_counter()
-
-    @app.before_request
-    def _periodic_expire_sessions():
-        _periodic_expire_sessions._last_ts = getattr(_periodic_expire_sessions, "_last_ts", 0.0)
-        now = time.time()
-        if now - _periodic_expire_sessions._last_ts < 60:
-            return
-        _periodic_expire_sessions._last_ts = now
-        try:
-            from app.services.captive_portal import expire_sessions
-            from app.database import get_db
-            expire_sessions(get_db())
-        except Exception:
-            pass
-
-    @app.context_processor
-    def _csrf_context():
-        from app.services.runtime_mode import mode_badge
-        return {
-            "csrf_token": get_csrf_token,
-            "profile_picture_url": profile_picture_url,
-            "runtime_mode_badge": mode_badge(),
-        }
-
-    @app.after_request
-    def _audit_browsing_events(response):
-        try:
-            if request.path.startswith("/static/") or request.endpoint == "static":
-                return response
-
-            user_id = session.get("user_id")
-            if not user_id:
-                return response
-
-            # Avoid duplicate noise for endpoints that already emit explicit session events.
-            if request.endpoint in {"auth.login", "auth.logout", "system.logout"}:
-                return response
-
-            elapsed_ms = 0
-            started = getattr(g, "request_start_time", None)
-            if started is not None:
-                elapsed_ms = int((time.perf_counter() - started) * 1000)
-
-            details = {
-                "method": request.method,
-                "path": request.path,
-                "endpoint": request.endpoint or "",
-                "status_code": response.status_code,
-                "latency_ms": elapsed_ms,
-                "user_agent": request.user_agent.string[:200] if request.user_agent else "",
-                "query_string": request.query_string.decode("utf-8", "ignore")[:200],
-                "referrer": (request.referrer or "")[:200],
-                "view_args": request.view_args or {},
-            }
-
-            is_api_request = request.path.startswith("/api/") or "/api/" in request.path
-            details["activity"] = _activity_summary(
-                is_api_request=is_api_request,
-                method=request.method,
-                path=request.path,
-                endpoint=request.endpoint or "",
-            )
-
-            if request.method == "GET" and not is_api_request:
-                log_event(
-                    category="browsing",
-                    action="page_view",
-                    username=session.get("username", "anonymous"),
-                    remote_addr=request.remote_addr,
-                    details=details,
-                )
-            elif is_api_request and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-                details["payload_keys"] = _safe_payload_keys()
-                log_event(
-                    category="system",
-                    action="api_change",
-                    username=session.get("username", "anonymous"),
-                    remote_addr=request.remote_addr,
-                    details=details,
-                )
-        except Exception:
-            # Audit logging must never break request flow.
-            pass
-
-        return response
-
-    # Ensure all required directories exist before the DB is opened.
+    # ── Database + filesystem ────────────────────────────────────────────────
     from .database import close_db
     app.teardown_appcontext(close_db)
 
@@ -368,83 +128,15 @@ def create_app():
 
     init_db()
 
-    # Emit startup warnings for missing optional keys (chatbot, threat intel, master key).
-    try:
-        from app.services.runtime_mode import startup_warnings
-        startup_warnings()
-    except Exception:
-        pass
+    # ── Background workers (leader-elected) ──────────────────────────────────
+    from .background import start_background_workers
+    start_background_workers(app)
 
-    # Elect a single leader worker before starting background daemon threads.
-    # On FreeBSD with multiple Gunicorn workers, only one process acquires the
-    # exclusive flock; the rest skip collector startup entirely.
-    from app.services.worker_lock import acquire_worker_lock
-    _is_leader = acquire_worker_lock()
+    # ── Routes + WebSocket ───────────────────────────────────────────────────
+    from .blueprints import register_blueprints
+    register_blueprints(app)
 
-    # Start SIEM background collectors (FreeBSD only; silent no-op on dev)
-    if _is_leader:
-        try:
-            from app.services.siem_collector import start_siem_collectors
-            start_siem_collectors()
-        except Exception:
-            pass
-
-    # Start threat-intel feed collector (requires ABUSECH_AUTH_KEY; silent no-op otherwise)
-    if _is_leader:
-        try:
-            from app.services.abusech_client import start_threat_intel_collector
-            start_threat_intel_collector()
-        except Exception:
-            pass
-
-    # Start gateway health monitor (pings gateways every 30s; FreeBSD only)
-    if _is_leader:
-        try:
-            from app.services.gateway_monitor import start_gateway_monitor
-            start_gateway_monitor()
-        except Exception:
-            pass
-
-    # Start schedule enforcer (reloads PF when schedule windows open/close; FreeBSD only)
-    if _is_leader:
-        try:
-            from app.services.schedule_enforcer import start_schedule_enforcer
-            start_schedule_enforcer(app)
-        except Exception:
-            pass
-
-    from routes.setup import setup_bp
-    from routes.auth import auth_bp
-    from routes.users import users_bp
-    from routes.system import system_bp
-    from routes.interfaces import interfaces_bp
-    from routes.routing import routing_bp
-    from routes.services import services_bp
-    from routes.firewall import firewall_bp
-    from routes.vpn import vpn_bp
-    from routes.status import status_bp
-    from routes.diagnostics import diagnostics_bp
-    from routes.network_api import network_api_bp
-    from routes.ids import ids_bp
-    from routes.filters import filters_bp
-    from routes.portal import portal_bp
-    from routes.chatbot import chatbot_bp
-
-    app.register_blueprint(setup_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(users_bp)
-    app.register_blueprint(system_bp)
-    app.register_blueprint(interfaces_bp)
-    app.register_blueprint(routing_bp)
-    app.register_blueprint(services_bp)
-    app.register_blueprint(firewall_bp)
-    app.register_blueprint(vpn_bp)
-    app.register_blueprint(status_bp)
-    app.register_blueprint(diagnostics_bp)
-    app.register_blueprint(network_api_bp)
-    app.register_blueprint(ids_bp)
-    app.register_blueprint(filters_bp)
-    app.register_blueprint(portal_bp)
-    app.register_blueprint(chatbot_bp)
+    from .websocket import register_websocket
+    register_websocket(app)
 
     return app

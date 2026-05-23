@@ -1,0 +1,108 @@
+/* ============================================================
+   SmartShield Design System — supplemental component layer
+   ------------------------------------------------------------
+   Additive only. The core `ss-` components (ss-card, ss-field,
+   ss-toggle, ss-page-header, …) live in base.css. This file adds
+   the SmartShield-specific status / badge / panel components used
+   by the Command Center, SOC Overview and SOC Portal Control.
+   All classes use the `ss-` prefix; none redefine base.css rules.
+   ============================================================ */
+
+/* ── Table row: revoked/inactive ─────────────────────────── */
+/* Replaces an inline style="opacity:.6" so strict CSP (SS_STRICT_CSP=1)
+   needs no 'unsafe-inline' for style attributes. */
+.ss-row-revoked { opacity: .6; }
+
+/* ── Metric tile ─────────────────────────────────────────── */
+.ss-metric {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  background: var(--border-color-soft, rgba(0,0,0,.04));
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 10px;
+}
+.ss-metric-value { font-size: 1.6rem; font-weight: 800; line-height: 1;
+  color: var(--text-color, #1f2328); font-variant-numeric: tabular-nums; }
+.ss-metric-label { font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted, #656d76); }
+
+/* ── Status pill ─────────────────────────────────────────── */
+.ss-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.ss-status-pill::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.ss-status-ok       { background: rgba(16,185,129,.12);  color: #0f9d6b; }
+.ss-status-warn     { background: rgba(245,158,11,.14);  color: #b46d00; }
+.ss-status-danger   { background: rgba(239,68,68,.12);   color: #d6322e; }
+.ss-status-muted    { background: rgba(100,116,139,.14); color: #5b6573; }
+
+/* ── Risk chip (SOC severity) ────────────────────────────── */
+.ss-risk-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.ss-risk-critical { background: rgba(220,38,38,.15);  color: #b91c1c; }
+.ss-risk-high     { background: rgba(234,88,12,.15);  color: #c2410c; }
+.ss-risk-medium   { background: rgba(245,158,11,.15); color: #b45309; }
+.ss-risk-low      { background: rgba(59,130,246,.15); color: #1d4ed8; }
+.ss-risk-info     { background: rgba(100,116,139,.15);color: #475569; }
+
+/* ── Action bar ──────────────────────────────────────────── */
+.ss-action-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 0;
+}
+.ss-action-bar .ss-action-spacer { margin-left: auto; }
+
+/* ── Empty state ─────────────────────────────────────────── */
+.ss-empty-state {
+  text-align: center; padding: 38px 20px;
+  color: var(--muted, #656d76);
+}
+.ss-empty-state i { font-size: 2rem; opacity: .4; margin-bottom: 10px; display: block; }
+.ss-empty-state-title { font-weight: 700; font-size: .95rem;
+  color: var(--text-color, #1f2328); margin-bottom: 4px; }
+
+/* ── Danger zone ─────────────────────────────────────────── */
+.ss-danger-zone {
+  border: 1px solid rgba(239,68,68,.35); border-radius: 10px;
+  background: rgba(239,68,68,.05); padding: 14px 16px;
+}
+.ss-danger-zone-title { font-weight: 700; color: #d6322e;
+  font-size: .85rem; margin-bottom: 6px; }
+
+/* ── Command panel (Command Center sections) ─────────────── */
+.ss-command-panel {
+  background: var(--panel, #fff);
+  border: 1px solid var(--border-color, #d0d7de);
+  border-left: 3px solid var(--primary, #00b4a0);
+  border-radius: 10px; padding: 14px 16px;
+}
+
+/* ── Service card (SOC Portal service-status tile) ───────── */
+.ss-service-card {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--panel, #fff);
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 10px; padding: 14px 16px;
+}
+.ss-service-card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+
+/* ── Workspace badges — Core vs SOC ──────────────────────── */
+.ss-core-badge, .ss-soc-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 6px;
+  font-size: .68rem; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.ss-core-badge { background: rgba(0,180,160,.14);  color: #00897b; }
+.ss-soc-badge  { background: rgba(99,102,241,.15); color: #4f46e5; }

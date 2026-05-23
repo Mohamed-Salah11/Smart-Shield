@@ -54,9 +54,12 @@ def _get_auth_key() -> str:
 def is_dry_run(conn=None) -> bool:
     """Return True when live API calls should be suppressed.
 
-    Checks the DB column first (GUI-controlled), falls back to the env var
-    (set by install.sh or overridden manually).
+    Explicit env var takes priority over DB so tests and deployment overrides
+    work reliably. Falls back to DB (GUI-controlled), then defaults to True.
     """
+    env_val = os.getenv("ABUSECH_DRY_RUN")
+    if env_val is not None:
+        return env_val != "0"
     if conn is None:
         try:
             from app.database import get_db
@@ -72,7 +75,7 @@ def is_dry_run(conn=None) -> bool:
                 return bool(row["abusech_dry_run"])
         except Exception:
             pass
-    return os.getenv("ABUSECH_DRY_RUN", "1") != "0"
+    return True
 
 
 def _auth_headers() -> dict:
@@ -182,7 +185,9 @@ def threatfox_recent_iocs(days: int = 1) -> dict:
 # Threat intel PF table push
 # ---------------------------------------------------------------------------
 
-_TI_IOC_PATH    = "/var/db/smart-shield/threat_intel_ips.txt"
+from app.config import _ss_dir as _ss_dir_ti
+_TI_VAR_DB      = _ss_dir_ti("/var/db")
+_TI_IOC_PATH    = os.path.join(_TI_VAR_DB, "threat_intel_ips.txt")
 _TI_PF_TABLE    = "ss_threat_intel"
 _TI_STATE_KEY   = "threat_intel_last_update"
 _TI_UPDATE_SECS = 3600 * 4   # re-fetch every 4 hours by default
@@ -220,8 +225,8 @@ def push_threat_intel_to_pf(conn) -> dict:
     Push stored threat-intel IPs to the PF table ``ss_threat_intel``.
 
     Reads the IP list from the siem_state row written by ``update_threat_feed``,
-    writes them to ``/var/db/smart-shield/threat_intel_ips.txt``, then calls
-    ``pfctl -t ss_threat_intel -T replace -f <file>`` atomically.
+    writes them to the SmartShield state directory (``threat_intel_ips.txt``),
+    then calls ``pfctl -t ss_threat_intel -T replace -f <file>`` atomically.
 
     On non-FreeBSD: no-op, returns ok=True with count.
     """
@@ -243,10 +248,22 @@ def push_threat_intel_to_pf(conn) -> dict:
         return {"ok": True, "count": count, "message": f"Non-FreeBSD — {count} IPs would be pushed to PF."}
 
     try:
-        import os as _os
-        _os.makedirs("/var/db/smart-shield", exist_ok=True)
-        with open(_TI_IOC_PATH, "w") as fh:
-            fh.write("\n".join(ips) + "\n")
+        import os as _os, tempfile as _tmp, shutil as _sh
+        _os.makedirs(_TI_VAR_DB, exist_ok=True)
+        # Write to a temp file first, then atomically rename so pfctl always
+        # reads a complete file even if the process crashes mid-write.
+        tmp_fd, tmp_path = _tmp.mkstemp(
+            dir=_TI_VAR_DB, prefix="threat_intel_", suffix=".txt"
+        )
+        _moved = False
+        try:
+            with _os.fdopen(tmp_fd, "w") as fh:
+                fh.write("\n".join(ips) + "\n")
+            _sh.move(tmp_path, _TI_IOC_PATH)
+            _moved = True
+        finally:
+            if not _moved and _os.path.exists(tmp_path):
+                _os.unlink(tmp_path)
 
         from app.services.priv_helper import run_privileged
         result = run_privileged(

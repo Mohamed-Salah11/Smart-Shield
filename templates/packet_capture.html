@@ -66,19 +66,15 @@
             </button>
           </div>
         </div>
-        <div style="overflow-x:auto;">
-          <pre id="cap-output" style="
-            min-height:280px;background:var(--bg);color:var(--text-color);
-            font-size:.78rem;padding:1rem;margin:0;white-space:pre-wrap;overflow:auto;
-            font-family:'Courier New',monospace;border-radius:0 0 8px 8px;
-          ">Waiting for capture…</pre>
+        <div class="ext-df74e8d8">
+          <pre class="ext-158c93a6" id="cap-output">Waiting for capture…</pre>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('btn-capture')?.addEventListener('click', function () {
   const iface  = document.getElementById('cap-iface').value;
   const count  = parseInt(document.getElementById('cap-count').value);

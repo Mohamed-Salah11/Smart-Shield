@@ -18,10 +18,13 @@ delete_web_filter_rule(conn, id)            -> None
 apply_web_filter(conn)                      -> dict
 """
 
+import logging
 import re
 import sys
 
-from app.services.content_policy import get_block_page_ip
+from app.services.content_policy import get_block_page_ip, normalize_action, normalize_domain
+
+_log = logging.getLogger(__name__)
 
 
 WEB_CATEGORIES = [
@@ -45,11 +48,12 @@ def _rows(conn, sql, params=()):
 
 
 def _extract_domain(url_pattern: str) -> str:
-    """Extract bare domain from a URL or domain pattern."""
-    d = re.sub(r'^https?://', '', url_pattern.strip().lower())
-    d = d.split('/')[0].strip()
-    d = d.lstrip('*.').strip('.')
-    return d
+    """Validate and extract bare domain from a URL pattern.
+
+    Delegates to ``content_policy.normalize_domain`` so DNS / Web / App filters
+    all apply the same validation rules. Returns "" for invalid input.
+    """
+    return normalize_domain(url_pattern or "")
 
 
 # ---------------------------------------------------------------------------
@@ -59,10 +63,9 @@ def _extract_domain(url_pattern: str) -> str:
 def generate_web_filter_zones(conn) -> list:
     """
     Return Unbound server-block lines for all enabled web filter rules.
-    Merged with DNS filter rules inside dns_writer.generate_unbound_conf().
 
-    Block rules redirect to Smart Shield's LAN IP so the browser hits the
-    /portal/block page. Falls back to always_nxdomain if no LAN IP is set.
+    DEPRECATED for the apply path — see ``dns_filter.generate_dns_filter_zones``
+    for the rationale. Kept only for ``filter_conflicts.get_filter_preview``.
     """
     block_ip = get_block_page_ip(conn)
 
@@ -75,18 +78,11 @@ def generate_web_filter_zones(conn) -> list:
     lines = []
     for rule in rules:
         domain = _extract_domain(rule.get("url_pattern") or "")
-        action = (rule.get("action") or "block").lower()
+        action = normalize_action(rule.get("action"))
         if not domain:
             continue
         fqdn = domain + "."
-        if action == "block":
-            if block_ip:
-                lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
-            else:
-                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
-        elif action == "allow":
-            # "Allow whitelist only" — block for everyone; whitelist_view overrides back to transparent.
+        if action in ("block_all", "allow_whitelist_only"):
             if block_ip:
                 lines.append(f'    local-zone: "{fqdn}" redirect')
                 lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
@@ -100,7 +96,12 @@ def generate_web_whitelist_overrides(conn) -> list:
     Return local-zone transparent overrides for 'allow whitelist only' web rules.
     Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
     """
-    rules = _rows(conn, "SELECT url_pattern FROM filter_web_rules WHERE action='allow' AND enabled=1")
+    rules = _rows(
+        conn,
+        "SELECT url_pattern FROM filter_web_rules "
+        "WHERE LOWER(COALESCE(action,'')) IN ('allow', 'allow_whitelist_only') "
+        "AND enabled=1",
+    )
     lines = []
     for rule in rules:
         domain = _extract_domain(rule.get("url_pattern") or "")
@@ -194,10 +195,10 @@ def hot_apply_web_rule(conn, rule_id: int) -> None:
         else:
             try:
                 run_privileged("unbound.local_zone_remove", domain=domain)
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _log.warning("web_filter: local_zone_remove failed for %r: %s", domain, exc)
+    except Exception as exc:
+        _log.warning("web_filter: hot_apply_web_rule failed for rule %s: %s", rule_id, exc)
 
 
 def toggle_web_filter_rule(conn, rule_id: int, enabled: bool) -> None:
@@ -217,13 +218,13 @@ def _hot_remove_domain(domain: str) -> None:
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_zone_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("web_filter: hot-remove local_zone failed for %r: %s", domain, exc)
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_data_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("web_filter: hot-remove local_data failed for %r: %s", domain, exc)
 
 
 def delete_web_filter_rule(conn, rule_id: int) -> None:
@@ -241,17 +242,14 @@ def delete_web_filter_rule(conn, rule_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 def apply_web_filter(conn) -> dict:
-    """Regenerate unbound.conf with the current web filter rules and reload."""
+    """Regenerate unbound.conf with the current web filter rules and reload.
+
+    Routes through ``apply_unbound`` so a syntax error in the generated
+    config is caught by ``unbound-checkconf`` *before* it can overwrite
+    the live unbound.conf.
+    """
     try:
-        from app.services.dns_writer import write_unbound_conf
-        result = write_unbound_conf(conn)
-        if not result["ok"]:
-            return result
-        if sys.platform.startswith("freebsd"):
-            from app.services.service_manager import service_action
-            r = service_action("unbound", "reload")
-            if not r["ok"]:
-                return {"ok": False, "message": f"Config written but Unbound reload failed: {r['message']}"}
-        return {"ok": True, "message": "Web filter applied and Unbound reloaded."}
+        from app.services.dns_writer import apply_unbound
+        return apply_unbound(conn)
     except Exception as exc:
         return {"ok": False, "message": str(exc)}

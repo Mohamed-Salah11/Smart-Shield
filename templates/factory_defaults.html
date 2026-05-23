@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container" style="max-width:680px">
+<div class="container ext-d031234f">
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">Factory Defaults</h1>
@@ -11,7 +11,7 @@
 
   <div class="ss-card">
     <div class="ss-card-head">
-      <div class="ss-card-icon" style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="ss-card-icon ext-a7ceb264"><i class="fa-solid fa-triangle-exclamation"></i></div>
       <div><div class="ss-card-title">Danger Zone</div><div class="ss-card-subtitle">This action cannot be undone</div></div>
     </div>
     <div class="ss-card-body">
@@ -43,7 +43,7 @@
   <div id="reset-status" class="mt-3 d-none"></div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('reset-confirm-text').addEventListener('input', function () {
   document.getElementById('btn-reset').disabled = (this.value.trim() !== 'RESET');
 });

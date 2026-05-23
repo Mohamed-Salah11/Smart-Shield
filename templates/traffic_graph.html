@@ -9,7 +9,7 @@
     </div>
     <div class="d-flex gap-2 align-items-center">
       <span class="badge bg-success" id="live-badge">
-        <i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live
+        <i class="fa fa-circle me-1 ext-d9303a02"></i>Live
       </span>
       <button id="btn-pause" class="btn btn-sm btn-outline-secondary">
         <i class="fa fa-pause me-1"></i>Pause
@@ -29,20 +29,20 @@
     <div class="ss-card-body">
       <div class="row g-3 text-center">
         <div class="col-6 col-md-3">
-          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">RX Rate</div>
-          <div id="net-rx-rate" class="fw-bold mt-1" style="font-size:1.5rem;color:#3b82f6;">—</div>
+          <div class="text-muted ext-e96256ee">RX Rate</div>
+          <div id="net-rx-rate" class="fw-bold mt-1 ext-50b82f40">—</div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">TX Rate</div>
-          <div id="net-tx-rate" class="fw-bold mt-1" style="font-size:1.5rem;color:#10b981;">—</div>
+          <div class="text-muted ext-e96256ee">TX Rate</div>
+          <div id="net-tx-rate" class="fw-bold mt-1 ext-1219222e">—</div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Total RX (since boot)</div>
-          <div id="net-rx-total" class="fw-bold mt-1" style="font-size:1.5rem;">—</div>
+          <div class="text-muted ext-e96256ee">Total RX (since boot)</div>
+          <div id="net-rx-total" class="fw-bold mt-1 ext-343cb84b">—</div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="text-muted" style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;">Total TX (since boot)</div>
-          <div id="net-tx-total" class="fw-bold mt-1" style="font-size:1.5rem;">—</div>
+          <div class="text-muted ext-e96256ee">Total TX (since boot)</div>
+          <div id="net-tx-total" class="fw-bold mt-1 ext-343cb84b">—</div>
         </div>
       </div>
     </div>
@@ -55,7 +55,7 @@
       <div><div class="ss-card-title">Network Throughput</div></div>
     </div>
     <div class="ss-card-body">
-      <div style="position:relative;height:300px;">
+      <div class="ext-e3372537">
         <canvas id="trafficChart"></canvas>
       </div>
     </div>
@@ -77,8 +77,8 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-<script>
+<script src="{{ static_v('js/chart.umd.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
 (function () {
   const MAX_POINTS  = 60;
   const INTERVAL_MS = 2000;
@@ -90,10 +90,10 @@
   function setStale(on) {
     if (on) {
       liveBadge.className = 'badge bg-warning text-dark';
-      liveBadge.innerHTML = '<i class="fa fa-circle me-1" style="font-size:.55rem"></i>Stale';
+      liveBadge.innerHTML = '<i class="fa fa-circle me-1 ext-d9303a02"></i>Stale';
     } else {
       liveBadge.className = 'badge bg-success';
-      liveBadge.innerHTML = '<i class="fa fa-circle me-1" style="font-size:.55rem"></i>Live';
+      liveBadge.innerHTML = '<i class="fa fa-circle me-1 ext-d9303a02"></i>Live';
     }
   }
 
@@ -207,8 +207,8 @@
       const txR  = r.tx != null ? r.tx + ' KB/s' : '—';
       return `<tr>
         <td><code>${s.name}</code></td>
-        <td class="text-end fw-semibold" style="color:#3b82f6;">${rxR}</td>
-        <td class="text-end fw-semibold" style="color:#10b981;">${txR}</td>
+        <td class="text-end fw-semibold ext-d294e9a2">${rxR}</td>
+        <td class="text-end fw-semibold ext-29fb9df2">${txR}</td>
         <td class="text-end">${fmt(s.rx_bytes)}</td>
         <td class="text-end">${fmt(s.tx_bytes)}</td>
         <td class="text-end">${s.rx_pkts.toLocaleString()}</td>
@@ -217,10 +217,10 @@
       </tr>`;
     }).join('');
 
-    const totalRow = `<tr style="border-top:2px solid var(--border-color-soft,#334);font-weight:700;background:rgba(255,255,255,.02);">
+    const totalRow = `<tr class="ext-28e9a570">
       <td>TOTAL</td>
-      <td class="text-end" style="color:#3b82f6;">${netRxKBs} KB/s</td>
-      <td class="text-end" style="color:#10b981;">${netTxKBs} KB/s</td>
+      <td class="text-end ext-d294e9a2">${netRxKBs} KB/s</td>
+      <td class="text-end ext-29fb9df2">${netTxKBs} KB/s</td>
       <td class="text-end">${fmt(sumRxBytes)}</td>
       <td class="text-end">${fmt(sumTxBytes)}</td>
       <td class="text-end">${sumRxPkts.toLocaleString()}</td>
@@ -230,8 +230,8 @@
 
     document.getElementById('iface-summary').innerHTML = `
       <div class="table-responsive">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft,#1e293b);">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-9b349a66">
             <tr>
               <th>Interface</th>
               <th class="text-end">RX Rate</th>

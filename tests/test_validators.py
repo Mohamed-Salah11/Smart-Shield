@@ -15,6 +15,7 @@ from app.validators import (
     validate_port_list,
     validate_protocol,
     validate_interface_name,
+    validate_mac,
     validate_username,
     validate_boolean,
     validate_description,
@@ -194,6 +195,44 @@ class TestValidateInterfaceName:
     def test_special_chars_raise(self):
         with pytest.raises(ValueError):
             validate_interface_name("em 0")
+
+
+class TestValidateMAC:
+    def test_valid_lowercase(self):
+        assert validate_mac("aa:bb:cc:dd:ee:ff") == "aa:bb:cc:dd:ee:ff"
+
+    def test_valid_uppercase_normalised(self):
+        assert validate_mac("AA:BB:CC:DD:EE:FF") == "aa:bb:cc:dd:ee:ff"
+
+    def test_valid_mixed_case(self):
+        assert validate_mac("00:1A:2b:3C:4d:5E") == "00:1a:2b:3c:4d:5e"
+
+    def test_empty_allowed_by_default(self):
+        assert validate_mac("") == ""
+        assert validate_mac(None) == ""
+
+    def test_empty_rejected_when_required(self):
+        with pytest.raises(ValueError, match="required"):
+            validate_mac("", allow_empty=False)
+
+    def test_too_few_groups_raises(self):
+        with pytest.raises(ValueError, match="Invalid MAC"):
+            validate_mac("aa:bb:cc:dd:ee")
+
+    def test_too_many_groups_raises(self):
+        with pytest.raises(ValueError, match="Invalid MAC"):
+            validate_mac("aa:bb:cc:dd:ee:ff:00")
+
+    def test_wrong_separator_raises(self):
+        with pytest.raises(ValueError, match="Invalid MAC"):
+            validate_mac("aa-bb-cc-dd-ee-ff")
+
+    def test_non_hex_raises(self):
+        with pytest.raises(ValueError, match="Invalid MAC"):
+            validate_mac("gg:bb:cc:dd:ee:ff")
+
+    def test_strips_whitespace(self):
+        assert validate_mac("  00:11:22:33:44:55  ") == "00:11:22:33:44:55"
 
 
 class TestValidateUsername:

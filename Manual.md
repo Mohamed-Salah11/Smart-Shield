@@ -10,13 +10,13 @@
 4. [CLI Reference — smartshieldctl](#4-cli-reference--smartshieldctl)
 5. [Console Recovery Menu](#5-console-recovery-menu)
 6. [Web GUI Reference](#6-web-gui-reference)
-   - 6.1 [Dashboard](#61-dashboard)
+   - 6.1 [Command Center (Dashboard)](#61-command-center-dashboard)
    - 6.2 [Network — Interfaces and Routing](#62-network--interfaces-and-routing)
    - 6.3 [Firewall](#63-firewall)
    - 6.4 [Network Services](#64-network-services)
    - 6.5 [VPN Tunnels](#65-vpn-tunnels)
    - 6.6 [Threat Detection — IDS/IPS](#66-threat-detection--idsips)
-   - 6.7 [Content Filtering](#67-content-filtering)
+   - 6.7 [Content Policy (DNS / Web / App)](#67-content-policy-dns--web--app)
    - 6.8 [Captive Portal](#68-captive-portal)
    - 6.9 [SIEM and Event Log](#69-siem-and-event-log)
    - 6.10 [Monitoring](#610-monitoring)
@@ -25,6 +25,8 @@
    - 6.13 [Backup and Restore](#613-backup-and-restore)
    - 6.14 [AI Assistant](#614-ai-assistant)
    - 6.15 [System Settings](#615-system-settings)
+   - 6.16 [Smart Shield SOC Portal](#616-smart-shield-soc-portal)
+   - 6.17 [Appliance Console (Hardened Terminal)](#617-appliance-console-hardened-terminal)
 7. [Environment Variables Reference](#7-environment-variables-reference)
 8. [Log Files Reference](#8-log-files-reference)
 9. [Directory Structure Reference](#9-directory-structure-reference)
@@ -34,18 +36,18 @@
 
 ## 1. Introduction
 
-Smart Shield is a web-managed network security appliance for FreeBSD. It provides a single
-HTTPS interface and an operator CLI (`smartshieldctl`) that together cover the full lifecycle
-of a network security gateway: initial provisioning, day-to-day firewall and policy management,
-real-time security monitoring, and incident response.
+Smart Shield is a web-managed network security appliance for FreeBSD. A single
+HTTPS interface and an operator CLI (`smartshieldctl`) cover the full lifecycle
+of a security gateway: provisioning, day-to-day firewall and policy
+management, real-time monitoring, captive portal authentication, and SOC
+incident handling through a separate analyst portal.
 
 ### Audience
 
-This manual is intended for:
-
-- **Network administrators** deploying Smart Shield as an edge security gateway.
-- **Security practitioners** using Smart Shield as a research or testing environment.
-- **Educators** running Smart Shield in a laboratory or classroom network.
+- **Network administrators** deploying Smart Shield as an edge gateway.
+- **Security practitioners** using Smart Shield as a research / testing platform.
+- **Educators** running Smart Shield in a lab or classroom network.
+- **SOC analysts** (L1 / L2 / L3) using the dedicated SOC portal — their work is kept separate from the firewall log so analyst events never pollute the appliance dashboard.
 
 ### Conventions
 
@@ -70,12 +72,12 @@ This manual is intended for:
 | Disk | 4 GB available (SSD recommended) |
 | Network interfaces | 2 physical NICs (WAN + LAN) |
 
-Smart Shield operates in **development mode** on Linux and macOS (or Windows via WSL) for
-UI development and dry-run testing. All network enforcement features require FreeBSD.
+Smart Shield runs in **development mode** on Linux, macOS, and Windows for UI
+work and dry-run policy testing. Network enforcement requires FreeBSD.
 
 ### 2.2 Running the Installer
 
-Clone the repository to the target FreeBSD host and run the installer as root:
+Clone to the target FreeBSD host and run the installer as root:
 
 ```sh
 git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smart-shield
@@ -83,249 +85,148 @@ cd /usr/local/share/smart-shield
 sh bsd/install.sh
 ```
 
-The installer performs these steps automatically:
+What the installer does:
 
-1. Installs FreeBSD packages: `nginx`, `python3`, `suricata`, `unbound`, `isc-dhcp44-server`,
-   `kea`, `openvpn`, `strongswan`, `mpd5`, `mrtg`, `miniupnpd`, `igmpproxy`, `ddclient`,
-   `sudo`, `git`, `sqlite3`, `ca_root_nss`, `bind-tools`, `tcpdump`, `nano`.
-2. Creates a Python virtual environment at `/usr/local/share/smart-shield/.venv` and installs
-   all pip dependencies from `requirements.txt`.
-3. Creates all required runtime directories (see §9).
-4. Generates a random `SECRET_KEY` (64 hex characters) and `SMARTSHIELD_MASTER_KEY`
-   (AES-256 base64 key) and writes them to the environment file.
-5. Installs the `smart_shield` FreeBSD rc.d service and enables it with `sysrc`.
-6. Generates a self-signed TLS certificate (RSA 2048-bit, valid 10 years) at
-   `/usr/local/etc/smart-shield/ssl/cert.pem`.
-7. Writes the nginx reverse proxy configuration and starts nginx.
-8. Installs the MRTG cron job (`*/5 * * * * root /usr/local/bin/mrtg …`).
-9. Installs `smartshieldctl` to `/usr/local/sbin/smartshieldctl`.
-10. Installs the `smart_shield_console` recovery menu to `/usr/local/sbin/`.
-11. Runs two MRTG passes to initialize log files and generate first-run graphs.
-12. Starts the Smart Shield service.
+1. Installs FreeBSD packages: `nginx python3 suricata unbound isc-dhcp44-server kea openvpn strongswan mpd5 mrtg miniupnpd igmpproxy ddclient sudo git sqlite3 ca_root_nss bind-tools tcpdump nano`.
+2. Creates `/usr/local/share/smart-shield/.venv` and installs `requirements.txt`.
+3. Creates every required runtime directory (see §9).
+4. Generates a random `SECRET_KEY` (64 hex chars) and `SMARTSHIELD_MASTER_KEY` (AES-256, base64) and writes them to `/usr/local/etc/smart-shield/smart-shield.env` with mode `0600`, owner `root:wheel`.
+5. Installs the `smart_shield` rc.d unit and enables it with `sysrc`. The unit **exports** `SMARTSHIELD_ENV_FILE` so the Flask app and every Gunicorn worker read the same env file regardless of working directory.
+6. Generates a self-signed TLS cert at `/usr/local/etc/smart-shield/ssl/cert.pem`.
+7. Writes the nginx reverse proxy + WebSocket upgrade configuration and starts nginx.
+8. Installs the MRTG cron job (`*/5 * * * *`).
+9. Installs `smartshieldctl` to `/usr/local/sbin/smartshieldctl` and the recovery menu to `/usr/local/sbin/smart_shield_console`.
+10. Runs two MRTG passes to seed graph files.
+11. Starts the Smart Shield service.
 
 ### 2.3 Verifying the Installation
 
-After the installer completes:
-
 ```sh
-# Check service status
 smartshieldctl status
-
-# Check nginx is listening on 443
 sockstat -4 -l | grep 443
-
-# Test the web UI is reachable
 smartshieldctl health
 ```
 
 ### 2.4 Environment File
 
-The environment file is at `/usr/local/etc/smart-shield/smart-shield.env`. Edit it to
-configure optional features (see §7 for the full variable reference):
+The environment file lives at `/usr/local/etc/smart-shield/smart-shield.env`.
+Edit it to configure optional features (see §7):
 
 ```sh
 nano /usr/local/etc/smart-shield/smart-shield.env
-```
-
-After editing, restart the service:
-
-```sh
 smartshieldctl restart
 ```
+
+If you run the app outside the default path (e.g. local development), set
+`SMARTSHIELD_ENV_FILE` to your env file:
+
+```sh
+SMARTSHIELD_ENV_FILE=/srv/smart-shield/dev.env .venv/bin/python wsgi.py
+```
+
+In production, `app/config.py` fails fast (raises `RuntimeError`) when
+`APP_ENV=production` is set without a `SECRET_KEY` — this is intentional, so
+an incomplete env file never silently boots with an insecure default.
 
 ---
 
 ## 3. First-Run Setup Wizard
 
-On the first visit to `https://<appliance-IP>`, Smart Shield redirects to the setup wizard.
-The wizard configures the minimum required settings to bring the appliance online.
+On the first visit to `https://<appliance-IP>`, Smart Shield redirects to the
+four-step setup wizard.
 
 ### 3.1 Step 1 — Interface Assignment
 
-Select which physical NIC is the **WAN** (internet-facing) interface and which is the
-**LAN** (internal network) interface. The page lists all detected physical interfaces with
-their names (e.g., `em0`, `em1`) and current link state.
-
-- Click **Assign as WAN** next to the internet-facing interface.
-- Click **Assign as LAN** next to the internal interface.
-- Click **Save & Continue**.
+Select which physical NIC is **WAN** and which is **LAN** from the detected
+interfaces (`em0`, `em1`, etc.). Click **Save & Continue**.
 
 ### 3.2 Step 2 — IP Configuration
 
-Configure addressing for both interfaces.
-
-**LAN Configuration:**
-- Enter the LAN IP address in CIDR notation (e.g., `192.168.1.1/24`).
-- Smart Shield derives the DHCP pool automatically from the entered subnet.
-
-**WAN Configuration:**
-- **DHCP** — the appliance obtains an IP from the upstream provider automatically.
-- **Static** — enter the WAN IP/CIDR, gateway, and DNS servers.
-- **PPPoE** — enter the username, password, and optional service name provided by the ISP.
+- **LAN**: enter a CIDR (e.g. `192.168.1.1/24`). The DHCP pool is derived automatically.
+- **WAN**: choose DHCP, Static, or PPPoE; enter the matching credentials.
 
 Click **Save & Continue**.
 
 ### 3.3 Step 3 — Admin Password
 
-Set the password for the `admin` superuser account. The password must be at least 8
-characters. Click **Set Password & Continue**.
+Set the `admin` superuser password (8 chars minimum). Click **Set Password & Continue**.
 
 ### 3.4 Step 4 — Apply and Finish
 
-Review the configuration summary and click **Apply**. The appliance:
+Review the summary, click **Apply**. Smart Shield:
 
 - Writes interface configuration to `rc.conf`.
 - Generates and loads `pf.conf`.
-- Starts DHCP and DNS services.
+- Starts DHCP and DNS.
 - Generates the initial MRTG configuration.
 
-After apply completes, the browser is redirected to the dashboard at `https://<LAN-IP>`.
-
-### 3.5 Accessing the Dashboard
-
-The dashboard is available at `https://<LAN-IP>` from any device on the LAN. Accept the
-self-signed certificate warning on first access, or install the certificate into the browser's
-trust store.
-
-Default login credentials: username `admin`, password set in Step 3.
+You are then redirected to the Command Center at `https://<LAN-IP>`.
 
 ---
 
 ## 4. CLI Reference — smartshieldctl
 
-`smartshieldctl` is an operator utility installed at `/usr/local/sbin/smartshieldctl`.
-It provides service control, interface management, diagnostics, and administration without
-requiring a browser.
-
-All commands require root privileges unless noted.
+`smartshieldctl` is installed at `/usr/local/sbin/smartshieldctl`. All commands
+require root unless noted.
 
 ### 4.1 Service Control
 
 | Command | Description |
 |---|---|
-| `smartshieldctl start` | Start the Smart Shield web service |
-| `smartshieldctl stop` | Stop the Smart Shield web service |
-| `smartshieldctl restart` | Restart the Smart Shield web service |
-| `smartshieldctl status` | Show whether the service is running (PID, uptime) |
-| `smartshieldctl enable` | Enable the service to start at boot |
-| `smartshieldctl disable` | Prevent the service from starting at boot |
-| `smartshieldctl health` | Check whether the web UI is reachable (HTTP health check) |
+| `smartshieldctl start` | Start the web service |
+| `smartshieldctl stop` | Stop the web service |
+| `smartshieldctl restart` | Restart the web service |
+| `smartshieldctl status` | Show service state (PID, uptime) |
+| `smartshieldctl enable` | Enable at boot |
+| `smartshieldctl disable` | Prevent boot start |
+| `smartshieldctl health` | HTTP health probe |
 
-**Example — restart and verify:**
-
-```sh
-smartshieldctl restart
-smartshieldctl status
-smartshieldctl health
-```
-
-### 4.2 Interface Management
-
-*(FreeBSD only)*
+### 4.2 Interface Management *(FreeBSD only)*
 
 | Command | Description |
 |---|---|
-| `smartshieldctl list-nics` | List all physical NICs with name, link state, and IP |
-| `smartshieldctl assign <LAN\|WAN> <port>` | Assign a physical NIC to the LAN or WAN role |
-| `smartshieldctl iface-show [LAN\|WAN]` | Display configuration and live IP for one or both interfaces |
-| `smartshieldctl iface-set <LAN\|WAN> dhcp [--apply]` | Configure DHCP mode; `--apply` applies immediately |
-| `smartshieldctl iface-set <LAN\|WAN> static <CIDR> [gateway] [--apply]` | Configure a static IP |
-
-**Examples:**
-
-```sh
-# List available NICs
-smartshieldctl list-nics
-
-# Assign em0 as WAN, em1 as LAN
-smartshieldctl assign WAN em0
-smartshieldctl assign LAN em1
-
-# Set LAN to static 192.168.1.1/24 and apply immediately
-smartshieldctl iface-set LAN static 192.168.1.1/24 --apply
-
-# Set WAN to DHCP
-smartshieldctl iface-set WAN dhcp --apply
-```
+| `smartshieldctl list-nics` | List physical NICs with link state |
+| `smartshieldctl assign <LAN\|WAN> <port>` | Assign a NIC to the LAN or WAN role |
+| `smartshieldctl iface-show [LAN\|WAN]` | Show configuration and live IP |
+| `smartshieldctl iface-set <LAN\|WAN> dhcp [--apply]` | Configure DHCP mode |
+| `smartshieldctl iface-set <LAN\|WAN> static <CIDR> [gateway] [--apply]` | Configure static |
 
 ### 4.3 Diagnostics
 
-*(FreeBSD only, except ping and sysinfo)*
-
 | Command | Description |
 |---|---|
-| `smartshieldctl ping [host] [count]` | ICMP ping (default: `8.8.8.8`, 4 packets) |
-| `smartshieldctl pf-status` | Show PF rule count, state table, NAT entries, and active interface |
-| `smartshieldctl apply-pf` | Regenerate `pf.conf` from the database and reload PF |
-| `smartshieldctl preflight` | Check directory permissions, binary availability, and kernel capabilities |
-| `smartshieldctl vpn-status` | Show OpenVPN, IPsec (strongSwan), and L2TP (mpd5) daemon status |
-| `smartshieldctl dhcp-status` | Show ISC DHCPd status and active lease count |
-| `smartshieldctl dns-status` | Show Unbound resolver status |
-| `smartshieldctl sysinfo` | Display CPU load, memory usage, disk usage, and uptime |
-
-**Examples:**
-
-```sh
-# Test connectivity
-smartshieldctl ping 1.1.1.1 5
-
-# Verify PF is running and show state counts
-smartshieldctl pf-status
-
-# Check all service binaries are present and kernel features are loaded
-smartshieldctl preflight
-
-# Show disk and memory usage
-smartshieldctl sysinfo
-```
+| `smartshieldctl ping [host] [count]` | ICMP ping |
+| `smartshieldctl pf-status` | PF rule count, states, NAT entries |
+| `smartshieldctl apply-pf` | Regenerate + reload `pf.conf` |
+| `smartshieldctl preflight` | Check directories, binaries, kernel features |
+| `smartshieldctl vpn-status` | OpenVPN / IPsec / L2TP daemon state |
+| `smartshieldctl dhcp-status` | ISC DHCPd status + active lease count |
+| `smartshieldctl dns-status` | Unbound status |
+| `smartshieldctl sysinfo` | CPU, memory, disk, uptime |
 
 ### 4.4 Log Access
 
 | Command | Description |
 |---|---|
-| `smartshieldctl logs [N]` | Tail the application log (default: last 100 lines) |
-| `smartshieldctl audit [N]` | Tail the SIEM audit log (default: last 100 lines) |
-| `smartshieldctl access [N]` | Tail the nginx access log (default: last 100 lines) |
-
-**Examples:**
-
-```sh
-# View last 50 audit events
-smartshieldctl audit 50
-
-# Watch application log in real time (use standard tail -f after getting the path)
-smartshieldctl logs 200
-```
+| `smartshieldctl logs [N]` | Tail the application log (default 100 lines) |
+| `smartshieldctl audit [N]` | Tail the SIEM audit log |
+| `smartshieldctl access [N]` | Tail the nginx access log |
 
 ### 4.5 Administration
 
 | Command | Description |
 |---|---|
-| `smartshieldctl passwd [username]` | Interactively reset a web UI user password |
-| `smartshieldctl factory-reset` | Wipe all configuration from the database (irreversible) |
-| `smartshieldctl ssh <enable\|disable\|status>` | Control the sshd daemon |
-| `smartshieldctl shell` | Drop to an interactive root shell |
-| `smartshieldctl menu` | Launch the interactive console recovery menu |
-
-**Examples:**
-
-```sh
-# Reset the admin password
-smartshieldctl passwd admin
-
-# Enable SSH for remote access
-smartshieldctl ssh enable
-
-# Open the recovery menu
-smartshieldctl menu
-```
+| `smartshieldctl passwd [username]` | Reset a user password |
+| `smartshieldctl factory-reset` | Wipe all configuration (irreversible) |
+| `smartshieldctl ssh <enable\|disable\|status>` | Control sshd |
+| `smartshieldctl shell` | Drop to a root shell |
+| `smartshieldctl menu` | Launch the console recovery menu |
 
 ---
 
 ## 5. Console Recovery Menu
 
-The interactive console recovery menu (`smart_shield_console`) is designed for emergency
-access over a serial console or out-of-band SSH session. Launch it with:
+`smart_shield_console` provides emergency access over serial or out-of-band SSH.
 
 ```sh
 smartshieldctl menu
@@ -333,46 +234,41 @@ smartshieldctl menu
 /usr/local/sbin/smart_shield_console
 ```
 
-### Menu Options
-
 | Option | Action |
 |---|---|
-| `1` | Show Smart Shield service status |
-| `2` | Start the Smart Shield service |
-| `3` | Stop the Smart Shield service |
-| `4` | Restart the Smart Shield service |
+| `1` | Service status |
+| `2` | Start the service |
+| `3` | Stop the service |
+| `4` | Restart the service |
 | `5` | View the last 50 lines of the application log |
 | `6` | View the last 50 lines of the audit log |
 | `7` | Reset the admin password interactively |
-| `8` | Reload PF rules from the database (regenerate and apply `pf.conf`) |
+| `8` | Reload PF rules from the database |
 | `9` | Run the first-boot setup sequence again (re-creates missing directories) |
 | `0` | Open a root shell |
-| `q` | Quit the menu |
-
-Each action displays output, then pauses with a "Press Enter to continue" prompt before
-returning to the menu.
+| `q` | Quit |
 
 ---
 
 ## 6. Web GUI Reference
 
-The web GUI is accessible at `https://<LAN-IP>`. The left sidebar provides navigation to all
-major sections.
+The GUI is at `https://<LAN-IP>`. The left sidebar navigates every section.
 
 ---
 
-### 6.1 Dashboard
+### 6.1 Command Center (Dashboard)
 
 **URL:** `/system/dashboard`
 
-The dashboard provides an at-a-glance view of the appliance state:
+The Command Center is the firewall admin landing page:
 
-- **KPI strip:** User count, group count, firewall rule counts (floating / WAN / LAN), NAT rule count, alias count.
-- **Service health:** Color-coded indicators for PF, DHCP, Unbound, OpenVPN, IPsec, Suricata, nginx, SIEM, and MRTG.
-- **Interface statistics:** Real-time RX/TX packet and byte counts per interface.
-- **Recent events:** Last few security events from the audit log (logins, rule changes, IDS alerts).
+- **KPI strip** — user / group / rule / NAT / alias counts.
+- **Service health** — colour-coded indicators for PF, DHCP, Unbound, OpenVPN, IPsec, Suricata, nginx, SIEM, MRTG.
+- **Interface statistics** — live RX/TX bytes and packets.
+- **Recent events** — last entries from the appliance audit log. SOC analyst events (`details.soc_origin = true`) are excluded by default — they appear only in the SOC portal.
 
-The dashboard refreshes automatically via Server-Sent Events (SSE) without reloading the page.
+The dashboard polls `/status/api/logs` for live updates. The endpoint defaults
+to hiding SOC events; a superuser can fetch them with `?hide_soc=0`.
 
 ---
 
@@ -380,45 +276,31 @@ The dashboard refreshes automatically via Server-Sent Events (SSE) without reloa
 
 #### Interface Assignments (`/interfaces/assignments`)
 
-Maps physical NIC names (e.g., `em0`, `em1`) to the WAN and LAN logical roles. After
-changing assignments, click **Save** and then apply the change.
+Map physical NIC names (`em0`, `em1`, …) to the WAN and LAN logical roles.
 
 #### LAN Interface (`/interfaces/lan`)
 
-Configure the LAN interface:
-
-- **IP Mode:** Static (most common) or DHCP.
-- **IP Address / Prefix Length:** e.g., `192.168.1.1 / 24`.
-- **MTU:** Leave at 1500 unless your network requires jumbo frames.
-- **Description:** A human-readable label for this interface.
-
-Click **Save** then **Apply** to activate the new configuration.
+- **IP Mode:** Static or DHCP.
+- **IP Address / Prefix Length:** `192.168.1.1 / 24`.
+- **MTU:** Default 1500.
+- **Description:** Free-text label.
 
 #### WAN Interface (`/interfaces/wan`)
 
-Configure the WAN interface:
+- **IP Mode:** DHCP / Static / PPPoE.
+- **Static settings:** IP / prefix, gateway, DNS.
+- **PPPoE settings:** username, password, service name, dial-on-demand.
 
-- **IP Mode:** DHCP (from upstream ISP), Static (fixed IP), or PPPoE (DSL/fiber with credentials).
-- **Static settings:** WAN IP/prefix, gateway IP, upstream DNS servers.
-- **PPPoE settings:** Username, password, service name (if required), dial-on-demand.
+#### VLANs
 
-#### VLANs (`/interfaces/` → VLAN tab)
-
-Add 802.1Q VLAN tags on a physical parent interface. Each VLAN appears as a separate logical
-interface (e.g., `em0.10`) that can be assigned an IP and treated like a physical NIC for
-firewall, DHCP, and routing purposes.
+Add 802.1Q tags on a parent interface (`em0.10`). Each VLAN is then assignable
+like a physical NIC.
 
 #### Routing (`/routing/`)
 
-**Gateways** — Define upstream router IP addresses. Each gateway entry can be monitored via
-ICMP ping; Smart Shield reports latency and packet loss in the status page.
-
-**Static Routes** — Add routes of the form `<destination CIDR> via <gateway>` for networks
-reachable through a specific next-hop.
-
-**Gateway Groups** — Combine multiple gateways into a group for load balancing (round-robin)
-or failover (tier-based priority). Reference a gateway group in a firewall rule to distribute
-or fail-over traffic automatically.
+- **Gateways** — upstream router IPs, ICMP-monitored for loss / latency.
+- **Static Routes** — `<destination CIDR> via <gateway>`.
+- **Gateway Groups** — load balancing or failover for use in firewall rules.
 
 ---
 
@@ -426,106 +308,59 @@ or fail-over traffic automatically.
 
 #### 6.3.1 Rules (`/firewall/rules`)
 
-The rule editor has three tabs: **Floating**, **WAN**, and **LAN**.
+Three tabs: **Floating**, **WAN**, **LAN**.
 
-- **Floating rules** match traffic on any interface and take effect before interface-specific rules. Use floating rules for global policy (e.g., block all Telnet everywhere).
-- **WAN rules** match inbound traffic arriving on the WAN interface.
-- **LAN rules** match traffic originating from the LAN.
+- **Floating rules** match traffic on any interface and take effect before interface-specific rules.
+- **WAN rules** match inbound traffic on WAN.
+- **LAN rules** match traffic originating on LAN.
 
-**Adding a rule:**
+Add a rule:
 
-1. Click **Add rule** (top of the table).
-2. Set the **Action**: `pass`, `block`, or `reject`.
-3. Set the **Protocol**: `any`, `TCP`, `UDP`, `ICMP`, `TCP/UDP`.
-4. Set **Source** and **Destination** (any, network, single host, alias, or interface address).
-5. Optionally set **Source port** and **Destination port**.
-6. Optionally assign a **Schedule** (time-based activation) or **Queue** (traffic shaping).
-7. Add a **Description** and click **Save**.
+1. Click **Add rule**.
+2. Set **Action** (`pass`, `block`, `reject`), **Protocol**, **Source**, **Destination**.
+3. Optionally set ports, schedule, queue.
+4. Add a description; **Save**.
 
-Rules are evaluated top-to-bottom; the first matching rule wins (PF "quick" semantics).
-Drag rules to reorder them.
+Rules are evaluated top-to-bottom (`quick` semantics). Drag to reorder.
 
-**Applying changes:**
-
-Click **Apply Changes** in the top-right banner. Smart Shield:
-1. Generates `pf.conf` from the database.
-2. Validates it with `pfctl -nf`.
-3. If validation passes, reloads PF with `pfctl -f`.
-4. If the reload fails, automatically restores the previous known-good configuration.
-
-**Rolling back:** Click **Rollback** to restore the last successfully applied `pf.conf`.
-
-**Previewing:** Click **Preview** to see the generated `pf.conf` without applying it.
+**Apply Changes** runs: `generate → pfctl -nf → known-good backup → atomic write → pfctl -f → roll back on failure`. **Rollback** restores the last good `pf.conf`. **Preview** shows the generated text without applying.
 
 #### 6.3.2 NAT (`/firewall/nat`)
 
-**Port Forwarding (NAT PF):** Redirect an external port to an internal host.
-
-1. Click **Add** under the Port Forwarding tab.
-2. Set **Interface** (typically WAN), **Protocol**, **Destination port**, **Redirect IP**, and **Redirect port**.
-3. Enable **NAT reflection** to allow LAN-to-LAN access via the WAN IP.
-
-**1:1 NAT:** Map a single external IP address to a single internal IP address bidirectionally.
-
-**Outbound NAT:** Control how internal traffic is masqueraded when leaving the WAN. By default,
-all LAN traffic is translated to the WAN IP. Add custom outbound rules for specific sources or
-to disable masquerade for particular subnets.
-
-**NPt (Network Prefix Translation):** Translate IPv6 prefixes at the border — useful when the
-internal prefix differs from the delegated upstream prefix.
+- **Port Forwarding (rdr)** — external port → internal host.
+- **1:1 NAT** — one external IP ↔ one internal IP.
+- **Outbound NAT** — control masquerade per-source.
+- **NPt** — translate IPv6 prefixes.
 
 #### 6.3.3 Aliases (`/firewall/aliases`)
 
-Aliases are named sets of IP addresses, networks, ports, or URLs referenced in rules.
-
-| Type | Example content |
+| Type | Example |
 |---|---|
 | Host | `192.168.1.100`, `10.0.0.5` |
 | Network | `192.168.10.0/24`, `172.16.0.0/12` |
 | Port | `80`, `443`, `8080:8090` |
-| URL | A remote text file listing IPs or networks (fetched periodically) |
-
-Create an alias once, reference it in any number of rules. Updating the alias automatically
-updates all rules that use it on the next PF apply.
+| URL | A remote text file fetched periodically |
 
 #### 6.3.4 Schedules (`/firewall/schedules`)
 
-Define time windows that can be attached to firewall rules. A rule with a schedule is active
-only during the specified periods.
+Time windows attachable to firewall rules.
 
-1. Click **Add Schedule**.
-2. Set a **Name** and optionally restrict by **Month**, **Day of week**, and **Start/End time**.
-3. Assign the schedule to a firewall rule in the rule editor.
+#### 6.3.5 Traffic Shaper / Limiters (`/firewall/traffic-shaper`)
 
-#### 6.3.5 Traffic Shaper and Limiters (`/firewall/traffic-shaper`)
-
-**Traffic Shaper (ALTQ):** Assign bandwidth allocations and priorities to traffic classes.
-
-1. Enable shaping on an interface and choose a scheduler (HFSC, CBQ, PRIQ, or FAIRQ).
-2. Create queues with bandwidth percentages and priority levels.
-3. Assign firewall rules to queues.
-
-**Limiters (dummynet):** Apply per-flow bandwidth, delay, and queue constraints.
-
-1. Create a limiter with a bandwidth rate (e.g., 10 Mbit/s) and mask type (per-source IP,
-   per-destination, or per flow).
-2. Reference the limiter in a firewall rule's **In/Out pipe** fields.
+- **ALTQ** — bandwidth class scheduling.
+- **dummynet** — per-flow rate / delay limiters referenced from rules' In/Out pipe fields.
 
 #### 6.3.6 Virtual IPs / CARP (`/firewall/virtual-ips`)
 
-Add IP aliases or CARP virtual IPs. CARP virtual IPs are shared between two appliances in
-a high-availability pair — the primary holds the IP; the backup takes it over if the primary
-fails. Configure CARP in **System → High Availability** first.
+Add IP aliases or CARP virtual IPs (shared across an HA pair).
 
 #### 6.3.7 Apply, Preview, and Rollback
 
-These controls appear in the top-right banner whenever there are unapplied changes:
-
 | Action | Effect |
 |---|---|
-| **Preview** | Show the generated `pf.conf` in a modal without applying |
-| **Apply Changes** | Validate and load `pf.conf` into the running kernel |
-| **Rollback** | Restore the most recent successfully applied `pf.conf` |
+| Preview | Show the generated `pf.conf` |
+| Apply Changes | Validate + load into the running kernel |
+| Rollback | Restore the most recent good `pf.conf` |
 
 ---
 
@@ -533,76 +368,50 @@ These controls appear in the top-right banner whenever there are unapplied chang
 
 #### 6.4.1 DHCP Server — IPv4 (`/services/dhcp-server`)
 
-Smart Shield uses ISC DHCPd to assign IPv4 addresses to LAN clients.
-
-- **Pool range:** Start and end IP within the LAN subnet.
-- **Default lease time / Max lease time:** In seconds (e.g., 3600 / 86400).
-- **Gateway:** Pushed to clients (defaults to LAN IP).
-- **DNS servers:** Pushed to clients (defaults to LAN IP for local resolution).
-- **Domain name:** Optional domain suffix pushed to clients.
-
-**Static Leases:** Click **Add Static Lease** to map a specific MAC address to a fixed IP.
-Enter the MAC address, desired IP, and optional hostname.
-
-After saving, click **Apply** to regenerate `dhcpd.conf` and restart DHCPd. The config is
-validated with `dhcpd -t` before the daemon is restarted.
+Standard ISC DHCPd configuration: pool range, lease times, gateway, DNS push,
+optional domain. Static leases bind MAC → IP. Configs are validated with
+`dhcpd -t` before reload.
 
 #### 6.4.2 DHCPv6 Server (`/services/dhcpv6-server`)
 
-Smart Shield uses Kea to assign IPv6 addresses and prefixes.
-
-- Configure an IPv6 prefix pool and lease lifetimes.
-- Enable Router Advertisements (RA) with the appropriate flags (M-bit, O-bit) for the
-  desired addressing mode (SLAAC, stateful, or stateless DHCPv6).
+Kea-based IPv6 — prefix pool, lifetimes, RA M-bit / O-bit flags.
 
 #### 6.4.3 DNS Resolver (`/services/dns-resolver`)
 
-Smart Shield uses Unbound as the recursive resolver for all LAN clients.
+Unbound configuration:
 
-- **Forwarding:** Leave empty for full recursive resolution, or enter upstream DNS server IPs
-  to forward queries.
-- **DNS-over-TLS:** Enable encrypted upstream queries (requires forwarding to a DoT-capable
-  server such as 1.1.1.1 or 9.9.9.9).
-- **DNSSEC:** Enable cryptographic validation of DNS responses.
-- **Host overrides:** Add static A/AAAA records for local hostnames.
-- **Domain overrides:** Forward specific domains to a different DNS server (e.g., internal
-  corporate domain to an internal resolver).
-- **Query logging:** Enable logging of all queries to `/var/log/unbound/query.log` for SIEM
-  integration. This setting activates the DNS SIEM collector.
+- **Forwarding** — empty for recursion, or upstream DNS list.
+- **DNS-over-TLS** — encrypt upstream queries.
+- **DNSSEC** — validate signed responses.
+- **Host overrides** — local A/AAAA records.
+- **Domain overrides** — forward specific zones elsewhere.
+- **Query logging** — enables the DNS SIEM collector tailing `/var/log/unbound/query.log`.
 
-Click **Apply** after saving to regenerate `unbound.conf` and restart Unbound.
+Apply runs `apply_unbound()` — validate, atomic write, reload, rollback on failure.
 
 #### 6.4.4 Dynamic DNS (`/services/dynamic-dns`)
 
-Configure ddclient to update a dynamic DNS hostname with the current WAN IP address whenever
-it changes. Enter the provider credentials (username, password, hostname) and the update
-interval.
+ddclient credentials per provider, with update interval.
 
 #### 6.4.5 NTP (`/services/ntp`)
 
-Configure the NTP daemon to synchronize the appliance clock with upstream time servers. Enter
-one or more NTP server hostnames (e.g., `0.freebsd.pool.ntp.org`).
+Upstream NTP server list.
 
 #### 6.4.6 SNMP (`/services/snmp`)
 
-Enable bsnmpd to expose standard MIB data (system info, interface counters) to network
-management systems. Set a community string (avoid `public` or `private`), the listen port
-(default 161), and the allowed management host subnet.
+bsnmpd community / port / allow-list.
 
 #### 6.4.7 UPnP / PCP (`/services/upnp-igd-pcp`)
 
-Enable miniupnpd to process Universal Plug and Play port mapping requests from LAN devices.
-Restrict which LANs can make mapping requests and set an optional external IP override.
+miniupnpd interface restrictions and optional external IP override.
 
 #### 6.4.8 IGMP Proxy (`/services/igmp-proxy`)
 
-Configure igmpproxy to forward multicast traffic between interfaces. Define upstream
-(internet-side) and downstream (LAN-side) interfaces.
+Upstream + downstream interface mapping.
 
 #### 6.4.9 Wake on LAN (`/services/wake-on-lan`)
 
-Store MAC addresses and broadcast IPs for devices you want to wake remotely. Click **Send**
-next to a saved host to transmit the magic packet.
+Saved MAC + broadcast IP entries with a one-click **Send**.
 
 ---
 
@@ -610,60 +419,17 @@ next to a saved host to transmit the magic packet.
 
 #### 6.5.1 OpenVPN (`/vpn/openvpn`)
 
-**Server instances (Servers tab):**
-
-1. Click **Add Server**.
-2. Set the **Protocol** (UDP recommended), **Port** (default 1194), and **Device type** (TUN for routing, TAP for bridging).
-3. Select the **Server certificate** from the certificate manager.
-4. Configure the **Tunnel network** (the IP pool for VPN clients, e.g., `10.8.0.0/24`).
-5. Optionally enable **Redirect gateway** to route all client traffic through the VPN.
-6. Optionally push DNS server and domain name to clients.
-7. Click **Save** then **Apply** to start the OpenVPN server.
-
-**Client instances (Clients tab):**
-
-Used when Smart Shield itself connects outbound to a remote VPN server.
-
-1. Click **Add Client**.
-2. Enter the **Remote server** hostname or IP and port.
-3. Select the client certificate and configure the cipher suite.
-4. Click **Save** then **Apply**.
-
-**Client-Specific Overrides (CSO tab):**
-
-Assign a fixed tunnel IP or push specific routes to individual VPN clients by common name.
-
-**Wizard:** A three-step wizard under the Wizards tab guides you through creating a
-complete OpenVPN server with a new CA, server certificate, and basic client profile.
+Server, client, CSO, and wizard tabs. The certificate manager backs the
+required PKI.
 
 #### 6.5.2 IPsec / IKEv2 (`/vpn/ipsec`)
 
-**Tunnels (Phase 1 tab):**
-
-1. Click **Add P1** to create a new IKE connection.
-2. Set the **Remote gateway** (peer IP or hostname), **Authentication method** (PSK or certificate), and the **Encryption/hash/DH group** algorithms.
-3. Under the Phase 1 entry, click **Add P2** to define Phase 2 (ESP child SA):
-   - Set **Local network** and **Remote network** (the subnets to be tunneled).
-   - Choose encryption and hash algorithms and optionally enable PFS.
-4. Click **Save** then **Apply** to push the configuration to strongSwan.
-
-**Mobile Clients tab:** Configure the IKEv2 roadwarrior profile for remote users connecting
-from laptops or mobile devices. Set the virtual IP pool and authentication method (PSK or EAP).
-
-**Pre-Shared Keys tab:** Manage PSK entries used for IKE authentication. Each entry can be
-scoped to a specific peer identifier.
-
-**Advanced Settings tab:** Tune logging verbosity, fragmentation, and DPD (dead peer
-detection) timers for all tunnels.
+Phase 1 + Phase 2 editor, mobile clients (road-warrior), PSK manager,
+advanced (DPD, fragmentation, logging) tab.
 
 #### 6.5.3 L2TP / IPsec (`/vpn/l2tp`)
 
-Configure the L2TP server via mpd5 for legacy remote-access clients that require L2TP/IPsec.
-
-1. Enable the L2TP server.
-2. Set the **Server address** (LAN IP), **Client address pool**, and **Authentication method** (local or RADIUS).
-3. Under the **Users** tab, add L2TP user accounts with usernames and passwords.
-4. Click **Apply** to regenerate the mpd5 configuration and start the service.
+mpd5-based L2TP — server address, client pool, local or RADIUS auth, users.
 
 ---
 
@@ -671,112 +437,67 @@ Configure the L2TP server via mpd5 for legacy remote-access clients that require
 
 #### 6.6.1 Enabling Suricata
 
-On the Threat Detection page (`/ids/`):
-
-1. Click **Enable** in the top-right toggle. Smart Shield:
-   - Generates `suricata.yaml` from the database.
-   - Validates the configuration with `suricata -T`.
-   - Sets `suricata_enable=YES` in `rc.conf`.
-   - Starts the Suricata service.
-   - Updates the database to reflect the enabled state only after the service starts successfully.
-
-2. The status banner at the top of the page shows whether Suricata is running and the current mode.
+On `/ids/` click **Enable**. Smart Shield generates `suricata.yaml`, validates
+with `suricata -T`, writes `suricata_enable=YES` to `rc.conf`, and starts the
+service. The DB only marks Suricata enabled after the service has actually
+come up.
 
 #### 6.6.2 IDS vs IPS Mode
 
-Navigate to **Configuration** tab to set the mode:
-
-- **IDS (Detection only):** Suricata listens passively on the selected interface using the
-  BPF pcap socket. Matching traffic is logged but not blocked.
-- **IPS (Inline prevention):** Suricata is inserted inline using FreeBSD netmap(4). Matching
-  traffic is blocked at wire speed. **Requires netmap kernel support** and a netmap-compatible
-  NIC driver (`em`, `igb`, `ixgbe`, `ixl`, `re`, `vtnet`, `vmx`, `bnxt`, `ix`). Smart Shield
-  validates netmap compatibility before enabling IPS mode and automatically falls back to IDS
-  mode if the inline start fails.
+- **IDS** — Suricata reads pcap from a BPF socket.
+- **IPS** — Suricata is inserted inline via `netmap(4)`. Requires a netmap-compatible NIC driver (`em`, `igb`, `ixgbe`, `ixl`, `re`, `vtnet`, `vmx`, `bnxt`, `ix`). The startup path automatically falls back to IDS mode if netmap fails.
 
 #### 6.6.3 Managing Rulesets
 
-On the **Rulesets** tab:
+The **Rulesets** tab lists installed sources (`et/open`, custom URLs).
+**Update Rules** runs `suricata-update`.
 
-- View installed rule sources (e.g., `et/open` for Emerging Threats Open).
-- Toggle individual rulesets on or off.
-- Add custom rule sources by URL using the **Add Source** button.
-- Click **Update Rules** to run `suricata-update` and download the latest signatures.
+#### 6.6.4 Threat Intelligence Feeds
 
-After changing rulesets, restart Suricata (toggle Disable then Enable, or use `smartshieldctl restart` — note: Suricata has its own restart from the toggle button).
-
-#### 6.6.4 Threat Intelligence Feeds (`/ids/` → Threat Feeds tab)
-
-Smart Shield integrates with abuse.ch to enrich threat detection:
-
-1. Enter your abuse.ch **Personal Auth-Key** (obtain from https://abuse.ch/api/ after
-   creating a free account).
-2. Optionally enable **Dry-run mode** to test API calls without pushing data to PF.
-3. Use the **Lookup** tool to query a URL, IP, domain, or file hash against URLhaus,
-   MalwareBazaar, and ThreatFox.
-4. Click **Recent Samples** to view the latest IOCs from ThreatFox.
-
-When a valid API key is configured and dry-run is disabled, Smart Shield automatically fetches
-recent threat IOCs every 4 hours and pushes the extracted IPs to the `ss_threat_intel` PF
-table, blocking them at the packet filter level.
+Enter an abuse.ch Personal Auth-Key and toggle dry-run. When live, Smart
+Shield fetches recent IOCs every 4 h and replaces the `ss_threat_intel` PF
+table via `pfctl -t ss_threat_intel -T replace`.
 
 #### 6.6.5 Alert Viewer
 
-The **Status & Alerts** tab shows recent Suricata detections parsed directly from
-`/var/log/suricata/eve.json`:
-
-- Filter alerts by **severity** (1 = Critical, 2 = High, 3 = Info) and **time window** (last
-  1h, 6h, 24h, or all).
-- Search by signature name or IP address.
-- The **Alerts Today** KPI counter updates automatically.
-
-#### 6.6.6 Verifying IDS Operation
-
-From the BSD shell:
-
-```sh
-# Is Suricata running?
-pgrep -x suricata && echo "Running" || echo "Stopped"
-
-# Did it start cleanly?
-tail -50 /var/log/suricata/suricata.log
-
-# Is EVE JSON being written?
-ls -lh /var/log/suricata/eve.json
-
-# Validate config without restarting
-suricata -T -c /usr/local/etc/suricata/suricata.yaml
-
-# Generate a test alert from a Kali or test host on the LAN:
-curl -A "Nikto" http://<BSD-LAN-IP>/
-tail -5 /var/log/suricata/fast.log
-```
+The **Status & Alerts** tab parses `/var/log/suricata/eve.json` directly.
+Filter by severity and time window.
 
 ---
 
-### 6.7 Content Filtering
+### 6.7 Content Policy (DNS / Web / App)
+
+Three filters share a single deduplication pass before Unbound writes
+`unbound.conf`. When the same domain appears in two filters, the higher
+precedence wins:
+
+```
+allow (whitelist-only)  >  SOC emergency block  >  App filter  >  Web filter  >  DNS manual
+```
+
+Implementation lives in [app/services/content_policy.py](app/services/content_policy.py)
+(`DomainPolicy` dataclass + `build_domain_policy_map()` + `emit_unbound_policy_zones()`).
+Exactly one `local-zone` + `local-data` record is emitted per blocked
+domain, which means `unbound-checkconf` never trips on duplicate rules.
 
 #### 6.7.1 DNS Filtering (`/filters/dns`)
 
-Block or redirect domains at the DNS resolver level. Matching queries return NXDOMAIN or
-a redirect IP, preventing clients from reaching the domain.
-
-1. Click **Add Rule**.
-2. Enter the **Domain** (exact match or wildcard, e.g., `*.example.com`).
-3. Set the **Action**: `block` (return NXDOMAIN), `allow` (whitelist override), or
-   `redirect` (return a specific IP, e.g., a block page server).
-4. Add a **Category** and **Description** for organization.
-5. Click **Save**, then click **Apply DNS Filter** to push the updated rules to Unbound.
+Block / allow / redirect domains. Block rules redirect to the LAN IP so the
+browser hits Smart Shield's block page; falls back to `always_nxdomain` when
+no LAN IP is configured.
 
 #### 6.7.2 Web Filtering (`/filters/web`)
 
-Block URL patterns at the application level. Add URL patterns (regex supported) with an
-action (block or allow). Apply changes after saving.
+Domain-level blocking organised around URL pattern / category. Full
+URL-path blocking would require an HTTP proxy and is out of scope.
 
 #### 6.7.3 Application Filtering (`/filters/app`)
 
-Block or throttle network traffic by application signature (destination port, protocol, or
-domain). These rules generate PF match entries that invoke dummynet limiters or block actions.
+Block by application signature — ports, protocol, and (optionally) domain
+list. App-filter PF rules are now **scoped to LAN ingress** (`block in log
+quick on $LAN_IFACE`) so the rule only affects downstream LAN clients and
+never the WAN side or other interfaces. Admin bypass and device whitelist
+PF tables (`<admin_bypass_clients>`, `<device_whitelist>`) take precedence.
 
 ---
 
@@ -786,28 +507,28 @@ domain). These rules generate PF match entries that invoke dummynet limiters or 
 
 #### 6.8.1 Configuration
 
-1. Enable the captive portal.
-2. Set the **Interface** (the LAN or VLAN that requires authentication).
-3. Choose the **Mode**: `soft` or `strict` (see §6.8.2).
-4. Set a **Session timeout** in minutes (0 = no timeout).
-5. Optionally configure a **Bandwidth limit** per authenticated session (kbps).
-6. Click **Save** then **Apply**.
+Enable, pick the LAN/VLAN, mode (soft / strict), session timeout, optional
+per-session bandwidth limit, then **Save** + **Apply**.
 
-#### 6.8.2 Soft vs. Strict Mode
+#### 6.8.2 Soft vs Strict Mode
 
 | Mode | Behaviour |
 |---|---|
-| **Soft** | Only HTTP (port 80) is redirected to the portal login. Other traffic (HTTPS, DNS, DHCP) passes without authentication. |
-| **Strict** | All traffic is blocked until the user authenticates. DNS and DHCP are permitted pre-authentication; all other traffic is redirected or blocked. |
+| **Soft** | Only HTTP (port 80) is redirected to the portal. HTTPS, DNS, DHCP, and other traffic pass without authentication |
+| **Strict** | All traffic is blocked until login. DNS and DHCP are permitted pre-auth |
 
-#### 6.8.3 Vouchers
+#### 6.8.3 HTTPS Block Page Limitation
 
-Vouchers provide time-limited guest access without creating permanent user accounts.
+HTTP sites can render Smart Shield's block page directly. **HTTPS sites may
+show a browser certificate or connection warning** instead — this is normal
+behaviour for any captive portal that does not perform TLS interception with
+a trusted local CA. The block page itself now states this so end-users are
+not confused.
 
-1. Navigate to the **Vouchers** tab.
-2. Click **Generate** and set a duration (minutes) and optional bandwidth limit.
-3. Distribute the generated codes to guests.
-4. Guests enter the code on the portal login page to activate their session.
+#### 6.8.4 Vouchers
+
+The **Vouchers** tab generates time-limited guest codes with optional
+bandwidth caps. Distribute the code, guest enters it on the portal login.
 
 ---
 
@@ -817,48 +538,38 @@ Vouchers provide time-limited guest access without creating permanent user accou
 
 #### 6.9.1 Live Event Stream
 
-The SIEM page shows a real-time stream of security events collected by the five background
-collector threads. Events are displayed newest-first in a dark-theme log viewport and
-refreshed automatically every 5 seconds by polling `/status/api/logs`.
+The page polls `/status/api/logs` every few seconds and renders events
+newest-first. SOC-origin events (`details.soc_origin = true`) are filtered
+out by default — they belong in the SOC portal. A superuser can pass
+`?hide_soc=0` if they need a merged view for incident review.
 
 #### 6.9.2 Categories and Severity Levels
 
-| Category | Events Included |
+| Category | Events |
 |---|---|
 | `connection` | New LAN connections (PF), DHCP leases, DNS queries |
-| `security` | Failed logins, brute-force detections, insecure protocol alerts, IDS floods |
-| `ids` | Suricata IDS/IPS alert events |
+| `security` | Failed logins, brute-force, insecure protocol alerts, IDS floods |
+| `ids` | Suricata IDS/IPS alerts |
 | `session` | Admin login, logout, re-authentication |
 | `system` | Config changes, firewall rule edits, PF reloads, service applies |
+| `privileged` | Appliance Console session events and individual command audits |
 
 | Severity | Meaning |
 |---|---|
-| `critical` | Suricata severity-1 alerts |
-| `high` | Brute-force detected, IDS flood, IPS inline block, insecure protocol; Suricata severity-2 |
-| `medium` | Suricata severity-3; RDP, database protocol connections |
-| `low` | Suricata severity-4; low-risk protocol connections |
+| `critical` | Suricata severity-1 |
+| `high` | Brute-force, IDS flood, IPS inline block, insecure protocol; Suricata severity-2 |
+| `medium` | Suricata severity-3; RDP, DB protocol connections |
+| `low` | Suricata severity-4; low-risk connections |
 | `info` | Normal connections, config changes, DHCP events |
-
-Note: Admin GUI page-view events (`browsing` category) are not shown in the live SIEM
-feed — they are recorded to the audit log for export purposes only.
 
 #### 6.9.3 Filtering and Search
 
-- **Category pills:** All Events, Network Traffic, Security Alerts, Firewall (firewall rule
-  changes + PF reloads + new connections), Config Changes, Sessions.
-- **Severity pills:** Filter by Critical, High, Medium, or Low.
-- **Time range:** Live (streaming), 1h, 6h, 24h, 7d (snapshot modes).
-- **Search box:** Free-text search against action name, IP address, hostname, username, and
-  event details.
-
-Click any row to expand it and view the full JSON event payload.
+Category pills, severity pills, time range (Live, 1h, 6h, 24h, 7d), free-text
+search across action / IP / hostname / username / details.
 
 #### 6.9.4 Exporting Logs
 
-Click **Export** in the footer bar to download a filtered JSON file
-(`smart-shield-siem-YYYY-MM-DD.json`) containing all events matching the current filters.
-The export includes all log lines including `page_view` events that are excluded from the
-live stream.
+**Export** downloads the filtered events as `smart-shield-siem-YYYY-MM-DD.json`.
 
 ---
 
@@ -866,38 +577,21 @@ live stream.
 
 #### 6.10.1 System Metrics (`/status/monitoring`)
 
-Displays a live interface statistics table (RX/TX packets, bytes, and errors per interface,
-refreshed every 10 seconds) and real-time CPU, memory, and disk utilisation from the health
-monitor API.
+Live interface counters; live CPU / memory / disk from the health monitor API.
 
 #### 6.10.2 Live Bandwidth Graph (`/status/traffic-graph`)
 
-A real-time chart of inbound and outbound bytes per second on each interface, updated every
-2 seconds.
+Real-time chart of inbound/outbound bytes per interface, updated every 2s.
 
 #### 6.10.3 Historical Traffic — MRTG (`/status/mrtg`)
 
-MRTG runs via cron every 5 minutes and generates PNG graphs for each configured interface.
-The Traffic History page displays:
+MRTG runs every 5 minutes via cron. Pages: Daily, Weekly, Monthly, Yearly. A
+status bar reports cron, graph directory, and lock file conditions.
 
-- **Daily** (5-minute intervals, 2 days shown)
-- **Weekly** (30-minute averages, 2 weeks shown)
-- **Monthly** (2-hour averages, 10 weeks shown)
-- **Yearly** (1-day averages, 400 days shown)
+#### 6.10.4 Service Health
 
-A countdown timer shows the time until the next graph update.
-
-If graphs are not appearing:
-
-1. Click **Reinitialize MRTG** to run two MRTG passes immediately.
-2. Check the status bar — it shows whether the cron job is installed, whether the graph
-   directory is writable, and whether a stale lock file is present.
-3. See §10 (Troubleshooting) for additional steps.
-
-#### 6.10.4 Service Health (`/status/` → health section)
-
-The health API at `/status/api/health/full` returns the live state of every managed service,
-disk, memory, and CPU. Individual service health is available at `/status/api/health/<name>`.
+`/status/api/health/full` returns the live state of every managed service plus
+disk, memory, CPU.
 
 ---
 
@@ -905,46 +599,31 @@ disk, memory, and CPU. Individual service health is available at `/status/api/he
 
 #### 6.11.1 Creating Users (`/users/`)
 
-1. Click **Add User**.
-2. Enter **Username**, **Password** (8 characters minimum), and **Display name**.
-3. Optionally mark as **Superuser** (full access to all pages and APIs).
-4. Click **Save**.
+Username, password (≥8 chars), display name, optional superuser flag.
 
 #### 6.11.2 Managing Groups (`/users/groups`)
 
-Groups collect users and define page-level permissions.
-
-1. Click **Add Group**, enter a name, and save.
-2. Add users to the group via the **Members** tab.
-3. Set page-level permissions on the **Permissions** tab — select which routes the group
-   members are allowed to access.
+Group name, members, page-level permissions per blueprint endpoint.
 
 #### 6.11.3 Permissions
 
-A user has access to a page if they are a superuser, or if any group they belong to has
-been granted permission for that page. The permission model operates at the blueprint
-endpoint level.
+A user has access if they are a superuser **or** any group they belong to has
+been granted that endpoint. Wildcards like `firewall.*` are supported.
 
 ---
 
 ### 6.12 Certificates
 
-#### 6.12.1 Certificate Authorities (`/system/certificates` → CA tab)
+#### 6.12.1 Certificate Authorities (`/system/certificates`)
 
-1. Click **Add CA**.
-2. Set the **Common Name**, key length (2048 or 4096 bits), and validity period.
-3. Click **Generate**. The CA key is generated and stored (AES-256-GCM encrypted) in the database.
+Add CA — common name, 2048 / 4096-bit key, validity period. Keys are stored
+AES-256-GCM-encrypted at rest.
 
-#### 6.12.2 Server and Client Certificates
+#### 6.12.2 Server / Client Certificates
 
-1. Click **Add Certificate**.
-2. Select the **CA** to sign the certificate.
-3. Set the **Type** (server or client), **Common Name**, and validity period.
-4. Click **Generate**.
-
-Certificates are available for selection in OpenVPN server and client configurations and in
-the IPsec Phase 1 settings. The Certificates page shows the expiry date for each certificate
-and warns when a certificate is within 30 days of expiry.
+Pick a CA, choose type (server / client), set CN + validity. Available to
+OpenVPN configs and IPsec Phase 1 settings. The Certificates page warns when
+a cert is within 30 days of expiry.
 
 ---
 
@@ -954,32 +633,18 @@ and warns when a certificate is within 30 days of expiry.
 
 #### 6.13.1 Creating a Backup
 
-1. Click **Create Backup**.
-2. Optionally enter an **Encryption passphrase** — if provided, the backup is encrypted with
-   AES-256-GCM using a PBKDF2-derived key.
-3. Click **Download**. The browser downloads a `.json` backup file.
-
-The backup contains the full database dump, the environment configuration, all service state,
-and the audit log.
+Click **Create Backup**, optionally enter an AES-256-GCM passphrase (PBKDF2
+key), **Download**.
 
 #### 6.13.2 Restoring from a Backup
 
-1. Click **Restore from File** and select a backup file.
-2. Enter the decryption passphrase if the backup is encrypted.
-3. Click **Restore**. Smart Shield validates the backup integrity and schema version before
-   replacing the database.
-
-**Warning:** Restoring overwrites the current configuration. Ensure the backup was created
-from a compatible Smart Shield version before restoring.
+Choose a backup file, enter the passphrase if encrypted, **Restore**. The
+schema version is validated before the DB is replaced.
 
 #### 6.13.3 Config Version History
 
-Every time a service configuration is applied, Smart Shield saves a snapshot. Navigate to
-**Config History** to:
-
-- List all saved versions for each service (firewall, DNS, DHCP, etc.).
-- View the content of any historical version.
-- Click **Rollback** to restore a specific version and re-apply it.
+Every apply saves a snapshot. **Config History** lists per-service versions
+with content view and one-click rollback.
 
 ---
 
@@ -987,35 +652,22 @@ Every time a service configuration is applied, Smart Shield saves a snapshot. Na
 
 **URL:** `/chatbot/`
 
-The AI assistant is powered by the Groq inference API. To enable it, set the `GROQ_API_KEY`
-environment variable (see §7) and restart the service.
+Powered by the Groq inference API. Enable by setting `GROQ_API_KEY` in the
+env file or via Admin → Settings → SmartShield AI.
 
-**Capabilities:**
+**Read-only tools** cover health, firewall, NAT, aliases, DHCP, tracked
+devices, IDS alerts, content policy, VPN status, audit log.
 
-The assistant can answer questions and report on the live state of the appliance using
-read-only data tools:
+**Write tools** (add firewall block, block / unblock domain) require explicit
+confirmation — "yes" / "apply" / "go ahead" — before execution.
 
-- System health and service status
-- Firewall rules, NAT, and aliases
-- DHCP leases and static reservations
-- Tracked devices and their whitelist status
-- IDS/IPS recent alerts
-- DNS, web, and application content policy
-- VPN tunnel status (OpenVPN, IPsec, L2TP)
-- Audit log events
-
-**Write operations** (adding firewall block rules, blocking or unblocking domains) are
-supported with a two-step confirmation: the assistant first shows you the planned change, then
-requires explicit approval ("yes", "apply", "go ahead") before executing.
-
-**Usage examples:**
+Example prompts:
 
 ```
 "Show me the last 5 IDS alerts"
 "What devices are connected to the LAN?"
 "Block the domain malicious.example.com"
 "Is Suricata running?"
-"What are my current floating firewall rules?"
 ```
 
 ---
@@ -1024,66 +676,121 @@ requires explicit approval ("yes", "apply", "go ahead") before executing.
 
 #### 6.15.1 General Setup (`/system/general-setup`)
 
-- **Hostname** and **Domain** — set the appliance's FQDN.
-- **Timezone** — used by the NTP daemon and event timestamps.
-- **Theme** — light or dark UI theme.
-- **Login message** — displayed on the login page.
+Hostname, domain, timezone, theme, login message.
 
-#### 6.15.2 Security Hardening (`/system/admin-access`)
+#### 6.15.2 Admin Access (`/system/admin-access`)
 
-- **Brute-force protection:** Set the maximum failed login attempts (per IP or per username)
-  before triggering a lockout, and the lockout duration in seconds.
-- **Whitelist IPs:** CIDR ranges that bypass brute-force lockout (e.g., the admin workstation).
+- **Brute-force protection** — failed-attempt threshold, lockout duration.
+- **Whitelist IPs** — CIDR exemptions.
+- **Console Options** — Password-protect Console Menu, **Enable web Appliance Console** (see §6.17).
 
 #### 6.15.3 Advanced Settings (`/system/advanced`)
 
-Nested tabs provide access to:
-
-- **Firewall/NAT:** PF state table tuning (maximum states, state timeouts, fragment handling),
-  MSS clamping, NAT reflection global settings.
-- **Network:** IPv6 global enable/disable, hardware TCP checksum offload, ARP proxy, SLAAC.
-- **Miscellaneous:** Power management, thermal sensors, MTU discovery, swap usage.
-- **System Tunables:** Arbitrary sysctl knobs — add, edit, or delete kernel parameter
-  overrides that are applied at boot.
+- **Firewall/NAT** — state-table tuning, MSS clamping, NAT-reflection.
+- **Network** — IPv6, hardware checksum offload, ARP proxy, SLAAC.
+- **Miscellaneous** — power management, thermal sensors, MTU discovery.
+- **System Tunables** — arbitrary `sysctl` knobs applied at boot.
 
 #### 6.15.4 Preflight Check (`/system/preflight`)
 
-The preflight check validates the deployment environment:
+Validates the deployment: kernel features, daemon binaries, validator
+binaries (`pfctl -nf`, `dhcpd -t`, `unbound-checkconf`, `suricata -T`),
+environment secrets, DB schema version.
 
-- FreeBSD kernel capabilities: PF, ALTQ, CARP, netmap, BPF.
-- Required daemon binaries: pfctl, dhcpd, unbound, openvpn, charon, suricata.
-- Config validators: pfctl -nf, dhcpd -t, unbound-checkconf, suricata -T.
-- Environment secrets: SECRET_KEY entropy, SMARTSHIELD_MASTER_KEY presence.
-- Database schema version.
+---
 
-Review the preflight results before moving to live mode to ensure all required components
-are present and functional.
+### 6.16 Smart Shield SOC Portal
+
+The SOC Portal is a **separate** web surface for L1 / L2 / L3 analysts. It
+shares the appliance database (one audit log, one event store) but is
+designed so analyst activity never bleeds into the firewall dashboard.
+
+#### 6.16.1 Architecture
+
+- Optional — enable in **System → SOC Portal Settings**.
+- Optionally bind on a dedicated LAN VIP / port so analysts and admins never share the same URL.
+- Has its own login (`/soc-portal/login`) and templates under `templates/soc_portal/`.
+- L1 / L2 / L3 tier model — page-level permissions hang off the `groups.soc_tier` column added in Phase 19.
+- Every SOC action is recorded by `log_soc_event()` which stamps `details.soc_origin = true`.
+
+#### 6.16.2 Separation Guarantees
+
+- `/status/api/logs` (used by the Command Center and the firewall log view) hides SOC-origin events by default. A superuser may pass `hide_soc=0` to merge views during an incident.
+- The Command Center shows a small **SOC Portal service** card (status + enable + quick link) but never streams SOC analyst events.
+- The SOC Portal has its own dashboard, alerts, investigations, blocklist, escalations, and audit pages.
+
+#### 6.16.3 Operator Workflow
+
+1. SOC portal admin enables the portal under System → SOC Portal Settings.
+2. SOC users are created normally under Users + assigned to a group whose `soc_tier` is `L1`, `L2`, or `L3`.
+3. Analysts visit `https://<VIP>:<port>/soc-portal/login`.
+4. Their actions appear in the SOC portal's own activity stream and are flagged `soc_origin` in the shared event store.
+
+---
+
+### 6.17 Appliance Console (Hardened Terminal)
+
+**Off by default.** A superuser turns it on under System → Admin Access →
+Console Options → **Enable web Appliance Console**. Until then, the
+WebSocket endpoint returns 404 and the navbar Console button is hidden — so
+the feature is not even probable.
+
+When enabled, a superuser can open the floating **Console** widget in the
+top-right navbar. The widget connects to a live PTY shell on the FreeBSD
+host.
+
+#### 6.17.1 What protects the console
+
+1. **Enable flag** — `terminal_enabled` on `advanced_admin_access`; default 0.
+2. **Superuser-only** — non-superusers get permission denied.
+3. **Recent reauth** — must have re-authenticated within 300 s before the WebSocket can be opened. The endpoint that issues the WS ticket re-checks this; the WS handler re-checks it again on connect.
+4. **WebSocket Origin check** — cross-site WebSocket hijacking is blocked.
+5. **Single-use signed ticket** — `/terminal/api/ws-ticket` returns an HMAC-SHA256 ticket bound to user-id + remote IP. The WS upgrade must present it within 60 s. Replays are rejected.
+6. **Audit logging with secret redaction** — every typed command is recorded under category `privileged`, with `password=…`, `secret_key=…`, `token=…`, `Authorization: Bearer …`, and `-----BEGIN … PRIVATE KEY-----` blocks replaced by `[REDACTED]`.
+7. **Visible warning** — the in-browser console banner reminds operators that every command is audited.
+
+#### 6.17.2 When to use
+
+- Emergency PF inspection (`pfctl -sr`, `pfctl -t <table> -T show`).
+- Service troubleshooting that the GUI does not already cover.
+- One-off filesystem checks.
+
+For everything else, prefer the relevant GUI page so the change is tracked
+through Smart Shield's normal apply/rollback path.
 
 ---
 
 ## 7. Environment Variables Reference
 
-The environment file is at `/usr/local/etc/smart-shield/smart-shield.env`.
+The environment file is at `/usr/local/etc/smart-shield/smart-shield.env`. To
+load a different file (development, custom path), set `SMARTSHIELD_ENV_FILE`
+**before** starting the app — `app/__init__.py` consults it before evaluating
+`config.py`.
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `APP_ENV` | `production` | No | Set to `development` to enable Flask debug mode |
-| `SECRET_KEY` | *(none)* | **Yes** | Flask session encryption key; must be long and random |
-| `FLASK_DEBUG` | `0` | No | Set to `1` to enable Flask auto-reloader (development only) |
-| `SMARTSHIELD_DB_PATH` | `/var/db/smart-shield/data.db` | No | SQLite database file path |
-| `SMARTSHIELD_CONFIG_PATH` | `/usr/local/etc/smart-shield/config.json` | No | JSON configuration file path |
-| `SMARTSHIELD_UPLOAD_DIR` | `/var/db/smart-shield/uploads/profile_pictures` | No | Profile picture storage directory |
-| `SMARTSHIELD_AUDIT_LOG_PATH` | `/var/log/smart-shield/audit.log` | No | Append-only SIEM audit log path |
-| `SMARTSHIELD_APP_LOG_PATH` | `/var/log/smart-shield/app.log` | No | Application log path |
-| `SMARTSHIELD_ENABLE_NETWORK_APPLY` | `0` | No | Set to `1` to allow live OS-level changes (live mode) |
-| `SMARTSHIELD_NETWORK_DRY_RUN` | `1` | No | Set to `0` to disable dry-run safety and allow actual network changes |
-| `SMARTSHIELD_MASTER_KEY` | *(auto-generated)* | No | Base64-encoded 32-byte AES-256 key for encrypting secrets in the database |
-| `ABUSECH_AUTH_KEY` | *(empty)* | No | abuse.ch personal auth key; enables threat intelligence integration |
-| `ABUSECH_DRY_RUN` | `1` | No | Set to `0` to enable live abuse.ch API calls; default is log-only |
-| `GROQ_API_KEY` | *(empty)* | No | Groq API key; enables the AI assistant chatbot |
+| `SMARTSHIELD_ENV_FILE` | `/usr/local/etc/smart-shield/smart-shield.env` | No | Explicit env file path consulted first by the app |
+| `APP_ENV` | `production` | No | `production` enables strict cookie + secret-key handling |
+| `SECRET_KEY` | *(none)* | **Yes** in production | Flask session signing key |
+| `FLASK_DEBUG` | `0` | No | `1` for dev hot-reload |
+| `SMARTSHIELD_DB_PATH` | `/var/db/smart-shield/data.db` | No | SQLite path |
+| `SMARTSHIELD_CONFIG_PATH` | `/usr/local/etc/smart-shield/config.json` | No | JSON config path |
+| `SMARTSHIELD_UPLOAD_DIR` | `/var/db/smart-shield/uploads/profile_pictures` | No | Profile picture storage |
+| `SMARTSHIELD_AUDIT_LOG_PATH` | `/var/log/smart-shield/audit.log` | No | Append-only SIEM log |
+| `SMARTSHIELD_APP_LOG_PATH` | `/var/log/smart-shield/app.log` | No | Application log |
+| `SMARTSHIELD_ENABLE_NETWORK_APPLY` | `0` | No | `1` to allow live OS changes |
+| `SMARTSHIELD_NETWORK_DRY_RUN` | `1` | No | `0` to leave dry-run mode |
+| `SMARTSHIELD_MASTER_KEY` | *(auto-generated)* | No | AES-256-GCM key for at-rest secret encryption |
+| `ABUSECH_AUTH_KEY` | *(empty)* | No | abuse.ch personal Auth-Key |
+| `ABUSECH_DRY_RUN` | `1` | No | `0` to fetch live IOCs every 4h |
+| `GROQ_API_KEY` | *(empty)* | No | Enables the AI assistant |
+| `GOOGLE_CSE_KEY` / `GOOGLE_CSE_CX` | *(empty)* | No | Optional Programmable Search keys for the AI assistant |
+| `BOOTSTRAP_ADMIN_USERNAME` | `admin` | No | First-run bootstrap admin username |
+| `BOOTSTRAP_ADMIN_PASSWORD` | *(empty)* | No | First-run bootstrap admin password (otherwise set via the wizard) |
 
-**Note:** Set both `SMARTSHIELD_ENABLE_NETWORK_APPLY=1` and `SMARTSHIELD_NETWORK_DRY_RUN=0`
-to enable full live mode where firewall changes are applied immediately to the running kernel.
+**Note:** Set both `SMARTSHIELD_ENABLE_NETWORK_APPLY=1` and
+`SMARTSHIELD_NETWORK_DRY_RUN=0` to enable full live mode where firewall
+changes are applied immediately.
 
 ---
 
@@ -1091,20 +798,20 @@ to enable full live mode where firewall changes are applied immediately to the r
 
 | Path | Content | Rotation |
 |---|---|---|
-| `/var/log/smart-shield/audit.log` | SIEM event log — NDJSON, one event per line | Daily, 90-day retention, 10 MB max, bzip2 compressed |
+| `/var/log/smart-shield/audit.log` | SIEM event log — NDJSON, one event per line | Daily, 90-day retention, 10 MB max, bzip2 |
 | `/var/log/smart-shield/app.log` | Application log (gunicorn stdout) | Daily, 30-day retention, bzip2 |
 | `/var/log/smart-shield/access.log` | HTTP access log (gunicorn) | Daily, 30-day retention, 50 MB max, bzip2 |
 | `/var/log/smart-shield/error.log` | Application error log (gunicorn stderr) | Daily, 30-day retention, bzip2 |
-| `/var/log/nginx/access.log` | nginx access log | Managed by nginx; review `/etc/newsyslog.conf` |
+| `/var/log/nginx/access.log` | nginx access log | Managed by nginx |
 | `/var/log/nginx/error.log` | nginx error log | Managed by nginx |
-| `/var/log/suricata/eve.json` | Suricata EVE JSON alert and event stream | Not managed by Smart Shield; configure via Suricata |
-| `/var/log/suricata/fast.log` | Suricata one-line alert summary | Not managed by Smart Shield |
-| `/var/log/suricata/suricata.log` | Suricata startup and runtime log | Not managed by Smart Shield |
-| `/var/log/unbound/query.log` | Unbound DNS query log (when enabled) | Not managed by Smart Shield |
-| `/var/log/openvpn/status*.log` | OpenVPN connection status files | Not managed by Smart Shield |
+| `/var/log/suricata/eve.json` | Suricata EVE JSON alert / event stream | Configure via Suricata |
+| `/var/log/suricata/fast.log` | Suricata one-line alert summary | Configure via Suricata |
+| `/var/log/suricata/suricata.log` | Suricata startup / runtime | Configure via Suricata |
+| `/var/log/unbound/query.log` | Unbound DNS query log when enabled | Configure via Unbound |
+| `/var/log/openvpn/status*.log` | OpenVPN connection status | Configure via OpenVPN |
 
 Log rotation is handled by newsyslog(8) via
-`/usr/local/etc/newsyslog.d/smart-shield.conf`, installed during setup.
+`/usr/local/etc/newsyslog.d/smart-shield.conf`, installed by `bsd/install.sh`.
 
 ---
 
@@ -1114,145 +821,158 @@ Log rotation is handled by newsyslog(8) via
 |---|---|
 | `/usr/local/share/smart-shield/` | Application code root |
 | `/usr/local/share/smart-shield/.venv/` | Python virtual environment |
-| `/usr/local/etc/smart-shield/` | Environment file, config.json, SSL certificates |
-| `/usr/local/etc/smart-shield/ssl/` | TLS certificate (`cert.pem`) and private key (`key.pem`) |
-| `/usr/local/etc/mrtg/` | MRTG configuration (`mrtg.cfg`) |
-| `/usr/local/etc/suricata/` | Suricata configuration and rules |
+| `/usr/local/etc/smart-shield/` | Env file, config.json, master.key, SSL certificates |
+| `/usr/local/etc/smart-shield/smart-shield.env` | Generated env file (root:wheel `0600`) |
+| `/usr/local/etc/smart-shield/master.key` | AES-256 master key (root:wheel `0600`) |
+| `/usr/local/etc/smart-shield/ssl/` | TLS cert / key |
+| `/usr/local/etc/mrtg/` | MRTG configuration |
+| `/usr/local/etc/suricata/` | Suricata configuration / rules |
 | `/usr/local/etc/unbound/` | Unbound configuration |
-| `/usr/local/etc/openvpn/` | OpenVPN server and client configuration files |
-| `/usr/local/etc/openvpn/keys/` | OpenVPN key and certificate files (mode 0700) |
-| `/usr/local/etc/nginx/nginx.conf` | nginx TLS reverse proxy configuration |
-| `/var/db/smart-shield/` | SQLite database and application data |
-| `/var/db/smart-shield/data.db` | SQLite database (all configuration) |
-| `/var/db/smart-shield/mrtg/` | MRTG graph PNG output |
-| `/var/db/smart-shield/uploads/` | User profile picture uploads |
+| `/usr/local/etc/openvpn/` | OpenVPN configuration |
+| `/usr/local/etc/openvpn/keys/` | OpenVPN key material (mode 0700) |
+| `/usr/local/etc/nginx/nginx.conf` | nginx TLS reverse proxy |
+| `/var/db/smart-shield/` | SQLite database + application data |
+| `/var/db/smart-shield/data.db` | SQLite database |
+| `/var/db/smart-shield/mrtg/` | MRTG PNG output |
+| `/var/db/smart-shield/uploads/` | User profile pictures |
 | `/var/db/smart-shield/threat_intel_ips.txt` | Latest threat intelligence IP list |
-| `/var/log/smart-shield/` | Application, audit, access, and error logs |
-| `/var/run/smart-shield/` | PID file, worker lock, MRTG lock (tmpfs — cleared on reboot) |
-| `/etc/cron.d/smart-shield-mrtg` | MRTG cron job (`*/5 * * * *`) |
+| `/var/log/smart-shield/` | Application, audit, access, error logs |
+| `/var/run/smart-shield/` | PID file, worker lock, MRTG lock (tmpfs) |
+| `/etc/cron.d/smart-shield-mrtg` | MRTG cron job |
 | `/etc/pf.conf` | Active PF firewall ruleset |
 | `/usr/local/etc/rc.d/smart_shield` | FreeBSD rc.d service script |
 | `/usr/local/sbin/smartshieldctl` | Operator CLI utility |
-| `/usr/local/sbin/smart_shield_console` | Interactive console recovery menu |
-| `/usr/local/sbin/mrtg-probe.sh` | netstat-based MRTG data probe script |
+| `/usr/local/sbin/smart_shield_console` | Console recovery menu |
+| `/usr/local/sbin/mrtg-probe.sh` | netstat-based MRTG data probe |
 | `/usr/local/etc/sudoers.d/smartshield` | sudo allowlist for privileged operations |
-| `/usr/local/etc/newsyslog.d/smart-shield.conf` | Log rotation configuration |
+| `/usr/local/etc/newsyslog.d/smart-shield.conf` | Log rotation |
 
 ---
 
 ## 10. Troubleshooting
 
-### IDS shows as disabled after navigating away from the Threat Detection page
+### Captive portal block page references "Content Policy"
 
-**Cause:** The configuration save form previously included an "Enable IDS" checkbox that could
-overwrite the enabled state if the form was submitted while the checkbox appeared unchecked
-(e.g., after browser form state restoration). This has been fixed: the enabled state is now
-managed exclusively through the Enable/Disable toggle button and is never touched by the
-configuration save form.
+Older builds typoed this as "Content Police" both in the captive-portal block
+HTML and in the redirect-page generator. The current build uses "Content
+Policy" everywhere — if you still see the typo, you are running an outdated
+appliance image; pull the latest source and `smartshieldctl restart`.
 
-**Resolution:** Ensure you are running the current version. If the issue persists:
+### HTTPS sites do not show the captive portal block page
+
+This is expected. Smart Shield does not perform TLS interception by default,
+so HTTPS clients see a browser certificate / connection warning instead of
+the block page. The block page itself now states this so end users know what
+they are seeing. To get a clean HTTPS block page you must configure TLS
+interception with a trusted local CA — out of scope for the default install.
+
+### The "Console" button is missing from the navbar
+
+By design — the Appliance Console is **off by default** (§6.17). A superuser
+must enable it under System → Admin Access → Console Options.
+
+### "Re-authentication required" when opening the Appliance Console
+
+Recent reauth (last 300 s) is required by the WebSocket ticket endpoint. Open
+any password-protected action (e.g. Diagnostics → Halt System) to refresh
+your reauth, then reopen the console.
+
+### SOC events appear in the firewall log
+
+They shouldn't — `/status/api/logs` defaults to filtering them out (§6.16.2).
+Confirm:
+
+- Events come from the SOC portal, not from a non-SOC route.
+- They were logged via `log_soc_event()` which stamps `details.soc_origin = true`.
+- The viewer is not appending `?hide_soc=0` (only superusers can opt back in).
+
+### Smart Shield service won't start after edits to the env file
 
 ```sh
-# Check DB state
-sqlite3 /var/db/smart-shield/data.db "SELECT enabled, mode FROM ids_config;"
-# If enabled=0 unexpectedly, use the toggle button in the GUI to re-enable.
+# Check syntax — every line should be KEY=VALUE.
+grep -n '=' /usr/local/etc/smart-shield/smart-shield.env
+
+# Reload + tail logs.
+service smart_shield restart
+tail -50 /var/log/smart-shield/app.log
 ```
 
-### MRTG graphs not showing in the browser
+In production, the app refuses to start if `SECRET_KEY` is missing (this is
+intentional). The error message tells you which env file to fix.
 
-**Check the status bar** on the Traffic History page — it shows a specific badge for each
-possible problem:
+### IDS shows as disabled after navigating away from Threat Detection
+
+The Threat Detection save form historically had an "Enable IDS" checkbox that
+could overwrite the enabled state. The current schema manages the enabled
+state exclusively through the toggle button. If you still see this, you are
+on an older build — pull the latest source and reload.
+
+### MRTG graphs not showing
+
+The Traffic History status bar shows a specific badge per problem:
 
 | Badge | Cause | Fix |
 |---|---|---|
-| "Stale lock file detected" | `/var/run/smart-shield/mrtg.lock` left by a crashed MRTG run | Click **Reinitialize MRTG** |
+| "Stale lock file detected" | `/var/run/smart-shield/mrtg.lock` left by a crashed run | Click **Reinitialize MRTG** |
 | "Cron job missing" | `/etc/cron.d/smart-shield-mrtg` not installed | Click **Regenerate Config** |
-| "Graph directory missing" | `/var/db/smart-shield/mrtg/` absent or not writable | Run `install -d -m 0755 /var/db/smart-shield/mrtg` as root |
-| "No graphs yet" (with cron installed) | MRTG hasn't run yet | Wait up to 5 minutes for the first cron tick |
+| "Graph directory missing" | `/var/db/smart-shield/mrtg/` absent | `install -d -m 0755 /var/db/smart-shield/mrtg` |
+| "No graphs yet" (cron installed) | MRTG hasn't run yet | Wait up to 5 minutes |
 
-Manual check:
+Manual diagnostics:
 
 ```sh
-# Is the cron job installed?
 cat /etc/cron.d/smart-shield-mrtg
-
-# Do PNG files exist?
 ls /var/db/smart-shield/mrtg/*.png 2>/dev/null || echo "No PNGs"
-
-# Run MRTG manually with verbose output
 env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --log-level 4
 ```
 
 ### Cannot reach the web GUI from a LAN client
 
 ```sh
-# Is nginx listening on 443?
 sockstat -4 -l | grep 443
-
-# Is the Smart Shield service running?
 smartshieldctl status
-
-# Is there a PF rule blocking port 443 on LAN?
 pfctl -sr | grep 443
-
-# Can the LAN client ping the appliance LAN IP?
 ping 192.168.1.1
 ```
 
-If the LAN client cannot reach the LAN IP at all, verify the interface assignment
-(`smartshieldctl iface-show LAN`) and confirm the LAN interface has the expected IP.
+If the LAN client cannot reach the LAN IP at all, verify the interface
+assignment (`smartshieldctl iface-show LAN`).
 
-### DHCP leases not being assigned to LAN clients
+### DHCP leases not being assigned
 
 ```sh
-# Is DHCPd running?
 smartshieldctl dhcp-status
 pgrep -x dhcpd
-
-# Check the DHCPd log for errors
 tail -30 /var/log/messages | grep dhcpd
-
-# Validate the config
 dhcpd -t -cf /usr/local/etc/dhcpd.conf
 ```
 
-Ensure the DHCP pool range is within the LAN subnet and does not overlap with the static
-LAN IP of the appliance.
+Ensure the DHCP pool is inside the LAN subnet and does not overlap the LAN
+appliance IP.
 
 ### DNS resolution failing for LAN clients
 
 ```sh
-# Is Unbound running?
 smartshieldctl dns-status
 pgrep -x unbound
-
-# Test resolution from the appliance itself
 dig @127.0.0.1 google.com
-
-# Check Unbound logs
-tail -20 /var/log/messages | grep unbound
-
-# Validate the config
 unbound-checkconf /usr/local/etc/unbound/unbound.conf
 ```
 
-Ensure LAN clients are configured to use the appliance LAN IP as their DNS server (typically
-pushed via DHCP).
+LAN clients must use the appliance LAN IP as their DNS server (this is
+normally pushed by DHCP).
 
 ### Suricata fails to start (IPS mode)
 
-If Suricata fails to start in IPS mode:
+1. `kldstat | grep netmap`
+2. `tail -50 /var/log/suricata/suricata.log`
+3. `suricata -T -c /usr/local/etc/suricata/suricata.yaml`
+4. Switch to IDS mode and retry.
 
-1. Check that your NIC driver supports netmap: `kldstat | grep netmap`.
-2. Review the startup log: `tail -50 /var/log/suricata/suricata.log`.
-3. Run the config test: `suricata -T -c /usr/local/etc/suricata/suricata.yaml`.
-4. Switch to IDS mode via the Configuration tab and try enabling again.
-
-Smart Shield automatically falls back to IDS (pcap) mode if the netmap-based IPS start fails.
+Smart Shield falls back to IDS automatically if netmap-based IPS startup
+fails.
 
 ### Backup restore fails with "schema version mismatch"
 
-This occurs when restoring a backup created by a different version of Smart Shield. Restore
-backups only to the same version that created them, or migrate to the new schema version
-first by running the application normally (it applies schema migrations automatically on
-startup).
+Restore backups only to the same Smart Shield version that created them, or
+let the app's automatic schema migration run first.

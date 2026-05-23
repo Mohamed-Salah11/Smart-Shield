@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title">
+        <i class="fa-solid fa-share-from-square me-2 ext-035cc887"></i>Log Forwarding
+      </h1>
+      <p class="ss-page-desc">Optionally mirror SmartShield audit events to an
+        external SIEM as RFC 5424 syslog or CEF.</p>
+    </div>
+  </div>
+
+  <div class="alert alert-info mb-3 ext-4e078adb">
+    <i class="fa-solid fa-circle-info me-1"></i>
+    SmartShield's <strong>built-in SIEM</strong> — System Logs, the SOC Console
+    and the SOC Portal — is the default and primary SIEM for this appliance.
+    Log forwarding below is <strong>optional</strong> and disabled by default; enable
+    it only if your organization also operates an external SIEM (Splunk,
+    FortiAnalyzer, QRadar, Elastic, Graylog…) that should receive a copy of these events.
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+          <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('status.log_forwarding_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-share-from-square"></i></div>
+        <div>
+          <div class="ss-card-title">External SIEM Collector (optional)</div>
+          <div class="ss-card-subtitle">Events are tailed from the built-in event store and
+            also streamed to the external collector below. The built-in SIEM keeps
+            working regardless of this setting.</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+
+        <div class="ss-toggle-row mb-3">
+          <label class="ss-toggle">
+            <input type="checkbox" name="enabled" {{ 'checked' if cfg and cfg['enabled'] }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable log forwarding</p>
+            <p class="ss-toggle-desc">When enabled, new events are forwarded starting from now
+              (history is not replayed).</p>
+          </div>
+        </div>
+
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="host">Collector host / IP</label>
+            <input type="text" id="host" name="host" class="form-control"
+                   value="{{ cfg['host'] if cfg else '' }}" placeholder="e.g. 10.0.0.50">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="port">Port</label>
+            <input type="number" id="port" name="port" class="form-control ext-844e0595" min="1" max="65535"
+                   value="{{ cfg['port'] if cfg else 514 }}">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="protocol">Transport</label>
+            <select id="protocol" name="protocol" class="form-select ext-ac5a4114">
+              <option value="udp" {{ 'selected' if cfg and cfg['protocol']=='udp' }}>UDP</option>
+              <option value="tcp" {{ 'selected' if cfg and cfg['protocol']=='tcp' }}>TCP</option>
+              <option value="tls" {{ 'selected' if cfg and cfg['protocol']=='tls' }}>TCP + TLS</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="format">Format</label>
+            <select id="format" name="format" class="form-select ext-ac5a4114">
+              <option value="rfc5424" {{ 'selected' if cfg and cfg['format']=='rfc5424' }}>RFC 5424 syslog</option>
+              <option value="cef"     {{ 'selected' if cfg and cfg['format']=='cef' }}>CEF (ArcSight / FortiAnalyzer)</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="ss-hint mt-2">
+          Secret-bearing fields in event details are redacted before forwarding.
+          UDP is fire-and-forget; use TCP or TLS for reliable delivery.
+        </p>
+
+        <hr class="my-3 ext-3be74282">
+
+        <div class="ss-toggle-row mb-2">
+          <label class="ss-toggle">
+            <input type="checkbox" name="tls_verify" {{ 'checked' if cfg.get('tls_verify', True) }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Verify upstream TLS certificate</p>
+            <p class="ss-toggle-desc">Recommended. Disables hostname &amp; chain validation when off (use only for self-signed lab collectors). Applies only when transport is TCP + TLS.</p>
+          </div>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label" for="tls_ca_path">Custom CA bundle path (optional)</label>
+          <input type="text" id="tls_ca_path" name="tls_ca_path" class="form-control"
+                 value="{{ cfg.get('tls_ca_path', '') }}"
+                 placeholder="e.g. /usr/local/etc/smartshield/ssl/upstream-ca.pem">
+          <p class="ss-hint">Leave blank to use the system trust store. When set, this PEM is used to verify the upstream collector's certificate.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <div>
+          <div class="ss-card-title">Event Retention</div>
+          <div class="ss-card-subtitle">Bound the indexed events table so search and dashboards stay fast.</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row mb-2">
+          <label class="ss-toggle">
+            <input type="checkbox" name="retention_enabled" {{ 'checked' if retention and retention.get('enabled', True) }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Automatically prune old events</p>
+            <p class="ss-toggle-desc">Background job runs hourly. The audit-log file on disk is rotated separately by newsyslog and is not affected.</p>
+          </div>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label" for="retention_days">Retain events for (days)</label>
+          <input type="number" id="retention_days" name="retention_days" class="form-control ext-844e0595"
+                 min="1" max="3650"
+                 value="{{ retention.days if retention else 90 }}">
+          <p class="ss-hint">Default 90 days to mirror the audit-log file rotation policy. Rows older than this are deleted from the indexed events table.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div>
+          <div class="ss-card-title">Syslog Listener (UDP)</div>
+          <div class="ss-card-subtitle">Accept syslog from other hosts and ingest it into the built-in SIEM.</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-toggle-row mb-2">
+          <label class="ss-toggle">
+            <input type="checkbox" name="listener_enabled" {{ 'checked' if listener and listener.get('enabled') }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable UDP syslog listener</p>
+            <p class="ss-toggle-desc">Inbound RFC 3164 / RFC 5424 messages are written through <code>log_event</code> with category <code>external_syslog</code>.</p>
+          </div>
+        </div>
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="listener_bind_ip">Bind IP</label>
+            <input type="text" id="listener_bind_ip" name="listener_bind_ip" class="form-control"
+                   value="{{ listener.bind_ip if listener else '0.0.0.0' }}"
+                   placeholder="0.0.0.0 to listen on every interface">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="listener_bind_port">UDP Port</label>
+            <input type="number" id="listener_bind_port" name="listener_bind_port" class="form-control ext-844e0595"
+                   min="1" max="65535"
+                   value="{{ listener.bind_port if listener else 5140 }}">
+            <p class="ss-hint">Default 5140. Port 514 collides with the FreeBSD system syslogd unless you disable it first.</p>
+          </div>
+        </div>
+        <div class="ss-toggle-row mt-2">
+          <label class="ss-toggle">
+            <input type="checkbox" name="listener_trust_host" {{ 'checked' if listener and listener.get('trust_remote_hostname') }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Trust sender-supplied hostname</p>
+            <p class="ss-toggle-desc">When off, SmartShield uses the packet's source IP as the canonical host. Turn on only if your senders are trustworthy.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-5">
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="fa-solid fa-floppy-disk me-1"></i> Save Settings
+      </button>
+      <a href="{{ url_for('status.system_logs') }}" class="btn btn-secondary">Back to Logs</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

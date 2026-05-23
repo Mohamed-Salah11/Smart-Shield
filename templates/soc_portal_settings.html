@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title"><i class="fa-solid fa-shield-halved me-2 ext-035cc887"></i>SOC Portal Control</h1>
+      <p class="ss-page-desc">Manage the external SmartShield SOC Portal service, access, and runtime settings — network address, port, TLS certificate, and tier assignments for analyst groups. SOC investigation data (cases, alerts, reports) is visible only inside the SOC Portal, never on this firewall console.</p>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+          <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('system.soc_portal_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- ── Portal Connection ──────────────────────────────────────────────── -->
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+        <div>
+          <div class="ss-card-title">Portal Connection</div>
+          <div class="ss-card-subtitle">Enable the SOC portal and configure its network endpoint</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+
+        <div class="ss-toggle-row mb-3">
+          <label class="ss-toggle">
+            <input type="checkbox" name="enabled" id="soc_enabled" {{ 'checked' if cfg and cfg['enabled'] }} data-action-change="h_336b756c57">
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Enable SOC Team Portal</p>
+            <p class="ss-toggle-desc">When enabled, SOC analysts can log in through the dedicated portal URL below</p>
+          </div>
+        </div>
+
+        <div id="portal-fields" class="ss-field-grid ss-field-grid-2{{ '' if cfg and cfg['enabled'] else ' ss-fields-disabled' }}">
+          <div class="ss-field">
+            <label class="ss-label" for="bind_ip">Bind IP Address (Virtual IP on LAN)</label>
+            <input type="text" id="bind_ip" name="bind_ip" class="form-control"
+                   value="{{ cfg['bind_ip'] if cfg and cfg['bind_ip'] and cfg['bind_ip'] != '0.0.0.0' else '' }}"
+                   placeholder="{{ 'e.g. ' ~ bind_ip_example if bind_ip_example else 'e.g. 192.168.1.250' }}">
+            <p class="ss-hint">
+              A dedicated virtual IP on the LAN subnet. SmartShield adds it as an alias on
+              the LAN interface{% if lan_port %} (<code>{{ lan_port }}</code>){% endif %} so SOC analysts hit a different
+              endpoint than the admin UI.
+              {% if lan_subnet %}
+                Must be inside <strong>{{ lan_subnet }}</strong>
+                {% if lan_primary_ip %}and different from the LAN primary IP <strong>{{ lan_primary_ip }}</strong>{% endif %}.
+              {% else %}
+                Assign LAN in Interfaces first.
+              {% endif %}
+            </p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="bind_port">HTTPS Port</label>
+            <input type="number" id="bind_port" name="bind_port" class="form-control ext-844e0595"
+                   value="{{ cfg['bind_port'] if cfg else 8443 }}"
+                   min="1" max="65535">
+            <p class="ss-hint">Default: 8443. Must differ from the admin portal port (443).</p>
+          </div>
+        </div>
+
+        {% if cfg and cfg['enabled'] %}
+        {% set _custom_ip = cfg['bind_ip'] and cfg['bind_ip'] != '0.0.0.0' %}
+        <div class="alert alert-info mt-3 mb-2 ext-4e078adb">
+          <i class="fa-solid fa-link me-1"></i>
+          SOC Portal URL:
+          {% if _custom_ip %}
+          <strong>https://{{ cfg['bind_ip'] }}:{{ cfg['bind_port'] }}/soc-portal/login</strong>
+          <a href="https://{{ cfg['bind_ip'] }}:{{ cfg['bind_port'] }}/soc-portal/login" target="_blank" class="ms-2">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+          {% else %}
+          <strong>https://{{ request.host }}/soc-portal/login</strong>
+          <a href="/soc-portal/login" target="_blank" class="ms-2">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+          <span class="ms-2 ext-eac8f080">(Set a specific Bind IP to expose on a dedicated port)</span>
+          {% endif %}
+        </div>
+        {% if _custom_ip %}
+        <details class="ext-d4316970">
+          <summary class="ext-f13956e0">
+            <i class="fa-solid fa-file-code me-1"></i>Generated nginx config
+            <span class="ext-411ca315">
+              (written to /usr/local/etc/nginx/soc-portal.conf on save)
+            </span>
+          </summary>
+          <div class="ext-e024db18">
+            Ensure your main <code>nginx.conf</code> includes:
+            <code>include soc-portal.conf;</code>
+          </div>
+          <pre class="ext-2bc76b0e"># SmartShield — SOC Team Portal
+# Auto-generated — do not edit manually.
+
+server {
+    listen      {{ cfg['bind_ip'] }}:{{ cfg['bind_port'] }} ssl;
+    server_name _;
+
+    ssl_certificate     /usr/local/etc/smartshield/ssl/cert.pem;
+    ssl_certificate_key /usr/local/etc/smartshield/ssl/key.pem;
+
+    ssl_protocols             TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache         shared:SOC:5m;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options           DENY                                  always;
+    add_header X-Content-Type-Options    nosniff                               always;
+
+    location /soc-portal/ {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        return 404;
+    }
+}</pre>
+        </details>
+        {% endif %}{# _custom_ip #}
+        {% endif %}{# cfg['enabled'] #}
+
+      </div>
+    </div>
+
+    <!-- ── TLS Certificate ────────────────────────────────────────────────── -->
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-certificate"></i></div>
+        <div>
+          <div class="ss-card-title">TLS Certificate</div>
+          <div class="ss-card-subtitle">Certificate used for the SOC portal HTTPS endpoint</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field ext-a80092e0">
+          <label class="ss-label" for="ssl_cert_id">SSL/TLS Certificate</label>
+          <select id="ssl_cert_id" name="ssl_cert_id" class="form-select">
+            <option value="">— Use nginx default self-signed —</option>
+            {% for cert in certs %}
+            <option value="{{ cert['id'] }}" {{ 'selected' if cfg and cfg['ssl_cert_id'] == cert['id'] }}>
+              {{ cert['name'] }}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="ss-hint">Only server certificates are shown. Manage certificates under System → Certificates.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Runtime & Access ───────────────────────────────────────────────── -->
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div>
+          <div class="ss-card-title">Runtime &amp; Access</div>
+          <div class="ss-card-subtitle">External access and retention for the SOC Portal service</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="public_url">Public URL</label>
+            <input type="text" id="public_url" name="public_url" class="form-control"
+                   value="{{ cfg['public_url'] if cfg and cfg['public_url'] else '' }}"
+                   placeholder="https://soc.example.com">
+            <p class="ss-hint">The externally-reachable URL analysts use to open the SOC Portal.</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="retention_days">SOC Log Retention (days)</label>
+            <input type="number" id="retention_days" name="retention_days" class="form-control ext-844e0595"
+                   value="{{ cfg['retention_days'] if cfg and cfg['retention_days'] else 90 }}"
+                   min="1" max="3650">
+            <p class="ss-hint">How long SOC investigation logs are kept.</p>
+          </div>
+        </div>
+        <div class="ss-field">
+          <label class="ss-label" for="allowed_networks">Allowed Source Networks</label>
+          <textarea id="allowed_networks" name="allowed_networks" class="form-control" rows="3"
+                    placeholder="192.168.100.0/24&#10;10.10.20.0/24">{{ cfg['allowed_networks'] if cfg and cfg['allowed_networks'] else '' }}</textarea>
+          <p class="ss-hint">One CIDR per line. Source networks permitted to reach the SOC Portal
+            (enforced in the generated nginx vhost). Leave blank to allow all.</p>
+        </div>
+        <div class="ss-toggle-row mb-2">
+          <label class="ss-toggle">
+            <input type="checkbox" name="external_ingest_enabled" id="external_ingest_enabled"
+                   {{ 'checked' if cfg and cfg['external_ingest_enabled'] }}>
+            <span class="ss-toggle-slider"></span>
+          </label>
+          <div class="ss-toggle-content">
+            <p class="ss-toggle-label">Allow External Event Ingest</p>
+            <p class="ss-toggle-desc">Permit external sensors to POST events to the HEC ingest API.</p>
+          </div>
+        </div>
+        <p class="ss-hint">
+          <i class="fa-solid fa-key me-1"></i>
+          HEC ingest authenticates with an API token (scope <code>hec.ingest</code>) — create and
+          manage tokens under <strong>System → API Tokens</strong>.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Group Tier Assignment ──────────────────────────────────────────── -->
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+        <div>
+          <div class="ss-card-title">SOC Tier Assignment</div>
+          <div class="ss-card-subtitle">Assign an analyst tier (L1 / L2 / L3) to existing user groups. Groups with no tier cannot access the SOC portal.</div>
+        </div>
+      </div>
+      <div class="ss-card-body p-0">
+        {% if groups %}
+        <table class="table table-hover mb-0 ext-4bfda429">
+          <thead class="ext-b2730d2a">
+            <tr>
+              <th class="ps-4 py-3">Group</th>
+              <th class="py-3">Description</th>
+              <th class="py-3 ext-1dfda96a">SOC Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in groups %}
+            <tr>
+              <td class="ps-4 py-3 fw-semibold">{{ g['name'] }}</td>
+              <td class="py-3 text-muted ext-727130b2">{{ g['description'] or '—' }}</td>
+              <td class="py-3">
+                <select name="group_tier_{{ g['id'] }}" class="form-select form-select-sm ext-2f01efdd">
+                  <option value="" {{ 'selected' if not g['soc_tier'] }}>No SOC Access</option>
+                  <option value="L1" {{ 'selected' if g['soc_tier'] == 'L1' }}>L1 — Triage</option>
+                  <option value="L2" {{ 'selected' if g['soc_tier'] == 'L2' }}>L2 — Investigate</option>
+                  <option value="L3" {{ 'selected' if g['soc_tier'] == 'L3' }}>L3 — Response</option>
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-muted">
+          No groups found. <a href="{{ url_for('users.group_manager') }}">Create a group</a> first, then assign it a SOC tier here.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── SOC User Tier Assignment ───────────────────────────────────────── -->
+    <div class="ss-card mb-4">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <div>
+          <div class="ss-card-title">SOC Users</div>
+          <div class="ss-card-subtitle">Assign an analyst tier directly to individual user accounts. A user's effective tier is the highest of their own tier and any tier inherited from their groups.</div>
+        </div>
+      </div>
+      <div class="ss-card-body p-0">
+        {% if users %}
+        <table class="table table-hover mb-0 ext-4bfda429">
+          <thead class="ext-b2730d2a">
+            <tr>
+              <th class="ps-4 py-3">User</th>
+              <th class="py-3">Name</th>
+              <th class="py-3 ext-1dfda96a">SOC Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td class="ps-4 py-3 fw-semibold">{{ u['username'] }}</td>
+              <td class="py-3 text-muted ext-727130b2">{{ u['full_name'] or '—' }}</td>
+              <td class="py-3">
+                {% if u['is_superuser'] %}
+                <select class="form-select form-select-sm ext-df7d1005" disabled
+                        title="Superusers always have L3 access">
+                  <option>L3 — Superuser</option>
+                </select>
+                {% else %}
+                <select name="user_tier_{{ u['id'] }}" class="form-select form-select-sm ext-2f01efdd">
+                  <option value="" {{ 'selected' if not u['soc_tier'] }}>No SOC Access</option>
+                  <option value="L1" {{ 'selected' if u['soc_tier'] == 'L1' }}>L1 — Triage</option>
+                  <option value="L2" {{ 'selected' if u['soc_tier'] == 'L2' }}>L2 — Investigate</option>
+                  <option value="L3" {{ 'selected' if u['soc_tier'] == 'L3' }}>L3 — Response</option>
+                </select>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-muted">No users found.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Tier Capabilities Reference ───────────────────────────────────── -->
+    <div class="ss-card mb-4 ext-fdefa2b8">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-circle-info"></i></div>
+        <div>
+          <div class="ss-card-title">Tier Capabilities</div>
+          <div class="ss-card-subtitle">What each SOC tier can see and do in the portal</div>
+        </div>
+      </div>
+      <div class="ss-card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 ext-25b95389">
+              <div class="fw-bold mb-2"><span class="badge ext-dc69ad85">L1</span> Triage Analyst</div>
+              <ul class="mb-0 ps-3 ext-a6b61a19">
+                <li>View live SIEM alert feed</li>
+                <li>Open new security cases</li>
+                <li>View case list</li>
+                <li>Acknowledge / flag alerts</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 ext-b1fc3a98">
+              <div class="fw-bold mb-2"><span class="badge bg-warning text-dark">L2</span> Investigator</div>
+              <ul class="mb-0 ps-3 ext-a6b61a19">
+                <li>Everything in L1</li>
+                <li>Add investigation notes</li>
+                <li>Assign / reassign cases</li>
+                <li>Threat intelligence view</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 rounded-3 ext-fd64b486">
+              <div class="fw-bold mb-2"><span class="badge bg-danger">L3</span> Incident Responder</div>
+              <ul class="mb-0 ps-3 ext-a6b61a19">
+                <li>Everything in L2</li>
+                <li>Block IP addresses</li>
+                <li>Reload firewall rules</li>
+                <li>Close / resolve cases</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="fa-solid fa-floppy-disk me-1"></i> Save Settings
+      </button>
+      <button type="submit" class="btn btn-secondary"
+              formaction="{{ url_for('system.soc_portal_restart') }}"
+              formnovalidate
+              title="Re-apply the SOC Portal nginx vhost and reload the service">
+        <i class="fa-solid fa-rotate me-1"></i> Restart SOC Portal
+      </button>
+      <a href="{{ url_for('system.dashboard') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+
+  </form>
+
+  <!-- ── Add SOC User ───────────────────────────────────────────────────── -->
+  <div class="ss-card mb-5">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-user-plus"></i></div>
+      <div>
+        <div class="ss-card-title">Add SOC User</div>
+        <div class="ss-card-subtitle">Create a new analyst account and assign its SOC tier in one step.</div>
+      </div>
+    </div>
+    <div class="ss-card-body">
+      <form method="POST" action="{{ url_for('system.soc_portal_add_user') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="new_username">Username</label>
+            <input type="text" id="new_username" name="username" class="form-control"
+                   required autocomplete="off">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="new_full_name">Full Name <span class="text-muted">(optional)</span></label>
+            <input type="text" id="new_full_name" name="full_name" class="form-control"
+                   autocomplete="off">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="new_password">Password</label>
+            <input type="password" id="new_password" name="password" class="form-control"
+                   required minlength="8" autocomplete="new-password">
+            <p class="ss-hint">At least 8 characters.</p>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="new_soc_tier">SOC Tier</label>
+            <select id="new_soc_tier" name="soc_tier" class="form-select ext-ac5a4114" required>
+              <option value="L1">L1 — Triage</option>
+              <option value="L2">L2 — Investigate</option>
+              <option value="L3">L3 — Response</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary px-4 mt-2">
+          <i class="fa-solid fa-user-plus me-1"></i> Create SOC User
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+function togglePortalFields() {
+  const enabled = document.getElementById('soc_enabled').checked;
+  const fields  = document.getElementById('portal-fields');
+  fields.classList.toggle('ss-fields-disabled', !enabled);
+}
+</script>
+{% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_336b756c57'] = function (event, el) { togglePortalFields() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

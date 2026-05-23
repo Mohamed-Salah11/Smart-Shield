@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}SOC Portal{% endblock %} — SmartShield</title>
+
+  <!-- Bootstrap 5 -->
+  <link rel="stylesheet" href="{{ static_v('vendor/bootstrap/bootstrap.min.css') }}">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/smartshield-system.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/ext-inline.css') }}">
+  <script src="{{ static_v('js/inline-handlers.js') }}"></script>
+  <!-- Inter font -->
+  <link href="{{ static_v('vendor/inter/inter.css') }}" rel="stylesheet">
+
+  <style nonce="{{ csp_nonce() }}">
+    :root {
+      --soc-bg:         #0a0f1e;
+      --soc-panel:      #111827;
+      --soc-card:       #1a2235;
+      --soc-border:     #2a3550;
+      --soc-primary:    #00b4a0;
+      --soc-accent:     #3b82f6;
+      --soc-danger:     #ef4444;
+      --soc-warning:    #f59e0b;
+      --soc-success:    #10b981;
+      --soc-text:       #e2e8f0;
+      --soc-muted:      #94a3b8;
+      --soc-heading:    #4dd9cd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--soc-bg);
+      color: var(--soc-text);
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    /* ── Top bar ───────────────────────────────────────────── */
+    .soc-topbar {
+      background: var(--soc-panel);
+      border-bottom: 1px solid var(--soc-border);
+      padding: 0 1.5rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .soc-topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--soc-heading);
+      text-decoration: none;
+    }
+    .soc-topbar-brand i { font-size: 1.2rem; }
+    .soc-topbar-nav { display: flex; align-items: center; gap: .25rem; }
+    .soc-nav-link {
+      padding: .35rem .75rem;
+      border-radius: 6px;
+      color: var(--soc-muted);
+      text-decoration: none;
+      font-size: .875rem;
+      font-weight: 500;
+      transition: background .15s, color .15s;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .soc-nav-link:hover, .soc-nav-link.active {
+      background: rgba(0,180,160,.12);
+      color: var(--soc-heading);
+    }
+    .soc-nav-form { margin: 0; display: inline-flex; }
+    .soc-nav-button {
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+    /* Severity / status / note color classes — replace data-driven inline
+       style attributes so a strict CSP can drop unsafe-inline for styles. */
+    .soc-sev { font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+    .soc-sev-badge { padding: .15rem .5rem; border-radius: 4px; background: rgba(255,255,255,.05); }
+    .soc-sev-critical { color: #ff4d6d; }
+    .soc-sev-high     { color: #ef4444; }
+    .soc-sev-medium   { color: #f59e0b; }
+    .soc-sev-low      { color: #10b981; }
+    .soc-sev-default  { color: #94a3b8; }
+    .soc-status-badge { font-size: .75rem; font-weight: 700; text-transform: uppercase; padding: .15rem .5rem; border-radius: 4px; }
+    .soc-status-closed { background: rgba(16,185,129,.15); color: #10b981; }
+    .soc-status-open   { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .soc-note-icon { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .soc-note-icon i { font-size: .75rem; }
+    .soc-note-icon-escalated { background: rgba(59,130,246,.2); }
+    .soc-note-icon-escalated i { color: var(--soc-accent); }
+    .soc-note-icon-closed { background: rgba(16,185,129,.15); }
+    .soc-note-icon-closed i { color: var(--soc-success); }
+    .soc-note-icon-default { background: rgba(0,180,160,.2); }
+    .soc-note-icon-default i { color: var(--soc-primary); }
+    .soc-note-body { border-radius: 8px; padding: .65rem .9rem; font-size: .875rem; color: var(--soc-text); white-space: pre-line; font-family: 'Courier New', monospace; line-height: 1.5; }
+    .soc-note-body-escalated { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.18); }
+    .soc-note-body-closed { background: rgba(16,185,129,.06); border: 1px solid rgba(16,185,129,.15); }
+    .soc-note-body-default { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
+    .soc-topbar-right { display: flex; align-items: center; gap: .75rem; }
+    .soc-tier-badge {
+      font-size: .72rem;
+      font-weight: 700;
+      padding: .2rem .55rem;
+      border-radius: 4px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .soc-tier-L1 { background: rgba(0,180,160,.2); color: var(--soc-primary); border: 1px solid rgba(0,180,160,.35); }
+    .soc-tier-L2 { background: rgba(245,158,11,.15); color: var(--soc-warning); border: 1px solid rgba(245,158,11,.3); }
+    .soc-tier-L3 { background: rgba(239,68,68,.15); color: var(--soc-danger); border: 1px solid rgba(239,68,68,.3); }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .soc-layout { display: flex; min-height: calc(100vh - 56px); }
+    .soc-sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--soc-panel);
+      border-right: 1px solid var(--soc-border);
+      padding: 1rem .75rem;
+    }
+    .soc-sidebar-section {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--soc-muted);
+      padding: .75rem .5rem .3rem;
+    }
+    .soc-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .45rem .75rem;
+      border-radius: 7px;
+      color: var(--soc-muted);
+      text-decoration: none;
+      font-size: .875rem;
+      font-weight: 500;
+      transition: background .15s, color .15s;
+      margin-bottom: 2px;
+    }
+    .soc-sidebar-link:hover { background: rgba(255,255,255,.05); color: var(--soc-text); }
+    .soc-sidebar-link.active { background: rgba(0,180,160,.15); color: var(--soc-heading); }
+    .soc-sidebar-link .soc-badge {
+      margin-left: auto;
+      background: var(--soc-danger);
+      color: #fff;
+      border-radius: 10px;
+      font-size: .68rem;
+      padding: .1rem .4rem;
+      font-weight: 700;
+    }
+    .soc-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
+
+    /* ── Cards ─────────────────────────────────────────────── */
+    .soc-card {
+      background: var(--soc-card);
+      border: 1px solid var(--soc-border);
+      border-radius: 12px;
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .soc-card-head {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .9rem 1.25rem;
+      border-bottom: 1px solid var(--soc-border);
+    }
+    .soc-card-title { font-weight: 700; font-size: .95rem; color: var(--soc-heading); }
+    .soc-card-subtitle { font-size: .8rem; color: var(--soc-muted); }
+    .soc-card-body { padding: 1.25rem; }
+
+    /* ── KPI ────────────────────────────────────────────────── */
+    .soc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .soc-kpi {
+      background: var(--soc-card);
+      border: 1px solid var(--soc-border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .soc-kpi-value { font-size: 2rem; font-weight: 800; line-height: 1; }
+    .soc-kpi-label { font-size: .78rem; color: var(--soc-muted); margin-top: .3rem; text-transform: uppercase; letter-spacing: .06em; }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .soc-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    .soc-table th {
+      background: rgba(255,255,255,.04);
+      color: var(--soc-muted);
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: .6rem 1rem;
+      border-bottom: 1px solid var(--soc-border);
+      text-align: left;
+    }
+    .soc-table td { padding: .65rem 1rem; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+    .soc-table tr:last-child td { border-bottom: none; }
+    .soc-table tr:hover td { background: rgba(255,255,255,.025); }
+
+    /* ── Severity badges ────────────────────────────────────── */
+    .sev-critical { color: #ff4d6d; font-weight: 700; }
+    .sev-high     { color: var(--soc-danger); }
+    .sev-medium   { color: var(--soc-warning); }
+    .sev-low      { color: var(--soc-success); }
+    .sev-info     { color: var(--soc-accent); }
+    .badge-sev {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-sev.critical { background: rgba(255,77,109,.15); color: #ff4d6d; }
+    .badge-sev.high     { background: rgba(239,68,68,.15); color: var(--soc-danger); }
+    .badge-sev.medium   { background: rgba(245,158,11,.15); color: var(--soc-warning); }
+    .badge-sev.low      { background: rgba(16,185,129,.15); color: var(--soc-success); }
+    .badge-sev.info     { background: rgba(59,130,246,.15); color: var(--soc-accent); }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn-soc-primary { background: var(--soc-primary); border: none; color: #fff; border-radius: 7px; padding: .4rem .9rem; font-weight: 600; font-size: .875rem; cursor: pointer; transition: opacity .15s; }
+    .btn-soc-primary:hover { opacity: .88; }
+    .btn-soc-danger { background: var(--soc-danger); border: none; color: #fff; border-radius: 7px; padding: .4rem .9rem; font-weight: 600; font-size: .875rem; cursor: pointer; }
+    .btn-soc-secondary { background: rgba(255,255,255,.08); border: 1px solid var(--soc-border); color: var(--soc-text); border-radius: 7px; padding: .4rem .9rem; font-weight: 600; font-size: .875rem; cursor: pointer; }
+
+    /* ── Misc ────────────────────────────────────────────────── */
+    .soc-empty { text-align: center; padding: 3rem 1rem; color: var(--soc-muted); }
+    .soc-empty i { font-size: 2.5rem; display: block; margin-bottom: .75rem; opacity: .4; }
+    .text-soc-primary { color: var(--soc-primary); }
+    .text-soc-muted   { color: var(--soc-muted); }
+    .soc-mono { font-family: 'Courier New', monospace; font-size: .8rem; }
+
+    /* ── Live pulse ──────────────────────────────────────────── */
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .live-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--soc-success);
+      animation: pulse 1.5s infinite;
+      margin-right: 5px;
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────────── -->
+<nav class="soc-topbar">
+  <a href="{{ url_for('soc_portal.dashboard') }}" class="soc-topbar-brand">
+    <i class="fa-solid fa-shield-halved"></i>
+    SOC Portal
+  </a>
+
+  <div class="soc-topbar-nav d-none d-md-flex">
+    <a href="{{ url_for('soc_portal.alerts') }}"
+       class="soc-nav-link {% if request.endpoint == 'soc_portal.alerts' %}active{% endif %}">
+      <i class="fa-solid fa-bell"></i> Alert Queue
+    </a>
+    <a href="{{ url_for('soc_portal.cases') }}"
+       class="soc-nav-link {% if 'case' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fa-solid fa-folder-open"></i> Cases
+    </a>
+    {% if soc_tier in ('L2','L3') %}
+    <a href="{{ url_for('soc_portal.threat_intel') }}"
+       class="soc-nav-link {% if request.endpoint == 'soc_portal.threat_intel' %}active{% endif %}">
+      <i class="fa-solid fa-bug-slash"></i> Threat Intel
+    </a>
+    {% endif %}
+    {% if soc_tier == 'L3' %}
+    <a href="{{ url_for('soc_portal.actions') }}"
+       class="soc-nav-link {% if request.endpoint == 'soc_portal.actions' %}active{% endif %}">
+      <i class="fa-solid fa-bolt"></i> Actions
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="soc-topbar-right">
+    <span class="soc-tier-badge soc-tier-{{ soc_tier }}">{{ soc_tier }}</span>
+    <span class="text-soc-muted ext-1e28117f">{{ soc_username }}</span>
+    <a href="{{ url_for('soc_portal.security') }}" class="soc-nav-link"
+       title="Account security &amp; MFA">
+      <i class="fa-solid fa-lock"></i>
+    </a>
+    <form method="POST" action="{{ url_for('soc_portal.logout') }}" class="soc-nav-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="soc-nav-link soc-nav-button" title="Sign out">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </form>
+  </div>
+</nav>
+
+<!-- ── Body ─────────────────────────────────────────────────────────────── -->
+<div class="soc-layout">
+  <!-- Sidebar -->
+  <aside class="soc-sidebar d-none d-lg-block">
+    <div class="soc-sidebar-section">Monitor</div>
+    <a href="{{ url_for('soc_portal.dashboard') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-gauge-high"></i> SOC Overview
+    </a>
+    <a href="{{ url_for('soc_portal.alerts') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.alerts' %}active{% endif %}">
+      <i class="fa-solid fa-bell"></i> Alert Queue
+    </a>
+
+    <div class="soc-sidebar-section">Incidents</div>
+    <a href="{{ url_for('soc_portal.cases') }}"
+       class="soc-sidebar-link {% if 'case' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fa-solid fa-folder-open"></i> Cases
+    </a>
+    <a href="{{ url_for('soc_portal.saved_searches') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.saved_searches' %}active{% endif %}">
+      <i class="fa-solid fa-bookmark"></i> Saved Searches
+    </a>
+    <a href="{{ url_for('soc_portal.recommendations') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.recommendations' %}active{% endif %}">
+      <i class="fa-solid fa-clipboard-check"></i> Response Recommendations
+    </a>
+
+    {% if soc_tier in ('L2','L3') %}
+    <div class="soc-sidebar-section">Intelligence</div>
+    <a href="{{ url_for('soc_portal.threat_intel') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.threat_intel' %}active{% endif %}">
+      <i class="fa-solid fa-bug-slash"></i> Threat Intel
+    </a>
+    {% endif %}
+
+    {% if soc_tier == 'L3' %}
+    <div class="soc-sidebar-section">Response</div>
+    <a href="{{ url_for('soc_portal.actions') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.actions' %}active{% endif %}">
+      <i class="fa-solid fa-bolt"></i> Quick Actions
+    </a>
+    {% endif %}
+  </aside>
+
+  <!-- Main content -->
+  <main class="soc-content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- SmartShield AI — SOC investigation assistant -->
+{% include 'soc_portal/_chatbot.html' %}
+
+<!-- Bootstrap JS -->
+<script src="{{ static_v('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+
+<script nonce="{{ csp_nonce() }}">
+/* CSRF token injection for all fetch() calls */
+(function() {
+  const token = document.querySelector('meta[name="csrf-token"]')?.content;
+  const _orig = window.fetch;
+  window.fetch = function(resource, init = {}) {
+    const method = (init.method || 'GET').toUpperCase();
+    if (!['GET','HEAD','OPTIONS','TRACE'].includes(method) && token) {
+      init.headers = new Headers(init.headers || {});
+      if (!init.headers.has('X-CSRF-Token')) init.headers.set('X-CSRF-Token', token);
+    }
+    return _orig(resource, init);
+  };
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

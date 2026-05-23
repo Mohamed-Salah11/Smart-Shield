@@ -1,0 +1,470 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Live Alerts{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">
+      <span class="live-dot"></span> Live Alert Feed
+    </h2>
+    <p class="ext-6609c206">Security events — auto-refreshing every 10 seconds</p>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <select id="filter-cat" class="form-select form-select-sm ext-0e0264e7">
+      <option value="">All categories</option>
+      <option value="security">Security</option>
+      <option value="ids">IDS</option>
+      <option value="session">Session</option>
+      <option value="system">System</option>
+      <option value="file_download">File Download</option>
+      <option value="vpn">VPN</option>
+    </select>
+    <input type="text" id="filter-ip" class="form-control form-control-sm ext-0e0264e7" placeholder="Source IP…"
+          >
+    <input type="text" id="filter-search" class="form-control form-control-sm ext-008d9e6c" placeholder="Search…"
+          >
+    <button class="btn-soc-secondary ext-4ddbe905" data-action="h_a6ba7141cd">
+      <i class="fa-solid fa-rotate"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<div class="soc-card mb-3">
+  <div class="soc-card-body ext-1a9d540d">
+    <div class="ext-889d0be9">
+      <i class="fa-solid fa-magnifying-glass ext-a729d7fe"></i>
+      <strong class="ext-727130b2">Investigate IOC</strong>
+      <input type="text" id="ioc-input" class="form-control form-control-sm ext-0f9b0ed5"
+             placeholder="IP, domain, URL, hash…"
+            >
+      <button class="btn-soc-secondary ext-4ddbe905" id="ioc-lookup-btn">
+        <i class="fa-solid fa-bullseye me-1"></i> Look up
+      </button>
+      <div class="ext-123f6076" id="ioc-result"></div>
+    </div>
+    <div class="ext-73329f82" id="ioc-events"></div>
+  </div>
+</div>
+
+<div class="soc-card">
+  <div class="soc-card-body p-0">
+    <table class="soc-table" id="alert-table">
+      <thead>
+        <tr>
+          <th class="ext-95782264">Timestamp</th>
+          <th class="ext-c78f4943">Severity</th>
+          <th class="ext-c78f4943">Category</th>
+          <th class="ext-8f77872c">Action</th>
+          <th>Details</th>
+          <th class="ext-729192c0">User</th>
+          <th class="ext-088cf005">Remote IP</th>
+          <th class="ext-1a30558f">Status</th>
+          <th class="ext-8db8d854">Case</th>
+          <th class="ext-39248fe8">Assign To</th>
+        </tr>
+      </thead>
+      <tbody id="alert-tbody">
+        <tr><td colspan="10" class="text-center py-4 ext-a729d7fe">Loading alerts…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Open Case Modal -->
+<div class="modal fade" id="caseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content ext-e7c1533d">
+      <div class="modal-header ext-14d14377">
+        <h5 class="modal-title ext-8372ff89">Open Security Case</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="case-source-event">
+        <div class="mb-3">
+          <label class="form-label ext-e2c29c05">Title</label>
+          <input type="text" id="case-title" class="form-control ext-4b1196ec" placeholder="Case title…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label ext-e2c29c05">Severity</label>
+          <select id="case-severity" class="form-select ext-4b1196ec">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label ext-e2c29c05">Description</label>
+          <textarea id="case-desc" class="form-control ext-4b1196ec" rows="3" placeholder="Describe what you observed…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer ext-14d14377">
+        <button class="btn-soc-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-soc-primary" data-action="h_365f8ec3d4">Open Case</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script nonce="{{ csp_nonce() }}">
+let allAlerts = [];
+let activeAnalysts = [];   // SOC analysts currently logged in — assignable targets
+const caseModal = new bootstrap.Modal(document.getElementById('caseModal'));
+
+const CAT_COLOR = {
+  security:      'var(--soc-danger)',
+  ids:           '#ff4d6d',
+  session:       'var(--soc-accent)',
+  system:        '#a78bfa',
+  file_download: '#fb7185',
+  vpn:           '#34d399',
+  privileged:    '#f59e0b',
+};
+
+// Keys to surface in the Details column, in priority order.
+const DETAIL_KEYS = ['cmd', 'domain', 'signature', 'dest_ip', 'port', 'reason', 'url', 'mac', 'auth_type'];
+
+function htmlEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function detailSummary(details) {
+  if (!details || typeof details !== 'object') return '';
+  for (const k of DETAIL_KEYS) {
+    if (details[k] != null && details[k] !== '') {
+      const v = String(details[k]);
+      return k + '=' + (v.length > 80 ? v.slice(0, 77) + '…' : v);
+    }
+  }
+  // Fall back to first useful-looking key
+  const first = Object.keys(details).find(k => details[k] != null && details[k] !== '');
+  if (!first) return '';
+  const v = String(details[first]);
+  return first + '=' + (v.length > 80 ? v.slice(0, 77) + '…' : v);
+}
+
+const SEV_COLOR = {
+  critical: { bg: 'rgba(255,77,109,.15)', color: '#ff4d6d' },
+  high:     { bg: 'rgba(239,68,68,.15)',  color: '#ef4444' },
+  medium:   { bg: 'rgba(245,158,11,.15)', color: '#f59e0b' },
+  low:      { bg: 'rgba(16,185,129,.15)', color: '#10b981' },
+  info:     { bg: 'rgba(148,163,184,.1)', color: '#94a3b8' },
+};
+
+function timeFmt(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+// Splunk-style detail groups. Each `kind:"ioc"` field gets a copy button.
+const DETAIL_GROUPS = [
+  { title: 'Event',       fields: [['timestamp','Time'],['category','Category'],
+                                   ['action','Action'],['severity','Severity'],
+                                   ['effective_severity','Effective severity']] },
+  { title: 'Signature',   fields: [['signature','Rule'],['mitre_tactic','MITRE tactic'],
+                                   ['sig_category','Class'],['gid','GID'],['sid','SID']] },
+  { title: 'Source',      fields: [['src_ip','IP','ioc'],['src_port','Port'],
+                                   ['hostname','Hostname'],['mac','MAC','ioc']] },
+  { title: 'Destination', fields: [['dest_ip','IP','ioc'],['dest_port','Port'],
+                                   ['proto','Protocol']] },
+  { title: 'HTTP',        fields: [['http_method','Method'],['http_status','Status'],
+                                   ['http_url','URL','ioc'],['http_host','Host','ioc'],
+                                   ['http_hostname','Hostname','ioc'],
+                                   ['http_agent','User-Agent']] },
+  { title: 'TLS',         fields: [['tls_sni','SNI','ioc']] },
+  { title: 'File',        fields: [['filename','Filename'],['extension','Extension'],
+                                   ['mime','MIME'],['magic','Magic'],['size','Size'],
+                                   ['md5','MD5','ioc'],['sha256','SHA-256','ioc'],
+                                   ['state','State']] },
+  { title: 'User',        fields: [['username','Username'],['remote_addr','Remote IP','ioc']] },
+];
+
+function fieldRow(label, value, kind) {
+  const v   = String(value);
+  const esc = htmlEscape(v);
+  const copy = (kind === 'ioc')
+    ? `<button class="ext-83d31f7f" type="button" data-action="soc-copy-ioc" data-value="${esc}" title="Copy"><i class="fa-regular fa-copy"></i></button>`
+    : '';
+  return `<tr>
+            <td class="ext-9f7def3f">${label}</td>
+            <td class="soc-mono ext-dbda352d">${esc}${copy}</td>
+          </tr>`;
+}
+
+function copyToClipboard(btn, v) {
+  if (!navigator.clipboard) return;
+  navigator.clipboard.writeText(v).then(() => {
+    const i = btn.querySelector('i');
+    if (!i) return;
+    const orig = i.className;
+    i.className = 'fa-solid fa-check';
+    btn.style.color = '#10b981';
+    setTimeout(() => { i.className = orig; btn.style.color = '#64748b'; }, 900);
+  });
+}
+
+function renderDetailPanel(e) {
+  const d    = (e.details && typeof e.details === 'object') ? e.details : {};
+  const flat = Object.assign({}, e, d);
+  const blocks = DETAIL_GROUPS.map(g => {
+    const rows = g.fields
+      .filter(([k]) => flat[k] !== undefined && flat[k] !== null && flat[k] !== '')
+      .map(([k, label, kind]) => fieldRow(label, flat[k], kind));
+    if (!rows.length) return '';
+    return `<div class="ext-46a7d992">
+              <div class="ext-12c0dff8">${g.title}</div>
+              <table class="ext-aae8b9ef">${rows.join('')}</table>
+            </div>`;
+  }).filter(Boolean).join('');
+  const rawJson = htmlEscape(JSON.stringify(d, null, 2));
+  return `<div class="ext-bd1aaf60">${blocks || '<div class="ext-6f459758">No structured fields. See raw event below.</div>'}</div>
+          <details class="ext-7f51845c">
+            <summary class="ext-5002f698"><i class="fa-solid fa-code me-1"></i>Show raw event JSON</summary>
+            <pre class="soc-mono ext-2ac6e3c9">${rawJson}</pre>
+          </details>`;
+}
+
+// ── Alert assignment ─────────────────────────────────────────────────────
+function assignCell(e, ts) {
+  const cur = e.assignment ? String(e.assignment.assignee_id) : '';
+  let opts = '<option value="">— Unassigned —</option>';
+  let curIsActive = false;
+  for (const a of activeAnalysts) {
+    const sel = (String(a.user_id) === cur) ? ' selected' : '';
+    if (sel) curIsActive = true;
+    opts += `<option value="${a.user_id}"${sel}>${htmlEscape(a.username)} (${htmlEscape(a.tier)})</option>`;
+  }
+  // Keep a current assignee visible even if they have since logged out.
+  if (cur && !curIsActive) {
+    opts += `<option value="${htmlEscape(cur)}" selected>${htmlEscape(e.assignment.assignee_name)} (offline)</option>`;
+  }
+  const key  = ts.replace(/'/g, "\\'");
+  const uuid = (e.event_uuid || '').replace(/'/g, "\\'");
+  const act  = (e.action || '').replace(/'/g, "\\'");
+  return `<select class="form-select form-select-sm ext-9335ffa4" data-action="alert-stop-prop"
+            data-event-uuid="${uuid}" data-event-key="${key}" data-event-action="${act}"
+            data-action-change="alert-assign"
+           >${opts}</select>`;
+}
+
+async function assignAlert(sel, eventUuid, eventKey, eventAction) {
+  try {
+    const r = await fetch('/soc-portal/alerts/assign', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        event_uuid:   eventUuid || '',
+        event_key:    eventKey,
+        event_action: eventAction,
+        assignee_id:  sel.value || null,
+      }),
+    });
+    const data = await r.json();
+    if (!data.ok) { alert(data.message || 'Assignment failed.'); loadAlerts(); return; }
+    // Reflect into the in-memory model so the next refresh does not flicker.
+    // Match by event_uuid first; fall back to timestamp for any pre-v34 row.
+    const a = allAlerts.find(x =>
+      (eventUuid && (x.event_uuid || '') === eventUuid) ||
+      (!eventUuid && (x.timestamp || '') === eventKey)
+    );
+    if (a) {
+      a.assignment = sel.value
+        ? {assignee_id: sel.value, assignee_name: sel.options[sel.selectedIndex].text}
+        : null;
+    }
+  } catch {
+    alert('Assignment request failed.');
+    loadAlerts();
+  }
+}
+
+async function loadAnalysts() {
+  try {
+    const r = await fetch('/soc-portal/api/active-analysts');
+    const d = await r.json();
+    activeAnalysts = (d && d.ok && d.analysts) ? d.analysts : [];
+  } catch { activeAnalysts = []; }
+}
+
+function renderRows(data) {
+  const tbody = document.getElementById('alert-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="soc-empty"><i class="fa-solid fa-shield-check"></i><br>No alerts matching filters</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((e, idx) => {
+    const ts   = e.timestamp || '';
+    const cat  = (e.category || '').toLowerCase();
+    const sev  = (e.effective_severity || 'info').toLowerCase();
+    const act  = e.action || '—';
+    const user = e.username || '—';
+    const ip   = e.remote_addr || '—';
+    const aa   = e.analyst_action;
+    const det  = detailSummary(e.details);
+    const sevStyle = SEV_COLOR[sev] || SEV_COLOR.info;
+    const sevBadge = `<span class="ext-b19834c2">${sev}</span>`;
+    const statusBadge = aa
+      ? `<span class="ext-f59a3da2">${aa.action}</span>`
+      : `<span class="ext-b267534b">New</span>`;
+    const caseLink = aa && aa.case_id
+      ? `<a class="ext-00d74da7" href="/soc-portal/cases/${aa.case_id}">#${aa.case_id}</a>`
+      : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${htmlEscape(ts)}" data-action-name="${htmlEscape(act)}">+ Case</button>`;
+    const detailPanel = renderDetailPanel(e);
+    return `<tr class="alert-row ext-b202c6d4" data-idx="${idx}" data-action="alert-row-toggle">
+      <td class="soc-mono ext-6c660c40">${timeFmt(ts)}</td>
+      <td>${sevBadge}</td>
+      <td><span class="ext-179624b7">${cat}</span></td>
+      <td class="ext-15e075a4" title="${htmlEscape(act)}">${htmlEscape(act)}</td>
+      <td class="soc-mono ext-f01908f1" title="${htmlEscape(det)}">${htmlEscape(det)}</td>
+      <td class="ext-76b0e39b">${htmlEscape(user)}</td>
+      <td class="ext-76b0e39b">${htmlEscape(ip)}</td>
+      <td>${statusBadge}</td>
+      <td>${caseLink}</td>
+      <td>${assignCell(e, ts)}</td>
+    </tr>
+    <tr class="alert-detail ext-9b0eb096" id="detail-${idx}">
+      <td class="ext-80a303e3" colspan="10">${detailPanel}</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleRow(idx) {
+  const r = document.getElementById('detail-' + idx);
+  if (!r) return;
+  r.style.display = r.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function applyFilters() {
+  const cat    = document.getElementById('filter-cat').value.toLowerCase();
+  const ip     = document.getElementById('filter-ip').value.trim().toLowerCase();
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  let filtered = allAlerts;
+  if (cat)    filtered = filtered.filter(e => (e.category||'').toLowerCase() === cat);
+  if (ip)     filtered = filtered.filter(e => (e.remote_addr||'').toLowerCase().includes(ip));
+  if (search) filtered = filtered.filter(e =>
+    JSON.stringify(e).toLowerCase().includes(search)
+  );
+  renderRows(filtered);
+}
+
+async function loadAlerts() {
+  try {
+    const r = await fetch('/soc-portal/api/alerts?limit=200');
+    allAlerts = await r.json();
+    applyFilters();
+  } catch {
+    document.getElementById('alert-tbody').innerHTML =
+      '<tr><td colspan="10" class="text-center ext-a729d7fe">Failed to load alerts</td></tr>';
+  }
+}
+
+function openCaseModal(sourceEvent, action) {
+  document.getElementById('case-source-event').value = sourceEvent;
+  document.getElementById('case-title').value = action ? `Investigate: ${action}` : '';
+  document.getElementById('case-desc').value = '';
+  caseModal.show();
+}
+
+async function submitCase() {
+  const payload = {
+    title:        document.getElementById('case-title').value.trim(),
+    description:  document.getElementById('case-desc').value.trim(),
+    severity:     document.getElementById('case-severity').value,
+    source_event: document.getElementById('case-source-event').value,
+  };
+  if (!payload.title) { alert('Title is required.'); return; }
+  const r = await fetch('/soc-portal/cases/open', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data = await r.json();
+  if (data.ok) {
+    caseModal.hide();
+    loadAlerts();
+    alert(`Case #${data.case_id} opened.`);
+  } else {
+    alert(data.message || 'Failed to open case.');
+  }
+}
+
+document.getElementById('filter-cat').addEventListener('change', applyFilters);
+document.getElementById('filter-ip').addEventListener('input', applyFilters);
+document.getElementById('filter-search').addEventListener('input', applyFilters);
+
+loadAnalysts().then(loadAlerts);
+setInterval(() => loadAnalysts().then(loadAlerts), 10000);
+
+// ── IOC lookup ───────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+async function lookupIOC() {
+  var input  = document.getElementById('ioc-input');
+  var result = document.getElementById('ioc-result');
+  var events = document.getElementById('ioc-events');
+  var ioc = (input.value || '').trim();
+  if (!ioc) { result.textContent = 'Enter an indicator to look up.'; events.style.display = 'none'; return; }
+  result.textContent = 'Looking up…';
+  events.style.display = 'none';
+  try {
+    var r = await fetch('{{ url_for("soc_portal.api_ioc_lookup") }}?ioc=' + encodeURIComponent(ioc));
+    var data = await r.json();
+    if (!data.ok) { result.textContent = data.message || 'Lookup failed.'; return; }
+    var pieces = [];
+    if (data.ti_hit) {
+      pieces.push('<span class="ext-dd0f2908">'
+                 + '<i class="fa-solid fa-circle-radiation me-1"></i>TI HIT</span> ('
+                 + escapeHtml(data.feed || '') + ')');
+    } else {
+      pieces.push('<span class="ext-29fb9df2"><i class="fa-solid fa-circle-check me-1"></i>Not in TI cache</span>');
+    }
+    pieces.push(escapeHtml(data.event_count) + ' matching event(s)');
+    result.innerHTML = pieces.join(' &middot; ');
+    if (data.events && data.events.length) {
+      var rows = data.events.map(function (e) {
+        return '<tr>'
+             + '<td class="ext-4ddbe905">' + escapeHtml(e.timestamp) + '</td>'
+             + '<td>' + escapeHtml(e.severity) + '</td>'
+             + '<td>' + escapeHtml(e.category) + '</td>'
+             + '<td>' + escapeHtml(e.action)   + '</td>'
+             + '<td>' + escapeHtml(e.remote_addr) + '</td>'
+             + '<td class="ext-8767e6a8">'
+             + escapeHtml(JSON.stringify(e.details)) + '</td>'
+             + '</tr>';
+      }).join('');
+      events.innerHTML =
+        '<table class="soc-table ext-0de4e77b">'
+        + '<thead><tr><th>Timestamp</th><th>Severity</th><th>Category</th>'
+        + '<th>Action</th><th>Remote</th><th>Details</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>';
+      events.style.display = 'block';
+    }
+  } catch (err) {
+    result.textContent = 'Lookup request failed.';
+  }
+}
+document.getElementById('ioc-lookup-btn').addEventListener('click', lookupIOC);
+document.getElementById('ioc-input').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); lookupIOC(); }
+});
+</script>
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_a6ba7141cd'] = function (event, el) { loadAlerts() };
+  R['h_365f8ec3d4'] = function (event, el) { submitCase() };
+  R['soc-copy-ioc']     = function (event, el) { event.stopPropagation(); copyToClipboard(el, el.dataset.value); };
+  R['alert-stop-prop']  = function (event, el) { event.stopPropagation(); };
+  R['alert-assign']     = function (event, el) { assignAlert(el, el.dataset.eventUuid, el.dataset.eventKey, el.dataset.eventAction); };
+  R['soc-open-case']    = function (event, el) { event.stopPropagation(); openCaseModal(el.dataset.ts, el.dataset.actionName); };
+  R['alert-row-toggle'] = function (event, el) { toggleRow(Number(el.dataset.idx)); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}

@@ -41,8 +41,11 @@
 			<h3 class="mb-3">User Authentication</h3>
 
 			<div class="mb-2">
-				<textarea class="form-control" rows="6" aria-label="User Authentication Source">Local Database bro</textarea>
-				<div class="mt-1 text-muted">Source</div>
+				<div class="alert alert-info mb-0 ext-026e2cd4">
+					<i class="fa-solid fa-circle-info me-1"></i>
+					Mobile clients authenticate against the <strong>local user database</strong>.
+					Manage users under <a href="{{ url_for('users.user_manager') }}">Users &amp; Groups</a>.
+				</div>
 			</div>
 
 			<div class="form-check mt-3">
@@ -57,7 +60,7 @@
 				<label class="form-check-label" for="radiusAccounting">
 					<strong>RADIUS Accounting</strong> - Enable RADIUS Accounting
 				</label>
-				<div class="mt-2 text-muted" style="line-height: 1.35;">
+				<div class="mt-2 text-muted ext-1b4d861c">
 					When enabled, the IPsec daemon will attempt to send RADIUS accounting data for mobile IPsec connections with Virtual IP addresses. Do not enable this option unless the selected RADIUS servers are online and capable of receiving RADIUS accounting data. If RADIUS accounting data is enabled and fails to send, tunnels will be disconnected.
 				</div>
 			</div>
@@ -164,7 +167,7 @@
 	</div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
 	loadIpsecMobileClients();
 	const btn = document.getElementById('ipsecMobileClientsSaveBtn');

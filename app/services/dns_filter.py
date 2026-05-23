@@ -17,10 +17,13 @@ delete_dns_filter_rule(conn, rule_id)        -> None
 apply_dns_filter(conn)                       -> dict        # {"ok", "message"}
 """
 
+import logging
 import re
 import sys
 
-from app.services.content_policy import get_block_page_ip
+from app.services.content_policy import get_block_page_ip, normalize_action, normalize_domain
+
+_log = logging.getLogger(__name__)
 
 
 def _rows(conn, sql, params=()):
@@ -30,11 +33,60 @@ def _rows(conn, sql, params=()):
 
 
 def _sanitize_domain(raw: str) -> str:
-    """Strip protocol, path, wildcards, and trailing dots from a domain string."""
-    d = re.sub(r'^https?://', '', raw.strip().lower())
-    d = d.split('/')[0].strip()
-    d = d.lstrip('*.').strip('.')
-    return d
+    """Validate and lowercase a domain. Returns "" for invalid input.
+
+    Delegates to ``content_policy.normalize_domain`` so DNS / Web / App filters
+    all apply the same domain rules (no schemes, no paths, no wildcards, no
+    single-label names).
+    """
+    return normalize_domain(raw or "")
+
+
+def _doh_blocking_enabled(conn) -> bool:
+    """True when the admin has not explicitly disabled DoH-provider blocking.
+
+    Default: ON whenever ANY content/DNS/web/app rule is active. Admin can
+    flip ``service_state.content_policy_settings.block_known_doh`` to False
+    to opt out (e.g., if their network legitimately uses Cloudflare DoH).
+    """
+    try:
+        import json as _json
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='content_policy_settings'"
+        ).fetchone()
+        if not row:
+            return True
+        cfg = _json.loads(row["value_json"]) or {}
+        # Missing key defaults to True (block by default).
+        return bool(cfg.get("block_known_doh", True))
+    except Exception:
+        return True
+
+
+def generate_doh_block_zones(conn) -> list:
+    """Return Unbound local-zone lines that NXDOMAIN every known DoH endpoint.
+
+    Emits only when content filtering is active AND the block_known_doh flag
+    is on. Always NXDOMAIN (never redirect to the block page) — DoH clients
+    don't render HTML so a redirect would just confuse them.
+    """
+    try:
+        from app.services.content_policy import (
+            has_active_content_policy, DOH_PROVIDER_DOMAINS,
+        )
+        if not has_active_content_policy(conn):
+            return []
+    except Exception:
+        return []
+
+    if not _doh_blocking_enabled(conn):
+        return []
+
+    lines: list = []
+    for domain in DOH_PROVIDER_DOMAINS:
+        fqdn = domain + "."
+        lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -44,12 +96,13 @@ def _sanitize_domain(raw: str) -> str:
 
 def generate_dns_filter_zones(conn) -> list:
     """
-    Return a list of Unbound server-block lines for all enabled DNS filter rules.
-    These are injected into unbound.conf by dns_writer.generate_unbound_conf().
+    Return Unbound server-block lines for all enabled DNS filter rules.
 
-    For "block" rules: redirect to Smart Shield's LAN IP so the browser hits the
-    /portal/block page instead of getting a raw NXDOMAIN.  Falls back to
-    always_nxdomain when no LAN IP is configured.
+    DEPRECATED for the apply path — ``dns_writer.generate_unbound_conf`` calls
+    ``content_policy.emit_unbound_policy_zones`` directly so duplicate domains
+    across DNS / Web / App filters collapse into a single ``local-zone``.
+    This function is kept only for ``filter_conflicts.get_filter_preview`` so
+    the UI can show per-filter previews. Do not call from apply paths.
     """
     block_ip = get_block_page_ip(conn)
 
@@ -62,16 +115,18 @@ def generate_dns_filter_zones(conn) -> list:
     lines = []
     for rule in rules:
         domain = _sanitize_domain(rule.get("domain") or "")
-        action = (rule.get("action") or "block").lower()
+        action = normalize_action(rule.get("action"))
         redirect_ip = (rule.get("redirect_ip") or "").strip()
         if not domain:
             continue
         fqdn = domain + "."
-        if action == "block":
+        # block_all and allow_whitelist_only both default-deny; the
+        # whitelist_view re-allows whitelisted clients out-of-band.
+        # TTL=5 s on the block redirect so the browser DNS cache expires
+        # quickly after the user authenticates and PF switches them to the
+        # upstream resolver.
+        if action in ("block_all", "allow_whitelist_only"):
             if block_ip:
-                # Redirect to Smart Shield so the block/login page is served.
-                # TTL=5 s so the browser DNS cache expires quickly after the user
-                # authenticates and PF switches them to the upstream resolver.
                 lines.append(f'    local-zone: "{fqdn}" redirect')
                 lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
             else:
@@ -79,13 +134,6 @@ def generate_dns_filter_zones(conn) -> list:
         elif action == "redirect" and redirect_ip:
             lines.append(f'    local-zone: "{fqdn}" redirect')
             lines.append(f'    local-data: "{fqdn} 5 A {redirect_ip}"')
-        elif action == "allow":
-            # "Allow whitelist only" — block for everyone; whitelist_view overrides back to transparent.
-            if block_ip:
-                lines.append(f'    local-zone: "{fqdn}" redirect')
-                lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
-            else:
-                lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
     return lines
 
 
@@ -94,7 +142,14 @@ def generate_dns_whitelist_overrides(conn) -> list:
     Return local-zone transparent overrides for 'allow whitelist only' DNS rules.
     Injected into the Unbound whitelist_view so whitelisted devices bypass the block.
     """
-    rules = _rows(conn, "SELECT domain FROM filter_dns_rules WHERE action='allow' AND enabled=1")
+    # Match either the legacy "allow" string or the canonical
+    # "allow_whitelist_only" — see content_policy.normalize_action.
+    rules = _rows(
+        conn,
+        "SELECT domain FROM filter_dns_rules "
+        "WHERE LOWER(COALESCE(action,'')) IN ('allow', 'allow_whitelist_only') "
+        "AND enabled=1",
+    )
     lines = []
     for rule in rules:
         domain = _sanitize_domain(rule.get("domain") or "")
@@ -199,14 +254,14 @@ def hot_apply_dns_rule(conn, rule_id: int) -> None:
         else:
             try:
                 run_privileged("unbound.local_zone_remove", domain=domain)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning("dns_filter: local_zone_remove failed for %r: %s", domain, exc)
             try:
                 run_privileged("unbound.local_data_remove", domain=domain)
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _log.warning("dns_filter: local_data_remove failed for %r: %s", domain, exc)
+    except Exception as exc:
+        _log.warning("dns_filter: hot_apply_dns_rule failed for rule %s: %s", rule_id, exc)
 
 
 def toggle_dns_filter_rule(conn, rule_id: int, enabled: bool) -> None:
@@ -225,13 +280,13 @@ def _hot_remove_domain(domain: str) -> None:
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_zone_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("dns_filter: hot-remove local_zone failed for %r: %s", domain, exc)
     try:
         from app.services.priv_helper import run_privileged
         run_privileged("unbound.local_data_remove", domain=domain)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("dns_filter: hot-remove local_data failed for %r: %s", domain, exc)
 
 
 def delete_dns_filter_rule(conn, rule_id: int) -> None:
@@ -249,17 +304,15 @@ def delete_dns_filter_rule(conn, rule_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 def apply_dns_filter(conn) -> dict:
-    """Regenerate unbound.conf (including filter rules) and reload Unbound."""
+    """Regenerate unbound.conf (including filter rules) and reload Unbound.
+
+    Routes through ``apply_unbound`` so the change goes through the
+    validate → backup → atomic write → reload → rollback pipeline rather
+    than the legacy raw-write path. A malformed rule cannot replace a
+    working unbound.conf this way.
+    """
     try:
-        from app.services.dns_writer import write_unbound_conf
-        result = write_unbound_conf(conn)
-        if not result["ok"]:
-            return result
-        if sys.platform.startswith("freebsd"):
-            from app.services.service_manager import service_action
-            r = service_action("unbound", "reload")
-            if not r["ok"]:
-                return {"ok": False, "message": f"Config written but Unbound reload failed: {r['message']}"}
-        return {"ok": True, "message": "DNS filter applied and Unbound reloaded."}
+        from app.services.dns_writer import apply_unbound
+        return apply_unbound(conn)
     except Exception as exc:
         return {"ok": False, "message": str(exc)}

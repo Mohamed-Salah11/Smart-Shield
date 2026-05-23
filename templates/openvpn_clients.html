@@ -15,6 +15,7 @@
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'clients' else '' }}" href="{{ url_for('vpn.openvpn_clients') }}">Clients</a></li>
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'cso' else '' }}" href="{{ url_for('vpn.openvpn_cso') }}">Client Specific Overrides</a></li>
     <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}" href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if active_tab == 'portal' else '' }}" href="{{ url_for('vpn.openvpn_portal_users') }}">Portal Users</a></li>
   </ul>
 
   <div class="ss-card">
@@ -22,9 +23,9 @@
       <div class="ss-card-icon"><i class="fa-solid fa-plug"></i></div>
       <div><div class="ss-card-title">OpenVPN Clients</div><div class="ss-card-subtitle">Outbound VPN client connections</div></div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
                 <tr>
                     <th>Protocol / Port</th>
                     <th>Interface</th>
@@ -204,8 +205,13 @@
 
                             <div class="mb-3">
                                 <label for="clientAuthDigestAlgorithm" class="form-label">Auth Digest Algorithm</label>
-                                <input type="text" class="form-control" id="clientAuthDigestAlgorithm"
-                                    name="auth_digest_algorithm" value="SHA256" />
+                                <select class="form-select" id="clientAuthDigestAlgorithm" name="auth_digest_algorithm">
+                                  <option value="SHA256" selected>SHA256 (recommended)</option>
+                                  <option value="SHA384">SHA384</option>
+                                  <option value="SHA512">SHA512</option>
+                                  <option value="SHA1">SHA1 (legacy)</option>
+                                  <option value="MD5">MD5 (legacy)</option>
+                                </select>
                             </div>
 
                             <div class="mb-3">
@@ -338,31 +344,38 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function () {
         // Load clients on page load
         loadOpenVPNClients();
 
         // Handle Save Client button
         document.getElementById('saveClientBtn').addEventListener('click', function () {
+            const gv = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+            const gc = id => { const e = document.getElementById(id); return e ? e.checked : false; };
             const formData = {
-                description: document.getElementById('clientDescription').value,
-                disabled: document.getElementById('clientDisabled').checked,
-                server_mode: document.getElementById('clientServerMode').value,
-                protocol: document.getElementById('clientProtocol').value,
-                interface: document.getElementById('clientInterface').value,
-                server_hostname: document.getElementById('clientServerHostname').value,
-                server_port: parseInt(document.getElementById('clientServerPort').value) || 1194,
-                use_tls_key: document.getElementById('clientUseTlsKey').checked,
-                tls_key: document.getElementById('clientTlsKey').value,
-                inactivity_timeout: parseInt(document.getElementById('clientInactivityTimeout').value) || 300,
-                ping_method: document.getElementById('clientPingMethod').value,
-                ping_interval: parseInt(document.getElementById('clientPingInterval').value) || 10,
-                ping_timeout: parseInt(document.getElementById('clientPingTimeout').value) || 60,
-                custom_options: document.getElementById('clientCustomOptions').value,
-                udp_fast_io: document.getElementById('clientUdpFastIo').checked,
-                send_receive_buffer: document.getElementById('clientSendReceiveBuffer').value,
-                verbosity_level: parseInt(document.getElementById('clientVerbosityLevel').value) || 3
+                description:         gv('clientDescription'),
+                disabled:            gc('clientDisabled'),
+                server_mode:         gv('clientServerMode'),
+                protocol:            gv('clientProtocol'),
+                interface:           gv('clientInterface'),
+                server_hostname:     gv('clientServerHostname'),
+                server_port:         parseInt(gv('clientServerPort')) || 1194,
+                use_tls_key:         gc('clientUseTlsKey'),
+                tls_key:             gv('clientTlsKey'),
+                data_encryption_algorithms: gv('clientDataEncryption'),
+                auth_digest_algorithm:      gv('clientAuthDigestAlgorithm'),
+                tunnel_network:      gv('clientIpv4TunnelNetwork'),
+                compression:         gv('clientAllowCompression'),
+                topology:            gv('clientTopology'),
+                inactivity_timeout:  parseInt(gv('clientInactivityTimeout')) || 300,
+                ping_method:         gv('clientPingMethod'),
+                ping_interval:       parseInt(gv('clientPingInterval')) || 10,
+                ping_timeout:        parseInt(gv('clientPingTimeout')) || 60,
+                custom_options:      gv('clientCustomOptions'),
+                udp_fast_io:         gc('clientUdpFastIo'),
+                send_receive_buffer: gv('clientSendReceiveBuffer'),
+                verbosity_level:     parseInt(gv('clientVerbosityLevel')) || 3,
             };
 
             const modalEl  = document.getElementById('openvpnAddClientModal');
@@ -432,10 +445,10 @@
             <td class="${statusClass}">${client.server_mode}</td>
             <td class="${statusClass}">${client.description || '-'}${statusBadge}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editClient(${client.id})" title="Edit">
+                <button type="button" class="btn btn-sm btn-primary" data-action="ovpn-client-edit" data-id="${client.id}" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteClient(${client.id})" title="Delete">
+                <button type="button" class="btn btn-sm btn-danger" data-action="ovpn-client-delete" data-id="${client.id}" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -457,21 +470,26 @@
 
             const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
             const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-            setVal('clientDescription',       c.description);
-            setChk('clientDisabled',          c.disabled);
-            setVal('clientServerMode',        c.server_mode);
-            setVal('clientProtocol',          c.protocol);
-            setVal('clientInterface',         c.interface);
-            setVal('clientServerHostname',    c.server_hostname);
-            setVal('clientServerPort',        c.server_port);
-            setVal('clientInactivityTimeout', c.inactivity_timeout);
-            setVal('clientPingMethod',        c.ping_method);
-            setVal('clientPingInterval',      c.ping_interval);
-            setVal('clientPingTimeout',       c.ping_timeout);
-            setVal('clientCustomOptions',     c.custom_options);
-            setChk('clientUdpFastIo',         c.udp_fast_io);
-            setVal('clientSendReceiveBuffer', c.send_receive_buffer);
-            setVal('clientVerbosityLevel',    c.verbosity_level);
+            setVal('clientDescription',          c.description);
+            setChk('clientDisabled',             c.disabled);
+            setVal('clientServerMode',           c.server_mode);
+            setVal('clientProtocol',             c.protocol);
+            setVal('clientInterface',            c.interface);
+            setVal('clientServerHostname',       c.server_hostname);
+            setVal('clientServerPort',           c.server_port);
+            setVal('clientDataEncryption',       c.data_encryption_algorithms);
+            setVal('clientAuthDigestAlgorithm',  c.auth_digest_algorithm || 'SHA256');
+            setVal('clientIpv4TunnelNetwork',    c.tunnel_network);
+            setVal('clientAllowCompression',     c.compression || 'no');
+            setVal('clientTopology',             c.topology || 'subnet');
+            setVal('clientInactivityTimeout',    c.inactivity_timeout);
+            setVal('clientPingMethod',           c.ping_method);
+            setVal('clientPingInterval',         c.ping_interval);
+            setVal('clientPingTimeout',          c.ping_timeout);
+            setVal('clientCustomOptions',        c.custom_options);
+            setChk('clientUdpFastIo',            c.udp_fast_io);
+            setVal('clientSendReceiveBuffer',    c.send_receive_buffer);
+            setVal('clientVerbosityLevel',       c.verbosity_level);
 
             modalEl._editClientId = clientId;
             new bootstrap.Modal(modalEl).show();
@@ -505,3 +523,16 @@
 </script>
 </div>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['ovpn-client-edit']   = function (event, el) { editClient(el.dataset.id); };
+  R['ovpn-client-delete'] = function (event, el) { deleteClient(el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

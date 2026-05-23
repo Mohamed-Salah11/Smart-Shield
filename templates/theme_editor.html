@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 /* ── Layout ── */
 .te-wrap { display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start; }
 .te-panel { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;padding:22px;box-shadow:var(--shadow-soft); }
@@ -61,15 +61,15 @@
 <div class="container-fluid py-4 px-4">
 
   <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div class="ext-bd3fcfdb">
     <div>
-      <h5 style="margin:0;font-weight:800;color:var(--text-color);">Theme Editor</h5>
-      <p style="margin:0;font-size:.8rem;color:var(--muted);">Customize every color in the interface. Changes are applied live.</p>
+      <h5 class="ext-94f30b0d">Theme Editor</h5>
+      <p class="ext-0a545e92">Customize every color in the interface. Changes are applied live.</p>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div class="ext-9c68691e">
       <a href="{{ url_for('system.dashboard') }}" class="btn btn-sm btn-outline-secondary">← Dashboard</a>
-      <button class="btn btn-sm btn-outline-secondary" onclick="resetToBase()">Reset</button>
-      <button class="btn btn-sm btn-primary" onclick="applyAndSave()">Save &amp; Apply</button>
+      <button class="btn btn-sm btn-outline-secondary" data-action="h_61a796c426">Reset</button>
+      <button class="btn btn-sm btn-primary" data-action="h_9eca1aedb3">Save &amp; Apply</button>
     </div>
   </div>
 
@@ -80,13 +80,13 @@
 
       <!-- Presets -->
       <div class="te-panel">
-        <p class="te-section-title" style="margin-top:0;">Preset Themes</p>
+        <p class="te-section-title ext-53896af7">Preset Themes</p>
         <div class="preset-grid">
-          <button class="preset-btn" id="pre-black"  onclick="applyPreset('black')">Pure Black</button>
-          <button class="preset-btn" id="pre-dark"   onclick="applyPreset('dark')">Dark Navy</button>
-          <button class="preset-btn" id="pre-light"  onclick="applyPreset('light')">Light</button>
-          <button class="preset-btn" id="pre-slate"  onclick="applyPreset('slate')">Slate</button>
-          <button class="preset-btn" id="pre-forest" onclick="applyPreset('forest')">Forest</button>
+          <button class="preset-btn" id="pre-black"  data-action="h_1f924b1c8d">Pure Black</button>
+          <button class="preset-btn" id="pre-dark"   data-action="h_fa6da1783f">Dark Navy</button>
+          <button class="preset-btn" id="pre-light"  data-action="h_712c3e6e28">Light</button>
+          <button class="preset-btn" id="pre-slate"  data-action="h_a11e237064">Slate</button>
+          <button class="preset-btn" id="pre-forest" data-action="h_c34bdd1ff1">Forest</button>
         </div>
       </div>
 
@@ -118,16 +118,16 @@
 
       <!-- Saved slots -->
       <div class="te-panel">
-        <p class="te-section-title" style="margin-top:0;">Saved Themes</p>
-        <p style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">Click a slot to save the current theme. Long-press / right-click to load.</p>
+        <p class="te-section-title ext-53896af7">Saved Themes</p>
+        <p class="ext-f23387ac">Click a slot to save the current theme. Long-press / right-click to load.</p>
         <div class="slot-grid" id="slotGrid"></div>
-        <div class="te-actions" style="margin-top:12px;">
-          <button class="btn btn-sm btn-outline-secondary" onclick="exportTheme()">Export JSON</button>
-          <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('importArea').style.display='block'">Import JSON</button>
+        <div class="te-actions ext-002535c2">
+          <button class="btn btn-sm btn-outline-secondary" data-action="h_4aa7fa1320">Export JSON</button>
+          <button class="btn btn-sm btn-outline-secondary" data-action="h_fdda04cf1c">Import JSON</button>
         </div>
-        <div id="importArea" style="display:none;margin-top:10px;">
+        <div class="ext-59058f2b" id="importArea">
           <textarea class="te-textarea" id="importJson" placeholder='Paste exported theme JSON here…' rows="4"></textarea>
-          <button class="btn btn-sm btn-primary mt-2" onclick="importTheme()">Apply Import</button>
+          <button class="btn btn-sm btn-primary mt-2" data-action="h_b17a85bc9f">Apply Import</button>
         </div>
       </div>
 
@@ -136,12 +136,12 @@
     <!-- RIGHT: Live preview -->
     <div>
       <div class="te-panel">
-        <p class="te-section-title" style="margin-top:0;">Live Preview</p>
+        <p class="te-section-title ext-53896af7">Live Preview</p>
 
         <div class="prev-kpi">
-          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:var(--primary);">148</div><div class="prev-kpi-lbl">Firewall Rules</div></div>
-          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:#10b981;">3</div><div class="prev-kpi-lbl">VPN Servers</div></div>
-          <div class="prev-kpi-card"><div class="prev-kpi-val" style="color:#f59e0b;">7</div><div class="prev-kpi-lbl">Security Rules</div></div>
+          <div class="prev-kpi-card"><div class="prev-kpi-val ext-035cc887">148</div><div class="prev-kpi-lbl">Firewall Rules</div></div>
+          <div class="prev-kpi-card"><div class="prev-kpi-val ext-29fb9df2">3</div><div class="prev-kpi-lbl">VPN Servers</div></div>
+          <div class="prev-kpi-card"><div class="prev-kpi-val ext-2a4cda41">7</div><div class="prev-kpi-lbl">Security Rules</div></div>
         </div>
 
         <div class="prev-badges">
@@ -155,32 +155,32 @@
           <thead><tr><th>Interface</th><th>IP Address</th><th>Status</th><th>Action</th></tr></thead>
           <tbody>
             <tr>
-              <td style="font-weight:600;">em0 (WAN)</td>
-              <td style="font-family:monospace;">203.0.113.1/24</td>
+              <td class="ext-e634e6da">em0 (WAN)</td>
+              <td class="ext-e89ae9ac">203.0.113.1/24</td>
               <td><span class="badge-s">Up</span></td>
               <td><button class="prev-btn prev-btn-o">Edit</button></td>
             </tr>
             <tr>
-              <td style="font-weight:600;">em1 (LAN)</td>
-              <td style="font-family:monospace;">192.168.1.1/24</td>
+              <td class="ext-e634e6da">em1 (LAN)</td>
+              <td class="ext-e89ae9ac">192.168.1.1/24</td>
               <td><span class="badge-s">Up</span></td>
               <td><button class="prev-btn prev-btn-o">Edit</button></td>
             </tr>
             <tr>
-              <td style="font-weight:600;">tun0 (PPPoE)</td>
-              <td style="font-family:monospace;">—</td>
+              <td class="ext-e634e6da">tun0 (PPPoE)</td>
+              <td class="ext-e89ae9ac">—</td>
               <td><span class="badge-d">Down</span></td>
               <td><button class="prev-btn prev-btn-p">Connect</button></td>
             </tr>
           </tbody>
         </table>
 
-        <div style="margin-top:14px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border-color);">
-          <p style="margin:0 0 8px;font-size:.78rem;font-weight:700;color:var(--text-color);">Sample card on page background</p>
-          <p style="margin:0;font-size:.74rem;color:var(--muted);">Muted helper text, borders, and backgrounds all update in real time as you pick colors.</p>
+        <div class="ext-8fbf14b8">
+          <p class="ext-d29eaa59">Sample card on page background</p>
+          <p class="ext-8aa8f4c6">Muted helper text, borders, and backgrounds all update in real time as you pick colors.</p>
         </div>
 
-        <div style="margin-top:14px;display:flex;gap:8px;">
+        <div class="ext-c85c8ab5">
           <button class="btn btn-sm btn-primary">Primary Button</button>
           <button class="btn btn-sm btn-success">Success</button>
           <button class="btn btn-sm btn-danger">Danger</button>
@@ -194,7 +194,7 @@
 
 <div id="toast"></div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 /* ────────────────────────────────────────────────
    Variable definitions
 ──────────────────────────────────────────────── */
@@ -527,3 +527,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_61a796c426'] = function (event, el) { resetToBase() };
+  R['h_9eca1aedb3'] = function (event, el) { applyAndSave() };
+  R['h_1f924b1c8d'] = function (event, el) { applyPreset('black') };
+  R['h_fa6da1783f'] = function (event, el) { applyPreset('dark') };
+  R['h_712c3e6e28'] = function (event, el) { applyPreset('light') };
+  R['h_a11e237064'] = function (event, el) { applyPreset('slate') };
+  R['h_c34bdd1ff1'] = function (event, el) { applyPreset('forest') };
+  R['h_4aa7fa1320'] = function (event, el) { exportTheme() };
+  R['h_fdda04cf1c'] = function (event, el) { document.getElementById('importArea').style.display='block' };
+  R['h_b17a85bc9f'] = function (event, el) { importTheme() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

@@ -5,7 +5,7 @@
 
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">Time Policies</h1>
+      <h1 class="ss-page-title">Time Windows</h1>
       <p class="ss-page-desc">Named time ranges that can be referenced by firewall rules</p>
     </div>
     <button type="button" class="btn btn-success" id="schedulesAdd" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">
@@ -23,11 +23,11 @@
         </button>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;">Name</th>
+            <th class="ext-16e59a0f">Name</th>
             <th>Range: Date / Times / Name</th>
             <th>Description</th>
             <th></th>
@@ -43,9 +43,9 @@
 <!-- Edit Schedule Modal -->
 <div class="modal fade" id="scheduleEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
-            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
-                <h5 class="modal-title fw-700" id="scheduleEditModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Add / Edit Schedule</h5>
+        <div class="modal-content ext-4e519faa">
+            <div class="modal-header ext-91a9433f">
+                <h5 class="modal-title fw-700 ext-4080a6fd" id="scheduleEditModalLabel">Add / Edit Schedule</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -71,7 +71,7 @@
                 <div class="mb-3 row">
                     <label for="scheduleMonth" class="col-sm-3 col-form-label fw-semibold">Month</label>
                     <div class="col-sm-9">
-                        <select id="scheduleMonth" class="form-select" style="max-width: 220px;">
+                        <select id="scheduleMonth" class="form-select ext-b66370e3">
                             <option value="1">January</option>
                             <option value="2">February</option>
                             <option value="3">March</option>
@@ -93,7 +93,7 @@
                     <div class="col-sm-9">
                         <div class="bg-light border rounded p-2 mb-2 text-center fw-semibold" id="calendarHeader">
                             January 2026</div>
-                        <div class="table-responsive" style="max-width: 400px;">
+                        <div class="table-responsive ext-6bdce2a0">
                             <table class="table table-bordered table-sm" id="calendarTable">
                                 <thead>
                                     <tr>
@@ -248,7 +248,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce() }}">
     #calendarTable td { cursor:pointer;text-align:center;padding:8px; }
     #calendarTable td:hover { background:var(--primary-soft); }
     #calendarTable td.selected { background:var(--primary);color:#fff; }
@@ -258,7 +258,7 @@
     #schedules-tbody td:last-child .btn { min-width:70px; }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
     const scheduleMonth = document.getElementById('scheduleMonth');
     const calendarHeader = document.getElementById('calendarHeader');
@@ -374,14 +374,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
             schedules.forEach((schedule) => {
                 const row = document.createElement('tr');
+                // Fv11 review §P2-02 — aria-label per row so the screen
+                // reader announces which schedule the operator is editing
+                // or deleting. The label is the schedule name; escapeHtml
+                // is reused since it's already in scope.
+                const safeName = escapeHtml(schedule.name);
                 row.innerHTML = `
-                    <td>${escapeHtml(schedule.name)}</td>
+                    <td>${safeName}</td>
                     <td>${buildRangeSummary(schedule.ranges)}</td>
                     <td>${escapeHtml(schedule.description || '')}</td>
                     <td>
                         <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-primary btn-sm schedule-edit" data-id="${schedule.id}" data-bs-toggle="modal" data-bs-target="#scheduleEditModal">Edit</button>
-                            <button type="button" class="btn btn-danger btn-sm schedule-delete" data-id="${schedule.id}">Delete</button>
+                            <button type="button" class="btn btn-primary btn-sm schedule-edit"
+                                    data-id="${schedule.id}"
+                                    aria-label="Edit schedule ${safeName}"
+                                    data-bs-toggle="modal" data-bs-target="#scheduleEditModal">Edit</button>
+                            <button type="button" class="btn btn-danger btn-sm schedule-delete"
+                                    data-id="${schedule.id}"
+                                    aria-label="Delete schedule ${safeName}">Delete</button>
                         </div>
                     </td>
                 `;

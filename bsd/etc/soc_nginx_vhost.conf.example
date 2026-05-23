@@ -1,0 +1,84 @@
+# SmartShield — SOC Portal nginx vhost example
+#
+# This vhost serves the SOC portal on a SEPARATE IP address and port from the
+# admin UI, providing network-level isolation between administrator and analyst
+# access.  Only traffic from the configured SOC subnet reaches /soc-portal/*.
+#
+# Configuration steps:
+#   1. Edit the variables below (SOC_IP, SOC_PORT, ssl_certificate paths,
+#      allowed subnet).
+#   2. Copy to /usr/local/etc/nginx/soc-portal.conf
+#   3. Include in /usr/local/etc/nginx/nginx.conf:
+#        include /usr/local/etc/nginx/soc-portal.conf;
+#   4. Reload nginx:  nginx -t && service nginx reload
+#
+# Prerequisites:
+#   - The SOC IP address must be assigned to a LAN/VLAN interface on this host.
+#   - The admin SOC Portal Control page (/system/soc-portal-settings) must have
+#     the same IP and port configured so the navbar widget links correctly.
+#   - A TLS certificate must exist at the paths below (can be the same
+#     self-signed cert as the admin UI, or a separate one).
+#
+# Self-signed cert (dev/testing):
+#   openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+#     -keyout /usr/local/etc/smartshield/ssl/soc-key.pem \
+#     -out    /usr/local/etc/smartshield/ssl/soc-cert.pem \
+#     -subj "/CN=soc.local"
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── SOC Portal HTTPS vhost ───────────────────────────────────────────────────
+server {
+    # Bind ONLY to the designated SOC network interface IP.
+    # Change 192.168.100.1 to the actual IP of your SOC LAN interface.
+    listen      192.168.100.1:8443 ssl;
+
+    server_name _;   # accepts any SNI; adjust to your SOC hostname if needed
+
+    # ── TLS ──────────────────────────────────────────────────────────────────
+    ssl_certificate     /usr/local/etc/smartshield/ssl/soc-cert.pem;
+    ssl_certificate_key /usr/local/etc/smartshield/ssl/soc-key.pem;
+
+    ssl_protocols             TLSv1.2 TLSv1.3;
+    ssl_ciphers               ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache         shared:SSL_SOC:5m;
+    ssl_session_timeout       1d;
+    ssl_session_tickets       off;
+
+    # ── Network-level access control ─────────────────────────────────────────
+    # Allow only the SOC analyst subnet.  All other source IPs are blocked
+    # before the request reaches Flask, providing a hard network boundary.
+    # Adjust the subnet below to match your SOC VLAN.
+    allow 192.168.100.0/24;   # SOC analyst network
+    # allow 10.10.20.0/24;    # add additional SOC subnets if needed
+    deny  all;
+
+    # ── Security headers ─────────────────────────────────────────────────────
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Frame-Options           DENY                                   always;
+    add_header X-Content-Type-Options    nosniff                                always;
+    add_header X-XSS-Protection          "1; mode=block"                        always;
+    add_header Referrer-Policy           "same-origin"                          always;
+
+    # ── Route ONLY soc-portal/* to Flask ─────────────────────────────────────
+    # Requests for any other path return 404 — the SOC portal host does NOT
+    # expose the admin UI or any other application routes.
+    location /soc-portal/ {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+
+        proxy_connect_timeout  30s;
+        proxy_read_timeout     120s;
+        proxy_send_timeout     30s;
+    }
+
+    # Block everything that is NOT under /soc-portal/
+    location / {
+        return 404;
+    }
+}

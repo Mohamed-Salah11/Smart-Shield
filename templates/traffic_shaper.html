@@ -5,7 +5,7 @@
 
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">QoS &amp; Shaping</h1>
+      <h1 class="ss-page-title">Flow Priority</h1>
       <p class="ss-page-desc">Traffic queue scheduling and bandwidth limiters</p>
     </div>
   </div>
@@ -24,7 +24,7 @@
         <div class="ss-card-icon"><i class="fa-solid fa-arrow-up-wide-short"></i></div>
         <div><div class="ss-card-title">WAN Configuration</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('wan')"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
+          <button type="button" class="btn btn-success btn-sm" data-action="h_df3bb7de99"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
         </div>
       </div>
       <div class="ss-card-body" id="wanConfig"><div class="config-entries"></div></div>
@@ -34,7 +34,7 @@
         <div class="ss-card-icon"><i class="fa-solid fa-arrow-down-wide-short"></i></div>
         <div><div class="ss-card-title">LAN Configuration</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-success btn-sm" onclick="addNewQueue('lan')"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
+          <button type="button" class="btn btn-success btn-sm" data-action="h_bda274039c"><i class="fa-solid fa-plus me-1"></i>Add Queue</button>
         </div>
       </div>
       <div class="ss-card-body" id="lanConfig"><div class="config-entries"></div></div>
@@ -49,7 +49,7 @@
         <div><div class="ss-card-title">Queue Overview</div></div>
       </div>
       <div class="ss-card-body">
-        <p style="color:var(--muted);font-size:.85rem;text-align:center;padding:20px 0;">No data available for By Queue view</p>
+        <p class="ext-44e9513d">No data available for By Queue view</p>
       </div>
     </div>
   </div>
@@ -61,16 +61,16 @@
         <div class="ss-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
         <div><div class="ss-card-title">Limiters</div><div class="ss-card-subtitle">Per-host bandwidth caps using dummynet pipes</div></div>
         <div class="ss-card-actions">
-          <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#limiterModal" onclick="openNewLimiterModal()">
+          <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#limiterModal" data-action="h_1063233382">
             <i class="fa-solid fa-plus me-1"></i>New Limiter
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
             <tr>
-              <th style="padding:10px 14px;">Name</th><th>Bandwidth</th><th>Mask</th><th>Scheduler</th><th>Description</th><th></th>
+              <th class="ext-16e59a0f">Name</th><th>Bandwidth</th><th>Mask</th><th>Scheduler</th><th>Description</th><th></th>
             </tr>
           </thead>
           <tbody id="limitersList"></tbody>
@@ -86,19 +86,19 @@
         <div class="ss-card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
         <div><div class="ss-card-title">Traffic Shaper Wizards</div></div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
-            <tr><th style="padding:10px 14px;">Wizard</th><th>Configuration File</th></tr>
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
+            <tr><th class="ext-16e59a0f">Wizard</th><th>Configuration File</th></tr>
           </thead>
           <tbody>
             <tr>
-              <td style="padding:8px 14px;font-weight:500;">Multiple LAN/WAN</td>
-              <td><a href="#" style="color:var(--primary);">traffic_shaper_wizard_multi_all.xml</a></td>
+              <td class="ext-92501b52">Multiple LAN/WAN</td>
+              <td><a class="ext-035cc887" href="#">traffic_shaper_wizard_multi_all.xml</a></td>
             </tr>
             <tr>
-              <td style="padding:8px 14px;font-weight:500;">Dedicated Links</td>
-              <td><a href="#" style="color:var(--primary);">traffic_shaper_wizard_dedicated.xml</a></td>
+              <td class="ext-92501b52">Dedicated Links</td>
+              <td><a class="ext-035cc887" href="#">traffic_shaper_wizard_dedicated.xml</a></td>
             </tr>
           </tbody>
         </table>
@@ -110,9 +110,9 @@
 <!-- Limiter Modal -->
 <div class="modal fade" id="limiterModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
-            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
-                <h5 class="modal-title fw-700" id="limiterModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Add / Edit Limiter</h5>
+        <div class="modal-content ext-4e519faa">
+            <div class="modal-header ext-91a9433f">
+                <h5 class="modal-title fw-700 ext-4080a6fd" id="limiterModalLabel">Add / Edit Limiter</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -275,9 +275,9 @@
 <!-- Queue Modal -->
 <div class="modal fade" id="queueModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
-            <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
-                <h5 class="modal-title fw-700" id="queueModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Edit Queue</h5>
+        <div class="modal-content ext-4e519faa">
+            <div class="modal-header ext-91a9433f">
+                <h5 class="modal-title fw-700 ext-4080a6fd" id="queueModalLabel">Edit Queue</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -359,7 +359,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function () {
         // Tab switching
         function openTab(tabId) {
@@ -435,10 +435,10 @@
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-sm btn-primary" onclick="editQueue(${config.id}, '${interfaceType}')">
+                <button type="button" class="btn btn-sm btn-primary" data-action="ts-queue-edit" data-id="${config.id}" data-iface="${interfaceType}">
                     <i class="fas fa-edit"></i> Edit
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteTrafficShaperConfig(${config.id})">
+                <button type="button" class="btn btn-sm btn-danger" data-action="ts-queue-delete" data-id="${config.id}">
                     <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
@@ -587,10 +587,10 @@
             <td>${config.scheduler}</td>
             <td>${config.description || '-'}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editLimiter(${config.id})">
+                <button type="button" class="btn btn-sm btn-primary" data-action="ts-limiter-edit" data-id="${config.id}">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteLimiter(${config.id})">
+                <button type="button" class="btn btn-sm btn-danger" data-action="ts-limiter-delete" data-id="${config.id}">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -720,3 +720,21 @@
 </script>
 
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_df3bb7de99'] = function (event, el) { addNewQueue('wan') };
+  R['h_bda274039c'] = function (event, el) { addNewQueue('lan') };
+  R['h_1063233382'] = function (event, el) { openNewLimiterModal() };
+  R['ts-queue-edit']    = function (event, el) { editQueue(el.dataset.id, el.dataset.iface); };
+  R['ts-queue-delete']  = function (event, el) { deleteTrafficShaperConfig(el.dataset.id); };
+  R['ts-limiter-edit']   = function (event, el) { editLimiter(el.dataset.id); };
+  R['ts-limiter-delete'] = function (event, el) { deleteLimiter(el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

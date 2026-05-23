@@ -1,0 +1,15 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Access Denied{% endblock %}
+{% block content %}
+<div class="soc-empty ext-51b71953">
+  <i class="fa-solid fa-lock ext-b73baa6c"></i>
+  <h3 class="ext-3a5a569f">Access Denied</h3>
+  <p class="ext-8e6686db">
+    This section requires <strong class="ext-a8443049">SOC Tier {{ required_tier }}</strong> or higher.
+    Your current tier is <strong class="ext-a8443049">{{ soc_tier }}</strong>.
+  </p>
+  <a href="{{ url_for('soc_portal.dashboard') }}" class="btn-soc-secondary ext-065da35a">
+    <i class="fa-solid fa-arrow-left me-1"></i> Back to Dashboard
+  </a>
+</div>
+{% endblock %}

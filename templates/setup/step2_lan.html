@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Shield Setup — Step 2: Network Configuration</title>
+  <title>SmartShield Setup — Step 2: Network Configuration</title>
   <link rel="stylesheet" href="/static/css/base.css">
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     body { background: #1a1d23; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; }
     .wizard-wrap { max-width: 640px; margin: 60px auto; padding: 0 20px; }
     .wizard-header { text-align: center; margin-bottom: 40px; }
@@ -40,8 +40,8 @@
 <body>
 <div class="wizard-wrap">
   <div class="wizard-header">
-    <img src="/static/images/SS.png" alt="Smart Shield" height="48" style="margin-bottom:12px">
-    <h1>Smart Shield Setup</h1>
+    <img class="ext-fa3e1c7d" src="/static/images/SS.png" alt="SmartShield" height="48">
+    <h1>SmartShield Setup</h1>
   </div>
 
   <div class="step-indicator">
@@ -52,26 +52,23 @@
   </div>
 
   <div class="card">
-    <h2 style="margin-top:0; color:#e0e0e0;">Step 2 — Network Configuration</h2>
+    <h2 class="ext-c20e3183">Step 2 — Network Configuration</h2>
 
     <div id="alert" class="alert"></div>
 
     <!-- Auto-detect from live BSD -->
-    <div id="bsd-detect-bar" style="display:flex;align-items:center;gap:12px;background:#1a2a1a;
-         border:1px solid #2e7d32;border-radius:6px;padding:10px 14px;margin-bottom:20px;">
-      <span style="font-size:.85rem;color:#81c784;flex:1;">
+    <div class="ext-ccb23931" id="bsd-detect-bar">
+      <span class="ext-1bcfbad5">
         <strong>Tip:</strong> Auto-detect reads the current IP and type directly from FreeBSD.
       </span>
-      <button type="button" onclick="detectFromBsd()"
-              style="padding:6px 14px;background:#2e7d32;color:#fff;border:none;
-                     border-radius:5px;font-size:.85rem;cursor:pointer;">
+      <button class="ext-c96fc73a" type="button" id="btn-detect">
         ↻ Auto-detect from BSD
       </button>
     </div>
 
     <div class="section-title">LAN Interface</div>
     <div class="form-group">
-      <label for="lan_ip">LAN IP Address / Subnet (CIDR) <span style="color:#ef5350">*</span></label>
+      <label for="lan_ip">LAN IP Address / Subnet (CIDR) <span class="ext-70cebc87">*</span></label>
       <input type="text" id="lan_ip" value="192.168.1.1/24" placeholder="e.g. 192.168.1.1/24">
       <div class="hint">This is the gateway address your LAN clients will use.</div>
     </div>
@@ -79,7 +76,7 @@
     <div class="section-title">WAN Interface</div>
     <div class="form-group">
       <label for="wan_type">WAN Connection Type</label>
-      <select id="wan_type" onchange="toggleWanFields()">
+      <select id="wan_type">
         <option value="dhcp">DHCP (automatic — most common)</option>
         <option value="static">Static IP</option>
         <option value="pppoe">PPPoE (DSL)</option>
@@ -99,13 +96,13 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn-secondary" onclick="window.location.href='/setup/step1'">← Back</button>
-      <button class="btn-primary" id="btn-next" onclick="saveStep2()">Next: Admin Password →</button>
+      <button class="btn-secondary" id="btn-back">← Back</button>
+      <button class="btn-primary" id="btn-next">Next: Admin Password →</button>
     </div>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   const CSRF_TOKEN = "{{ csrf_token() }}";
 function toggleWanFields() {
   const type = document.getElementById('wan_type').value;
@@ -187,6 +184,11 @@ async function detectFromBsd() {
     if (bar) bar.style.borderColor = '#4fc3f7';
   } catch(e) { console.warn('BSD detect failed:', e); }
 }
+
+document.getElementById('btn-detect').addEventListener('click', detectFromBsd);
+document.getElementById('wan_type').addEventListener('change', toggleWanFields);
+document.getElementById('btn-back').addEventListener('click', () => { window.location.href = '/setup/step1'; });
+document.getElementById('btn-next').addEventListener('click', saveStep2);
 </script>
 </body>
 </html>

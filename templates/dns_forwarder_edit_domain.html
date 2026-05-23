@@ -20,6 +20,7 @@
   <div class="card-header">Domain Override Options</div>
   <div class="card-body">
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row mb-3">
         <div class="col-md-2"><label class="form-label">Domain</label></div>
         <div class="col-md-10">

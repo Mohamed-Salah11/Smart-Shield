@@ -18,6 +18,7 @@
       </div>
       <div class="ss-card-body">
         <form id="igmp-general-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="enable_igmp" name="enable_igmp"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Enable IGMP Multicast Proxy</p></div></div>
           <div class="ss-toggle-row"><label class="ss-toggle"><input type="checkbox" class="form-check-input" id="verbose_logging" name="verbose_logging"><span class="ss-toggle-slider"></span></label><div class="ss-toggle-content"><p class="ss-toggle-label">Verbose Logging</p><p class="ss-toggle-desc">Write detailed multicast routing decisions to the system log</p></div></div>
         </form>
@@ -30,18 +31,18 @@
         <div class="ss-card-icon"><i class="fa-solid fa-arrows-left-right"></i></div>
         <div><div class="ss-card-title">Proxy Interfaces</div><div class="ss-card-subtitle">One upstream interface and one or more downstream interfaces required</div></div>
         <div class="ss-card-actions">
-          <button class="btn btn-success btn-sm" onclick="showEditForm()">
+          <button class="btn btn-success btn-sm" data-action="h_7956fe7507">
             <i class="fa-solid fa-plus me-1"></i>Add Interface
           </button>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="table table-hover mb-0" style="font-size:.85rem;">
-          <thead style="background:var(--border-color-soft);">
-            <tr><th style="padding:10px 14px;">Name</th><th>Type</th><th>Networks</th><th>Description</th><th></th></tr>
+      <div class="ext-df74e8d8">
+        <table class="table table-hover mb-0 ext-1e28117f">
+          <thead class="ext-4c3186f1">
+            <tr><th class="ext-16e59a0f">Name</th><th>Type</th><th>Networks</th><th>Description</th><th></th></tr>
           </thead>
           <tbody>
-            <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">No proxy interfaces configured</td></tr>
+            <tr><td class="ext-a9edf93a" colspan="5">No proxy interfaces configured</td></tr>
           </tbody>
         </table>
       </div>
@@ -55,7 +56,7 @@
   </div>
 
   <!-- Edit Form -->
-  <div id="edit-view" style="display:none;">
+  <div class="ext-cb458930" id="edit-view">
     <div class="ss-card">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-pen-to-square"></i></div>
@@ -63,7 +64,8 @@
       </div>
       <div class="ss-card-body">
         <form id="proxy-edit-form" action="{{ url_for('services.igmp_proxy') }}" method="POST">
-          <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="ss-field-grid ss-field-grid-2 ext-3019698e">
             <div class="ss-field">
               <label class="ss-label">Interface</label>
               <select name="proxy_interface" class="form-select">
@@ -80,7 +82,7 @@
             </div>
             <div class="ss-field">
               <label class="ss-label">TTL Threshold</label>
-              <input type="number" class="form-control" name="threshold" value="1" min="1" max="32" style="max-width:120px;">
+              <input type="number" class="form-control ext-8c92abea" name="threshold" value="1" min="1" max="32">
               <p class="ss-hint">Ignore packets with TTL below this value</p>
             </div>
             <div class="ss-field">
@@ -91,8 +93,8 @@
           <div class="ss-field">
             <label class="ss-label">Networks (CIDR)</label>
             <div class="d-flex gap-2 mb-2">
-              <input type="text" class="form-control" name="network_cidr" placeholder="e.g. 239.0.0.0/8" style="max-width:260px;">
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addNetworkField()">
+              <input type="text" class="form-control ext-c3b421e0" name="network_cidr" placeholder="e.g. 239.0.0.0/8">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_137338b1ea">
                 <i class="fa-solid fa-plus me-1"></i>Add Network
               </button>
             </div>
@@ -102,7 +104,7 @@
       </div>
     </div>
     <div class="ss-save-bar">
-      <button type="button" class="btn btn-secondary" onclick="showMainView()">Cancel</button>
+      <button type="button" class="btn btn-secondary" data-action="h_854ff7d81c">Cancel</button>
       <button type="submit" form="proxy-edit-form" class="btn btn-primary px-4">
         <i class="fa-solid fa-check me-1"></i>Save Interface
       </button>
@@ -110,7 +112,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 const mainView = document.getElementById('main-view');
 const editView = document.getElementById('edit-view');
 
@@ -124,9 +126,24 @@ function showMainView() { editView.style.display = 'none'; mainView.style.displa
 function addNetworkField() {
   const div = document.createElement('div');
   div.className = 'mb-2 d-flex gap-2';
-  div.innerHTML = `<input type="text" name="networks[]" class="form-control" placeholder="Network/CIDR" style="max-width:260px;">
-    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('div').remove()"><i class="fa-solid fa-trash"></i></button>`;
+  div.innerHTML = `<input type="text" name="networks[]" class="form-control ext-c3b421e0" placeholder="Network/CIDR">
+    <button type="button" class="btn btn-danger btn-sm" data-action="h_3a6d94523f"><i class="fa-solid fa-trash"></i></button>`;
   document.getElementById('networks-container').appendChild(div);
 }
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_7956fe7507'] = function (event, el) { showEditForm() };
+  R['h_137338b1ea'] = function (event, el) { addNetworkField() };
+  R['h_854ff7d81c'] = function (event, el) { showMainView() };
+  R['h_3a6d94523f'] = function (event, el) { this.closest('div').remove() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

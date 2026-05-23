@@ -17,6 +17,7 @@
     </div>
     <div class="ss-card-body">
       <form method="POST" action="{{ url_for('services.wake_on_lan') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="ss-field-grid ss-field-grid-2">
           <div class="ss-field">
             <label class="ss-label">Interface</label>
@@ -36,7 +37,7 @@
             <p class="ss-hint">Format: xx:xx:xx:xx:xx:xx</p>
           </div>
         </div>
-        <div class="ss-save-bar" style="margin-top:8px;">
+        <div class="ss-save-bar ext-d4316970">
           <button type="submit" class="btn btn-primary px-4">
             <i class="fa-solid fa-bolt me-1"></i>Send Packet
           </button>
@@ -59,21 +60,21 @@
         </button>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
-          <tr><th style="padding:10px 14px;">Interface</th><th>MAC Address</th><th>Description</th><th></th></tr>
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
+          <tr><th class="ext-16e59a0f">Interface</th><th>MAC Address</th><th>Description</th><th></th></tr>
         </thead>
         <tbody>
           {% if devices %}{% for dev in devices %}
           <tr>
-            <td style="padding:8px 14px;">{{ dev.interface }}</td>
-            <td><a href="#" class="wake-device" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}" style="color:var(--primary);font-weight:600;font-family:monospace;">{{ dev.mac }}</a></td>
+            <td class="ext-ec6b5e99">{{ dev.interface }}</td>
+            <td><a href="#" class="wake-device ext-3694f4d2" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}">{{ dev.mac }}</a></td>
             <td>{{ dev.description }}</td>
             <td><button type="button" class="btn btn-sm btn-primary wake-device-btn" data-mac="{{ dev.mac }}" data-interface="{{ dev.interface }}"><i class="fa-solid fa-bolt me-1"></i>Wake</button></td>
           </tr>
           {% endfor %}{% else %}
-          <tr><td colspan="4" style="text-align:center;padding:28px;color:var(--muted);">No devices configured — add one to get started</td></tr>
+          <tr><td class="ext-a9edf93a" colspan="4">No devices configured — add one to get started</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -81,7 +82,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.querySelectorAll('.wake-device, .wake-device-btn').forEach(el => {
   el.addEventListener('click', function(e) {
     e.preventDefault();

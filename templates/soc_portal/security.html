@@ -1,0 +1,87 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<div class="soc-page-header mb-3">
+  <h1 class="ext-43a67986">
+    <i class="fa-solid fa-lock me-2"></i>Account Security
+  </h1>
+  <p class="ext-c9e1c6a9">
+    Multi-factor authentication for your SOC analyst account ({{ username }} — {{ tier }}).
+  </p>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, msg in messages %}
+      <div class="alert alert-{{ 'danger' if category in ['error','danger'] else category }} mb-2">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="ext-7646a058">
+  <div class="ext-da07a484">
+    <div>
+      <div class="ext-074c7b62">
+        Authenticator App (TOTP)
+        {% if mfa_enabled %}
+          <span class="badge bg-success ms-2">Enabled</span>
+        {% else %}
+          <span class="badge bg-secondary ms-2">Not configured</span>
+        {% endif %}
+      </div>
+      <div class="ext-a8d00143">
+        Adds a 6-digit code prompt after your password. Compatible with Google Authenticator,
+        Authy, 1Password, Bitwarden, and any standard TOTP app.
+      </div>
+    </div>
+    <div>
+      {% if mfa_enabled %}
+        <button type="button" class="btn btn-outline-danger btn-sm"
+                data-bs-toggle="modal" data-bs-target="#disableMfaModal">
+          <i class="fa-solid fa-circle-minus me-1"></i> Disable
+        </button>
+      {% else %}
+        <a href="{{ url_for('soc_portal.security_enroll') }}" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-shield-halved me-1"></i> Set up MFA
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if mfa_enabled %}
+<!-- Disable MFA modal -->
+<div class="modal fade" id="disableMfaModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content ext-fdeb8b96">
+      <form method="POST" action="{{ url_for('soc_portal.security_disable') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header ext-e7785cba">
+          <h5 class="modal-title">Disable MFA</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="ext-be80f092">
+            Re-enter your password and a current 6-digit code to confirm.
+            Disabling MFA reduces your account security.
+          </p>
+          <div class="mb-2">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-control" required autocomplete="current-password">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Authenticator Code</label>
+            <input type="text" name="code" class="form-control"
+                   inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+          </div>
+        </div>
+        <div class="modal-footer ext-2c85cfc0">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger btn-sm">Disable MFA</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

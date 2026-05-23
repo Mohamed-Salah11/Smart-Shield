@@ -214,7 +214,7 @@ small {
 }
 
 /* ========================================
-   SECTION / CARD HEADERS  (Smart Shield style — no pfSense dark bars)
+   SECTION / CARD HEADERS  (Smart Shield appliance style)
 ======================================== */
 .section-header,
 .table-header,
@@ -647,6 +647,14 @@ small {
   background: rgba(239,68,68,.1);
   color: var(--danger) !important;
 }
+.dropdown-item-form { margin: 0; }
+.dropdown-item-button {
+  background: none;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
 .dropdown-divider { border-color: var(--border-color); margin: 4px 0; }
 
 
@@ -955,6 +963,14 @@ nav[aria-label="breadcrumb"],
 .breadcrumb-section,
 .breadcrumb-box,
 .nav-breadcrumb { display: none !important; }
+
+/* Generic visibility utility used to replace inline display:none style
+   attributes (CSP-friendly). JS may still override via element.style. */
+.ss-hidden { display: none; }
+
+/* Dim + disable interaction for a field group whose parent toggle is off.
+   Replaces an inline opacity/pointer-events style attribute. */
+.ss-fields-disabled { opacity: .45; pointer-events: none; }
 
 /* ========================================
    TABS

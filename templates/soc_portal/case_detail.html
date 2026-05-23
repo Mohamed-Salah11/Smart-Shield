@@ -1,0 +1,558 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Case #{{ case.id }}{% endblock %}
+
+{% block content %}
+{% set sev_class = {'critical':'soc-sev-critical','high':'soc-sev-high','medium':'soc-sev-medium','low':'soc-sev-low'}.get(case.severity, 'soc-sev-default') %}
+
+<div class="mb-3">
+  <a class="ext-3b39d4a1" href="{{ url_for('soc_portal.cases') }}">
+    <i class="fa-solid fa-arrow-left me-1"></i> Back to Cases
+  </a>
+</div>
+
+<!-- ── Case Header ─────────────────────────────────────────────────────── -->
+<div class="d-flex align-items-start justify-content-between mb-4 gap-3 flex-wrap">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+      <span class="ext-9fb8e23e">Case #{{ case.id }}</span>
+      <span class="soc-sev soc-sev-badge {{ sev_class }}">
+        {{ case.severity }}
+      </span>
+      <span class="soc-status-badge {{ 'soc-status-closed' if case.status == 'closed' else 'soc-status-open' }}">
+        {{ case.status }}
+      </span>
+      {% if case.escalation_tier %}
+      <span class="ext-6cc0f26a">
+        <i class="fa-solid fa-arrow-up me-1 ext-8cba01a2"></i>Escalated → {{ case.escalation_tier }}
+      </span>
+      {% endif %}
+      {% if case.closure_type %}
+        {% if case.closure_type == 'false_positive' %}
+      <span class="ext-af2f3834">
+        False Positive
+      </span>
+      <span class="ext-55399a04">
+        Resolved
+      </span>
+        {% else %}
+      <span class="ext-55399a04">
+        Resolved
+      </span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <h2 class="ext-5d54ff35">{{ case.title }}</h2>
+    <p class="ext-fe4d94cf">
+      Opened by <strong>{{ case.created_by }}</strong> · {{ case.created_at[:16] if case.created_at else '' }}
+    </p>
+  </div>
+
+  <!-- ── Action Buttons (tier-aware) ───────────────────────────────────── -->
+  {% if case.status == 'open' %}
+  <div class="d-flex gap-2 flex-wrap">
+    {% if soc_tier == 'L1' %}
+      <button class="btn-soc-primary ext-2b5af5e2" data-action="h_71adfed319">
+        <i class="fa-solid fa-arrow-up me-1"></i> Escalate to L2
+      </button>
+      <button class="btn-soc-secondary ext-ceb54319" data-action="h_214ba5776b"
+             >
+        <i class="fa-solid fa-xmark me-1"></i> False Positive
+      </button>
+
+    {% elif soc_tier == 'L2' %}
+      <button class="btn-soc-primary ext-2b5af5e2" data-action="h_fbf4c8aedb">
+        <i class="fa-solid fa-arrow-up me-1"></i> Escalate to L3
+      </button>
+      <button class="btn-soc-secondary ext-ceb54319" data-action="h_aaeb61a384"
+             >
+        <i class="fa-solid fa-xmark me-1"></i> False Positive
+      </button>
+
+    {% elif soc_tier == 'L3' %}
+      <button class="btn-soc-primary" data-action="h_a19a6b5d65">
+        <i class="fa-solid fa-circle-check me-1"></i> Close as Resolved
+      </button>
+      <button class="btn-soc-secondary ext-ceb54319" data-action="h_c6862b73fa"
+             >
+        <i class="fa-solid fa-xmark me-1"></i> False Positive
+      </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <!-- ── Timeline / Notes ─────────────────────────────────────────────── -->
+  <div class="col-lg-8">
+    {% if case.description %}
+    <div class="soc-card mb-3">
+      <div class="soc-card-body">
+        <p class="ext-0cdf73c7">{{ case.description }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="soc-card mb-3">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-timeline ext-e07b2ee9"></i>
+        <div>
+          <div class="soc-card-title">Investigation Timeline</div>
+          <div class="soc-card-subtitle">{{ notes|length }} note{{ 's' if notes|length != 1 }}</div>
+        </div>
+      </div>
+      <div class="soc-card-body">
+        {% if notes %}
+        <div class="ext-eec2a5d9">
+          {% for note in notes %}
+          <div class="ext-f0b295ec">
+            {% set note_kind = 'escalated' if '[ESCALATED' in note.note else ('closed' if '[CLOSED' in note.note else 'default') %}
+            <div class="soc-note-icon soc-note-icon-{{ note_kind }}">
+              <i class="fa-solid {{ 'fa-arrow-up' if note_kind == 'escalated' else ('fa-lock' if note_kind == 'closed' else 'fa-user') }}"></i>
+            </div>
+            <div class="ext-da5cd676">
+              <div class="ext-f0506952">
+                <strong class="ext-a8443049">{{ note.created_by }}</strong>
+                · {{ note.created_at[:16] if note.created_at else '' }}
+              </div>
+              <div class="soc-note-body soc-note-body-{{ note_kind }}">
+{{ note.note }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="ext-78a63f80">No notes yet.</p>
+        {% endif %}
+
+        {% if soc_tier in ('L2','L3') and case.status == 'open' %}
+        <div class="mt-3 ext-ec4cb9e3">
+          <textarea id="new-note" class="form-control mb-2 ext-4b1196ec" rows="2" placeholder="Add investigation note…"
+                   ></textarea>
+          <button type="button" class="btn-soc-primary" data-action="cd-add-note">
+            <i class="fa-solid fa-paper-plane me-1"></i> Add Note
+          </button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Case Details Sidebar ─────────────────────────────────────────── -->
+  <div class="col-lg-4">
+    <div class="soc-card mb-3">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-circle-info ext-a729d7fe"></i>
+        <div><div class="soc-card-title">Case Details</div></div>
+      </div>
+      <div class="soc-card-body">
+        <table class="ext-07653709">
+          <tr><td class="ext-f16a9fe7">Severity</td>
+              <td class="soc-sev {{ sev_class }}">{{ case.severity }}</td></tr>
+          <tr><td class="ext-d3fdd065">Status</td>
+              <td>{{ case.status }}</td></tr>
+          <tr><td class="ext-d3fdd065">Created by</td>
+              <td>{{ case.created_by }}</td></tr>
+          <tr><td class="ext-d3fdd065">Updated</td>
+              <td class="ext-6c660c40">{{ case.updated_at[:16] if case.updated_at else '—' }}</td></tr>
+          {% if case.escalation_tier %}
+          <tr><td class="ext-d3fdd065">Escalated</td>
+              <td class="ext-468d7d84">→ {{ case.escalation_tier }}</td></tr>
+          {% endif %}
+        </table>
+
+        <!-- Assignment section — tier-aware -->
+        {% if case.status == 'open' %}
+        <div class="mt-3 ext-e462bfec">
+          <label class="ext-64eb38a8">
+            <i class="fa-solid fa-user-check me-1"></i> Assignment
+          </label>
+
+          {% if soc_tier == 'L1' %}
+          {# L1: can only take the case for themselves #}
+          <button type="button" class="btn-soc-primary w-100 ext-1e28117f" data-action="cd-take-self"
+                 >
+            <i class="fa-solid fa-hand me-1"></i> Take This Case
+          </button>
+          <p class="ext-5d43a904">
+            Assign this case to yourself
+          </p>
+
+          {% elif soc_tier in ('L2','L3') %}
+          {# L2/L3: full analyst dropdown #}
+          <div class="d-flex gap-2">
+            <select id="assignee-select" class="form-select form-select-sm ext-4b1196ec"
+                   >
+              <option value="">— Unassigned —</option>
+              {% for a in analysts %}
+              <option value="{{ a.id }}" {{ 'selected' if case.assigned_to == a.id }}>{{ a.username }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn-soc-secondary ext-4d34038f" data-action="cd-assign">
+              Save
+            </button>
+          </div>
+          <button type="button" class="btn-soc-secondary w-100 mt-2 ext-6c660c40" data-action="cd-take-self"
+                 >
+            <i class="fa-solid fa-hand me-1"></i> Take It Myself
+          </button>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if case.source_event %}
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-link ext-a729d7fe"></i>
+        <div><div class="soc-card-title">Source Event</div></div>
+      </div>
+      <div class="soc-card-body">
+        <code class="ext-b0d5b2fb">{{ case.source_event }}</code>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style nonce="{{ csp_nonce() }}">
+  .verdict-card {
+    position:relative; display:block; cursor:pointer; user-select:none;
+    background:#0d1526; border:2px solid #2a3550; border-radius:10px;
+    padding:.85rem .9rem; transition:border-color .15s, background .15s;
+  }
+  .verdict-card input[type="radio"] { position:absolute; top:.6rem; right:.6rem; }
+  .verdict-card:hover { border-color:#4dd9cd; }
+  .verdict-card.selected { border-color:#4dd9cd; background:rgba(0,180,160,.08); }
+  .verdict-card[data-disabled="true"] { opacity:.45; cursor:not-allowed; }
+  .verdict-card[data-disabled="true"]:hover { border-color:#2a3550; }
+  .verdict-card-title { font-weight:800; font-size:.95rem; letter-spacing:.02em; }
+  .verdict-card-sub   { color:#94a3b8; font-size:.78rem; margin-top:.2rem; }
+  .w5-block label.form-label { margin-bottom:.15rem; }
+  .w5-block textarea { background:#0d1526; border-color:#2a3550; color:#e2e8f0; font-size:.82rem; }
+</style>
+
+<!-- ── Escalate Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="escalateModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content ext-e7c1533d">
+      <div class="modal-header ext-14d14377">
+        <h5 class="modal-title ext-8372ff89">
+          <i class="fa-solid fa-arrow-up me-2"></i>Escalate to <span id="escalate-target-label"></span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3 p-3 rounded ext-26b89319">
+          <i class="fa-solid fa-circle-info me-1 ext-fe726ce2"></i>
+          Escalate only if this is a <strong class="ext-a8443049">confirmed true positive</strong>.
+          Answer all five questions below to produce the incident report.
+        </div>
+
+        <div class="soc-card w5-block ext-4bf7d4d9">
+          <div class="ext-220e693c">
+            <i class="fa-solid fa-clipboard-list me-1"></i> Incident Report — answer all five
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">Who <span class="ext-c9e34862">*</span></label>
+            <textarea id="esc-w-who"   class="form-control form-control-sm" rows="2"
+              placeholder="User, account, or threat actor (employee, service account, external IP…)"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">What <span class="ext-c9e34862">*</span></label>
+            <textarea id="esc-w-what"  class="form-control form-control-sm" rows="2"
+              placeholder="Specific alert and actions performed (commands, child processes, downloads…)"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">When <span class="ext-c9e34862">*</span></label>
+            <textarea id="esc-w-when"  class="form-control form-control-sm" rows="2"
+              placeholder="Exact start time, duration, time flagged"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">Where <span class="ext-c9e34862">*</span></label>
+            <textarea id="esc-w-where" class="form-control form-control-sm" rows="2"
+              placeholder="Affected host(s), IP, network segment, geo, folder path"></textarea>
+          </div>
+          <div>
+            <label class="form-label ext-3b8e2be5">Why <span class="ext-c9e34862">*</span></label>
+            <textarea id="esc-w-why"   class="form-control form-control-sm" rows="2"
+              placeholder="Intent + risk (insider, lateral movement, scan, false positive…)"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer ext-14d14377">
+        <button class="btn-soc-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-soc-primary ext-2b5af5e2"
+                data-action="cd-escalate">
+          <i class="fa-solid fa-arrow-up me-1"></i> Escalate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Close Case Modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="closeModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content ext-e7c1533d">
+      <div class="modal-header ext-14d14377">
+        <h5 class="modal-title ext-8372ff89" id="close-modal-title">Close Case #{{ case.id }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="ext-64a6fe32">
+          <i class="fa-solid fa-gavel me-1"></i> Verdict
+        </div>
+        <div class="ext-24d717e3">
+          <label class="verdict-card" data-verdict="resolved"
+                 {% if soc_tier in ('L1','L2') %}data-disabled="true" title="Requires L3 — escalate first"{% endif %}>
+            <input type="radio" name="close-verdict" value="resolved" {% if soc_tier in ('L1','L2') %}disabled{% endif %}>
+            <div class="verdict-card-title ext-29fb9df2">
+              <i class="fa-solid fa-shield-check me-1"></i> TRUE POSITIVE
+            </div>
+            <div class="verdict-card-sub">Confirmed threat — incident resolved
+              {% if soc_tier in ('L1','L2') %}<br><em class="ext-578c7579">L3 only — escalate first</em>{% endif %}
+            </div>
+          </label>
+          <label class="verdict-card selected" data-verdict="false_positive">
+            <input type="radio" name="close-verdict" value="false_positive" checked>
+            <div class="verdict-card-title ext-c9e34862">
+              <i class="fa-solid fa-circle-xmark me-1"></i> FALSE POSITIVE
+            </div>
+            <div class="verdict-card-sub">Not a real threat — alert mislabelled</div>
+          </label>
+        </div>
+
+        <div class="soc-card w5-block ext-6196a1ca">
+          <div class="ext-220e693c">
+            <i class="fa-solid fa-clipboard-list me-1"></i> Incident Report — answer all five
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">Who <span class="ext-c9e34862">*</span></label>
+            <textarea id="cls-w-who"   class="form-control form-control-sm" rows="2"
+              placeholder="User, account, or threat actor (employee, service account, external IP…)"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">What <span class="ext-c9e34862">*</span></label>
+            <textarea id="cls-w-what"  class="form-control form-control-sm" rows="2"
+              placeholder="Specific alert and actions performed"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">When <span class="ext-c9e34862">*</span></label>
+            <textarea id="cls-w-when"  class="form-control form-control-sm" rows="2"
+              placeholder="Exact start time, duration, time flagged"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label ext-3b8e2be5">Where <span class="ext-c9e34862">*</span></label>
+            <textarea id="cls-w-where" class="form-control form-control-sm" rows="2"
+              placeholder="Affected host(s), IP, network segment, geo, folder path"></textarea>
+          </div>
+          <div>
+            <label class="form-label ext-3b8e2be5">Why <span class="ext-c9e34862">*</span></label>
+            <textarea id="cls-w-why"   class="form-control form-control-sm" rows="2"
+              placeholder="Intent + risk (insider, lateral movement, false positive…)"></textarea>
+          </div>
+        </div>
+
+        <label class="form-label ext-d5d00dda">Additional notes (optional)</label>
+        <textarea id="close-resolution" class="form-control form-control-sm ext-4b1196ec" rows="2"
+                 
+                  placeholder="Anything else worth recording…"></textarea>
+      </div>
+      <div class="modal-footer ext-14d14377">
+        <button class="btn-soc-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="close-confirm-btn" type="button" class="btn-soc-danger" data-action="cd-close">
+          Close Case
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+
+<script nonce="{{ csp_nonce() }}">
+const escalateModal = new bootstrap.Modal(document.getElementById('escalateModal'));
+const closeModal    = new bootstrap.Modal(document.getElementById('closeModal'));
+let _escalateTarget = null;
+
+/* ── Self-assign ─────────────────────────────────────────────────────── */
+async function takeCaseSelf(caseId, userId) {
+  const r = await fetch(`/soc-portal/cases/${caseId}/assign`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({assignee_id: userId}),
+  });
+  const d = await r.json();
+  if (d.ok) window.location.reload();
+  else alert(d.message || 'Failed to self-assign case.');
+}
+
+/* ── Full assign (L2/L3 dropdown) ────────────────────────────────────── */
+async function assignCase(caseId) {
+  const sel = document.getElementById('assignee-select');
+  const assignee_id = sel ? (sel.value ? parseInt(sel.value) : null) : null;
+  const r = await fetch(`/soc-portal/cases/${caseId}/assign`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({assignee_id}),
+  });
+  const d = await r.json();
+  if (d.ok) window.location.reload();
+  else alert(d.message || 'Failed to assign case.');
+}
+
+/* ── 5W form helpers ─────────────────────────────────────────────────── */
+const W5_KEYS = ['who','what','when','where','why'];
+
+function readW5(prefix) {
+  // prefix is 'esc-w-' or 'cls-w-'
+  const out = {};
+  const missing = [];
+  for (const k of W5_KEYS) {
+    const el = document.getElementById(prefix + k);
+    const v = (el && el.value || '').trim();
+    if (!v) missing.push(k.toUpperCase());
+    out[k] = v;
+  }
+  return { values: out, missing };
+}
+
+function clearW5(prefix) {
+  for (const k of W5_KEYS) {
+    const el = document.getElementById(prefix + k);
+    if (el) el.value = '';
+  }
+}
+
+/* ── Escalation ──────────────────────────────────────────────────────── */
+function openEscalateModal(targetTier) {
+  _escalateTarget = targetTier;
+  document.getElementById('escalate-target-label').textContent = targetTier;
+  clearW5('esc-w-');
+  escalateModal.show();
+}
+
+async function confirmEscalate(caseId) {
+  const { values, missing } = readW5('esc-w-');
+  if (missing.length) {
+    alert('All 5 W\'s are required. Missing: ' + missing.join(', '));
+    return;
+  }
+  const r = await fetch(`/soc-portal/cases/${caseId}/escalate`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(values),
+  });
+  const d = await r.json();
+  if (d.ok) { escalateModal.hide(); window.location.reload(); }
+  else alert(d.message || 'Failed to escalate case.');
+}
+
+/* ── Close ───────────────────────────────────────────────────────────── */
+function selectVerdict(value) {
+  const cards = document.querySelectorAll('.verdict-card');
+  cards.forEach(c => {
+    const isThis = c.getAttribute('data-verdict') === value;
+    if (c.getAttribute('data-disabled') === 'true') return;
+    c.classList.toggle('selected', isThis);
+    const radio = c.querySelector('input[type="radio"]');
+    if (radio) radio.checked = isThis;
+  });
+  const btn = document.getElementById('close-confirm-btn');
+  if (btn) {
+    btn.textContent = (value === 'resolved') ? 'Close — True Positive' : 'Close — False Positive';
+    btn.style.background = (value === 'resolved') ? '#10b981' : '';
+  }
+}
+
+function wireVerdictCards() {
+  document.querySelectorAll('.verdict-card').forEach(card => {
+    card.addEventListener('click', () => {
+      if (card.getAttribute('data-disabled') === 'true') return;
+      selectVerdict(card.getAttribute('data-verdict'));
+    });
+  });
+}
+
+function openCloseModal(closureType) {
+  clearW5('cls-w-');
+  document.getElementById('close-resolution').value = '';
+  const title = document.getElementById('close-modal-title');
+  if (title) title.textContent = `Close Case #{{ case.id }}`;
+
+  // Try to pre-select the verdict the operator clicked. If they're not
+  // permitted (L1/L2 clicking 'resolved' from a hypothetical button), fall
+  // back to false_positive.
+  const wanted = (closureType === 'resolved') ? 'resolved' : 'false_positive';
+  const wantedCard = document.querySelector(`.verdict-card[data-verdict="${wanted}"]`);
+  const allowed = wantedCard && wantedCard.getAttribute('data-disabled') !== 'true';
+  selectVerdict(allowed ? wanted : 'false_positive');
+  closeModal.show();
+}
+
+async function confirmClose(caseId) {
+  const chosen = document.querySelector('input[name="close-verdict"]:checked');
+  if (!chosen) { alert('Choose True Positive or False Positive.'); return; }
+  const { values, missing } = readW5('cls-w-');
+  if (missing.length) {
+    alert('All 5 W\'s are required. Missing: ' + missing.join(', '));
+    return;
+  }
+  const payload = {
+    closure_type: chosen.value,
+    resolution:   document.getElementById('close-resolution').value.trim(),
+    ...values,
+  };
+  const r = await fetch(`/soc-portal/cases/${caseId}/close`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const d = await r.json();
+  if (d.ok) { closeModal.hide(); window.location.reload(); }
+  else alert(d.message || 'Failed to close case.');
+}
+
+document.addEventListener('DOMContentLoaded', wireVerdictCards);
+
+/* ── Add note (L2/L3) ────────────────────────────────────────────────── */
+async function addNote(caseId) {
+  const note = document.getElementById('new-note').value.trim();
+  if (!note) return;
+  const r = await fetch(`/soc-portal/cases/${caseId}/note`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({note}),
+  });
+  const d = await r.json();
+  if (d.ok) window.location.reload();
+  else alert(d.message || 'Failed to add note.');
+}
+</script>
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_71adfed319'] = function (event, el) { openEscalateModal('L2') };
+  R['h_214ba5776b'] = function (event, el) { openCloseModal('false_positive') };
+  R['h_fbf4c8aedb'] = function (event, el) { openEscalateModal('L3') };
+  R['h_aaeb61a384'] = function (event, el) { openCloseModal('false_positive') };
+  R['h_a19a6b5d65'] = function (event, el) { openCloseModal('resolved') };
+  R['h_c6862b73fa'] = function (event, el) { openCloseModal('false_positive') };
+  var __cdCaseId = {{ case.id|tojson }};
+  var __cdSocUserId = {{ soc_user_id|tojson }};
+  R['cd-add-note']  = function (event, el) { addNote(__cdCaseId); };
+  R['cd-take-self'] = function (event, el) { takeCaseSelf(__cdCaseId, __cdSocUserId); };
+  R['cd-assign']    = function (event, el) { assignCase(__cdCaseId); };
+  R['cd-escalate']  = function (event, el) { confirmEscalate(__cdCaseId); };
+  R['cd-close']     = function (event, el) { confirmClose(__cdCaseId); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
