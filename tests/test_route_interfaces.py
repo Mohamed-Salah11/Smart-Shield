@@ -9,7 +9,8 @@ class TestInterfaceRoutes:
 
     def test_interfaces_home_accessible(self, superuser):
         client, _ = superuser
-        r = client.get("/interfaces/")
+        # /interfaces/ redirects to the port-assignments page; follow it.
+        r = client.get("/interfaces/", follow_redirects=True)
         assert r.status_code == 200
 
     def test_get_interface_groups_empty(self, superuser):

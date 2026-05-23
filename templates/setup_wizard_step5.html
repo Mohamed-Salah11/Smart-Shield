@@ -11,16 +11,17 @@
 <span class="badge bg-primary">Step 4 of 9</span>
 <small class="text-muted">44% Complete</small>
 </div>
-<div class="progress" style="height: 8px; border-radius: 4px;">
-<div class="progress-bar" role="progressbar" style="width: 44%; background: var(--primary);" aria-valuenow="44" aria-valuemin="0" aria-valuemax="100"></div>
+<div class="progress ext-6937aa3d">
+<div class="progress-bar ext-820b600b" role="progressbar" aria-valuenow="44" aria-valuemin="0" aria-valuemax="100"></div>
 </div>
 </div>
 
-<form method="post" action="#">
+<form method="post" action="">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <!-- Configuration Type -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-network-wired"></i></div><div><div class="ss-card-title">Configure WAN Interface</div></div></div>
-<div class="ss-card-body" style="padding: 24px;">
+<div class="ss-card-body ext-7174bca8">
 <p class="text-muted mb-4">Configure the Wide Area Network (WAN) interface settings for your internet connection.</p>
 
 <div class="row mb-4">
@@ -40,7 +41,7 @@
 <!-- General Configuration -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-sliders"></i></div><div><div class="ss-card-title">General Configuration</div></div></div>
-<div class="ss-card-body" style="padding: 24px;">
+<div class="ss-card-body ext-7174bca8">
 <div class="row mb-4">
 <label class="col-sm-3 col-form-label fw-semibold">MAC Address</label>
 <div class="col-sm-6">
@@ -69,7 +70,7 @@
 <!-- Static IP Configuration -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-map-pin"></i></div><div><div class="ss-card-title">Static IP Configuration</div></div></div>
-<div class="ss-card-body" style="padding: 24px;">
+<div class="ss-card-body ext-7174bca8">
 <div class="row mb-4">
 <label class="col-sm-3 col-form-label fw-semibold">IP Address</label>
 <div class="col-sm-4">
@@ -100,7 +101,7 @@
 <!-- Security Settings -->
 <div class="ss-card">
 <div class="ss-card-head"><div class="ss-card-icon"><i class="fa-solid fa-shield-halved"></i></div><div><div class="ss-card-title">Security Settings</div></div></div>
-<div class="ss-card-body" style="padding: 24px;">
+<div class="ss-card-body ext-7174bca8">
 <div class="mb-4">
 <div class="form-check form-switch">
 <input class="form-check-input" type="checkbox" id="block_rfc1918" checked>

@@ -1,0 +1,56 @@
+{% extends "vpn_portal/base.html" %}
+{% block title %}Two-factor setup{% endblock %}
+{% block content %}
+<div class="vp-card ext-d80f5e63">
+  <h1>Two-factor authentication</h1>
+  {% if already_enrolled %}
+    <p class="subtitle">Two-factor is currently <strong class="ext-892fac91">enabled</strong> on your account.</p>
+    <form method="POST" class="d-flex flex-column gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="unenrol">
+      <button type="submit" class="btn btn-outline-danger">
+        <i class="fas fa-shield-slash"></i> Disable two-factor
+      </button>
+      <a href="{{ url_for('vpn_portal.home') }}" class="btn btn-outline-light">Back</a>
+    </form>
+  {% else %}
+    <p class="subtitle">Scan the QR code with your authenticator app, then enter the 6-digit code below to enable two-factor.</p>
+
+    {% if error %}<div class="alert-vp-danger mb-3">{{ error }}</div>{% endif %}
+
+    <div class="text-center mb-3">
+      <div class="ext-937295ea" id="qrcode"></div>
+    </div>
+    <p class="vp-meta">Can't scan? Enter this secret manually:<br><code>{{ secret }}</code></p>
+
+    <form method="POST" autocomplete="off" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="form-label" for="code">Verification code</label>
+        <input id="code" name="code" type="text" class="form-control ext-e955de81"
+               inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               autocomplete="one-time-code" required
+              >
+      </div>
+      <button type="submit" class="btn btn-vp w-100">
+        <i class="fas fa-shield-check"></i> Enable two-factor
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if not already_enrolled %}
+<script src="{{ static_v('vendor/qrcode/qrcode.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+  // Render the QR client-side so the otpauth URI (which contains the
+  // secret) never reaches a third-party service.
+  new QRCode(document.getElementById("qrcode"), {
+    text: {{ uri | tojson }},
+    width: 192, height: 192,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -22,7 +22,7 @@
 			<div class="ss-card-icon"><i class="fa-solid fa-terminal"></i></div>
 			<div><div class="ss-card-title">IPsec Logging Controls</div><div class="ss-card-subtitle">Per-subsystem verbosity levels</div></div>
 		</div>
-		<div style="overflow-x:auto;">
+		<div class="ext-df74e8d8">
 			<table class="table mb-0">
 				<tbody>
 					{% set logging_rows = [
@@ -301,7 +301,7 @@
 	</div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function () {
 	loadIpsecAdvancedSettings();
 	const btn = document.getElementById('ipsecAdvancedSaveBtn');

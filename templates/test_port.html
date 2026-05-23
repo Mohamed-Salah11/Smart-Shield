@@ -54,7 +54,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('btn-test').addEventListener('click', function () {
   const host    = document.getElementById('pt-host').value.trim();
   const port    = parseInt(document.getElementById('pt-port').value);

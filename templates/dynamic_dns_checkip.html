@@ -28,20 +28,20 @@
         </button>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
           <tr>
-            <th style="padding:10px 14px;">Name</th><th>URL</th><th>Verify SSL/TLS</th><th>Description</th><th></th>
+            <th class="ext-16e59a0f">Name</th><th>URL</th><th>Verify SSL/TLS</th><th>Description</th><th></th>
           </tr>
         </thead>
         <tbody>
           {% set services = services if services is defined else [{'name':'Default','url':'http://checkip.dyndns.org','verify_ssl':False,'description':'Default Check IP Service'}] %}
           {% for s in services %}
           <tr>
-            <td style="padding:8px 14px;font-weight:500;">{{ s.name }}</td>
-            <td style="font-family:monospace;font-size:.8rem;">{{ s.url }}</td>
-            <td>{% if s.verify_ssl %}<span style="color:var(--success);">Yes</span>{% else %}<span style="color:var(--muted);">No</span>{% endif %}</td>
+            <td class="ext-92501b52">{{ s.name }}</td>
+            <td class="ext-7abe10da">{{ s.url }}</td>
+            <td>{% if s.verify_ssl %}<span class="ext-6e17958f">Yes</span>{% else %}<span class="ext-87ddc0dc">No</span>{% endif %}</td>
             <td>{{ s.description }}</td>
             <td><button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addCheckIPModal"><i class="fa-solid fa-pen"></i></button></td>
           </tr>
@@ -55,13 +55,14 @@
 <!-- Add/Edit Modal -->
 <div class="modal fade" id="addCheckIPModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content" style="border-radius:14px;border:1px solid var(--border-color);">
-      <div class="modal-header" style="border-bottom:1px solid var(--border-color-soft);">
-        <h5 class="modal-title fw-700" id="addCheckIPModalLabel" style="font-size:.9rem;text-transform:uppercase;letter-spacing:.08em;color:var(--secondary);">Check IP Service</h5>
+    <div class="modal-content ext-4e519faa">
+      <div class="modal-header ext-91a9433f">
+        <h5 class="modal-title fw-700 ext-4080a6fd" id="addCheckIPModalLabel">Check IP Service</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="padding:24px;">
+      <div class="modal-body ext-0f8ab67f">
         <form id="checkIPForm" method="post" action="{{ url_for('services.dynamic_dns_checkip') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="ss-field-grid ss-field-grid-2">
             <div class="ss-field">
               <label class="ss-label">Name</label>
@@ -80,7 +81,7 @@
               <label class="ss-label">Password</label>
               <input type="password" class="form-control" name="password" placeholder="Password">
             </div>
-            <div class="ss-field" style="grid-column:span 2;">
+            <div class="ss-field ext-a74d27d5">
               <label class="ss-label">Description</label>
               <input class="form-control" name="description" placeholder="Optional note">
             </div>
@@ -92,7 +93,7 @@
           </div>
         </form>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color-soft);">
+      <div class="modal-footer ext-febac6a2">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="submit" form="checkIPForm" class="btn btn-primary px-4">
           <i class="fa-solid fa-check me-1"></i>Save

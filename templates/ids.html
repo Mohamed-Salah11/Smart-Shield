@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 .ids-status-card {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   border: 1px solid rgba(255,255,255,.07);
@@ -22,6 +22,12 @@
   height: 2px;
   background: linear-gradient(90deg, var(--ids-accent, #10b981) 0%, transparent 100%);
 }
+/* Accent + state colors driven by running/stopped, as classes instead of
+   inline style attributes (CSP-friendly). */
+.ids-status-card.is-running { --ids-accent: #10b981; }
+.ids-status-card.is-stopped { --ids-accent: #ef4444; }
+.ids-kpi-val.is-running { color: #10b981; }
+.ids-kpi-val.is-stopped { color: var(--muted); }
 .ids-status-dot {
   width: 12px; height: 12px;
   border-radius: 50%;
@@ -119,22 +125,56 @@
       <h1 class="ss-page-title">Threat Detection</h1>
       <p class="ss-page-desc">Intrusion detection and prevention with Suricata</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
+      <span id="phasePill" class="badge bg-secondary d-none ext-phase-pill"></span>
       <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" id="btnDiagnostics" type="button">
+          <i class="fa-solid fa-stethoscope"></i> Diagnostics
+        </button>
         <button class="btn btn-sm btn-primary" id="btnRefreshStatus"><i class="fa-solid fa-rotate"></i> Refresh</button>
-        <button class="btn btn-sm {% if cfg.enabled %}btn-danger{% else %}btn-success{% endif %}" id="btnToggle"
-                data-enabled="{{ cfg.enabled }}">
-          {% if cfg.enabled %}<i class="fa-solid fa-stop"></i> Disable{% else %}<i class="fa-solid fa-play"></i> Enable{% endif %}
+        <button class="btn btn-sm {% if status.running %}btn-danger{% else %}btn-success{% endif %}" id="btnToggle"
+                data-enabled="{{ 1 if status.running else 0 }}">
+          {% if status.running %}<i class="fa-solid fa-stop"></i> Disable{% else %}<i class="fa-solid fa-play"></i> Enable{% endif %}
         </button>
       </div>
     </div>
   </div>
 
+  <!-- Diagnostics panel — collapsed by default; auto-expands on toggle error -->
+  <div id="diagnosticsPanel" class="card mt-2 d-none">
+    <div class="card-body py-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong><i class="fa-solid fa-stethoscope"></i> IDS Diagnostics</strong>
+        <button class="btn btn-sm btn-outline-secondary" id="btnDiagRefresh" type="button">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless mb-1" id="diagTable">
+          <tbody>
+            <tr><td colspan="2" class="text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="mt-1">
+        <summary class="text-muted small">Suricata log tail (last 20 lines)</summary>
+        <pre class="ext-diag-log" id="diagLogTail"></pre>
+      </details>
+    </div>
+  </div>
+
+  {% if cfg.enabled and not status.running %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mt-2 mb-2 ext-1e28117f" id="warningBanner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span>Suricata is marked as enabled in config but is not currently running.
+    Click <strong>Enable</strong> to attempt a restart, or check system logs for errors.</span>
+  </div>
+  {% endif %}
+
   <!-- Status Banner -->
-  <div class="ids-status-card" id="statusBanner"
-       style="--ids-accent: {{ '#10b981' if status.running else '#ef4444' }};">
+  <div class="ids-status-card {{ 'is-running' if status.running else 'is-stopped' }}" id="statusBanner">
     <div class="ids-status-dot {% if status.running %}running{% endif %}" id="statusDot"></div>
-    <div style="flex:1;min-width:0;">
+    <div class="ext-89bd09bd">
       <div class="ids-status-name">Suricata IDS/IPS</div>
       <div class="ids-status-meta" id="statusMsg">
         {{ status.message }} &nbsp;·&nbsp;
@@ -153,49 +193,63 @@
       <div class="ids-kpi-lbl">Alerts Today</div>
     </div>
     <div class="ids-kpi">
-      <div class="ids-kpi-val" style="color:{% if cfg.enabled %}#10b981{% else %}var(--muted){% endif %};">
-        {{ 'Active' if cfg.enabled else 'Inactive' }}
+      <div class="ids-kpi-val {{ 'is-running' if status.running else 'is-stopped' }}">
+        {{ 'Running' if status.running else 'Stopped' }}
       </div>
       <div class="ids-kpi-lbl">State</div>
     </div>
     <div class="ids-kpi">
-      <div class="ids-kpi-val" style="font-size:1.1rem;">{{ (cfg.mode or 'ids')|upper }}</div>
+      <div class="ids-kpi-val ext-5b20e6ef">{{ (cfg.mode or 'ids')|upper }}</div>
       <div class="ids-kpi-lbl">Mode</div>
     </div>
     <div class="ids-kpi">
       <div class="ids-kpi-val">{{ rulesets|selectattr('enabled')|list|length }}</div>
       <div class="ids-kpi-lbl">Active Rulesets</div>
     </div>
+    <div class="ids-kpi">
+      <div class="ids-kpi-val {{ 'is-stopped' if (status.signatures_loaded or 0) == 0 else '' }}">
+        {{ status.signatures_loaded or 0 }}
+      </div>
+      <div class="ids-kpi-lbl">Signatures</div>
+    </div>
   </div>
+  {% if (status.signatures_loaded or 0) == 0 %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mt-2 mb-2">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span>Suricata is installed but no signatures are loaded — IDS has
+    <strong>no detection coverage</strong>. Click <strong>Update Rules</strong>
+    on the Rulesets tab before relying on IDS/IPS alerts.</span>
+  </div>
+  {% endif %}
 
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="idsTabs">
     <li class="nav-item">
       <a class="nav-link {% if active_tab=='status' %}active{% endif %}"
-         href="#" onclick="showTab('status',this);return false;">
+         href="#" data-action="h_9c6d5d0c2a">
         <i class="fa-solid fa-gauge me-1"></i>Status &amp; Alerts
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if active_tab=='config' %}active{% endif %}"
-         href="#" onclick="showTab('config',this);return false;">
+         href="#" data-action="h_6c357e1795">
         <i class="fa-solid fa-gear me-1"></i>Configuration
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if active_tab=='rules' %}active{% endif %}"
-         href="#" onclick="showTab('rules',this);return false;">
+         href="#" data-action="h_5692699ca5">
         <i class="fa-solid fa-list-check me-1"></i>Rulesets
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link {% if active_tab=='feeds' %}active{% endif %}"
-         href="#" onclick="showTab('feeds',this);return false;">
+         href="#" data-action="h_86c05a16fc">
         <i class="fa-solid fa-satellite-dish me-1"></i>Threat Feeds
         {% if feeds_has_key %}
-        <span class="badge bg-success ms-1" style="font-size:.65rem;vertical-align:middle;">Key set</span>
+        <span class="badge bg-success ms-1 ext-c1e35aa5">Key set</span>
         {% else %}
-        <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;vertical-align:middle;">No key</span>
+        <span class="badge bg-warning text-dark ms-1 ext-c1e35aa5">No key</span>
         {% endif %}
       </a>
     </li>
@@ -203,33 +257,69 @@
 
   <!-- ── Tab: Status & Alerts ── -->
   <div class="tab-pane {% if active_tab=='status' %}d-block{% else %}d-none{% endif %}" id="tab-status">
+
+    <!-- Daemon log panel — surfaces /var/log/suricata/<source>.log so you
+         can self-diagnose a Stopped IDS without ssh. -->
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-file-lines"></i></div>
+        <div>
+          <div class="ss-card-title">Daemon log</div>
+          <div class="ss-card-subtitle ext-ca0abc75">
+            Live tail of <code>/var/log/suricata/&lt;source&gt;.log</code> — refreshes every 10 s.
+          </div>
+        </div>
+        <div class="ss-card-actions ext-faaa794c">
+          <select id="idsLogSource" class="form-select form-select-sm ext-4f15898a">
+            <option value="suricata">suricata.log</option>
+            <option value="fast">fast.log</option>
+            <option value="stats">stats.log</option>
+          </select>
+          <input type="text" id="idsLogGrep" class="form-control form-control-sm ext-844e0595"
+                 placeholder="grep…">
+          <label class="ext-45631cc2">
+            <input type="checkbox" id="idsLogAutoRefresh" checked>auto-refresh
+          </label>
+          <button class="btn btn-sm btn-secondary" data-action="h_d395db77f7">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </div>
+      </div>
+      <div class="ext-26df416f" id="idsLogStatus">
+        Loading…
+      </div>
+      <pre class="ext-500b7acb" id="idsLogBody">
+(opening log…)
+      </pre>
+    </div>
+
     <div class="ss-card mt-3">
       <div class="ss-card-head">
         <div class="ss-card-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
         <div><div class="ss-card-title">Recent Alerts</div></div>
         <div class="ss-card-actions">
-          <button class="btn btn-sm btn-secondary" onclick="loadAlerts()"><i class="fa-solid fa-rotate"></i> Reload</button>
+          <button class="btn btn-sm btn-secondary" data-action="h_b1cd5af14b"><i class="fa-solid fa-rotate"></i> Reload</button>
         </div>
       </div>
       <!-- Alert filter toolbar -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-color);">
-        <input type="text" id="alertSearch" class="form-control form-control-sm"
-               placeholder="Search signature, IP…" style="max-width:260px;"
-               oninput="debounceAlerts()">
-        <select id="alertSeverity" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+      <div class="ext-f1133a52">
+        <input type="text" id="alertSearch" class="form-control form-control-sm ext-c3b421e0"
+               placeholder="Search signature, IP…"
+               data-action-input="h_86fe8ca97b">
+        <select id="alertSeverity" class="form-select form-select-sm ext-4f15898a" data-action-change="h_84218f5783">
           <option value="0">All Severities</option>
           <option value="1">Sev 1 — Critical</option>
           <option value="2">Sev 2 — High</option>
           <option value="3">Sev 3 — Info</option>
         </select>
-        <select id="alertHours" class="form-select form-select-sm" style="width:auto;" onchange="loadAlerts()">
+        <select id="alertHours" class="form-select form-select-sm ext-4f15898a" data-action-change="h_aaf6f9ec21">
           <option value="0">All Time</option>
           <option value="1">Last 1 h</option>
           <option value="6">Last 6 h</option>
           <option value="24">Last 24 h</option>
           <option value="168">Last 7 d</option>
         </select>
-        <span id="alertCount" class="text-muted ms-auto" style="font-size:.78rem;"></span>
+        <span id="alertCount" class="text-muted ms-auto ext-bb0425a5"></span>
       </div>
       <div class="alert-scroll">
         <table class="alert-tbl">
@@ -245,7 +335,41 @@
             </tr>
           </thead>
           <tbody id="alertTbody">
-            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px 0;">Loading alerts…</td></tr>
+            <tr><td class="ext-05f83e3e" colspan="7">Loading alerts…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Auth & Security Events card -->
+    <div class="ss-card mt-3">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <div>
+          <div class="ss-card-title">Auth &amp; Security Events</div>
+          <div class="ss-card-subtitle ext-ca0abc75">
+            Failed logins &amp; brute-force detections — from application audit log
+          </div>
+        </div>
+        <div class="ss-card-actions">
+          <button class="btn btn-sm btn-secondary" data-action="h_25310002bb">
+            <i class="fa-solid fa-rotate"></i> Reload
+          </button>
+        </div>
+      </div>
+      <div class="alert-scroll">
+        <table class="alert-tbl">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Severity</th>
+              <th>Event</th>
+              <th>Source IP</th>
+              <th>User</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="authEventTbody">
+            <tr><td class="ext-05f83e3e" colspan="6">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -266,7 +390,7 @@
           <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">Mode</label>
             <div class="col-sm-9">
-              <select name="mode" class="form-select" style="max-width:300px;">
+              <select name="mode" class="form-select ext-4d14681b">
                 <option value="ids" {% if cfg.mode=='ids' %}selected{% endif %}>
                   IDS — Detection only (passive, no blocking)
                 </option>
@@ -281,7 +405,7 @@
           <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">Interface</label>
             <div class="col-sm-9">
-              <select name="interface" class="form-select" style="max-width:300px;">
+              <select name="interface" class="form-select ext-4d14681b">
                 <option value="">— Auto (WAN) —</option>
                 {% for nic in nics %}
                 <option value="{{ nic.name }}" {% if cfg.interface == nic.name %}selected{% endif %}>
@@ -299,7 +423,7 @@
           <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">HOME_NET</label>
             <div class="col-sm-9">
-              <input type="text" name="home_net" class="form-control" style="max-width:400px;"
+              <input type="text" name="home_net" class="form-control ext-88efe206"
                      value="{{ cfg.home_net or '192.168.0.0/16' }}"
                      placeholder="192.168.0.0/16">
               <small class="text-muted">Your internal/LAN network(s). Suricata uses this to classify traffic direction.</small>
@@ -309,7 +433,7 @@
           <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">EXTERNAL_NET</label>
             <div class="col-sm-9">
-              <input type="text" name="external_net" class="form-control" style="max-width:400px;"
+              <input type="text" name="external_net" class="form-control ext-88efe206"
                      value="{{ cfg.external_net or '!$HOME_NET' }}"
                      placeholder="!$HOME_NET">
             </div>
@@ -334,7 +458,7 @@
           <div class="mb-3 row align-items-center">
             <label class="col-sm-3 col-form-label fw-semibold">Max Pending Packets</label>
             <div class="col-sm-9">
-              <input type="number" name="max_pending_packets" class="form-control" style="max-width:180px;"
+              <input type="number" name="max_pending_packets" class="form-control ext-74286440"
                      value="{{ cfg.max_pending_packets or 1024 }}" min="256" max="65536" step="256">
               <small class="text-muted">Tune for throughput. 1024 is a safe default.</small>
             </div>
@@ -365,29 +489,44 @@
         </div>
       </div>
       <div class="section-body">
-        <p class="text-muted mb-3" style="font-size:.85rem;">
-          Rulesets are downloaded via <code>suricata-update</code>. Toggle to enable/disable per source.
+        <p class="mb-2 ext-a06182ff">
+          Rules are managed by <code>suricata-update</code> and merged into
+          <code>/var/lib/suricata/rules/suricata.rules</code>.
+          Click <strong>Update Rules</strong> before enabling Suricata for real
+          detection coverage. If no rules are downloaded, Smart Shield starts
+          Suricata with an empty placeholder file — IDS will run but will not
+          generate signature alerts until rules are installed.
+          Toggle sources below to enable/disable per ruleset, then click Update Rules again.
         </p>
         <div id="rulesetList">
           {% for rs in rulesets %}
+          {# Fv11 review §P2-02 — accessible labels on per-row controls. The
+             repeated `data-id` attribute is fine (data-* attributes scope to
+             the element); but the toggle and delete button still need
+             screen-reader-friendly labels so the operator knows which
+             ruleset they're acting on. #}
           <div class="ruleset-row" data-id="{{ rs.id }}">
             <div class="form-check form-switch m-0">
               <input class="form-check-input ruleset-toggle" type="checkbox"
-                     data-id="{{ rs.id }}" {% if rs.enabled %}checked{% endif %}>
+                     data-id="{{ rs.id }}"
+                     aria-label="Enable or disable ruleset {{ rs.name }}"
+                     {% if rs.enabled %}checked{% endif %}>
             </div>
-            <div style="flex:1;min-width:0;">
+            <div class="ext-89bd09bd">
               <div class="ruleset-name">{{ rs.name }}</div>
               {% if rs.description %}<div class="ruleset-desc">{{ rs.description }}</div>{% endif %}
               {% if rs.url %}<div class="ruleset-url">{{ rs.url }}</div>{% endif %}
             </div>
-            <button class="btn btn-sm btn-outline-danger" data-del="{{ rs.id }}" title="Remove">
-              <i class="fa-solid fa-trash"></i>
+            <button class="btn btn-sm btn-outline-danger" data-del="{{ rs.id }}"
+                    title="Remove ruleset {{ rs.name }}"
+                    aria-label="Remove ruleset {{ rs.name }}">
+              <i class="fa-solid fa-trash" aria-hidden="true"></i>
             </button>
           </div>
           {% endfor %}
         </div>
         <div id="updateLog" class="mt-3 d-none">
-          <pre style="max-height:200px;overflow:auto;font-size:.8rem;" id="updateLogContent"></pre>
+          <pre class="ext-0c90f12b" id="updateLogContent"></pre>
         </div>
       </div>
     </div>
@@ -400,7 +539,7 @@
         <div class="ss-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
         <div>
           <div class="ss-card-title">Threat Intelligence Feeds</div>
-          <div class="ss-card-subtitle" style="font-size:.8rem;color:var(--muted);">
+          <div class="ss-card-subtitle ext-ca0abc75">
             URLhaus &nbsp;·&nbsp; MalwareBazaar &nbsp;·&nbsp; ThreatFox
           </div>
         </div>
@@ -408,7 +547,7 @@
       <div class="ss-card-body">
 
         <!-- Key status banner -->
-        <div id="feedsStatusBanner" class="alert {% if feeds_has_key %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center gap-2 mb-4" style="font-size:.875rem;">
+        <div id="feedsStatusBanner" class="alert {% if feeds_has_key %}alert-success{% else %}alert-warning{% endif %} d-flex align-items-center gap-2 mb-4 ext-6bf47011">
           <i class="fa-solid {% if feeds_has_key %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
           <span id="feedsStatusText">
             {% if feeds_has_key %}
@@ -425,7 +564,7 @@
             Abuse.ch Auth-Key
           </label>
           <div class="col-sm-9">
-            <div class="input-group" style="max-width:520px;">
+            <div class="input-group ext-e5bdc370">
               <input type="password" id="feedsAuthKey" class="form-control"
                      placeholder="{% if feeds_has_key %}Key already stored — paste new key to replace{% else %}Paste your Auth-Key here{% endif %}"
                      autocomplete="new-password">
@@ -433,7 +572,7 @@
                 <i class="fa-solid fa-eye"></i>
               </button>
             </div>
-            <div class="mt-1" style="font-size:.8rem;color:var(--muted);">
+            <div class="mt-1 ext-ca0abc75">
               Get your key at
               <a href="https://abuse.ch/" target="_blank" rel="noopener">abuse.ch</a>.
               The key is stored encrypted (AES-256-GCM) and never logged.
@@ -453,7 +592,7 @@
                 Dry-run (logging only)
               </label>
             </div>
-            <div style="font-size:.8rem;color:var(--muted);margin-top:4px;">
+            <div class="ext-00b095e6">
               When enabled, lookups reach abuse.ch live. When disabled, calls are logged but not sent.
               Automatically enabled when you save an Auth-Key.
             </div>
@@ -483,8 +622,8 @@
               <i class="fa-solid fa-magnifying-glass me-1"></i>Abuse.ch Lookup
             </h6>
 
-            <div class="input-group mb-2" style="max-width:720px;">
-              <select id="abusechLookupType" class="form-select" style="max-width:150px;">
+            <div class="input-group mb-2 ext-2bd9fd65">
+              <select id="abusechLookupType" class="form-select ext-bc21563f">
                 <option value="url">URLhaus URL</option>
                 <option value="host">URLhaus Host/IP</option>
                 <option value="hash">MalwareBazaar Hash</option>
@@ -505,8 +644,8 @@
             </div>
 
             <pre id="abusechResult"
-                 class="d-none"
-                 style="max-height:320px;overflow:auto;font-size:.78rem;background:var(--border-color-soft);border:1px solid var(--border-color);border-radius:8px;padding:12px;"></pre>
+                 class="d-none ext-9959a9c8"
+                ></pre>
           </div>
         </div>
 
@@ -547,7 +686,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 /* ── Tab switching ── */
 function showTab(tab, link) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.replace('d-block','d-none'));
@@ -563,39 +702,167 @@ const apiFetch = (url, opts={}) => {
   return fetch(url, opts);
 };
 
+/* ── Shared status updater (used by Refresh + auto-refresh) ── */
+function updateStatus(res) {
+  document.getElementById('statusDot').className = 'ids-status-dot' + (res.running ? ' running' : '');
+  document.getElementById('statusMsg').textContent = res.message + ' · Interface: {{ cfg.interface or "—" }}';
+  document.getElementById('kpiAlerts').textContent = res.alerts_today;
+  const btn = document.getElementById('btnToggle');
+  btn.dataset.enabled = res.running ? '1' : '0';
+  if (res.running) {
+    btn.className = btn.className.replace('btn-success', 'btn-danger');
+    btn.innerHTML = '<i class="fa-solid fa-stop"></i> Disable';
+  } else {
+    btn.className = btn.className.replace('btn-danger', 'btn-success');
+    btn.innerHTML = '<i class="fa-solid fa-play"></i> Enable';
+  }
+  const wb = document.getElementById('warningBanner');
+  if (wb) wb.style.display = (res.cfg_enabled && !res.running) ? '' : 'none';
+}
+
+/* ── Refresh button ── */
+document.getElementById('btnRefreshStatus').addEventListener('click', async function() {
+  const res = await fetch('{{ url_for("ids.ids_status") }}').then(r => r.json()).catch(() => null);
+  if (res) updateStatus(res);
+});
+
+/* ── Auto-refresh every 15 seconds ── */
+setInterval(async () => {
+  try {
+    const res = await fetch('{{ url_for("ids.ids_status") }}').then(r => r.json());
+    updateStatus(res);
+  } catch {}
+}, 15000);
+
+/* ── Phase pill + diagnostics panel ── */
+const PHASE_LABEL = {
+  STOPPED:            ['Stopped',           'bg-secondary'],
+  UPDATING_RULES:     ['Updating rules…',   'bg-info'],
+  VALIDATING_CONFIG:  ['Validating config…','bg-info'],
+  LOADING_KMOD:       ['Loading netmap…',   'bg-info'],
+  STARTING:           ['Starting…',         'bg-info'],
+  RUNNING:            ['Running',           'bg-success'],
+  ERROR:              ['Error',             'bg-danger'],
+};
+
+function setPhasePill(phase) {
+  const pill = document.getElementById('phasePill');
+  if (!pill) return;
+  if (!phase) { pill.classList.add('d-none'); return; }
+  const [label, cls] = PHASE_LABEL[phase] || [phase, 'bg-secondary'];
+  pill.className = 'badge ext-phase-pill ' + cls;
+  pill.textContent = label;
+  pill.classList.remove('d-none');
+}
+
+function _escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function loadDiagnostics() {
+  const tbody = document.querySelector('#diagTable tbody');
+  const logEl = document.getElementById('diagLogTail');
+  tbody.innerHTML = '<tr><td colspan="2" class="text-muted">Loading…</td></tr>';
+  let d;
+  try {
+    d = await fetch('{{ url_for("ids.ids_diagnostics") }}').then(r => r.json());
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="2" class="text-danger">Failed to load diagnostics: ' + _escapeHtml(e) + '</td></tr>';
+    return null;
+  }
+  const yn = v => v ? '<span class="text-success">yes</span>' : '<span class="text-danger">no</span>';
+  const rows = [
+    ['Phase', _escapeHtml(d.phase || '—')],
+    ['Last error', d.error ? '<span class="text-danger">' + _escapeHtml(d.error) + '</span>' : '<span class="text-muted">—</span>'],
+    ['Mode', _escapeHtml((d.mode || '').toUpperCase())],
+    ['Interface', _escapeHtml(d.interface || '—')],
+    ['Process running (pgrep)', yn(d.running)],
+    ['rc.conf enabled', yn(d.rc_enabled)],
+    ['Config DB enabled', yn(d.cfg_enabled)],
+    ['Signatures loaded', _escapeHtml(d.signatures_loaded)],
+    ['Rules file', _escapeHtml(d.rules_file) + ' (' + _escapeHtml(d.rules_size) + ' bytes)'],
+    ['Config file', _escapeHtml(d.config_path) + ' ' + yn(d.config_exists)],
+    ['netmap.ko loaded', yn(d.netmap_loaded)],
+  ];
+  tbody.innerHTML = rows.map(([k, v]) =>
+    '<tr><td class="text-muted ext-diag-k">' + _escapeHtml(k) + '</td><td>' + v + '</td></tr>'
+  ).join('');
+  logEl.textContent = (d.log_tail || []).join('\n') || '(no log lines)';
+  return d;
+}
+
+document.getElementById('btnDiagnostics').addEventListener('click', async function() {
+  const panel = document.getElementById('diagnosticsPanel');
+  if (panel.classList.contains('d-none')) {
+    panel.classList.remove('d-none');
+    await loadDiagnostics();
+  } else {
+    panel.classList.add('d-none');
+  }
+});
+
+document.getElementById('btnDiagRefresh').addEventListener('click', loadDiagnostics);
+
 /* ── Toggle IDS on/off ── */
 document.getElementById('btnToggle').addEventListener('click', async function() {
   const curEnabled = parseInt(this.dataset.enabled || '0');
   const newEnabled = curEnabled ? false : true;
   const btn = this;
   btn.disabled = true;
+  setPhasePill(newEnabled ? 'STARTING' : 'STOPPED');
+  btn.innerHTML = newEnabled
+    ? '<i class="fa-solid fa-spinner fa-spin"></i> Starting…'
+    : '<i class="fa-solid fa-spinner fa-spin"></i> Stopping…';
+
+  // Light-touch phase poll while the toggle request is in flight so the
+  // operator sees Loading netmap… / Updating rules… / Validating config…
+  // as the backend marches through them, instead of a single spinner.
+  let polling = true;
+  const pollPhase = async () => {
+    while (polling) {
+      try {
+        const d = await fetch('{{ url_for("ids.ids_diagnostics") }}').then(r => r.json());
+        if (d && d.phase) setPhasePill(d.phase);
+      } catch (e) { /* ignore transient errors */ }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  };
+  pollPhase();
 
   const res = await apiFetch('{{ url_for("ids.ids_toggle") }}', {
     method: 'POST',
     body: JSON.stringify({enabled: newEnabled}),
   }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
 
+  polling = false;
   btn.disabled = false;
 
+  // Reflect the authoritative phase from the response (or fall back).
+  if (res.phase) setPhasePill(res.phase);
+  else setPhasePill(res.ok ? (newEnabled ? 'RUNNING' : 'STOPPED') : 'ERROR');
+
   if (!res.ok) {
-    // Show inline error banner so the user can see what failed after reload
-    const msg = res.message || 'Unknown error';
     const errDiv = document.createElement('div');
     errDiv.className = 'alert alert-danger alert-dismissible mt-2';
-    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + msg +
-      ' <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>';
+    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + _escapeHtml(res.message || 'Unknown error') +
+      ' <button type="button" class="btn-close" data-action="h_f78e2a0dc3"></button>';
     document.querySelector('.ss-page-header').after(errDiv);
+    btn.innerHTML = newEnabled
+      ? '<i class="fa-solid fa-play"></i> Enable'
+      : '<i class="fa-solid fa-stop"></i> Disable';
+    // Auto-expand diagnostics so the operator can see *which* step broke.
+    const panel = document.getElementById('diagnosticsPanel');
+    panel.classList.remove('d-none');
+    loadDiagnostics();
+    return;
   }
-  // Always reload so the UI reflects the actual DB state (Fix for stale-page bug)
-  location.reload();
-});
 
-/* ── Refresh status ── */
-document.getElementById('btnRefreshStatus').addEventListener('click', async function() {
-  const res = await fetch('{{ url_for("ids.ids_status") }}').then(r=>r.json());
-  document.getElementById('statusDot').className = 'ids-status-dot' + (res.running?' running':'');
-  document.getElementById('statusMsg').textContent = res.message + ' · Interface: {{ cfg.interface or "—" }}';
-  document.getElementById('kpiAlerts').textContent = res.alerts_today;
+  // After Enable: wait 2.5s so Suricata has time to start before pgrep check on reload.
+  // After Disable: reload immediately.
+  // 4 s: server sleeps 1.5 s for pgrep verification + network roundtrip buffer
+  setTimeout(() => location.reload(), newEnabled ? 4000 : 0);
 });
 
 /* ── Load alerts ── */
@@ -604,7 +871,7 @@ async function loadAlerts() {
   const search = encodeURIComponent((document.getElementById('alertSearch')?.value || '').trim());
   const sev    = document.getElementById('alertSeverity')?.value || '0';
   const hours  = document.getElementById('alertHours')?.value   || '0';
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td class="ext-61eece2a" colspan="7">Loading…</td></tr>';
   let url = '{{ url_for("ids.ids_alerts") }}?limit=500';
   if (search)        url += '&search='   + search;
   if (sev   !== '0') url += '&severity=' + sev;
@@ -614,19 +881,19 @@ async function loadAlerts() {
   const countEl = document.getElementById('alertCount');
   if (countEl) countEl.textContent = alerts.length + ' alert' + (alerts.length!==1?'s':'') + ' shown';
   if (!alerts.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No alerts match the current filter.</td></tr>';
+    tbody.innerHTML = '<tr><td class="ext-49a99a1b" colspan="7">No alerts match the current filter.</td></tr>';
     return;
   }
   const sevClass = s => s==1?'sev-1':s==2?'sev-2':'sev-3';
   const actionBadge = a => a==='blocked'
-    ? '<span class="badge bg-danger" style="font-size:.7rem;">Blocked</span>'
-    : '<span class="badge bg-secondary" style="font-size:.7rem;">Allowed</span>';
+    ? '<span class="badge bg-danger ext-bc9efe64">Blocked</span>'
+    : '<span class="badge bg-secondary ext-bc9efe64">Allowed</span>';
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   tbody.innerHTML = alerts.map(a => `
     <tr>
       <td class="td-time">${esc(a.timestamp).slice(0,19).replace('T',' ')}</td>
-      <td><span class="${sevClass(a.severity)}" style="font-weight:700;">${esc(a.severity)}</span></td>
-      <td style="max-width:320px;word-break:break-word;">${esc(a.signature)}</td>
+      <td><span class="${sevClass(a.severity)} ext-83e4487b">${esc(a.severity)}</span></td>
+      <td class="ext-d7969c28">${esc(a.signature)}</td>
       <td class="td-mono">${esc(a.src_ip)}${a.src_port?':'+a.src_port:''}</td>
       <td class="td-mono">${esc(a.dest_ip)}${a.dest_port?':'+a.dest_port:''}</td>
       <td class="td-mono">${esc(a.proto)}</td>
@@ -638,6 +905,43 @@ let _alertDebounce;
 function debounceAlerts() {
   clearTimeout(_alertDebounce);
   _alertDebounce = setTimeout(loadAlerts, 350);
+}
+
+/* ── Auth & security events (login failures, brute force detections) ── */
+async function loadAuthEvents() {
+  const tbody = document.getElementById('authEventTbody');
+  tbody.innerHTML = '<tr><td class="ext-61eece2a" colspan="6">Loading…</td></tr>';
+  const url = '/status/api/logs?categories=session,security&actions=login_failed,brute_force_detected,login_blocked_user_lockout&limit=100';
+  const res = await fetch(url).then(r => r.json()).catch(() => ({ok: false, events: []}));
+  const events = res.events || [];
+  if (!events.length) {
+    tbody.innerHTML = '<tr><td class="ext-49a99a1b" colspan="6">No auth events found.</td></tr>';
+    return;
+  }
+  const sevBadge = s => {
+    const map = {critical: 'danger', high: 'warning', medium: 'primary', low: 'secondary', info: 'secondary'};
+    return `<span class="badge bg-${map[s] || 'secondary'} ext-bc9efe64">${(s || 'info').toUpperCase()}</span>`;
+  };
+  const actionLabel = a => ({
+    login_failed:               'Login Failed',
+    brute_force_detected:       'Brute Force Detected',
+    login_blocked_user_lockout: 'Account Locked',
+  }[a] || a);
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  tbody.innerHTML = events.map(e => {
+    const d = e.details || {};
+    const detail = e.action === 'brute_force_detected'
+      ? `${d.count || '?'} attempts in ${d.window_minutes || 5} min`
+      : (d.reason || '');
+    return `<tr>
+      <td class="td-time">${esc((e.timestamp || '').slice(0, 19).replace('T', ' '))}</td>
+      <td>${sevBadge(e.severity)}</td>
+      <td class="ext-e634e6da">${esc(actionLabel(e.action))}</td>
+      <td class="td-mono">${esc(e.remote_addr)}</td>
+      <td class="td-mono">${esc(e.username)}</td>
+      <td class="ext-97de4d59">${esc(detail)}</td>
+    </tr>`;
+  }).join('');
 }
 
 /* ── Ruleset toggles ── */
@@ -678,16 +982,18 @@ document.getElementById('btnAddRuleset').addEventListener('click', async functio
 /* ── Update rules ── */
 document.getElementById('btnUpdateRules').addEventListener('click', async function() {
   this.disabled = true;
-  this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating…';
+  this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching…';
   const log = document.getElementById('updateLog');
   const logContent = document.getElementById('updateLogContent');
   log.classList.remove('d-none');
-  logContent.textContent = 'Running suricata-update…\n';
+  log.className = 'mt-3 alert alert-info';
+  logContent.textContent = 'Running suricata-update — this may take a minute on first run…\n';
   const res = await apiFetch('{{ url_for("ids.ids_update_rules") }}', {method:'POST'})
     .then(r=>r.json()).catch(e=>({ok:false,message:String(e)}));
-  logContent.textContent += res.message || '';
-  if (res.updated) {
-    res.updated.forEach(u => logContent.textContent += `\n  ${u.name}: ${u.ok?'OK':'FAILED'}`);
+  log.className = 'mt-3 alert ' + (res.ok ? 'alert-success' : 'alert-danger');
+  logContent.textContent = res.message || (res.ok ? 'Rules updated.' : 'Update failed.');
+  if (res.rules_path) {
+    logContent.textContent += `\nRules path: ${res.rules_path}`;
   }
   this.disabled = false;
   this.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Update Rules';
@@ -696,7 +1002,78 @@ document.getElementById('btnUpdateRules').addEventListener('click', async functi
 /* Init */
 if (document.getElementById('tab-status').classList.contains('d-block')) {
   loadAlerts();
+  loadAuthEvents();
+  loadSuricataLog();
 }
+
+/* ── Daemon log panel ─────────────────────────────────────────────────── */
+function _ansiEscape(s){return String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _classifyLine(line){
+  if (/<Error>|\bERROR\b|\bFATAL\b/.test(line)) return 'color:#ff7a7a;';
+  if (/<Warning>|\bWARN\b/.test(line))          return 'color:#f1c14a;';
+  if (/<Notice>|<Info>|\bINFO\b/.test(line))    return 'color:#9ad4ff;';
+  return '';
+}
+async function loadSuricataLog(){
+  const body   = document.getElementById('idsLogBody');
+  const status = document.getElementById('idsLogStatus');
+  if (!body || !status) return;
+  const src  = (document.getElementById('idsLogSource')||{}).value || 'suricata';
+  const grep = (document.getElementById('idsLogGrep')  ||{}).value || '';
+  try {
+    const params = new URLSearchParams({source: src, lines: 200});
+    if (grep) params.set('grep', grep);
+    const r = await fetch('{{ url_for("ids.ids_log") }}?' + params.toString());
+    const data = await r.json();
+    if (!data.ok && data.missing) {
+      status.textContent = (data.path || src + '.log') + ' has not been created yet — Suricata may not have started yet.';
+      body.textContent = '';
+      return;
+    }
+    if (!data.ok) {
+      status.textContent = data.message || 'Read failed.';
+      body.textContent = '';
+      return;
+    }
+    const lines = data.lines || [];
+    const running = data.status && data.status.running;
+    const svc     = data.service && data.service.message ? data.service.message : '';
+    status.innerHTML =
+      (running
+        ? '<span class="ext-0be7ef7f">Running</span>'
+        : '<span class="ext-36d557d1">Stopped</span>')
+      + ' &middot; ' + _ansiEscape(data.path)
+      + ' &middot; ' + lines.length + ' lines'
+      + (svc ? ' &middot; service: ' + _ansiEscape(svc).split('\\n')[0] : '');
+    body.innerHTML = lines.length
+      ? lines.map(function(l){
+          const style = _classifyLine(l);
+          return style
+            ? '<span class="ext-476156c4">' + _ansiEscape(l) + '</span>'
+            : _ansiEscape(l);
+        }).join('\n')
+      : '(log is empty)';
+    body.scrollTop = body.scrollHeight;
+  } catch (e) {
+    status.textContent = 'Request failed: ' + e;
+  }
+}
+['idsLogSource','idsLogGrep'].forEach(function(id){
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', loadSuricataLog);
+});
+const _idsGrepEl = document.getElementById('idsLogGrep');
+if (_idsGrepEl) _idsGrepEl.addEventListener('input', function(){
+  clearTimeout(window._idsGrepT);
+  window._idsGrepT = setTimeout(loadSuricataLog, 350);
+});
+setInterval(function(){
+  const auto = document.getElementById('idsLogAutoRefresh');
+  if (!auto || !auto.checked) return;
+  if (document.getElementById('tab-status').classList.contains('d-block'))
+    loadSuricataLog();
+}, 10000);
 
 /* ── Threat Feeds ── */
 const btnShowKey = document.getElementById('btnShowKey');
@@ -877,3 +1254,25 @@ if (btnClearFeeds) {
 }
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_9c6d5d0c2a'] = function (event, el) { showTab('status',this);return false; };
+  R['h_6c357e1795'] = function (event, el) { showTab('config',this);return false; };
+  R['h_5692699ca5'] = function (event, el) { showTab('rules',this);return false; };
+  R['h_86c05a16fc'] = function (event, el) { showTab('feeds',this);return false; };
+  R['h_d395db77f7'] = function (event, el) { loadSuricataLog() };
+  R['h_b1cd5af14b'] = function (event, el) { loadAlerts() };
+  R['h_86fe8ca97b'] = function (event, el) { debounceAlerts() };
+  R['h_84218f5783'] = function (event, el) { loadAlerts() };
+  R['h_aaf6f9ec21'] = function (event, el) { loadAlerts() };
+  R['h_25310002bb'] = function (event, el) { loadAuthEvents() };
+  R['h_f78e2a0dc3'] = function (event, el) { this.parentElement.remove() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

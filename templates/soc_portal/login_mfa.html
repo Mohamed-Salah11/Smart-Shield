@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOC Portal — Verify Code</title>
+  <link rel="stylesheet" href="{{ static_v('vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+  <link href="{{ static_v('vendor/inter/inter.css') }}" rel="stylesheet">
+  <style nonce="{{ csp_nonce() }}">
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(ellipse at 60% 30%, #0f1f3d 0%, #0a0f1e 70%);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      color: #e2e8f0;
+    }
+    .soc-login-wrap { width: 100%; max-width: 400px; padding: 1rem; }
+    .soc-login-logo { text-align: center; margin-bottom: 2rem; }
+    .soc-login-logo i { font-size: 2.5rem; color: #00b4a0; }
+    .soc-login-logo h1 { font-size: 1.4rem; font-weight: 800; color: #4dd9cd; margin: .5rem 0 .2rem; }
+    .soc-login-logo p { color: #94a3b8; font-size: .85rem; }
+    .soc-login-box { background: #111827; border: 1px solid #2a3550; border-radius: 16px; padding: 2rem; }
+    .soc-login-box label { font-size: .85rem; font-weight: 600; color: #94a3b8; margin-bottom: .4rem; display: block; }
+    .soc-login-box .form-control {
+      background: #0d1526; border: 1px solid #2a3550; color: #e2e8f0;
+      border-radius: 8px; padding: .75rem 1rem; font-size: 1.4rem;
+      letter-spacing: .4rem; text-align: center; font-weight: 600;
+    }
+    .soc-login-box .form-control:focus {
+      background: #0d1526; border-color: #00b4a0; color: #e2e8f0;
+      box-shadow: 0 0 0 3px rgba(0,180,160,.15);
+    }
+    .btn-soc-login {
+      width: 100%; background: linear-gradient(135deg, #00b4a0, #0090a0); color: #fff;
+      border: none; border-radius: 8px; padding: .7rem; font-weight: 700; font-size: .95rem;
+      cursor: pointer; margin-top: .75rem;
+    }
+    .btn-soc-login:hover { opacity: .9; }
+    .soc-error {
+      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3);
+      color: #fca5a5; padding: .65rem 1rem; border-radius: 8px;
+      font-size: .875rem; margin-bottom: 1rem;
+    }
+    .soc-hint { color: #94a3b8; font-size: .82rem; margin-top: .75rem; text-align: center; }
+    .soc-footer { text-align: center; margin-top: 1.5rem; color: #4a5568; font-size: .78rem; }
+  </style>
+</head>
+<body>
+  <div class="soc-login-wrap">
+    <div class="soc-login-logo">
+      <i class="fa-solid fa-key"></i>
+      <h1>Two-Factor Verification</h1>
+      <p>Enter the 6-digit code from your authenticator app{% if username %} for <strong>{{ username }}</strong>{% endif %}.</p>
+    </div>
+
+    <div class="soc-login-box">
+      {% if error %}
+      <div class="soc-error"><i class="fa-solid fa-circle-exclamation me-1"></i>{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('soc_portal.login_mfa') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-1">
+          <label for="code">Authenticator Code</label>
+          <input type="text" id="code" name="code" class="form-control"
+                 inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                 autocomplete="one-time-code" autofocus required>
+        </div>
+        <p class="soc-hint">Codes refresh every 30 seconds.</p>
+        <button type="submit" class="btn-soc-login">
+          <i class="fa-solid fa-shield-halved me-1"></i> Verify &amp; Continue
+        </button>
+      </form>
+    </div>
+
+    <div class="soc-footer">
+      <a class="ext-d118642b" href="{{ url_for('soc_portal.login') }}">Cancel and sign in as someone else</a>
+    </div>
+  </div>
+</body>
+</html>

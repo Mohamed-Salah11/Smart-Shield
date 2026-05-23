@@ -509,7 +509,8 @@ def get_expiring_certs(conn, warn_days: int = 30) -> dict:
 # CRL generation
 # ---------------------------------------------------------------------------
 
-_CRL_DIR = "/usr/local/etc/smart-shield/crl"
+from app.config import _ss_dir as _ss_dir_cert
+_CRL_DIR = os.path.join(_ss_dir_cert("/usr/local/etc"), "crl")
 
 
 def generate_crl(conn, ca_id: int) -> dict:
@@ -685,7 +686,7 @@ def request_acme_cert(
     domain: str,
     email: str = "",
     staging: bool = False,
-    webroot: str = "/usr/local/www/smart-shield/.well-known/acme-challenge",
+    webroot: str = "",
 ) -> dict:
     """
     Request or renew a certificate from Let's Encrypt using certbot.
@@ -700,6 +701,11 @@ def request_acme_cert(
     domain = (domain or "").strip()
     if not domain:
         return {"ok": False, "message": "domain is required.", "id": None}
+
+    if not webroot:
+        webroot = os.path.join(
+            _ss_dir_cert("/usr/local/www"), ".well-known", "acme-challenge"
+        )
 
     if not _sys.platform.startswith("freebsd"):
         return {

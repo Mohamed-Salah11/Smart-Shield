@@ -23,6 +23,23 @@ from typing import List, Optional
 _ON_FREEBSD = sys.platform.startswith("freebsd")
 
 
+# Phase 11: canonical path is now `smartshield` (no hyphen). On in-place
+# upgrades from older installs the legacy `smart-shield` directory may exist
+# alongside (or instead of) the new one — install.sh creates a compat
+# symlink, but operators sometimes wipe symlinks during cleanup. Resolve at
+# import time so the preflight check / dir manifest reach the right tree even
+# when no symlink is in place.
+def _ss(parent: str, *, new: str = "smartshield", old: str = "smart-shield") -> str:
+    if not _ON_FREEBSD:
+        return os.path.join(parent, new)
+    new_path = os.path.join(parent, new)
+    old_path = os.path.join(parent, old)
+    # Prefer the legacy path ONLY when it exists AND the new one does not.
+    if os.path.isdir(old_path) and not os.path.isdir(new_path):
+        return old_path
+    return new_path
+
+
 # ---------------------------------------------------------------------------
 # Directory manifest
 # ---------------------------------------------------------------------------
@@ -55,38 +72,38 @@ def _app_dirs() -> List[DirSpec]:
 
 
 def _default_db():
-    if _ON_FREEBSD:   return "/var/db/smart-shield/data.db"
+    if _ON_FREEBSD:   return os.path.join(_ss("/var/db"), "data.db")
     if sys.platform.startswith("win"):
         return os.path.join(os.getenv("LOCALAPPDATA", "."), "SmartShield", "data.db")
     return "data.db"
 
 def _default_cfg():
-    if _ON_FREEBSD:   return "/usr/local/etc/smart-shield/config.json"
+    if _ON_FREEBSD:   return os.path.join(_ss("/usr/local/etc"), "config.json")
     return "config.json"
 
 def _default_uploads():
-    if _ON_FREEBSD:   return "/var/db/smart-shield/uploads/profile_pictures"
+    if _ON_FREEBSD:   return os.path.join(_ss("/var/db"), "uploads", "profile_pictures")
     return os.path.join("static", "uploads", "profile_pictures")
 
 def _default_audit():
-    if _ON_FREEBSD:   return "/var/log/smart-shield/audit.log"
+    if _ON_FREEBSD:   return os.path.join(_ss("/var/log"), "audit.log")
     return "audit.log"
 
 
 # All dirs that must exist on FreeBSD
 _FREEBSD_DIRS: List[DirSpec] = [
     # ── Smart Shield runtime ──────────────────────────────────────────────
-    DirSpec("/var/db/smart-shield",
+    DirSpec(_ss("/var/db"),
             description="Smart Shield database root"),
-    DirSpec("/var/db/smart-shield/uploads/profile_pictures",
+    DirSpec(os.path.join(_ss("/var/db"), "uploads/profile_pictures"),
             description="User profile picture uploads"),
-    DirSpec("/var/log/smart-shield",
+    DirSpec(_ss("/var/log"),
             description="Smart Shield application + audit logs"),
-    DirSpec("/var/run/smart-shield",
+    DirSpec(_ss("/var/run"),
             description="Smart Shield PID file"),
-    DirSpec("/usr/local/etc/smart-shield",
+    DirSpec(_ss("/usr/local/etc"),
             description="Smart Shield env + config.json"),
-    DirSpec("/usr/local/share/smart-shield",
+    DirSpec(_ss("/usr/local/share"),
             description="Smart Shield application code"),
 
     # ── PF (packet filter) ────────────────────────────────────────────────
@@ -153,6 +170,11 @@ class ToolSpec:
     alt_binary: str = ""  # fallback path to check
 
 
+# Canonical tool manifest for the appliance. This is the single source of truth
+# for "what binaries must/should exist"; the FreeBSD installer's verification
+# loop (bsd/install.sh) and feature_registry.py's required/optional_commands are
+# kept in sync with this list by hand (install.sh's check runs before the venv
+# exists, so it can't import this module).
 _TOOLS: List[ToolSpec] = [
     # ── FreeBSD base (no install needed) ─────────────────────────────────
     ToolSpec("pfctl",    "/sbin/pfctl",     "",
@@ -187,11 +209,15 @@ _TOOLS: List[ToolSpec] = [
              description="SQLite CLI (used by smartshieldctl)"),
 
     # ── Gunicorn (installed via pip in .venv) ─────────────────────────────
+    # Primary path matches the canonical `smartshield` layout install.sh
+    # creates today. alt_binary covers two fallbacks tried in order by
+    # check_tools(): the legacy hyphenated path (in-place upgrades) and a
+    # system-wide `pip install gunicorn` outside any venv.
     ToolSpec("gunicorn",
-             "/usr/local/share/smart-shield/.venv/bin/gunicorn",
+             os.path.join(_ss("/usr/local/share"), ".venv/bin/gunicorn"),
              "gunicorn (pip)",
              description="Production WSGI server",
-             alt_binary="/usr/local/bin/gunicorn"),
+             alt_binary="/usr/local/share/smart-shield/.venv/bin/gunicorn"),
 
     # ── DHCP ──────────────────────────────────────────────────────────────
     ToolSpec("dhcpd",
@@ -260,6 +286,65 @@ _TOOLS: List[ToolSpec] = [
              "/usr/local/share/certs/ca-root-nss.crt",
              "ca_root_nss",
              description="Mozilla CA bundle (required for HTTPS)"),
+
+    # ── Additional base diagnostics / kernel / network tools ──────────────
+    # FreeBSD base system (pkg=""); used by diagnostics pages, writers, and
+    # priv_helper actions (kldload, dnctl, etc.).
+    ToolSpec("kldload",  "/sbin/kldload",   "",
+             description="Load kernel module (netmap for IPS, etc.) — base"),
+    ToolSpec("kldstat",  "/sbin/kldstat",   "",
+             description="List loaded kernel modules — base"),
+    ToolSpec("sysctl",   "/sbin/sysctl",    "",
+             description="Kernel state (IP forwarding, etc.) — base"),
+    ToolSpec("dmesg",    "/sbin/dmesg",     "",
+             description="Kernel message buffer (OOM diagnostics) — base"),
+    ToolSpec("dnctl",    "/sbin/dnctl",     "",
+             description="dummynet traffic-shaper control — base"),
+    ToolSpec("service",  "/usr/sbin/service", "",
+             description="rc.d service control — base"),
+    ToolSpec("netstat",  "/usr/bin/netstat", "",
+             description="Network statistics / routing table — base"),
+    ToolSpec("ndp",      "/usr/sbin/ndp",   "",
+             description="IPv6 neighbour table — base"),
+    ToolSpec("pkill",    "/bin/pkill",      "",
+             description="Signal processes by name — base"),
+    ToolSpec("ntpd",     "/usr/sbin/ntpd",  "",
+             description="NTP daemon (clock sync for TLS) — base"),
+    ToolSpec("ntpq",     "/usr/sbin/ntpq",  "",
+             description="NTP query tool — base"),
+    ToolSpec("rtadvd",   "/usr/sbin/rtadvd", "",
+             description="IPv6 Router Advertisement daemon — base"),
+    ToolSpec("bsnmpd",   "/usr/sbin/bsnmpd", "",
+             description="SNMP daemon — base"),
+    ToolSpec("openssl",  "/usr/bin/openssl", "",
+             description="TLS/cert tooling — base"),
+
+    # ── Optional feature daemons / CLIs (pkg-installed) ───────────────────
+    ToolSpec("kea-dhcp6", "/usr/local/sbin/kea-dhcp6", "kea",
+             optional=True, description="Kea DHCPv6 server"),
+    ToolSpec("miniupnpd", "/usr/local/sbin/miniupnpd", "miniupnpd",
+             optional=True, description="UPnP IGD daemon"),
+    ToolSpec("igmpproxy", "/usr/local/sbin/igmpproxy", "igmpproxy",
+             optional=True, description="IGMP multicast proxy"),
+    ToolSpec("ddclient",  "/usr/local/sbin/ddclient", "ddclient",
+             optional=True, description="Dynamic DNS update client"),
+    ToolSpec("mrtg",      "/usr/local/bin/mrtg", "mrtg",
+             optional=True, description="Traffic grapher"),
+    ToolSpec("ipsec (strongSwan CLI)", "/usr/local/sbin/ipsec", "strongswan",
+             optional=True, description="strongSwan ipsec control CLI"),
+
+    # ── DNS / resolver helper CLIs ────────────────────────────────────────
+    ToolSpec("unbound-checkconf", "/usr/local/sbin/unbound-checkconf", "unbound",
+             optional=True, alt_binary="/usr/sbin/unbound-checkconf",
+             description="Unbound config validator"),
+    ToolSpec("unbound-control", "/usr/local/sbin/unbound-control", "unbound",
+             optional=True, alt_binary="/usr/sbin/unbound-control",
+             description="Unbound runtime control"),
+    ToolSpec("nsupdate", "/usr/local/bin/nsupdate", "bind-tools",
+             description="Dynamic DNS update tool (bind-tools)"),
+    ToolSpec("dig", "/usr/local/bin/dig", "bind-tools",
+             alt_binary="/usr/bin/drill",
+             description="DNS lookup tool (bind-tools; drill fallback)"),
 ]
 
 
@@ -307,7 +392,7 @@ def _ensure_config_json():
 
     cfg_path = os.getenv(
         "SMARTSHIELD_CONFIG_PATH",
-        "/usr/local/etc/smart-shield/config.json" if _ON_FREEBSD else "config.json",
+        os.path.join(_ss("/usr/local/etc"), "config.json") if _ON_FREEBSD else "config.json",
     )
     if os.path.exists(cfg_path):
         return  # already present

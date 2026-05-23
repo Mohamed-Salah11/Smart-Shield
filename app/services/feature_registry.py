@@ -141,7 +141,9 @@ _FEATURES: List[Feature] = [
         name="DNS Resolver (Unbound)",
         description="Unbound recursive DNS resolver / forwarder",
         required_commands=["unbound", "unbound-checkconf"],
-        required_services=["local_unbound"],
+        # The unbound package's rc.d service is `unbound` (what install.sh enables
+        # and the rest of the app manages) — NOT the base-system `local_unbound`.
+        required_services=["unbound"],
         freebsd_only=True,
         category="services",
     ),
@@ -367,6 +369,14 @@ def _feature_mode(feature: Feature) -> str:
     # Required commands must all be present
     missing_cmds = [c for c in feature.required_commands if not _cmd_present(c)]
     if missing_cmds:
+        return "unavailable"
+
+    # Required services — having the binary on PATH is not enough; the rc.d
+    # wrapper must exist or the feature has no way to start/stop the daemon.
+    # This catches the case where a pkg is uninstalled but its binary lingers
+    # under /usr/local/bin (e.g. from a venv-installed CLI of the same name).
+    missing_svcs = [s for s in feature.required_services if not _service_present(s)]
+    if missing_svcs:
         return "unavailable"
 
     # Special env-key checks

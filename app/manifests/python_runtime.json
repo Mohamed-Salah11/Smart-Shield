@@ -1,0 +1,15 @@
+{
+  "_comment": "Single source of truth for Python runtime imports required at app boot. Keep in sync with requirements.txt. Read by bsd/install.sh (post-venv import check), tools/release_check.py, and tools/runtime_preflight.py to avoid the kind of drift that produced the Fv12 flask_socketio false-fatal.",
+  "imports": [
+    "flask",
+    "cryptography",
+    "flask_sock",
+    "werkzeug",
+    "jinja2",
+    "dotenv",
+    "yaml",
+    "requests",
+    "gunicorn",
+    "gevent"
+  ]
+}

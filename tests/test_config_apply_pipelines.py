@@ -33,7 +33,7 @@ class TestPFGeneratorPipeline:
             text = generate_pf_conf(conn)
             assert "set block-policy drop" in text
             assert "scrub in all" in text
-            assert "block all" in text
+            assert "block log all" in text
             assert "pass out quick keep state" in text
 
     def test_default_nat_masquerade_added_when_no_outbound_rules(self, app):

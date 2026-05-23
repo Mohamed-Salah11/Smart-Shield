@@ -62,8 +62,9 @@ def sysrc_set(key: str, value: str) -> dict:
     try:
         result = run_privileged("sysrc.set", key=key, value=value)
         ok = result.returncode == 0
-        msg = (result.stdout or result.stderr or "").strip()
-        return {"ok": ok, "message": msg or f"sysrc: {key}={value}"}
+        parts = [p.strip() for p in (result.stdout, result.stderr) if p and p.strip()]
+        msg = "\n".join(parts) or f"sysrc: {key}={value}"
+        return {"ok": ok, "message": msg}
 
     except (FreeBSDNetworkError, PrivilegedActionError) as exc:
         return _err(str(exc))
@@ -96,8 +97,12 @@ def service_action(name: str, action: str) -> dict:
     try:
         result = run_privileged("service.action", service_name=name, action=action)
         ok = result.returncode == 0
-        msg = (result.stdout or result.stderr or "").strip()
-        return {"ok": ok, "message": msg or f"service {name} {action} completed"}
+        # Combine BOTH streams: FreeBSD rc-scripts print progress banners to
+        # stdout ("Performing sanity check on nginx configuration:") and the
+        # actual error to stderr. Picking only one drops the diagnostic.
+        parts = [p.strip() for p in (result.stdout, result.stderr) if p and p.strip()]
+        msg = "\n".join(parts) or f"service {name} {action} completed"
+        return {"ok": ok, "message": msg}
     except (FreeBSDNetworkError, PrivilegedActionError) as exc:
         return _err(str(exc))
 
@@ -260,60 +265,53 @@ def reload_all_services(conn) -> dict:
     pf_result = reload_pf_rules(conn)
     results.append({"service": "pf", "ok": pf_result["ok"], "message": pf_result["message"]})
 
-    # DHCP
+    # nginx — regenerate from DB so listeners track current LAN IP
     try:
-        from app.services.dhcp_writer import write_dhcpd_conf
-        dhcp_result = write_dhcpd_conf(conn)
+        from app.services.nginx_writer import apply_nginx
+        nginx_result = apply_nginx(conn)
+        results.append({"service": "nginx", "ok": nginx_result["ok"], "message": nginx_result["message"]})
+    except Exception as exc:
+        results.append({"service": "nginx", "ok": False, "message": str(exc)})
+
+    # DHCP — apply_dhcpd validates, atomically writes, restarts, rolls back on failure,
+    # and stops/disables the service when the DB says disabled.
+    try:
+        from app.services.dhcp_writer import apply_dhcpd
+        dhcp_result = apply_dhcpd(conn)
         results.append({"service": "dhcpd", "ok": dhcp_result["ok"], "message": dhcp_result["message"]})
-        if dhcp_result["ok"]:
-            r = service_action(SERVICES["dhcpd"], "restart")
-            results.append({"service": "dhcpd-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "dhcpd", "ok": False, "message": str(exc)})
 
-    # DNS (unbound)
+    # DNS (unbound) — apply_unbound validates with unbound-checkconf, atomic-writes,
+    # reloads, and rolls back from known-good on reload failure.
     try:
-        from app.services.dns_writer import write_unbound_conf
-        dns_result = write_unbound_conf(conn)
+        from app.services.dns_writer import apply_unbound
+        dns_result = apply_unbound(conn)
         results.append({"service": "unbound", "ok": dns_result["ok"], "message": dns_result["message"]})
-        if dns_result["ok"]:
-            r = service_action(SERVICES["unbound"], "restart")
-            results.append({"service": "unbound-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "unbound", "ok": False, "message": str(exc)})
 
     # OpenVPN
     try:
-        from app.services.openvpn_writer import write_openvpn_configs
-        ovpn_result = write_openvpn_configs(conn)
+        from app.services.openvpn_writer import apply_openvpn
+        ovpn_result = apply_openvpn(conn)
         results.append({"service": "openvpn", "ok": ovpn_result["ok"], "message": ovpn_result["message"]})
-        if ovpn_result["ok"]:
-            r = service_action(SERVICES["openvpn"], "restart")
-            results.append({"service": "openvpn-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "openvpn", "ok": False, "message": str(exc)})
 
     # IPsec
     try:
-        from app.services.ipsec_writer import write_ipsec_conf
-        ipsec_result = write_ipsec_conf(conn)
+        from app.services.ipsec_writer import apply_ipsec
+        ipsec_result = apply_ipsec(conn)
         results.append({"service": "strongswan", "ok": ipsec_result["ok"], "message": ipsec_result["message"]})
-        if ipsec_result["ok"]:
-            r = service_action(SERVICES["strongswan"], "restart")
-            results.append({"service": "strongswan-restart", "ok": r["ok"], "message": r["message"]})
     except Exception as exc:
         results.append({"service": "strongswan", "ok": False, "message": str(exc)})
 
-    # L2TP (mpd5) — only apply when explicitly enabled
+    # L2TP (mpd5) — apply_l2tp handles enabled/disabled internally
     try:
-        _l2tp_row = conn.execute("SELECT enabled FROM l2tp_config WHERE id=1").fetchone()
-        if _l2tp_row and _l2tp_row["enabled"]:
-            from app.services.l2tp_writer import write_l2tp_conf
-            l2tp_result = write_l2tp_conf(conn)
-            results.append({"service": "l2tp", "ok": l2tp_result["ok"], "message": l2tp_result["message"]})
-            if l2tp_result["ok"]:
-                r = service_action("mpd5", "restart")
-                results.append({"service": "l2tp-restart", "ok": r["ok"], "message": r["message"]})
+        from app.services.l2tp_writer import apply_l2tp
+        l2tp_result = apply_l2tp(conn)
+        results.append({"service": "l2tp", "ok": l2tp_result["ok"], "message": l2tp_result["message"]})
     except Exception as exc:
         results.append({"service": "l2tp", "ok": False, "message": str(exc)})
 
@@ -329,16 +327,16 @@ def reload_all_services(conn) -> dict:
     except Exception as exc:
         results.append({"service": "ntpd", "ok": False, "message": str(exc)})
 
-    # IDS / Suricata
+    # IDS / Suricata — route through apply_ids so reload-all goes through the
+    # same rules-bootstrap + write + restart ordering as the GUI toggle.
+    # Restarting Suricata without a rules file is what caused the
+    # "No rule files match" warning on first-time enable.
     try:
-        from app.services.ids_writer import write_suricata_config, _cfg as _ids_cfg
-        ids_cfg = _ids_cfg(conn)
-        if ids_cfg.get("enabled"):
-            ids_result = write_suricata_config(conn)
-            results.append({"service": "suricata", "ok": ids_result["ok"], "message": ids_result["message"]})
-            if ids_result["ok"]:
-                r = service_action("suricata", "restart")
-                results.append({"service": "suricata-restart", "ok": r["ok"], "message": r["message"]})
+        from app.services.ids_writer import apply_ids
+        ids_result = apply_ids(conn)
+        results.append({"service": "suricata",
+                        "ok": ids_result["ok"],
+                        "message": ids_result["message"]})
     except Exception as exc:
         results.append({"service": "suricata", "ok": False, "message": str(exc)})
 
@@ -390,15 +388,83 @@ def reload_all_services(conn) -> dict:
     except Exception as exc:
         results.append({"service": "igmpproxy", "ok": False, "message": str(exc)})
 
-    # Captive portal PF anchor
+    # Captive portal PF anchor — always call apply_* so disabling clears stale anchors.
     try:
-        from app.services.captive_portal import apply_captive_portal, get_captive_status
-        cp_status = get_captive_status(conn)
-        if cp_status.get("enabled"):
-            cp_result = apply_captive_portal(conn)
-            results.append({"service": "captive_portal", "ok": cp_result["ok"], "message": cp_result["message"]})
+        from app.services.captive_portal import apply_captive_portal
+        cp_result = apply_captive_portal(conn)
+        results.append({"service": "captive_portal", "ok": cp_result["ok"], "message": cp_result["message"]})
     except Exception as exc:
         results.append({"service": "captive_portal", "ok": False, "message": str(exc)})
 
     overall_ok = all(r["ok"] for r in results)
     return {"ok": overall_ok, "results": results}
+
+
+# ---------------------------------------------------------------------------
+# Package queries (read-only `pkg info` / `pkg search`)
+#
+# These are non-privileged, read-only repository queries. Privileged package
+# installs go through priv_helper's "pkg.install" action, not this module.
+# ---------------------------------------------------------------------------
+
+def pkg_list_installed() -> dict:
+    """Return installed packages via `pkg info`. Read-only; FreeBSD only."""
+    import json as _json
+    import subprocess as _sp
+    if not _on_freebsd():
+        return {"ok": True, "packages": [], "note": "pkg not available on this platform."}
+    try:
+        result = _sp.run(
+            ["pkg", "info", "--raw=json-compact"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return {"ok": False, "message": result.stderr.strip() or "pkg info failed."}
+        pkgs_raw = _json.loads(result.stdout)
+        packages = [
+            {
+                "name":    name,
+                "version": meta.get("version", ""),
+                "comment": meta.get("comment", ""),
+                "size":    meta.get("flatsize", 0),
+            }
+            for name, meta in pkgs_raw.items()
+        ]
+        packages.sort(key=lambda p: p["name"].lower())
+        return {"ok": True, "packages": packages, "count": len(packages)}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+def pkg_search(query: str) -> dict:
+    """Search the pkg repository for an exact package name. Read-only; FreeBSD only."""
+    import json as _json
+    import subprocess as _sp
+    if not _on_freebsd():
+        return {"ok": True, "results": [], "note": "pkg not available on this platform."}
+    try:
+        result = _sp.run(
+            ["pkg", "search", "--raw=json-compact", "--exact", "--", query],
+            capture_output=True, text=True, timeout=30,
+        )
+        results = []
+        try:
+            pkgs_raw = _json.loads(result.stdout)
+            results = [
+                {
+                    "name":    name,
+                    "version": meta.get("version", ""),
+                    "comment": meta.get("comment", ""),
+                }
+                for name, meta in pkgs_raw.items()
+            ]
+        except Exception:
+            # Fallback: plain-text search output
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    parts = line.split(None, 1)
+                    results.append({"name": parts[0], "version": "",
+                                    "comment": parts[1] if len(parts) > 1 else ""})
+        return {"ok": True, "results": results, "count": len(results)}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}

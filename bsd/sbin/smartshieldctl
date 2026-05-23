@@ -9,12 +9,18 @@ set -eu
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SERVICE_NAME="${SMARTSHIELD_SERVICE_NAME:-smart_shield}"
-APP_ROOT="${SMARTSHIELD_APP_ROOT:-/usr/local/share/smart-shield}"
-ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smart-shield/smart-shield.env}"
-DEFAULT_DB="${APP_ROOT}/data.db"
-LOG_FILE="/var/log/smart-shield/app.log"
-AUDIT_LOG="/var/log/smart-shield/audit.log"
-ACCESS_LOG="/var/log/smart-shield/access.log"
+APP_ROOT="${SMARTSHIELD_APP_ROOT:-/usr/local/share/smartshield}"
+ENV_FILE="${SMARTSHIELD_ENV_FILE:-/usr/local/etc/smartshield/smartshield.env}"
+# Production DB lives under /var/db/smartshield (root-runtime). The previous
+# fallback pointed at ${APP_ROOT}/data.db, which is the right location ONLY
+# for in-tree development — running `smartshieldctl passwd admin` against a
+# broken env file would silently bypass the real production DB and create a
+# zero-byte sqlite file under APP_ROOT (Fv11 review §P0-04). The recovery
+# tool must always pick the safest production default.
+DEFAULT_DB="${SMARTSHIELD_DEFAULT_DB:-/var/db/smartshield/data.db}"
+LOG_FILE="/var/log/smartshield/app.log"
+AUDIT_LOG="/var/log/smartshield/audit.log"
+ACCESS_LOG="/var/log/smartshield/access.log"
 WEB_BIND="${SMARTSHIELD_BIND:-127.0.0.1:5000}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,6 +50,80 @@ _sql() {
     sqlite3 "$(_db)" "$1"
 }
 
+# _sql_param <mode> [args...]
+#
+# Parameterized SQLite helper for any command that writes to or filters by
+# user-controlled input. The shell-interpolated _sql() above is fine for
+# fixed-string queries (factory_reset, pf_status, the SELECT-everything in
+# iface_show) but fails — sometimes silently, sometimes destructively — when
+# the argument can contain quotes or backslashes. Fv11 review §P0-05 flagged
+# the password reset and interface-assignment paths as the high-risk
+# offenders.
+#
+# Each mode below corresponds to one historical _sql() callsite that took
+# user input. Add a new mode here before adding a new sqlite3 "$1" call.
+_sql_param() {
+    _need_python
+    _db_path="$(_db)"
+    python3 - "${_db_path}" "$@" <<'PY'
+import sqlite3
+import sys
+
+db_path = sys.argv[1]
+mode    = sys.argv[2]
+args    = sys.argv[3:]
+
+conn = sqlite3.connect(db_path)
+try:
+    if mode == "resolve_port":
+        itype = args[0]
+        row = conn.execute(
+            "SELECT network_port FROM interface_assignments "
+            "WHERE interface_type=? LIMIT 1",
+            (itype,),
+        ).fetchone()
+        print(row[0] if row and row[0] else "")
+    elif mode == "assign_port":
+        # interface_assignments + lan_config/wan_config in one transaction so
+        # an interrupt mid-flight can't leave the two tables disagreeing about
+        # which physical port owns LAN/WAN.
+        itype, port = args
+        conn.execute(
+            "INSERT OR IGNORE INTO interface_assignments "
+            "(interface_type, network_port) VALUES (?, ?)",
+            (itype, port),
+        )
+        conn.execute(
+            "UPDATE interface_assignments SET network_port=? "
+            "WHERE interface_type=?",
+            (port, itype),
+        )
+        table = "lan_config" if itype == "LAN" else "wan_config"
+        # Whitelist guard — sqlite3 cannot parameterize identifiers, so the
+        # table name is selected from a fixed two-element set.
+        if table not in ("lan_config", "wan_config"):
+            raise SystemExit(f"refusing unexpected table: {table!r}")
+        conn.execute(f"INSERT OR IGNORE INTO {table} (id) VALUES (1)")
+        conn.execute(f"UPDATE {table} SET assigned_port=? WHERE id=1", (port,))
+        conn.commit()
+    elif mode == "set_password":
+        username, hashed = args
+        conn.execute(
+            "UPDATE users SET password=? WHERE username=?",
+            (hashed, username),
+        )
+        # changes() returns -1 if no statement has executed in the connection;
+        # explicit fetchone() gives us a row count we can act on.
+        changed = conn.execute("SELECT changes()").fetchone()[0]
+        conn.commit()
+        print(changed)
+    else:
+        raise SystemExit(f"unknown _sql_param mode: {mode!r}")
+finally:
+    conn.close()
+PY
+}
+
 _validate_cidr() {
     _need_python
     python3 - "$1" <<'PY'
@@ -68,9 +148,12 @@ PY
 }
 
 _resolve_port() {
-    # Returns the physical port (e.g. em0) assigned to WAN or LAN
+    # Returns the physical port (e.g. em0) assigned to WAN or LAN.
+    # Uses the parameterized helper because interface_type is supplied by the
+    # operator on the command line — a value containing a quote would have
+    # mangled the old shell-interpolated SELECT.
     itype="$1"
-    raw="$(_sql "SELECT network_port FROM interface_assignments WHERE interface_type='${itype}' LIMIT 1;")"
+    raw="$(_sql_param resolve_port "${itype}")"
     echo "${raw}" | awk '{print $1}' | tr -cd 'A-Za-z0-9_.:-'
 }
 
@@ -220,17 +303,19 @@ cmd_iface_set() {
 cmd_assign() {
     # smartshieldctl assign <LAN|WAN> <port>
     itype="$(echo "${1:-}" | tr '[:lower:]' '[:upper:]')"
-    # Sanitize port: allow only alphanumeric, dots, colons, underscores, hyphens
+    # Sanitize port: allow only alphanumeric, dots, colons, underscores, hyphens.
+    # This is the outer guard; the inner _sql_param call still uses bound
+    # parameters so any byte that slips through is treated as data, not SQL.
     port="$(echo "${2:-}" | tr -cd 'A-Za-z0-9_.:-')"
-    [ -z "${itype}" ] || [ -z "${port}" ] && { echo "usage: smartshieldctl assign <LAN|WAN> <port>"; exit 1; }
-    _need_sqlite
-    _sql "INSERT OR IGNORE INTO interface_assignments (interface_type, network_port) VALUES ('${itype}','${port}');
-          UPDATE interface_assignments SET network_port='${port}' WHERE interface_type='${itype}';"
-    # Also update assigned_port in lan_config/wan_config
+    if [ -z "${itype}" ] || [ -z "${port}" ]; then
+        echo "usage: smartshieldctl assign <LAN|WAN> <port>"
+        exit 1
+    fi
     case "${itype}" in
-        LAN) _sql "INSERT OR IGNORE INTO lan_config (id) VALUES (1); UPDATE lan_config SET assigned_port='${port}' WHERE id=1;" ;;
-        WAN) _sql "INSERT OR IGNORE INTO wan_config (id) VALUES (1); UPDATE wan_config SET assigned_port='${port}' WHERE id=1;" ;;
+        LAN|WAN) ;;
+        *) echo "error: interface must be LAN or WAN"; exit 1 ;;
     esac
+    _sql_param assign_port "${itype}" "${port}"
     echo "${itype} assigned to port '${port}'."
 }
 
@@ -271,7 +356,9 @@ from werkzeug.security import generate_password_hash
 print(generate_password_hash(os.environ['_SS_PASSWD']))
 " 2>/dev/null)"
     [ -z "${hashed}" ] && { echo "error: could not hash password (werkzeug not installed?)"; exit 1; }
-    rows="$(_sql "UPDATE users SET password='${hashed}' WHERE username='${user}'; SELECT changes();")"
+    # Parameterized UPDATE so a username like  admin'test  no longer breaks
+    # the statement or risks accidental data damage (Fv11 review §P0-05).
+    rows="$(_sql_param set_password "${user}" "${hashed}")"
     if [ "${rows}" = "0" ]; then
         echo "User '${user}' not found."
         exit 1
@@ -358,6 +445,114 @@ sys.exit(0 if r["overall_ok"] else 1)
 PY
 }
 
+cmd_verify() {
+    # smartshieldctl verify {startup|deployment} [--json]
+    sub="${1:-deployment}"; shift 2>/dev/null || true
+    json_mode=0
+    for arg in "$@"; do
+        [ "${arg}" = "--json" ] && json_mode=1
+    done
+
+    _need_python
+    _load_env
+
+    case "${sub}" in
+        startup)
+            # Drive tools/smoke_startup.py; exit 0 iff create_app() succeeds.
+            if [ "${json_mode}" -eq 1 ]; then
+                python3 - <<PY
+import json, sys
+sys.path.insert(0, "${APP_ROOT}")
+try:
+    from app import create_app
+    app = create_app()
+    routes = sum(1 for _ in app.url_map.iter_rules())
+    print(json.dumps({"ok": True, "blueprints": len(app.blueprints),
+                      "routes": routes, "database": "ok"}))
+except Exception as exc:
+    print(json.dumps({"ok": False, "error": str(exc)}))
+    sys.exit(1)
+PY
+            else
+                exec python3 "${APP_ROOT}/tools/smoke_startup.py"
+            fi
+            ;;
+        deployment)
+            # Umbrella: startup + release_check + security_lint_routes.
+            # Exit non-zero if any check fails.
+            python3 - <<PY
+import json, sys, subprocess
+sys.path.insert(0, "${APP_ROOT}")
+
+results = {}
+ok = True
+
+# 1. Startup
+try:
+    from app import create_app
+    app = create_app()
+    results["startup"] = {
+        "ok": True,
+        "blueprints": len(app.blueprints),
+        "routes": sum(1 for _ in app.url_map.iter_rules()),
+    }
+except Exception as exc:
+    results["startup"] = {"ok": False, "error": str(exc)}
+    ok = False
+
+# 2. Release check
+try:
+    rc = subprocess.run(
+        [sys.executable, "${APP_ROOT}/tools/release_check.py"],
+        capture_output=True, text=True, timeout=60,
+    )
+    results["release_check"] = {"ok": rc.returncode == 0,
+                                  "stdout_tail": rc.stdout[-2000:],
+                                  "stderr_tail": rc.stderr[-2000:]}
+    if rc.returncode != 0:
+        ok = False
+except Exception as exc:
+    results["release_check"] = {"ok": False, "error": str(exc)}
+    ok = False
+
+# 3. Route security lint
+try:
+    rc = subprocess.run(
+        [sys.executable, "${APP_ROOT}/tools/security_lint_routes.py"],
+        capture_output=True, text=True, timeout=60,
+    )
+    results["security_lint_routes"] = {
+        "ok": rc.returncode == 0,
+        "stdout_tail": rc.stdout[-2000:],
+        "stderr_tail": rc.stderr[-2000:],
+    }
+    if rc.returncode != 0:
+        ok = False
+except Exception as exc:
+    results["security_lint_routes"] = {"ok": False, "error": str(exc)}
+    ok = False
+
+if ${json_mode}:
+    print(json.dumps({"ok": ok, "checks": results}, indent=2))
+else:
+    for name, r in results.items():
+        flag = "OK" if r.get("ok") else "FAIL"
+        print(f"[{flag:4s}] {name}")
+        if not r.get("ok") and r.get("error"):
+            print(f"        error: {r['error']}")
+    print(f"\nOverall: {'PASS' if ok else 'FAIL'}")
+
+sys.exit(0 if ok else 1)
+PY
+            ;;
+        *)
+            echo "Unknown verify target: ${sub}"
+            echo "Usage: smartshieldctl verify {startup|deployment} [--json]"
+            exit 1
+            ;;
+    esac
+}
+
 cmd_vpn_status() {
     echo "=== OpenVPN ==="
     pgrep -a openvpn 2>/dev/null && echo "Running." || echo "Not running."
@@ -439,6 +634,81 @@ cmd_shell() {
     exec /bin/sh
 }
 
+cmd_db_path() {
+    # Print the production DB path the rest of this script will use. Useful
+    # when the operator wants to confirm the env file is being read and the
+    # /var/db fallback applies (Fv11 review §P0-04 acceptance check).
+    _db
+}
+
+cmd_doctor() {
+    # Fv11 review §P3-01: one-command appliance health check. Each line is a
+    # PASS/WARN/FAIL with the underlying observation, so the operator can
+    # paste the output into a support thread without further triage.
+    fail=0
+    _doctor_check() {
+        # _doctor_check <label> <command...>  — exit code 0 → OK, non-zero → FAIL.
+        # `eval` lets the caller pass shell tests (e.g. `[ -f /foo ]`) verbatim.
+        _label="$1"; shift
+        if eval "$@" >/dev/null 2>&1; then
+            _ok "${_label}"
+        else
+            _err "${_label}"
+            fail=$((fail + 1))
+        fi
+    }
+    _doctor_warn() {
+        _label="$1"; shift
+        if eval "$@" >/dev/null 2>&1; then
+            _ok "${_label}"
+        else
+            _warn "${_label}"
+        fi
+    }
+
+    echo "=== Smart Shield doctor ==="
+
+    # ── Config / secrets ────────────────────────────────────────────────────
+    _doctor_check "env file present (${ENV_FILE})"        "[ -f '${ENV_FILE}' ]"
+    _doctor_check "env file mode 0600"                    "[ \"\$(stat -f '%Lp' '${ENV_FILE}' 2>/dev/null)\" = '600' ]"
+    _doctor_check "SECRET_KEY set and not a placeholder"  "grep -qE '^SECRET_KEY=[0-9a-fA-F]{16,}' '${ENV_FILE}' && ! grep -qE '^SECRET_KEY=(CHANGE_ME|please-change|changeme)' '${ENV_FILE}'"
+    _doctor_check "master.key present"                    "[ -f '/usr/local/etc/smartshield/master.key' ]"
+    _doctor_check "master.key mode 0600"                  "[ \"\$(stat -f '%Lp' '/usr/local/etc/smartshield/master.key' 2>/dev/null)\" = '600' ]"
+
+    # ── Database ────────────────────────────────────────────────────────────
+    _db_path="$(_db)"
+    _doctor_check "database file exists (${_db_path})"    "[ -f '${_db_path}' ]"
+    _doctor_check "database directory writable"           "[ -w \"\$(dirname '${_db_path}')\" ]"
+
+    # ── Service / web ───────────────────────────────────────────────────────
+    _doctor_warn "smart_shield enabled at boot"           "sysrc -n ${SERVICE_NAME}_enable | grep -qi '^yes$'"
+    _doctor_warn "smart_shield service running"           "service ${SERVICE_NAME} status"
+    _doctor_warn "nginx enabled at boot"                  "sysrc -n nginx_enable | grep -qi '^yes$'"
+    _doctor_warn "nginx running"                          "service nginx status"
+    _doctor_warn "PF enabled at boot"                     "sysrc -n pf_enable | grep -qi '^yes$'"
+    _doctor_warn "web UI reachable at ${WEB_BIND}/login"  "{ fetch -qo /dev/null http://${WEB_BIND}/login 2>/dev/null || curl -fsS -o /dev/null http://${WEB_BIND}/login 2>/dev/null; }"
+
+    # ── Suricata (P1-08 visibility) ─────────────────────────────────────────
+    if command -v suricata >/dev/null 2>&1; then
+        _doctor_check "suricata config valid (suricata -T)" "suricata -T -c /usr/local/etc/suricata/suricata.yaml"
+        _doctor_warn "suricata-update available"           "command -v suricata-update"
+        _doctor_warn "suricata rules file non-empty"       "[ -s /var/lib/suricata/rules/suricata.rules ]"
+    else
+        _info "Suricata not installed — IDS section skipped"
+    fi
+
+    # ── Disk / logs ─────────────────────────────────────────────────────────
+    _doctor_warn "log directory writable"                 "[ -w '/var/log/smartshield' ]"
+
+    echo ""
+    if [ "${fail}" -eq 0 ]; then
+        _ok "All required checks passed."
+    else
+        _err "${fail} required check(s) failed."
+        exit 1
+    fi
+}
+
 # ── Usage ─────────────────────────────────────────────────────────────────────
 
 _usage() {
@@ -466,7 +736,9 @@ Diagnostics:
   ping [host] [count]                 ICMP ping (default 8.8.8.8, 4 packets)
   pf-status                           Show pf rules, NAT, state table
   apply-pf                            Regenerate pf.conf and reload pfctl
-  preflight                           Check dirs + tools
+  preflight                           Check dirs + tools (alias of legacy)
+  verify startup [--json]             Smoke-test the Flask app boots cleanly
+  verify deployment [--json]          Full deployment readiness report
   vpn-status                          Show OpenVPN / IPsec / L2TP state
   dhcp-status                         Show DHCP leases
   dns-status                          Show Unbound status
@@ -478,6 +750,10 @@ Administration:
   ssh <enable|disable|status>         Control sshd
   shell                               Drop to /bin/sh
   menu                                Launch interactive console menu
+
+Support:
+  db-path                             Print the production DB path in use
+  doctor                              One-shot appliance health report
 EOF
 }
 
@@ -505,6 +781,7 @@ case "${cmd}" in
     pf-status)      cmd_pf_status ;;
     apply-pf)       cmd_apply_pf ;;
     preflight)      cmd_preflight ;;
+    verify)         cmd_verify "$@" ;;
     vpn-status)     cmd_vpn_status ;;
     dhcp-status)    cmd_dhcp_status ;;
     dns-status)     cmd_dns_status ;;
@@ -514,6 +791,8 @@ case "${cmd}" in
     ssh)            cmd_ssh "$@" ;;
     shell)          cmd_shell ;;
     menu)           exec smartshield-cli ;;
+    db-path)        cmd_db_path ;;
+    doctor)         cmd_doctor ;;
     --help|-h|help) _usage ;;
     *) echo "Unknown command: ${cmd}"; echo "Run 'smartshieldctl --help' for usage."; exit 1 ;;
 esac

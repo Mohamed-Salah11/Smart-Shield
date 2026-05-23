@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
 {% block main %}
-<div class="container" style="max-width:680px">
+<div class="container ext-d031234f">
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">Halt / Reboot</h1>
-      <p class="ss-page-desc">Gracefully shut down or restart the firewall appliance</p>
+      <p class="ss-page-desc">Gracefully shut down or restart the Smart Shield appliance</p>
     </div>
   </div>
 
@@ -63,7 +63,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 let pendingAction = null;
 const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
 

@@ -49,12 +49,13 @@ def _state(running: bool) -> str:
 # Disk usage
 # ---------------------------------------------------------------------------
 
+from app.config import _ss_dir as _ss_dir_health
 _PATHS_TO_MONITOR = [
-    ("/",                    "root"),
-    ("/var",                 "var"),
-    ("/var/db/smart-shield", "data"),
-    ("/var/log/smart-shield","logs"),
-    ("/tmp",                 "tmp"),
+    ("/",                              "root"),
+    ("/var",                           "var"),
+    (_ss_dir_health("/var/db"),        "data"),
+    (_ss_dir_health("/var/log"),       "logs"),
+    ("/tmp",                           "tmp"),
 ]
 
 
@@ -670,7 +671,9 @@ def get_interface_link_status() -> list:
 
     try:
         from app.services.network_service import run_command
-        r = run_command(["ifconfig", "-a"], check=False, timeout_seconds=5)
+        # Read-only poll — opt out of audit-log to avoid filling the SOC feed
+        # with hundreds of identical entries per minute.
+        r = run_command(["ifconfig", "-a"], check=False, timeout_seconds=5, _audit=False)
         for line in (r.stdout or "").splitlines():
             # Interface header: starts with a non-whitespace char and contains ":"
             if line and not line[0].isspace() and ":" in line:
@@ -760,9 +763,9 @@ def send_alerts(conn, snapshot: dict) -> list:
 
     settings  = _load_alert_settings(conn)
     channels  = settings.get("channels", [])
-    subject   = "Smart Shield Health Alert"
+    subject   = "SmartShield Health Alert"
     body      = "\n".join(f"• {a}" for a in alerts)
-    body      = f"Smart Shield detected the following issues at {snapshot.get('timestamp','?')}:\n\n{body}"
+    body      = f"SmartShield detected the following issues at {snapshot.get('timestamp','?')}:\n\n{body}"
 
     for ch in channels:
         ch_type = (ch.get("type") or "").lower()

@@ -1,0 +1,168 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Quick Actions{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">
+      <i class="fa-solid fa-bolt ext-6c0fabf5"></i> Quick Actions
+    </h2>
+    <p class="ext-6609c206">
+      L3 Incident Response — all actions are logged to the audit trail
+    </p>
+  </div>
+  <span class="soc-tier-badge soc-tier-L3 ms-2">L3 Access</span>
+</div>
+
+<div class="row g-3">
+  <!-- Block IP -->
+  <div class="col-lg-6">
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-ban ext-ca6a3f2f"></i>
+        <div>
+          <div class="soc-card-title">Block IP Address</div>
+          <div class="soc-card-subtitle">Add to PF <code class="ext-6c660c40">soc_blocklist</code> table immediately</div>
+        </div>
+      </div>
+      <div class="soc-card-body">
+        <div class="mb-3">
+          <label class="ext-b5dfb31e">IP Address *</label>
+          <input type="text" id="block-ip" class="form-control ext-be0d0d35" placeholder="e.g. 203.0.113.45"
+                >
+        </div>
+        <div class="mb-3">
+          <label class="ext-b5dfb31e">Reason / Note</label>
+          <input type="text" id="block-note" class="form-control ext-4b1196ec" placeholder="e.g. Confirmed C2 traffic from case #42"
+                >
+        </div>
+        <button class="btn-soc-danger" data-action="h_ff2bf6f719">
+          <i class="fa-solid fa-ban me-1"></i> Block IP
+        </button>
+        <div id="block-result" class="mt-2 ext-cb458930"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reload Firewall -->
+  <div class="col-lg-6">
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-rotate ext-eb8645b3"></i>
+        <div>
+          <div class="soc-card-title">Reload Firewall Rules</div>
+          <div class="soc-card-subtitle">Force <code class="ext-6c660c40">pfctl -f /etc/pf.conf</code> — applies pending rule changes</div>
+        </div>
+      </div>
+      <div class="soc-card-body">
+        <p class="ext-0d7c7c90">
+          Reload all PF firewall rules from the current configuration. This applies any rules that were saved but not yet active.
+          The operation is logged to the audit trail with your username.
+        </p>
+        <div class="ext-54d04e8a">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          Active connections may be momentarily interrupted during a rule reload.
+        </div>
+        <button class="btn-soc-primary ext-1b32ae3a" data-action="h_799d25811f">
+          <i class="fa-solid fa-rotate me-1"></i> Reload Firewall
+        </button>
+        <div id="reload-result" class="mt-2 ext-cb458930"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Action History (last 10 from audit log) -->
+<div class="soc-card mt-3">
+  <div class="soc-card-head">
+    <i class="fa-solid fa-clock-rotate-left ext-a729d7fe"></i>
+    <div>
+      <div class="soc-card-title">Recent Actions</div>
+      <div class="soc-card-subtitle">Your SOC actions from this session</div>
+    </div>
+  </div>
+  <div class="soc-card-body p-0">
+    <table class="soc-table" id="action-history-table">
+      <thead><tr><th>Time</th><th>Action</th><th>Target / Result</th></tr></thead>
+      <tbody id="action-history-tbody">
+        <tr><td colspan="3" class="text-center py-3 ext-a729d7fe">No actions taken yet this session.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+
+<script nonce="{{ csp_nonce() }}">
+const actionHistory = [];
+
+function addToHistory(action, detail, ok) {
+  actionHistory.unshift({
+    time: new Date().toLocaleTimeString(),
+    action,
+    detail,
+    ok,
+  });
+  const tbody = document.getElementById('action-history-tbody');
+  tbody.innerHTML = actionHistory.map(a => `<tr>
+    <td class="soc-mono ext-6c660c40">${a.time}</td>
+    <td class="ext-1e29eefb">${a.action}</td>
+    <td class="ext-60f36eb8">${a.detail}</td>
+  </tr>`).join('');
+}
+
+function showResult(elId, message, ok) {
+  const el = document.getElementById(elId);
+  el.style.display = 'block';
+  el.style.background = ok ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)';
+  el.style.border = `1px solid ${ok ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.3)'}`;
+  el.style.color  = ok ? 'var(--soc-success)' : '#fca5a5';
+  el.style.padding = '.6rem .9rem';
+  el.style.borderRadius = '8px';
+  el.style.fontSize = '.875rem';
+  el.textContent  = message;
+}
+
+async function blockIP() {
+  const ip   = document.getElementById('block-ip').value.trim();
+  const note = document.getElementById('block-note').value.trim();
+  if (!ip) { alert('Please enter an IP address.'); return; }
+  const r = await fetch('/soc-portal/actions/block-ip', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ip, note}),
+  });
+  const d = await r.json();
+  showResult('block-result', d.message || (d.ok ? 'Blocked.' : 'Failed.'), d.ok);
+  addToHistory('Block IP', `${ip} — ${d.ok ? 'success' : 'failed'}`, d.ok);
+  if (d.ok) document.getElementById('block-ip').value = '';
+}
+
+function confirmReload() {
+  if (!confirm('Reload all PF firewall rules? Active connections may be briefly interrupted.')) return;
+  doReload();
+}
+
+async function doReload() {
+  const r = await fetch('/soc-portal/actions/reload-firewall', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({}),
+  });
+  const d = await r.json();
+  showResult('reload-result', d.message || (d.ok ? 'Rules reloaded.' : 'Reload failed.'), d.ok);
+  addToHistory('Reload Firewall', d.ok ? 'success' : 'failed', d.ok);
+}
+</script>
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_ff2bf6f719'] = function (event, el) { blockIP() };
+  R['h_799d25811f'] = function (event, el) { confirmReload() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}

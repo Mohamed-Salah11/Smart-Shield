@@ -1,0 +1,89 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Set up MFA{% endblock %}
+{% block content %}
+<div class="soc-page-header mb-3">
+  <h1 class="ext-43a67986">
+    <i class="fa-solid fa-shield-halved me-2"></i>Set up Two-Factor Authentication
+  </h1>
+  <p class="ext-c9e1c6a9">
+    Add a 6-digit code prompt to your sign-in. Takes about 30 seconds.
+  </p>
+</div>
+
+<div class="ext-7646a058">
+  {% if error %}
+    <div class="alert alert-danger mb-3">{{ error }}</div>
+  {% endif %}
+
+  <ol class="ext-4d816a0e">
+    <li>
+      <strong>Install an authenticator app</strong> on your phone — Google Authenticator,
+      Authy, 1Password, Bitwarden, or any other standard TOTP app.
+    </li>
+    <li>
+      <strong>Add an account.</strong> Either scan the QR code with the app's camera,
+      or pick "Enter a setup key" and type the secret below.
+    </li>
+  </ol>
+
+  <div class="ext-a0e8876d">
+    <div class="ext-79ff0c9e">
+      <div class="ext-b208f99f" id="mfa-qr"
+           data-uri="{{ uri }}">
+        <noscript>
+          <div class="ext-ddda2df0">
+            JavaScript is required to render the QR code. Type the setup key into your authenticator app instead.
+          </div>
+        </noscript>
+      </div>
+      <div class="ext-51d7888a">Rendered locally in your browser — the secret never leaves this page.</div>
+    </div>
+    <div>
+      <div class="ext-c875ac7d">Account</div>
+      <div class="ext-c20a0e95">SmartShield SOC : {{ username }}</div>
+
+      <div class="ext-c875ac7d">Setup Key</div>
+      <code class="ext-84e99946">{{ secret }}</code>
+
+      <div class="ext-5b8ae67e">Algorithm</div>
+      <div class="ext-e963fb61">SHA1 · 6 digits · 30 s period</div>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('soc_portal.security_enroll') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="form-label ext-d9739007">
+      Enter the current 6-digit code from your app to finish enrollment
+    </label>
+    <div class="d-flex gap-2 ext-284b8423">
+      <input type="text" name="code" class="form-control ext-2251fd7c"
+             inputmode="numeric" pattern="[0-9]*" maxlength="6"
+            
+             autofocus required>
+      <button type="submit" class="btn btn-primary">Activate</button>
+    </div>
+    <p class="ext-dc77f074">
+      If verification fails, your device clock may be skewed. Check that automatic time is on, then try the next code.
+    </p>
+  </form>
+
+  <hr class="ext-3c89972a">
+  <a href="{{ url_for('soc_portal.security') }}" class="btn btn-secondary btn-sm">Cancel</a>
+</div>
+
+<!-- Client-side QR rendering (qrcodejs by davidshim) — the otpauth URI never leaves the browser. -->
+<script src="{{ static_v('vendor/qrcode/qrcode.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+  (function () {
+    var target = document.getElementById('mfa-qr');
+    if (!target || typeof QRCode === 'undefined') return;
+    var uri = target.dataset.uri || '';
+    if (!uri) return;
+    new QRCode(target, {
+      text: uri, width: 200, height: 200,
+      colorDark: '#000', colorLight: '#fff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  })();
+</script>
+{% endblock %}

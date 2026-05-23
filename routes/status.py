@@ -1,20 +1,14 @@
 import json as _json
-from flask import Blueprint, render_template, request, jsonify, session
-from app.auth_utils import login_required
+from flask import Blueprint, render_template, request, jsonify, session, abort, current_app
+from app.auth_utils import login_required, superuser_required
 from app.api_auth import api_permission_required
-from app.audit_log import tail_events, tail_events_since, log_stats
+from app.audit_log import tail_events, tail_events_since, log_stats, events_timeseries
 
 status_bp = Blueprint("status", __name__, url_prefix="/status")
 
 # Interfaces to exclude from network stats (loopback, PF log, IPsec enc).
 # VPN tunnel interfaces (tun*, gif*, gre*) are kept — they carry real user traffic.
 _VIRTUAL_IFACE_PREFIXES = frozenset(("lo", "pflog", "enc"))
-
-# Actions excluded from the SIEM live feed unconditionally.
-# page_view is admin GUI navigation — useful for access auditing but not for
-# security monitoring. Export still includes everything.
-_SIEM_EXCLUDED_ACTIONS = frozenset({"page_view"})
-
 
 # --------------------------------------------------
 # STATUS MAIN PAGE
@@ -57,12 +51,6 @@ def dhcp_leases():
 # DHCPv6 LEASES (IPv6)
 # --------------------------------------------------
 
-@status_bp.route("/dhcpv6-leases")
-@login_required
-def dhcpv6_leases():
-    return render_template("dhcpv6_leases.html")
-
-
 # --------------------------------------------------
 # FILTER RELOAD STATUS
 # --------------------------------------------------
@@ -79,11 +67,14 @@ def filter_reload():
     cur.execute("SELECT * FROM firewall_rules_lan WHERE disabled=0 ORDER BY rule_order LIMIT 1")
     has_lan = cur.fetchone() is not None
     cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_wan WHERE disabled=0")
-    wan_count = (cur.fetchone() or {}).get("c", 0)
+    row = cur.fetchone()
+    wan_count = row["c"] if row else 0
     cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_lan WHERE disabled=0")
-    lan_count = (cur.fetchone() or {}).get("c", 0)
+    row = cur.fetchone()
+    lan_count = row["c"] if row else 0
     cur.execute("SELECT COUNT(*) AS c FROM firewall_rules_floating WHERE disabled=0")
-    float_count = (cur.fetchone() or {}).get("c", 0)
+    row = cur.fetchone()
+    float_count = row["c"] if row else 0
     pf_enabled = sys.platform.startswith("freebsd") and os.path.exists("/dev/pf")
     return render_template("filter_reload.html",
         wan_count=wan_count, lan_count=lan_count,
@@ -292,13 +283,25 @@ def api_logs():
         end_ts=end_ts,
     )
 
-    # Exclude page_view and other non-security noise from the live SIEM feed.
-    # (Export endpoint still returns the full unfiltered log.)
-    events = [e for e in events if e.get("action") not in _SIEM_EXCLUDED_ACTIONS]
-
     # Action-level filter (used by the Firewall category pill).
     if action_filter:
         events = [e for e in events if e.get("action") in action_filter]
+
+    # SOC-origin events are hidden from /status/api/logs **by default**. The
+    # firewall dashboard, alerts, and log views consume this endpoint, and SOC
+    # analyst activity belongs in the SOC portal — not in the appliance log.
+    # A superuser may explicitly opt in by passing ``hide_soc=0``; for any
+    # other caller (or non-superuser) we filter SOC-tagged events out.
+    _hide_soc_raw = request.args.get("hide_soc")
+    _is_superuser = bool(session.get("is_superuser"))
+    _show_soc = (
+        _hide_soc_raw is not None
+        and _hide_soc_raw.strip().lower() in ("0", "false", "no")
+        and _is_superuser
+    )
+    if not _show_soc:
+        events = [e for e in events
+                  if not (e.get("details") or {}).get("soc_origin")]
 
     if search:
         def _matches(e):
@@ -329,6 +332,439 @@ def api_logs():
 def api_logs_stats():
     """Per-category event counts + critical/high totals for the SIEM header."""
     return jsonify(log_stats())
+
+
+@status_bp.route("/api/logs/timeseries")
+@login_required
+def api_logs_timeseries():
+    """
+    Event counts grouped by time bucket and severity, for the log charts.
+
+    Query params: bucket (hour|day), categories, severities, start_ts, end_ts.
+    """
+    bucket   = request.args.get("bucket", "hour").strip()
+    if bucket not in ("hour", "day"):
+        bucket = "hour"
+    start_ts = request.args.get("start_ts", "").strip()
+    end_ts   = request.args.get("end_ts",   "").strip()
+    cats_raw = request.args.get("categories", "").strip()
+    sevs_raw = request.args.get("severities", "").strip()
+    categories = [c.strip() for c in cats_raw.split(",") if c.strip()] if cats_raw else None
+    severities = [s.strip() for s in sevs_raw.split(",") if s.strip()] if sevs_raw else None
+
+    data = events_timeseries(
+        bucket=bucket,
+        categories=categories,
+        severities=severities,
+        start_ts=start_ts,
+        end_ts=end_ts,
+    )
+    return jsonify({"ok": True, **data})
+
+
+@status_bp.route("/api/logs/stream")
+@login_required
+def api_logs_stream():
+    """
+    Server-Sent Events stream of new audit events for the live log monitor.
+
+    Query params: categories, severities (comma-separated), since_id.
+    Emits `event: ready` (the starting id) then `event: log` per new event.
+    The connection recycles after 10 minutes; EventSource auto-reconnects.
+    """
+    from flask import Response, stream_with_context
+    import time as _time
+
+    cats_raw = request.args.get("categories", "").strip()
+    sevs_raw = request.args.get("severities", "").strip()
+    categories = {c.strip() for c in cats_raw.split(",") if c.strip()} if cats_raw else None
+    severities = {s.strip() for s in sevs_raw.split(",") if s.strip()} if sevs_raw else None
+    try:
+        since_id = int(request.args.get("since_id", 0) or 0)
+    except (ValueError, TypeError):
+        since_id = 0
+
+    # SOC-origin filtering mirrors /api/logs (paginated): hide SOC-tagged
+    # events from the firewall live feed unless a superuser explicitly opts
+    # in with ?hide_soc=0. Capture in locals so the streaming generator does
+    # not have to read request/session inside its long-lived loop.
+    _hide_soc_raw = request.args.get("hide_soc")
+    _is_superuser = bool(session.get("is_superuser"))
+    _show_soc = (
+        _hide_soc_raw is not None
+        and _hide_soc_raw.strip().lower() in ("0", "false", "no")
+        and _is_superuser
+    )
+
+    def _gen():
+        from app.audit_log import _events_db
+        conn = _events_db()
+        last_id = since_id
+        if conn is not None and last_id == 0:
+            try:
+                last_id = conn.execute(
+                    "SELECT COALESCE(MAX(id), 0) AS m FROM events"
+                ).fetchone()["m"]
+            except Exception:
+                last_id = 0
+        yield "event: ready\ndata: %d\n\n" % last_id
+
+        start = last_beat = _time.time()
+        while _time.time() - start < 600:          # recycle after 10 min
+            try:
+                if conn is None:
+                    conn = _events_db()
+                rows = conn.execute(
+                    "SELECT id, ts, severity, category, action, username, "
+                    "remote_addr, details, event_uuid, soc_origin "
+                    "FROM events WHERE id > ? "
+                    "ORDER BY id LIMIT 200", (last_id,),
+                ).fetchall() if conn is not None else []
+                for r in rows:
+                    last_id = r["id"]
+                    # Indexed soc_origin filter — preferred over JSON parse.
+                    # Falls back to details.soc_origin for any pre-v34 row
+                    # the backfill missed.
+                    if not _show_soc:
+                        try:
+                            if r["soc_origin"]:
+                                continue
+                        except (IndexError, KeyError):
+                            pass
+                    if categories and (r["category"] or "") not in categories:
+                        continue
+                    if severities and (r["severity"] or "info") not in severities:
+                        continue
+                    try:
+                        details = _json.loads(r["details"]) if r["details"] else {}
+                    except Exception:
+                        details = {}
+                    # Belt-and-braces: catch pre-v34 rows where the indexed
+                    # soc_origin column is NULL but the details JSON still
+                    # carries the marker.
+                    if not _show_soc and (details or {}).get("soc_origin"):
+                        continue
+                    try:
+                        event_uuid = r["event_uuid"] or ""
+                    except (IndexError, KeyError):
+                        event_uuid = ""
+                    ev = {
+                        "timestamp":   r["ts"],
+                        "event_uuid":  event_uuid,
+                        "severity":    r["severity"] or "info",
+                        "category":    r["category"] or "",
+                        "action":      r["action"] or "",
+                        "username":    r["username"] or "anonymous",
+                        "remote_addr": r["remote_addr"] or "",
+                        "details":     details,
+                    }
+                    yield "event: log\ndata: %s\n\n" % _json.dumps(ev)
+            except Exception:
+                pass
+            now = _time.time()
+            if now - last_beat >= 15:
+                last_beat = now
+                yield ": keepalive\n\n"
+            _time.sleep(1.5)
+
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    resp = Response(stream_with_context(_gen()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"]   = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"   # tell nginx not to buffer the stream
+    return resp
+
+
+@status_bp.route("/collector-health")
+@login_required
+def collector_health_page():
+    """Render the collector-health page (data loaded via JSON below)."""
+    return render_template("collector_health.html")
+
+
+@status_bp.route("/api/collector-health")
+@login_required
+def api_collector_health():
+    """Per-collector status + dead-letter rows for the health page."""
+    from app.services.collector_health import list_state, list_dead_letter
+    limit_dlq = 50
+    try:
+        limit_dlq = min(int(request.args.get("dlq_limit", 50) or 50), 500)
+    except (ValueError, TypeError):
+        pass
+    source_name = (request.args.get("source") or "").strip()
+    return jsonify({
+        "ok":           True,
+        "collectors":   list_state(),
+        "dead_letter":  list_dead_letter(limit=limit_dlq,
+                                         source_name=source_name),
+    })
+
+
+@status_bp.route("/api/collector-health/dlq/<int:dlq_id>/replay",
+                 methods=["POST"])
+@superuser_required
+def api_collector_dlq_replay(dlq_id: int):
+    """Re-run the parser on a single DLQ row and re-ingest on success."""
+    from app.services.collector_health import replay_dead_letter
+    from app.audit_log import log_event
+    result = replay_dead_letter(dlq_id)
+    log_event(
+        category="admin_audit", action="dlq_replay",
+        username=session.get("username") or "admin",
+        remote_addr=request.remote_addr or "",
+        details={"dlq_id": dlq_id, "ok": result.get("ok"),
+                 "message": (result.get("message") or "")[:200]},
+        severity="low",
+    )
+    return jsonify(result)
+
+
+@status_bp.route("/api/collector-health/dlq/purge", methods=["POST"])
+@superuser_required
+def api_collector_dlq_purge():
+    """Purge DLQ rows older than ``older_than_days`` (default 0 = all)."""
+    from app.services.collector_health import purge_dead_letter
+    from app.audit_log import log_event
+    data = request.get_json(silent=True) or {}
+    try:
+        days = max(0, int(data.get("older_than_days", 0) or 0))
+    except (TypeError, ValueError):
+        days = 0
+    source = (data.get("source") or "").strip()
+    deleted = purge_dead_letter(older_than_days=days, source_name=source)
+    log_event(
+        category="admin_audit", action="dlq_purge",
+        username=session.get("username") or "admin",
+        remote_addr=request.remote_addr or "",
+        details={"older_than_days": days, "source": source,
+                 "deleted": deleted},
+        severity="low",
+    )
+    return jsonify({"ok": True, "deleted": deleted,
+                    "older_than_days": days, "source": source})
+
+
+@status_bp.route("/api/migration-health")
+@login_required
+def api_migration_health():
+    """Schema health report — version, missing tables/columns, last error.
+
+    Wave N of the Fv5 plan. Surfaces what ``run_migrations`` did so an
+    operator can confirm the DB is upgraded without grepping the audit log.
+    """
+    from app.database import get_db
+    from app.migrations import CURRENT_SCHEMA_VERSION
+
+    conn = get_db()
+
+    # current applied version
+    try:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(version), 0) AS v FROM schema_version"
+        ).fetchone()
+        db_version = int(row["v"] if row else 0)
+    except Exception:
+        db_version = 0
+
+    # required tables vs missing
+    required = [
+        "events", "firewall_events", "dns_events", "alerts",
+        "alert_actions", "alert_suppressions", "alert_observations",
+        "case_alerts", "siem_cases", "collector_state",
+        "event_dead_letter", "tracked_hosts", "lan_config",
+    ]
+    present = {r["name"] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    missing_tables = [t for t in required if t not in present]
+
+    # last migration audit entry (if any)
+    last_err = None
+    try:
+        from app.audit_log import _events_db
+        evdb = _events_db()
+        if evdb is not None:
+            try:
+                rerr = evdb.execute(
+                    "SELECT ts, details FROM events "
+                    "WHERE category = 'system' AND action = 'db_migration' "
+                    "  AND details LIKE '%WARNING%' "
+                    "ORDER BY id DESC LIMIT 1"
+                ).fetchone()
+                if rerr:
+                    last_err = {"ts": rerr["ts"], "details": rerr["details"]}
+            finally:
+                try: evdb.close()
+                except Exception: pass
+    except Exception as exc:
+        from app.app_log import log_warning
+        log_warning("status", "db_migration last-error lookup failed", {"error": str(exc)})
+
+    return jsonify({
+        "ok":              True,
+        "current_version": CURRENT_SCHEMA_VERSION,
+        "db_version":      db_version,
+        "up_to_date":      db_version == CURRENT_SCHEMA_VERSION,
+        "missing_tables":  missing_tables,
+        "last_error":      last_err,
+    })
+
+
+@status_bp.route("/log-forwarding", methods=["GET", "POST"])
+@superuser_required
+def log_forwarding_settings():
+    """Configure log forwarding, events retention, and the syslog listener."""
+    from flask import flash, redirect, url_for
+    from app.database import get_db
+    from app.audit_log import log_event
+    from app.services.log_forwarder import load_config, save_config
+    from app.services import events_retention, syslog_listener
+
+    conn = get_db()
+    if request.method == "POST":
+        cfg = save_config(conn, {
+            "enabled":     request.form.get("enabled") == "on",
+            "host":        request.form.get("host", ""),
+            "port":        request.form.get("port", 514),
+            "protocol":    request.form.get("protocol", "udp"),
+            "format":      request.form.get("format", "rfc5424"),
+            "tls_verify":  request.form.get("tls_verify") == "on",
+            "tls_ca_path": request.form.get("tls_ca_path", ""),
+        })
+        ret_cfg = events_retention.save_config(conn, {
+            "enabled": request.form.get("retention_enabled") == "on",
+            "days":    request.form.get("retention_days", 90),
+        })
+        listen_cfg = syslog_listener.save_config(conn, {
+            "enabled":               request.form.get("listener_enabled") == "on",
+            "bind_ip":               request.form.get("listener_bind_ip", "0.0.0.0"),
+            "bind_port":             request.form.get("listener_bind_port", 5140),
+            "trust_remote_hostname": request.form.get("listener_trust_host") == "on",
+        })
+        log_event(
+            category="system", action="log_forwarding_saved",
+            username=session.get("username"), remote_addr=request.remote_addr,
+            details={"enabled": cfg["enabled"], "host": cfg["host"],
+                     "port": cfg["port"], "protocol": cfg["protocol"],
+                     "format": cfg["format"], "tls_verify": cfg["tls_verify"],
+                     "retention_enabled": ret_cfg["enabled"],
+                     "retention_days": ret_cfg["days"],
+                     "listener_enabled":  listen_cfg["enabled"],
+                     "listener_port":     listen_cfg["bind_port"]},
+        )
+        flash("SIEM settings saved.", "success")
+        return redirect(url_for("status.log_forwarding_settings"))
+
+    return render_template("log_forwarding.html",
+                           cfg=load_config(conn),
+                           retention=events_retention.load_config(conn),
+                           listener=syslog_listener.load_config(conn))
+
+
+# ---------------------------------------------------------------------------
+# Correlation rules — drive correlation_engine.py
+# ---------------------------------------------------------------------------
+
+@status_bp.route("/correlation-rules")
+@superuser_required
+def correlation_rules():
+    """Manage the SIEM correlation rules."""
+    from app.database import get_db
+    rules = get_db().execute(
+        "SELECT * FROM correlation_rules ORDER BY id"
+    ).fetchall()
+    return render_template("correlation_rules.html", rules=rules)
+
+
+@status_bp.route("/correlation-rules/add", methods=["POST"])
+@superuser_required
+def correlation_rules_add():
+    from flask import flash, redirect, url_for
+    from app.database import get_db
+    from app.audit_log import log_event
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("Rule name is required.", "danger")
+        return redirect(url_for("status.correlation_rules"))
+    try:
+        threshold = max(1, int(request.form.get("threshold") or 5))
+        window    = max(10, int(request.form.get("window_seconds") or 300))
+    except (ValueError, TypeError):
+        threshold, window = 5, 300
+    severity = request.form.get("severity", "high")
+    if severity not in ("low", "medium", "high", "critical"):
+        severity = "high"
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO correlation_rules (name, category_filter, action_filter, "
+        "group_by, threshold, window_seconds, severity, mitre_technique, "
+        "prerequisite_action, auto_case) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (name,
+         (request.form.get("category_filter") or "").strip(),
+         (request.form.get("action_filter") or "").strip(),
+         (request.form.get("group_by") or "remote_addr").strip(),
+         threshold, window, severity,
+         (request.form.get("mitre_technique") or "").strip(),
+         (request.form.get("prerequisite_action") or "").strip(),
+         1 if request.form.get("auto_case") == "on" else 0),
+    )
+    conn.commit()
+    log_event(category="system", action="correlation_rule_added",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"name": name})
+    flash(f"Correlation rule '{name}' added.", "success")
+    return redirect(url_for("status.correlation_rules"))
+
+
+@status_bp.route("/correlation-rules/test", methods=["POST"])
+@superuser_required
+def correlation_rules_test():
+    """Backtest a (saved or draft) rule against the last 24h without firing."""
+    from app.services.correlation_engine import simulate
+    payload = request.get_json(silent=True) or {}
+    try:
+        hours = int(payload.get("hours") or 24)
+    except (TypeError, ValueError):
+        hours = 24
+    return jsonify(simulate(payload, hours=hours))
+
+
+@status_bp.route("/correlation-rules/<int:rule_id>/toggle", methods=["POST"])
+@superuser_required
+def correlation_rules_toggle(rule_id):
+    from flask import redirect, url_for
+    from app.database import get_db
+    conn = get_db()
+    conn.execute(
+        "UPDATE correlation_rules SET enabled = 1 - enabled WHERE id = ?",
+        (rule_id,),
+    )
+    conn.commit()
+    return redirect(url_for("status.correlation_rules"))
+
+
+@status_bp.route("/correlation-rules/<int:rule_id>/delete", methods=["POST"])
+@superuser_required
+def correlation_rules_delete(rule_id):
+    from flask import flash, redirect, url_for
+    from app.database import get_db
+    from app.audit_log import log_event
+    conn = get_db()
+    conn.execute("DELETE FROM correlation_rules WHERE id = ?", (rule_id,))
+    conn.commit()
+    log_event(category="system", action="correlation_rule_deleted",
+              username=session.get("username"), remote_addr=request.remote_addr,
+              details={"rule_id": rule_id})
+    flash("Correlation rule deleted.", "success")
+    return redirect(url_for("status.correlation_rules"))
 
 
 @status_bp.route("/api/logs/export")
@@ -368,7 +804,7 @@ def api_logs_export():
         ]
 
     date_str  = _dt.date.today().isoformat()
-    filename  = f"smart-shield-siem-{date_str}.json"
+    filename  = f"smartshield-siem-{date_str}.json"
     body      = _json.dumps(events, indent=2, ensure_ascii=True)
 
     from flask import Response
@@ -430,6 +866,93 @@ def api_health_service(service_name: str):
 
 
 # ══════════════════════════════════════════════════
+# LIVENESS / READINESS  (for service managers & load balancers)
+# ══════════════════════════════════════════════════
+# These are intentionally UNAUTHENTICATED so an external supervisor (rc.d
+# health probe, load balancer, monitoring) can reach them. They return only
+# booleans and an overall status — never secrets or config detail.
+
+@status_bp.route("/health")
+def status_health():
+    """Liveness probe: the process is up and the database answers a trivial
+    query. Returns 200 when alive, 503 otherwise."""
+    alive = True
+    db_ok = False
+    try:
+        from app.database import get_db
+        get_db().execute("SELECT 1")
+        db_ok = True
+    except Exception:
+        alive = False
+    return jsonify({"ok": alive, "status": "ok" if alive else "fail", "db": db_ok}), (200 if alive else 503)
+
+
+@status_bp.route("/readiness")
+def status_readiness():
+    """Readiness probe: deeper checks that must pass before the appliance
+    should receive traffic — DB connectivity, schema at the expected version,
+    writable data/log directories, and a readable master key. Returns 200 when
+    ready, 503 when any required check fails."""
+    import os as _os
+    checks: dict[str, bool] = {}
+
+    # DB connectivity + schema version.
+    schema_ok = False
+    try:
+        from app.database import get_db
+        from app.migrations import CURRENT_SCHEMA_VERSION
+        conn = get_db()
+        conn.execute("SELECT 1")
+        checks["db"] = True
+        try:
+            row = conn.execute(
+                "SELECT MAX(version) AS v FROM schema_version"
+            ).fetchone()
+            schema_ok = bool(row) and (row["v"] is not None) and int(row["v"]) >= CURRENT_SCHEMA_VERSION
+        except Exception:
+            schema_ok = False
+    except Exception:
+        checks["db"] = False
+    checks["schema"] = schema_ok
+
+    cfg = current_app.config
+
+    # Writable data dir (DB parent) and log dirs.
+    def _dir_writable(path: str) -> bool:
+        try:
+            d = _os.path.dirname(path) or "."
+            return _os.path.isdir(d) and _os.access(d, _os.W_OK)
+        except Exception:
+            return False
+
+    db_path = cfg.get("DB_PATH") or ""
+    # In-memory test DB has no real directory; treat as writable.
+    checks["data_dir_writable"] = True if "memory" in db_path else _dir_writable(db_path)
+    checks["audit_log_writable"] = _dir_writable(cfg.get("AUDIT_LOG_PATH") or "")
+    checks["app_log_writable"] = _dir_writable(cfg.get("APP_LOG_PATH") or "") if cfg.get("APP_LOG_PATH") else True
+
+    # Master key readable (env value present, or key file readable).
+    master_ok = True
+    try:
+        if not cfg.get("MASTER_KEY"):
+            key_path = _os.getenv("SMARTSHIELD_MASTER_KEY_PATH", "")
+            if key_path:
+                master_ok = _os.path.isfile(key_path) and _os.access(key_path, _os.R_OK)
+            # If neither env value nor explicit path is set, the app auto-manages
+            # the key elsewhere; don't fail readiness on that account.
+    except Exception:
+        master_ok = False
+    checks["master_key"] = master_ok
+
+    ready = all(checks.values())
+    return jsonify({
+        "ok": ready,
+        "status": "ready" if ready else "not_ready",
+        "checks": checks,
+    }), (200 if ready else 503)
+
+
+# ══════════════════════════════════════════════════
 # PF CONFIG PREVIEW
 # ══════════════════════════════════════════════════
 
@@ -451,6 +974,7 @@ def api_pf_preview():
 
 @status_bp.route("/api/pf/rollback", methods=["POST"])
 @login_required
+@superuser_required
 def api_pf_rollback():
     """Restore the last known-good pf.conf."""
     from app.database import get_db
@@ -514,6 +1038,26 @@ def api_dhcp_leases():
         cur  = conn.cursor()
         cur.execute("SELECT * FROM static_leases ORDER BY interface_type, ip_address")
         leases = [dict(r) for r in cur.fetchall()]
+
+    # Fill in hostnames for leases the client never announced, by actively
+    # probing the device (NetBIOS / mDNS). Cached, and never fatal.
+    try:
+        from app.services.hostname_resolver import resolve_hostnames
+        missing = [
+            l["ip_address"]
+            for l in leases
+            if not (l.get("hostname") or "").strip() and l.get("ip_address")
+        ]
+        if missing:
+            probed = resolve_hostnames(missing)
+            for l in leases:
+                if not (l.get("hostname") or "").strip():
+                    name = probed.get(l.get("ip_address"))
+                    if name:
+                        l["hostname"] = name
+    except Exception:
+        pass
+
     return jsonify({"ok": True, "leases": leases, "count": len(leases)})
 
 
@@ -523,6 +1067,7 @@ def api_dhcp_leases():
 
 @status_bp.route("/api/dns/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def api_dns_apply():
     """Validate, write, and reload Unbound."""
     from app.database import get_db
@@ -553,6 +1098,7 @@ def api_dns_preview():
 
 @status_bp.route("/api/dns/test")
 @login_required
+@api_permission_required("api.network.edit")
 def api_dns_test():
     """
     Resolve a hostname via the local DNS resolver.
@@ -646,6 +1192,7 @@ def api_config_history_get(version_id: int):
 
 @status_bp.route("/api/config-history/<int:version_id>/rollback", methods=["POST"])
 @login_required
+@superuser_required
 def api_config_history_rollback(version_id: int):
     """
     Roll back a service config to a previously saved version.
@@ -670,6 +1217,7 @@ def api_config_history_rollback(version_id: int):
 
 @status_bp.route("/api/config-history/<service>/prune", methods=["POST"])
 @login_required
+@superuser_required
 def api_config_history_prune(service: str):
     """
     Delete old config versions beyond the most-recent ``keep``.
@@ -854,7 +1402,7 @@ def mrtg_apply():
     result = apply_mrtg(conn)
     log_event(
         category="system", action="mrtg_apply",
-        username=request.values.get("username"),
+        username=session.get("username", "unknown"),
         remote_addr=request.remote_addr,
         details={"ok": result["ok"], "message": result.get("message", "")},
     )
@@ -873,8 +1421,8 @@ def mrtg_image(filename):
     from flask import send_from_directory, abort, make_response
     if ".." in filename or filename.startswith("/"):
         abort(400)
-    mrtg_dir = "/var/db/smart-shield/mrtg"
-    resp = make_response(send_from_directory(mrtg_dir, filename))
+    from app.services.mrtg_writer import _MRTG_WORK_DIR
+    resp = make_response(send_from_directory(_MRTG_WORK_DIR, filename))
     resp.cache_control.no_store = True
     resp.cache_control.max_age = 0
     return resp
@@ -1078,8 +1626,9 @@ def api_production_gate():
           not weak_key, "critical",
           "Generate: python3 -c \"import secrets; print(secrets.token_hex(32))\"" if weak_key else "OK")
 
-    _gate("master_key", "SMARTSHIELD_MASTER_KEY is set",
-          bool(_os.getenv("SMARTSHIELD_MASTER_KEY")), "warning",
+    from app.secret_store import has_master_key as _has_master_key
+    _gate("master_key", "Master key is available (env var or key file)",
+          _has_master_key(), "warning",
           "Auto-generated key will not survive reboots")
 
     _gate("debug_off", "FLASK_DEBUG is not 1 in production",

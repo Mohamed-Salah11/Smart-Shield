@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title">
+        <i class="fa-solid fa-server me-2 ext-035cc887"></i>Asset &amp; Identity Catalog
+      </h1>
+      <p class="ss-page-desc">Tag your hosts and users so SOC analysts and compliance reports
+        know which events hit a crown-jewel. Every <code>log_event</code> call automatically
+        attaches the matching <code>asset</code> / <code>identity</code> record to its details payload.</p>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+        <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- ASSETS -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-server"></i></div>
+      <div>
+        <div class="ss-card-title">Assets</div>
+        <div class="ss-card-subtitle">Hosts identified by IP. Criticality drives report scoring.</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if assets %}
+      <table class="table table-hover mb-0">
+        <thead class="ext-14203611">
+          <tr>
+            <th class="ps-4 py-2">IP</th>
+            <th class="py-2">Hostname</th>
+            <th class="py-2">Owner / BU</th>
+            <th class="py-2">Criticality</th>
+            <th class="py-2">Tags</th>
+            <th class="py-2 text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in assets %}
+          <tr>
+            <td class="ps-4 py-2"><code>{{ a['ip'] }}</code></td>
+            <td class="py-2">{{ a['hostname'] or '—' }}</td>
+            <td class="py-2">{{ a['owner'] or '—' }}{% if a['business_unit'] %} / {{ a['business_unit'] }}{% endif %}</td>
+            <td class="py-2">
+              <span class="badge bg-{{ {'crown_jewel':'danger','high':'warning','medium':'info','low':'secondary'}.get(a['criticality'],'secondary') }}">
+                {{ a['criticality'] }}
+              </span>
+            </td>
+            <td class="py-2 text-muted ext-1e28117f">{{ a['tags'] or '—' }}</td>
+            <td class="py-2 text-end pe-4">
+              <form class="ext-5677b988" method="POST"
+                    data-action-submit="confirm-delete"
+                    data-confirm="Delete this asset?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="op" value="asset_delete">
+                <input type="hidden" name="id" value="{{ a['id'] }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash-can"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-muted">No assets defined yet.</div>
+      {% endif %}
+
+      <form method="POST" class="p-3 ext-eb2bafdc">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="op" value="asset_save">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="ip">IP address *</label>
+            <input type="text" name="ip" id="ip" class="form-control" required placeholder="e.g. 192.168.10.5">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="hostname">Hostname</label>
+            <input type="text" name="hostname" id="hostname" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="owner">Owner</label>
+            <input type="text" name="owner" id="owner" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="business_unit">Business unit</label>
+            <input type="text" name="business_unit" id="business_unit" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="criticality">Criticality</label>
+            <select name="criticality" id="criticality" class="form-select">
+              <option value="low">low</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
+              <option value="crown_jewel">crown jewel</option>
+            </select>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="tags">Tags (comma-separated)</label>
+            <input type="text" name="tags" id="tags" class="form-control" placeholder="db, prod, pci">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2"><i class="fa-solid fa-plus me-1"></i> Add Asset</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- IDENTITIES -->
+  <div class="ss-card mb-5">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-id-badge"></i></div>
+      <div>
+        <div class="ss-card-title">Identities</div>
+        <div class="ss-card-subtitle">User accounts and their sensitivity tier.</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if identities %}
+      <table class="table table-hover mb-0">
+        <thead class="ext-14203611">
+          <tr>
+            <th class="ps-4 py-2">Username</th>
+            <th class="py-2">Full name / Role</th>
+            <th class="py-2">Sensitivity</th>
+            <th class="py-2">Manager / BU</th>
+            <th class="py-2 text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in identities %}
+          <tr>
+            <td class="ps-4 py-2"><code>{{ i['username'] }}</code></td>
+            <td class="py-2">{{ i['full_name'] or '—' }}{% if i['role'] %} ({{ i['role'] }}){% endif %}</td>
+            <td class="py-2">
+              <span class="badge bg-{{ {'crown_jewel':'danger','privileged':'warning','standard':'secondary'}.get(i['sensitivity'],'secondary') }}">
+                {{ i['sensitivity'] }}
+              </span>
+            </td>
+            <td class="py-2 text-muted ext-1e28117f">
+              {{ i['manager'] or '—' }}{% if i['business_unit'] %} / {{ i['business_unit'] }}{% endif %}
+            </td>
+            <td class="py-2 text-end pe-4">
+              <form class="ext-5677b988" method="POST"
+                    data-action-submit="confirm-delete"
+                    data-confirm="Delete this identity?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="op" value="identity_delete">
+                <input type="hidden" name="id" value="{{ i['id'] }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash-can"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-muted">No identities defined yet.</div>
+      {% endif %}
+
+      <form method="POST" class="p-3 ext-eb2bafdc">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="op" value="identity_save">
+        <div class="ss-field-grid ss-field-grid-2">
+          <div class="ss-field">
+            <label class="ss-label" for="username">Username *</label>
+            <input type="text" name="username" id="username" class="form-control" required>
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="full_name">Full name</label>
+            <input type="text" name="full_name" id="full_name" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="email">Email</label>
+            <input type="email" name="email" id="email" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="role">Role</label>
+            <input type="text" name="role" id="role" class="form-control" placeholder="e.g. Domain Admin">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="manager">Manager</label>
+            <input type="text" name="manager" id="manager" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="i_business_unit">Business unit</label>
+            <input type="text" name="business_unit" id="i_business_unit" class="form-control">
+          </div>
+          <div class="ss-field">
+            <label class="ss-label" for="sensitivity">Sensitivity</label>
+            <select name="sensitivity" id="sensitivity" class="form-select">
+              <option value="standard" selected>standard</option>
+              <option value="privileged">privileged</option>
+              <option value="crown_jewel">crown jewel</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2"><i class="fa-solid fa-plus me-1"></i> Add Identity</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

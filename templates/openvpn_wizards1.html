@@ -20,6 +20,10 @@
         <a class="nav-link {{ 'active' if active_tab == 'wizards' else '' }}"
             href="{{ url_for('vpn.openvpn_wizards') }}">Wizards</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {{ 'active' if active_tab == 'portal' else '' }}"
+            href="{{ url_for('vpn.openvpn_portal_users') }}">Portal Users</a>
+    </li>
 </ul>
 
 <div class="ss-card">
@@ -171,7 +175,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 	document.addEventListener('DOMContentLoaded', function () {
 		// Handle Add new CA button
 		document.getElementById('addCaBtn').addEventListener('click', function (e) {

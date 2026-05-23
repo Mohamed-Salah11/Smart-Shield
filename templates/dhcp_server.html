@@ -24,7 +24,7 @@
       <div><div class="ss-card-title">General Settings</div><div class="ss-card-subtitle">Backend, enable state and client policy</div></div>
     </div>
     <div class="ss-card-body">
-      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+      <div class="ss-field-grid ss-field-grid-2 ext-3019698e">
         <div class="ss-field">
           <label class="ss-label">DHCP Backend</label>
           <input type="text" class="form-control" value="ISC DHCP" readonly>
@@ -53,7 +53,7 @@
       <div><div class="ss-card-title">Address Pool</div><div class="ss-card-subtitle">The range of IP addresses leased to clients</div></div>
     </div>
     <div class="ss-card-body">
-      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+      <div class="ss-field-grid ss-field-grid-2 ext-3019698e">
         <div class="ss-field">
           <label class="ss-label">Subnet</label>
           <input type="text" class="form-control" value="192.168.1.0/24" readonly>
@@ -71,7 +71,7 @@
           <input type="text" class="form-control" placeholder="e.g. 192.168.1.200">
         </div>
       </div>
-      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="alert('Add Address Pool')">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-action="h_f05a0dae57">
         <i class="fa-solid fa-plus me-1"></i>Add Additional Pool
       </button>
     </div>
@@ -84,7 +84,7 @@
       <div><div class="ss-card-title">Server Options</div><div class="ss-card-subtitle">Gateway, DNS, domain and lease times pushed to clients</div></div>
     </div>
     <div class="ss-card-body">
-      <div class="ss-field-grid ss-field-grid-2" style="margin-bottom:20px;">
+      <div class="ss-field-grid ss-field-grid-2 ext-3019698e">
         <div class="ss-field">
           <label class="ss-label">Gateway</label>
           <input type="text" class="form-control" value="192.168.1.200">
@@ -159,7 +159,7 @@
           <label class="ss-label">OMAPI Key</label>
           <input type="text" class="form-control" placeholder="Secret key">
         </div>
-        <div class="ss-field" style="display:flex;align-items:flex-end;">
+        <div class="ss-field ext-3868b543">
           <label class="ss-check-item">
             <input type="checkbox" id="gen_key">
             <span>Generate New Key</span>
@@ -201,7 +201,7 @@
       <div id="dhcp-wan-tftp" class="d-none ss-field mb-3"><label class="ss-label">TFTP Server</label><input type="text" name="tftp_server" class="form-control" placeholder="192.168.1.10"></div>
       <div id="dhcp-wan-ldap" class="d-none ss-field mb-3"><label class="ss-label">LDAP URI</label><input type="text" name="ldap_uri" class="form-control" placeholder="ldap://192.168.1.1/dc=example,dc=com"></div>
       <div id="dhcp-wan-netboot" class="d-none ss-field-grid ss-field-grid-2 mb-3">
-        <div style="grid-column:1/-1;"><label class="ss-check-item"><input type="checkbox" name="netboot_enable" id="netboot_enable_wan"><span>Enable Network Booting (PXE)</span></label></div>
+        <div class="ext-1b9b41ec"><label class="ss-check-item"><input type="checkbox" name="netboot_enable" id="netboot_enable_wan"><span>Enable Network Booting (PXE)</span></label></div>
         <div class="ss-field"><label class="ss-label">Next Server</label><input type="text" name="next_server" class="form-control" placeholder="192.168.1.100"></div>
         <div class="ss-field"><label class="ss-label">Boot Filename</label><input type="text" name="filename" class="form-control" placeholder="pxelinux.0"></div>
         <div class="ss-field"><label class="ss-label">Root Path</label><input type="text" name="root_path" class="form-control" placeholder="/tftpboot"></div>
@@ -224,13 +224,13 @@
         </a>
       </div>
     </div>
-    <div style="overflow-x:auto;">
-      <table class="table table-hover mb-0" style="font-size:.85rem;">
-        <thead style="background:var(--border-color-soft);">
-          <tr><th style="padding:10px 14px;">IP Address</th><th>Hostname</th><th>MAC Address</th><th>Description</th><th></th></tr>
+    <div class="ext-df74e8d8">
+      <table class="table table-hover mb-0 ext-1e28117f">
+        <thead class="ext-4c3186f1">
+          <tr><th class="ext-16e59a0f">IP Address</th><th>Hostname</th><th>MAC Address</th><th>Description</th><th></th></tr>
         </thead>
         <tbody id="static_mappings_body">
-          <tr id="empty_row"><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">No static leases configured</td></tr>
+          <tr id="empty_row"><td class="ext-ab184940" colspan="5">No static leases configured</td></tr>
         </tbody>
       </table>
     </div>
@@ -243,7 +243,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 function getDhcpServerSettingsRoot() {
   const allSections = Array.from(document.querySelectorAll('.ss-card'));
   const untilMappings = [];
@@ -305,11 +305,11 @@ async function loadStaticMappings() {
       emptyRow.style.display = 'none';
       tbody.innerHTML = mappings.map(m => `
         <tr>
-          <td style="padding:8px 14px;">${m.ip_address}</td>
+          <td class="ext-ec6b5e99">${m.ip_address}</td>
           <td>${m.hostname || ''}</td>
           <td><code>${m.mac_address}</code></td>
           <td>${m.description || ''}</td>
-          <td><button onclick="deleteMapping(${m.id})" class="btn btn-sm btn-danger">Delete</button></td>
+          <td><button type="button" data-action="mapping-delete" data-id="${m.id}" class="btn btn-sm btn-danger">Delete</button></td>
         </tr>`).join('');
     } else { emptyRow.style.display = 'table-row'; }
   } catch (e) { console.error('Failed to load static mappings:', e); }
@@ -328,3 +328,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_f05a0dae57'] = function (event, el) { alert('Add Address Pool') };
+  R['mapping-delete'] = function (event, el) { deleteMapping(el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

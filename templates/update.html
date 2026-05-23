@@ -37,7 +37,7 @@
             
             <div class="card mt-3">
                 <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Confirmation Required to update Smart Shield system.</h5>
+                    <h5 class="mb-0">Confirmation Required to update SmartShield system.</h5>
                 </div>
                 <div class="card-body">
                     {% if message %}
@@ -64,8 +64,8 @@
                         <div class="row mb-3">
                             <label class="col-sm-2 col-form-label">Messages</label>
                             <div class="col-sm-6">
-                                <div class="form-control" style="min-height: 60px; background-color: #f8f9fa;">
-                                    Smart Shield-repo: failed to fetch the repo data
+                                <div class="form-control ext-58789d99">
+                                    SmartShield-repo: failed to fetch the repo data
                                 </div>
                             </div>
                         </div>
@@ -73,7 +73,7 @@
                         <div class="row mb-3">
                             <label class="col-sm-2 col-form-label">Current Base System</label>
                             <div class="col-sm-6">
-                                <input type="text" class="form-control" value="Smart Shield 2.8.1-RELEASE" readonly>
+                                <input type="text" class="form-control" value="SmartShield 2.8.1-RELEASE" readonly>
                             </div>
                         </div>
 
@@ -87,7 +87,7 @@
                         <div class="row mb-3">
                             <label class="col-sm-2 col-form-label">Retrieving</label>
                             <div class="col-sm-6">
-                                <div class="form-control" style="background-color: #f8f9fa;">
+                                <div class="form-control ext-ab54c1cb">
                                     <div class="d-flex align-items-center">
                                         <span class="me-2">Unable to check for updates</span>
                                         <button type="submit" name="check_updates" class="btn btn-sm btn-primary">
@@ -155,6 +155,7 @@
                     {% endif %}
 
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="row mb-3">
                             <label class="col-sm-2 col-form-label">Dashboard Check</label>
                             <div class="col-sm-6">
@@ -182,7 +183,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce() }}">
 .alert-warning {
     border-left: 4px solid #fd7e14;
 }
@@ -199,7 +200,7 @@
 }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 // Initialize Bootstrap tabs
 document.addEventListener('DOMContentLoaded', function() {
     var triggerTabList = [].slice.call(document.querySelectorAll('#updateTabs button'))

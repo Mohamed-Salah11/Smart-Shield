@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block main %}
+<div class="container-fluid">
+
+  <div class="ss-page-header mb-3">
+    <div>
+      <h1 class="ss-page-title"><i class="fa-solid fa-clipboard-check me-2 ext-035cc887"></i>Response Recommendations</h1>
+      <p class="ss-page-desc">SOC analysts file response recommendations inside the SOC Portal.
+        Endorsed recommendations arrive here for SmartShield Core approval — approving applies the
+        firewall action; the SOC Portal never changes firewall state directly.</p>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          {% set alert_class = 'danger' if category in ['error','danger'] else category %}
+          <div class="alert alert-{{ alert_class }} mb-2">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ── Awaiting Core approval ─────────────────────────────────────────── -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-inbox"></i></div>
+      <div>
+        <div class="ss-card-title">Awaiting Core Approval</div>
+        <div class="ss-card-subtitle">Recommendations endorsed by the SOC, pending firewall action</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if pending %}
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4 py-3">#</th><th class="py-3">Action</th><th class="py-3">Target</th>
+            <th class="py-3">Severity</th><th class="py-3">Reason</th><th class="py-3">Filed by</th>
+            <th class="py-3 ext-69e6838d">Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in pending %}
+          <tr>
+            <td class="ps-4 py-3 fw-semibold">{{ r['id'] }}</td>
+            <td class="py-3">{{ r['action_type'] }}</td>
+            <td class="py-3"><code>{{ r['target_value'] }}</code></td>
+            <td class="py-3"><span class="ss-risk-chip ss-risk-{{ r['severity'] }}">{{ r['severity'] }}</span></td>
+            <td class="py-3 text-muted ext-727130b2">{{ r['reason'] or '—' }}</td>
+            <td class="py-3">{{ r['created_by'] or '—' }}{% if r['reviewed_by'] %}<br><small class="text-muted">SOC: {{ r['reviewed_by'] }}</small>{% endif %}</td>
+            <td class="py-3">
+              <div class="d-flex gap-2">
+                <form method="POST" action="{{ url_for('system.soc_recommendation_approve', rec_id=r['id']) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-primary"><i class="fa-solid fa-check me-1"></i>Approve &amp; Apply</button>
+                </form>
+                <form method="POST" action="{{ url_for('system.soc_recommendation_reject', rec_id=r['id']) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-secondary"><i class="fa-solid fa-xmark me-1"></i>Reject</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="ss-empty-state">
+        <i class="fa-solid fa-clipboard-check"></i>
+        <div class="ss-empty-state-title">Nothing awaiting approval</div>
+        <div>No SOC recommendations are currently pending Core review.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Recent history ─────────────────────────────────────────────────── -->
+  <div class="ss-card mb-4">
+    <div class="ss-card-head">
+      <div class="ss-card-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div>
+        <div class="ss-card-title">Recent Recommendations</div>
+        <div class="ss-card-subtitle">Last 100 across all statuses</div>
+      </div>
+    </div>
+    <div class="ss-card-body p-0">
+      {% if recent %}
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4 py-3">#</th><th class="py-3">Action</th><th class="py-3">Target</th>
+            <th class="py-3">Status</th><th class="py-3">Filed by</th><th class="py-3">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent %}
+          <tr>
+            <td class="ps-4 py-3 fw-semibold">{{ r['id'] }}</td>
+            <td class="py-3">{{ r['action_type'] }}</td>
+            <td class="py-3"><code>{{ r['target_value'] }}</code></td>
+            <td class="py-3">{{ r['status'] }}</td>
+            <td class="py-3">{{ r['created_by'] or '—' }}</td>
+            <td class="py-3 text-muted ext-1e28117f">{{ r['created_at'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="ss-empty-state">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <div class="ss-empty-state-title">No recommendations yet</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

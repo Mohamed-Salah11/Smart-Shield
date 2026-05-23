@@ -237,8 +237,8 @@ class TestGeneratePfConf:
         scrub_pos = conf.index("scrub in all")
         nat_pos = conf.index("nat on $WAN")
         rdr_pos = conf.index("rdr on em0 proto tcp")
-        rdr_anchor_pos = conf.index('rdr-anchor "captive_portal"')
-        filter_anchor_pos = conf.index('anchor "captive_portal"')
+        rdr_anchor_pos = conf.index('rdr-anchor "captive_portal_rdr"')
+        filter_anchor_pos = conf.index('anchor "captive_portal_filter"')
 
         assert table_pos < alias_pos < options_pos < scrub_pos
         assert scrub_pos < nat_pos < rdr_pos < rdr_anchor_pos < filter_anchor_pos

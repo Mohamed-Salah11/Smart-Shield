@@ -18,7 +18,7 @@ Block format
     defaultrouter="10.0.0.1"
     pf_enable="YES"
     pflog_enable="YES"
-    isc_dhcpd_enable="YES"
+    dhcpd_enable="YES"
     unbound_enable="YES"
     # <<< end Smart Shield managed block >>>
 
@@ -65,7 +65,8 @@ def generate_rc_conf_block(conn) -> str:
     lines += [
         'pf_enable="YES"',
         'pflog_enable="YES"',
-        'gateway_enable="YES"',   # IPv4 packet forwarding — required for router/NAT operation
+        'gateway_enable="YES"',        # IPv4 packet forwarding — required for router/NAT operation
+        'ipv6_gateway_enable="YES"',   # IPv6 packet forwarding — IPv6 routing / DHCPv6 / RA features
     ]
 
     # ── WAN interface ────────────────────────────────────────────────────────
@@ -182,10 +183,13 @@ def generate_rc_conf_block(conn) -> str:
         lines.append(f'cloned_interfaces="${{cloned_interfaces}} {name}"')
 
     # ── Services enabled in rc.conf ──────────────────────────────────────────
-    # DHCP
+    # DHCP — the pkg rc script reads `dhcpd_enable`, NOT `isc_dhcpd_enable`.
+    # Get this wrong and `service isc-dhcpd restart` silently no-ops with
+    # "Cannot 'restart' dhcpd. Set dhcpd_enable to YES in /etc/rc.conf".
     dhcp_on = _rows(conn, "SELECT COUNT(*) AS c FROM dhcp_pools WHERE enabled=1")
     if dhcp_on and dhcp_on[0]["c"] > 0:
-        lines.append('isc_dhcpd_enable="YES"')
+        lines.append('dhcpd_enable="YES"')
+        lines.append('dhcpd_flags="-q"')
 
     # Unbound (DNS)
     try:
@@ -218,6 +222,16 @@ def generate_rc_conf_block(conn) -> str:
     ipsec_count = _rows(conn, "SELECT COUNT(*) AS c FROM ipsec_phase1 WHERE disabled=0")
     if ipsec_count and ipsec_count[0]["c"] > 0:
         lines.append('strongswan_enable="YES"')
+
+    # L2TP / mpd5 — separate row, separate daemon. Without this entry the
+    # admin enables L2TP through the UI, mpd5 runs once, then dies on the
+    # first reboot.
+    try:
+        l2tp_row = _rows(conn, "SELECT enabled FROM l2tp_config WHERE id=1")
+        if l2tp_row and l2tp_row[0].get("enabled"):
+            lines.append('mpd_enable="YES"')
+    except Exception:
+        pass
 
     # IDS/Suricata
     ids_row = _rows(conn, "SELECT enabled FROM ids_config WHERE id=1")
@@ -253,35 +267,33 @@ def get_current_rc_conf_block() -> str:
         return ""
 
 
-_NGINX_CONF = "/usr/local/etc/nginx/nginx.conf"
+def _validate_rc_conf_local(text: str) -> list:
+    """Static checks on the generated /etc/rc.conf.local before we install it.
 
-
-def _update_nginx_lan_ip(ip: str) -> None:
-    """Replace the listen IP in nginx.conf with the current LAN IP."""
-    if not os.path.exists(_NGINX_CONF):
-        return
-    try:
-        with open(_NGINX_CONF) as fh:
-            content = fh.read()
-        # Replace any existing x.x.x.x:80 / x.x.x.x:443 listen directives
-        content = re.sub(
-            r'(\blisten\s+)\d+\.\d+\.\d+\.\d+(:\d+)',
-            lambda m: m.group(1) + ip + m.group(2),
-            content,
+    Returns a list of error strings; an empty list means valid.
+    """
+    errors = []
+    starts = text.count(_BLOCK_START)
+    ends   = text.count(_BLOCK_END)
+    if starts != 1 or ends != 1:
+        errors.append(
+            f"managed-block markers must appear exactly once "
+            f"(found {starts} start / {ends} end)"
         )
-        # proxy_pass is intentionally NOT updated here — gunicorn always binds
-        # to 127.0.0.1:5000 and nginx proxies to that address regardless of
-        # which LAN IP nginx listens on.
-        with open(_NGINX_CONF, "w") as fh:
-            fh.write(content)
-        # Reload nginx so the new listen address takes effect immediately
-        try:
-            from app.services.network_service import run_command
-            run_command(["service", "nginx", "reload"], check=False, timeout_seconds=10)
-        except Exception:
-            pass
-    except OSError:
-        pass
+    if text.count('"') % 2 != 0:
+        errors.append("unbalanced double-quote in generated rc.conf.local")
+    # Reject display labels like `em0 (08:00:27:aa:bb:cc)` slipping into ifconfig_*
+    for m in re.finditer(r'^(ifconfig_[A-Za-z0-9_.]+)\s*=\s*"([^"]*)"', text, re.MULTILINE):
+        val = m.group(2).strip()
+        if not val:
+            continue
+        if "(" in val or ")" in val:
+            errors.append(f"{m.group(1)} contains display-label characters: {val!r}")
+        # Must look like a DHCP / SYNCDHCP keyword OR start with "inet "
+        head = val.split()[0].upper() if val else ""
+        if head not in {"DHCP", "SYNCDHCP", "INET", "INET6"} and not val.startswith("inet "):
+            errors.append(f"{m.group(1)} has unexpected form: {val!r}")
+    return errors
 
 
 def apply_rc_conf(conn) -> dict:
@@ -316,30 +328,45 @@ def apply_rc_conf(conn) -> dict:
     else:
         new_content = existing.rstrip("\n") + "\n\n" + full_block
 
-    try:
-        with open(_RC_CONF_LOCAL, "w") as fh:
-            fh.write(new_content)
-        if _on_freebsd():
-            from app.services.network_service import run_command
-            # Activate IP forwarding immediately so LAN clients can route without a reboot
-            run_command(["sysctl", "net.inet.ip.forwarding=1"], check=False)
-            # Keep nginx listen address in sync with the current LAN IP
-            lan_rows = _rows(conn, "SELECT ipv4_address FROM lan_config WHERE id=1")
-            if lan_rows:
-                lan_cidr = (lan_rows[0].get("ipv4_address") or "").strip()
-                if lan_cidr:
-                    try:
-                        lan_ip = str(ipaddress.ip_interface(lan_cidr).ip)
-                        _update_nginx_lan_ip(lan_ip)
-                    except ValueError:
-                        pass
+    # Strip any stale `isc_dhcpd_enable=...` line sitting OUTSIDE the managed
+    # block from an older install — the FreeBSD pkg rc script wants
+    # `dhcpd_enable`, and leaving both around just confuses readers.
+    new_content = re.sub(r"^isc_dhcpd_enable=.*\n?", "", new_content, flags=re.MULTILINE)
+
+    # Static-validate the generated content before installing it.
+    val_errors = _validate_rc_conf_local(new_content)
+    if val_errors:
         return {
-            "ok": True,
-            "message": f"Network config written to {_RC_CONF_LOCAL}",
+            "ok": False,
+            "message": f"rc.conf.local validation failed: {'; '.join(val_errors)}",
             "block": full_block,
+            "errors": val_errors,
         }
+
+    try:
+        from app.services.config_file_utils import atomic_write, backup_config
+        backup_config(_RC_CONF_LOCAL)
+        atomic_write(_RC_CONF_LOCAL, new_content, mode=0o644)
     except OSError as exc:
         return {"ok": False, "message": f"Cannot write {_RC_CONF_LOCAL}: {exc}", "block": full_block}
+
+    if _on_freebsd():
+        from app.services.network_service import run_command
+        # Activate IP forwarding immediately so LAN clients can route without a reboot
+        run_command(["sysctl", "net.inet.ip.forwarding=1"], check=False)
+        run_command(["sysctl", "net.inet6.ip6.forwarding=1"], check=False)
+        # NOTE: nginx regeneration intentionally NOT done here. Callers must
+        # invoke apply_nginx() AFTER apply_interface_config() has plumbed the
+        # new LAN IP onto the interface — otherwise `service nginx reload`
+        # tries to bind to an IP that is not yet live and fails with
+        # EADDRNOTAVAIL. See routes/setup.py api_step4_apply for the wizard
+        # path (reload_all_services runs after apply_interface_config) and
+        # routes/interfaces.py save_lan_config for the UI path.
+    return {
+        "ok": True,
+        "message": f"Network config written to {_RC_CONF_LOCAL}",
+        "block": full_block,
+    }
 
 
 def apply_static_routes(conn) -> dict:
@@ -378,20 +405,45 @@ def apply_static_routes(conn) -> dict:
         except Exception as exc:
             errors.append(f"{dst} via {gw}: {exc}")
 
-    # Also persist to rc.conf.local as static_routes entries
+    # Persist to rc.conf.local using valid FreeBSD syntax. FreeBSD requires named
+    # routes in `static_routes` plus a `route_<name>` variable per entry:
+    #
+    #   static_routes="ssroute0 ssroute1"
+    #   route_ssroute0="-net 10.10.0.0/24 192.168.1.254"
+    #   route_ssroute1="-net 172.16.0.0/16 192.168.1.254"
+    #
+    # Entries are wrapped in BEGIN/END markers so admin-managed routes that live
+    # outside our block are never clobbered on update.
+    _STATIC_BEGIN = "# SMARTSHIELD_STATIC_ROUTES_BEGIN"
+    _STATIC_END   = "# SMARTSHIELD_STATIC_ROUTES_END"
     try:
-        route_lines = " ".join(
-            f'"-net {r["destination"]} {r["gateway"]}"' for r in routes
+        names: list[str] = []
+        defs:  list[str] = []
+        for idx, r in enumerate(routes):
+            name = f"ssroute{idx}"
+            names.append(name)
+            defs.append(f'route_{name}="-net {r["destination"]} {r["gateway"]}"')
+        new_block = (
+            _STATIC_BEGIN + "\n"
+            + f'static_routes="{" ".join(names)}"\n'
+            + ("\n".join(defs) + "\n" if defs else "")
+            + _STATIC_END + "\n"
         )
+
         existing = ""
         if os.path.exists(_RC_CONF_LOCAL):
             with open(_RC_CONF_LOCAL) as fh:
                 existing = fh.read()
-        # Replace or append static_routes line
-        if 'static_routes=' in existing:
-            existing = re.sub(r'^static_routes=.*$', f'static_routes="{route_lines}"', existing, flags=re.MULTILINE)
+        marker_re = re.compile(
+            re.escape(_STATIC_BEGIN) + r".*?" + re.escape(_STATIC_END) + r"\n?",
+            re.DOTALL,
+        )
+        if marker_re.search(existing):
+            existing = marker_re.sub(new_block, existing)
         else:
-            existing += f'\nstatic_routes="{route_lines}"\n'
+            if existing and not existing.endswith("\n"):
+                existing += "\n"
+            existing += new_block
         with open(_RC_CONF_LOCAL, "w") as fh:
             fh.write(existing)
     except OSError:

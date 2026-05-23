@@ -46,19 +46,15 @@
             <button id="btn-clear" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
           </div>
         </div>
-        <div style="overflow-x:auto;">
-          <pre id="ping-output" style="
-            min-height:220px;background:var(--bg);color:var(--text-color);
-            font-size:.82rem;padding:1rem;margin:0;white-space:pre-wrap;
-            font-family:'Courier New',monospace;border-radius:0 0 8px 8px;
-          ">Waiting for input…</pre>
+        <div class="ext-df74e8d8">
+          <pre class="ext-532abc07" id="ping-output">Waiting for input…</pre>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('btn-ping').addEventListener('click', function () {
   const host  = document.getElementById('ping-host').value.trim();
   const count = document.getElementById('ping-count').value;

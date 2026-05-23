@@ -10,7 +10,8 @@ _MEMORY_ANCHOR_PATH = None
 
 def _default_db_path():
     if sys.platform.startswith("freebsd"):
-        return "/var/db/smart-shield/data.db"
+        from app.config import _ss_dir
+        return os.path.join(_ss_dir("/var/db"), "data.db")
     if sys.platform.startswith("win"):
         # Keep Windows dev DB out of compressed/synced workdirs and in persistent user-local storage.
         local_appdata = os.getenv("LOCALAPPDATA") or tempfile.gettempdir()
@@ -68,6 +69,12 @@ def get_db():
 
     conn = sqlite3.connect(db_path, uri=is_uri)
     conn.execute("PRAGMA foreign_keys = ON")
+    # File-backed databases use WAL for better read/write concurrency and a
+    # 5 s busy timeout so concurrent writers wait instead of failing with
+    # "database is locked". The in-memory test DB does not support WAL.
+    if "mode=memory" not in db_path:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
     conn.row_factory = sqlite3.Row
 
     try:
@@ -106,6 +113,7 @@ def init_db():
         status TEXT DEFAULT 'active',
         profile_picture TEXT,
         email TEXT,
+        soc_tier TEXT DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -115,7 +123,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE NOT NULL,
-        description TEXT
+        description TEXT,
+        soc_tier TEXT DEFAULT NULL
     )
     """)
 
@@ -437,6 +446,28 @@ ON interface_assignments(interface_type)
     _lf_cols = {row["name"] for row in cursor.fetchall()}
     if _lf_cols and "username" not in _lf_cols:
         cursor.execute("ALTER TABLE login_failures ADD COLUMN username TEXT")
+
+    # Migration: add soc_tier to groups if missing (column added in Phase 19).
+    cursor.execute("PRAGMA table_info(groups)")
+    _grp_cols = {row["name"] for row in cursor.fetchall()}
+    if _grp_cols and "soc_tier" not in _grp_cols:
+        cursor.execute("ALTER TABLE groups ADD COLUMN soc_tier TEXT DEFAULT NULL")
+
+    # Migration: terminal_enabled flag on advanced_admin_access. Off by default
+    # so a fresh appliance never exposes the live root shell until a superuser
+    # turns it on explicitly. Read by routes/terminal.py and base.html.
+    cursor.execute("PRAGMA table_info(advanced_admin_access)")
+    _aaa_cols = {row["name"] for row in cursor.fetchall()}
+    if _aaa_cols and "terminal_enabled" not in _aaa_cols:
+        cursor.execute(
+            "ALTER TABLE advanced_admin_access ADD COLUMN terminal_enabled INTEGER DEFAULT 0"
+        )
+
+    # Migration: add ssl_cert_id to soc_portal_config if the table predates that column.
+    cursor.execute("PRAGMA table_info(soc_portal_config)")
+    _soc_cols = {row["name"] for row in cursor.fetchall()}
+    if _soc_cols and "ssl_cert_id" not in _soc_cols:
+        cursor.execute("ALTER TABLE soc_portal_config ADD COLUMN ssl_cert_id INTEGER DEFAULT NULL")
 
     # HIGH AVAILABILITY SETTINGS
     cursor.execute("""
@@ -1189,6 +1220,18 @@ ON interface_assignments(interface_type)
         wins_server1 TEXT,
         wins_server2 TEXT,
         custom_options TEXT,
+        ca_id INTEGER,
+        server_cert_id INTEGER,
+        inactivity_timeout INTEGER DEFAULT 300,
+        ping_method TEXT DEFAULT 'keepalive',
+        ping_interval INTEGER DEFAULT 10,
+        ping_timeout INTEGER DEFAULT 60,
+        dh_parameter_length TEXT DEFAULT '2048',
+        ecdh_curve TEXT DEFAULT 'default',
+        data_encryption_algorithms TEXT DEFAULT 'AES-256-GCM',
+        fallback_data_encryption_algorithm TEXT DEFAULT 'AES-256-CBC',
+        auth_digest_algorithm TEXT DEFAULT 'SHA256',
+        verbosity_level INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1260,6 +1303,7 @@ ON interface_assignments(interface_type)
         require_pap INTEGER DEFAULT 0,
         radius_server TEXT,
         radius_secret TEXT,
+        pre_shared_key TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1409,6 +1453,18 @@ ON static_leases(mac_address)
     _th_cols = {row["name"] for row in cursor.fetchall()}
     if _th_cols and "is_whitelisted" not in _th_cols:
         cursor.execute("ALTER TABLE tracked_hosts ADD COLUMN is_whitelisted INTEGER DEFAULT 0")
+    # Phase 3.2: split the overloaded "whitelist" concept. is_whitelisted now
+    # means "bypass captive portal only" (access_whitelist PF table). The new
+    # is_policy_exempt column means "bypass DNS/web/app content policy"
+    # (policy_exemption PF table + Unbound policy_exemption_view).
+    if _th_cols and "is_policy_exempt" not in _th_cols:
+        cursor.execute("ALTER TABLE tracked_hosts ADD COLUMN is_policy_exempt INTEGER DEFAULT 0")
+
+    # Migration: add pre_shared_key to l2tp_config (for L2TP/IPsec PSK)
+    cursor.execute("PRAGMA table_info(l2tp_config)")
+    _l2tp_cols = {row["name"] for row in cursor.fetchall()}
+    if _l2tp_cols and "pre_shared_key" not in _l2tp_cols:
+        cursor.execute("ALTER TABLE l2tp_config ADD COLUMN pre_shared_key TEXT DEFAULT ''")
 
     # ----------------------------
     # IDS / IPS (Suricata)
@@ -1419,7 +1475,7 @@ ON static_leases(mac_address)
         enabled     INTEGER DEFAULT 0,
         mode        TEXT    DEFAULT 'ids',
         interface   TEXT    DEFAULT '',
-        home_net    TEXT    DEFAULT '192.168.0.0/16',
+        home_net    TEXT    DEFAULT '',
         external_net TEXT   DEFAULT '!$HOME_NET',
         block_list_enabled  INTEGER DEFAULT 1,
         eve_json_enabled    INTEGER DEFAULT 1,
@@ -1460,13 +1516,15 @@ ON static_leases(mac_address)
     CREATE TABLE IF NOT EXISTS ids_threat_feeds (
         id               INTEGER PRIMARY KEY CHECK (id = 1),
         abusech_auth_key TEXT    DEFAULT '',
-        abusech_dry_run  INTEGER DEFAULT 0,
+        abusech_dry_run  INTEGER DEFAULT 1,
         updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
+    # Seed dry-run ON: an unconfigured feed (no Auth-Key) must stay offline-safe
+    # rather than report "live" and then fail every call. See abusech_client.py.
     cursor.execute(
-        "INSERT OR IGNORE INTO ids_threat_feeds (id, abusech_dry_run) VALUES (1, 0)"
+        "INSERT OR IGNORE INTO ids_threat_feeds (id, abusech_dry_run) VALUES (1, 1)"
     )
 
     # SIEM collector offset persistence
@@ -1477,6 +1535,233 @@ ON static_leases(mac_address)
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
+    # Indexed event store — every audit event is mirrored here for fast,
+    # indexed queries; the audit.log file remains the durable forensic record.
+    #
+    # The full post-v34 column set is created here on fresh installs so the
+    # first log_event() write at startup does not race the ALTER TABLE in
+    # migration v34. Legacy DBs created before this change still rely on
+    # _migration_v34 to add the same columns (it uses ADD COLUMN IF NOT
+    # EXISTS semantics via a PRAGMA pre-check).
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS events (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts              TEXT NOT NULL,
+        severity        TEXT DEFAULT 'info',
+        category        TEXT,
+        action          TEXT,
+        username        TEXT,
+        remote_addr     TEXT,
+        details         TEXT,
+        event_uuid      TEXT,
+        source_type     TEXT,
+        source_name     TEXT,
+        src_ip          TEXT,
+        src_port        INTEGER,
+        dst_ip          TEXT,
+        dst_port        INTEGER,
+        protocol        TEXT,
+        interface       TEXT,
+        direction       TEXT,
+        hostname        TEXT,
+        mac             TEXT,
+        domain          TEXT,
+        url             TEXT,
+        rule_id         TEXT,
+        rule_name       TEXT,
+        policy_id       TEXT,
+        policy_name     TEXT,
+        mitre_tactic    TEXT,
+        mitre_technique TEXT,
+        soc_origin      INTEGER DEFAULT 0,
+        raw             TEXT
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_ts       ON events(ts)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_category ON events(category)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_action   ON events(action)")
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_uuid "
+        "ON events(event_uuid)"
+    )
+
+    # Correlation rules — drive correlation_engine.py (Phase 23)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS correlation_rules (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        enabled         INTEGER DEFAULT 1,
+        category_filter TEXT DEFAULT '',
+        action_filter   TEXT DEFAULT '',
+        group_by        TEXT DEFAULT 'remote_addr',
+        threshold       INTEGER DEFAULT 5,
+        window_seconds  INTEGER DEFAULT 300,
+        severity        TEXT DEFAULT 'high',
+        mitre_technique TEXT DEFAULT '',
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # SIEM Case Management — incidents / case tracking with SOC assignment
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_cases (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        title            TEXT    NOT NULL,
+        description      TEXT    DEFAULT '',
+        severity         TEXT    DEFAULT 'medium',
+        status           TEXT    DEFAULT 'open',
+        assigned_to      INTEGER,
+        created_by       TEXT    NOT NULL DEFAULT 'system',
+        source_event     TEXT    DEFAULT '',
+        tags             TEXT    DEFAULT '',
+        escalation_tier  TEXT    DEFAULT NULL,
+        closure_type     TEXT    DEFAULT NULL,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(assigned_to) REFERENCES users(id) ON DELETE SET NULL
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_siem_cases_status   ON siem_cases(status)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_siem_cases_assigned ON siem_cases(assigned_to)"
+    )
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_case_notes (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id    INTEGER NOT NULL,
+        note       TEXT    NOT NULL,
+        created_by TEXT    NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(case_id) REFERENCES siem_cases(id) ON DELETE CASCADE
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_case_events (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        case_id         INTEGER NOT NULL,
+        event_timestamp TEXT    NOT NULL,
+        event_action    TEXT    NOT NULL DEFAULT '',
+        event_category  TEXT    NOT NULL DEFAULT '',
+        event_summary   TEXT    DEFAULT '',
+        FOREIGN KEY(case_id) REFERENCES siem_cases(id) ON DELETE CASCADE
+    )
+    """)
+
+    # SOC L1 analyst actions on individual audit-log events.
+    # event_uuid is the collision-safe join key (migration v35); event_key
+    # stays for backward compat with rows whose event row aged out before
+    # the v35 backfill could resolve a uuid.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_alert_actions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_key    TEXT    NOT NULL,
+        event_uuid   TEXT,
+        event_action TEXT    NOT NULL DEFAULT '',
+        action       TEXT    NOT NULL,
+        taken_by     TEXT    NOT NULL,
+        taken_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        note         TEXT    DEFAULT '',
+        case_id      INTEGER
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_saa_event_key ON siem_alert_actions(event_key)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_saa_event_uuid ON siem_alert_actions(event_uuid)"
+    )
+
+    # SOC L3-blocked IPs — source of truth for the persistent <soc_blocklist> PF table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS soc_blocked_ips (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip         TEXT    NOT NULL UNIQUE,
+        note       TEXT    DEFAULT '',
+        blocked_by TEXT    DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Current analyst assignment for a live alert, keyed by event_key
+    # (legacy timestamp PRIMARY KEY) with event_uuid as the collision-safe
+    # join key added in migration v35.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS siem_alert_assignments (
+        event_key     TEXT    PRIMARY KEY,
+        event_uuid    TEXT,
+        assignee_id   INTEGER,
+        assignee_name TEXT    DEFAULT '',
+        assigned_by   TEXT    DEFAULT '',
+        assigned_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_saasign_event_uuid "
+        "ON siem_alert_assignments(event_uuid)"
+    )
+
+    # SOC analyst presence heartbeat — which analysts are currently logged in
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS soc_active_sessions (
+        user_id   INTEGER PRIMARY KEY,
+        username  TEXT    DEFAULT '',
+        tier      TEXT    DEFAULT '',
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # ── Phase 19: SOC Team Portal configuration ───────────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS soc_portal_config (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        enabled     INTEGER DEFAULT 0,
+        bind_ip     TEXT    DEFAULT '0.0.0.0',
+        bind_port   INTEGER DEFAULT 8443,
+        ssl_cert_id INTEGER DEFAULT NULL,
+        public_url              TEXT    DEFAULT '',
+        allowed_networks        TEXT    DEFAULT '',
+        external_ingest_enabled INTEGER DEFAULT 0,
+        retention_days          INTEGER DEFAULT 90,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    cursor.execute("INSERT OR IGNORE INTO soc_portal_config (id) VALUES (1)")
+
+    # ── SOC response recommendations ──────────────────────────────────────────
+    # The SOC Portal does not change firewall state directly. Analysts file a
+    # recommendation here; SmartShield Core admin reviews and approves it before
+    # any firewall action is applied (separation Rule 1 + Phase 9 workflow).
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS soc_recommendations (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        source_alert_id  TEXT    DEFAULT '',
+        action_type      TEXT    NOT NULL,           -- block_ip | unblock_ip | …
+        target_value     TEXT    NOT NULL,           -- e.g. the IP address
+        reason           TEXT    DEFAULT '',
+        severity         TEXT    DEFAULT 'medium',
+        status           TEXT    DEFAULT 'pending',  -- pending | approved_by_soc |
+                                                     -- rejected_by_soc | sent_to_core |
+                                                     -- approved_by_core | rejected_by_core |
+                                                     -- applied | failed
+        created_by       TEXT    DEFAULT '',
+        reviewed_by      TEXT    DEFAULT '',
+        reviewed_at      TIMESTAMP,
+        exported_at      TIMESTAMP,
+        core_approved_by TEXT    DEFAULT '',
+        core_approved_at TIMESTAMP
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_soc_recommendations_status "
+        "ON soc_recommendations(status)"
+    )
 
     # Seed abuse.ch key + dry-run flag from env into DB if install.sh set it and DB has no key yet
     _env_abusech_key  = os.environ.get("ABUSECH_AUTH_KEY",  "").strip()
@@ -1669,7 +1954,7 @@ ON static_leases(mac_address)
     # Monotonically increasing integer; bumped each time the DB schema changes.
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS schema_version (
-        version    INTEGER NOT NULL,
+        version    INTEGER PRIMARY KEY,
         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -1802,6 +2087,22 @@ ON static_leases(mac_address)
         created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+
+    # ── Captive portal auth attempts (rate limiting) ─────────────────────────
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS captive_auth_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_address TEXT    NOT NULL,
+        username   TEXT    DEFAULT '',
+        auth_type  TEXT    DEFAULT '',
+        success    INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+    )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_captive_auth_attempts_ip_time "
+        "ON captive_auth_attempts(ip_address, created_at)"
+    )
 
     # ── Pending interface changes (rollback protection) ───────────────────────
     # Records a pre-apply snapshot so the UI can offer explicit rollback.

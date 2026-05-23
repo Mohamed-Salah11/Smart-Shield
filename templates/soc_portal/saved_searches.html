@@ -1,0 +1,170 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}Saved Searches{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">
+      <i class="fa-solid fa-bookmark me-2"></i>Saved Searches
+    </h2>
+    <p class="ext-6609c206">
+      Reusable queries against the events store. Set a schedule (minutes) to have the
+      scheduler re-run the search and emit a <code>saved_search_match</code> event
+      whenever the result set is non-empty.
+    </p>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, msg in messages %}
+      <div class="alert alert-{{ 'danger' if category in ['error','danger'] else category }} mb-2">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="soc-card mb-4">
+  <div class="soc-card-body p-0">
+    {% if searches %}
+    <table class="soc-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th class="ext-8f77872c">Query</th>
+          <th class="ext-088cf005">Schedule</th>
+          <th class="ext-088cf005">Last run</th>
+          <th class="ext-8db8d854">Hits</th>
+          <th class="ext-8db8d854">Status</th>
+          <th class="ext-69e6838d">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in searches %}
+        <tr>
+          <td><strong>{{ s['name'] }}</strong>{% if s['owner'] %}<br><small class="ext-a729d7fe">{{ s['owner'] }}</small>{% endif %}</td>
+          <td class="ext-b0f14564">
+            {% if s['query'].get('search') %}"{{ s['query']['search'] }}"{% endif %}
+            {% if s['query'].get('categories') %} · cat:{{ s['query']['categories']|join(',') }}{% endif %}
+            {% if s['query'].get('severities') %} · sev:{{ s['query']['severities']|join(',') }}{% endif %}
+            {% if s['query'].get('actions') %} · action:{{ s['query']['actions']|join(',') }}{% endif %}
+          </td>
+          <td>{% if s['schedule_minutes'] %}every {{ s['schedule_minutes'] }} min{% else %}manual{% endif %}</td>
+          <td><small class="ext-a729d7fe">{{ s['last_run_at'] or 'never' }}</small></td>
+          <td>{{ s['last_match_count'] or 0 }}</td>
+          <td>
+            {% if s['enabled'] %}
+              <span class="badge bg-success">on</span>
+            {% else %}
+              <span class="badge bg-secondary">off</span>
+            {% endif %}
+          </td>
+          <td>
+            <button type="button" class="btn-soc-secondary" data-action="soc-run-search" data-id="{{ s['id'] }}">
+              <i class="fa-solid fa-play me-1"></i>Run
+            </button>
+            <form class="ext-5677b988" method="POST"
+                  data-action-submit="confirm-delete"
+                  data-confirm="Delete this saved search?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="op" value="delete">
+              <input type="hidden" name="id" value="{{ s['id'] }}">
+              <button type="submit" class="btn-soc-secondary ext-45ee279c"><i class="fa-solid fa-trash-can"></i></button>
+            </form>
+            <div class="ext-e7541461" id="run-result-{{ s['id'] }}"></div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="p-4 ext-a729d7fe">No saved searches yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="soc-card">
+  <div class="soc-card-body">
+    <h5 class="ext-728869bd">New saved search</h5>
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="op" value="save">
+      <div class="ss-field-grid ss-field-grid-2">
+        <div class="ss-field">
+          <label class="ss-label">Name *</label>
+          <input type="text" name="name" class="form-control ext-4b1196ec" required
+                >
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Schedule (minutes, 0 = manual)</label>
+          <input type="number" name="schedule_minutes" min="0" max="1440" value="0" class="form-control ext-4e5a07fb"
+                >
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Search text (FTS)</label>
+          <input type="text" name="search" class="form-control ext-4b1196ec" placeholder='e.g. login_failed OR brute OR "192.168.1.5"'
+                >
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Result limit</label>
+          <input type="number" name="limit" min="1" max="1000" value="200" class="form-control ext-4e5a07fb"
+                >
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Categories (comma-sep)</label>
+          <input type="text" name="categories" class="form-control ext-4b1196ec" placeholder="security, ids"
+                >
+        </div>
+        <div class="ss-field">
+          <label class="ss-label">Severities (comma-sep)</label>
+          <input type="text" name="severities" class="form-control ext-4b1196ec" placeholder="high, critical"
+                >
+        </div>
+        <div class="ss-field ext-1b9b41ec">
+          <label class="ss-label">Actions (comma-sep, optional)</label>
+          <input type="text" name="actions" class="form-control ext-4b1196ec" placeholder="login_failed, correlation_match"
+                >
+        </div>
+      </div>
+      <div class="ext-50a1b3a9">
+        <label class="ext-42962336">
+          <input type="checkbox" name="enabled" checked> Enabled
+        </label>
+        <button type="submit" class="btn-soc-secondary ext-a4f64625">
+          <i class="fa-solid fa-floppy-disk me-1"></i> Save Search
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function runSearch(id) {
+  var out = document.getElementById('run-result-' + id);
+  out.textContent = 'Running…';
+  try {
+    var url = {{ url_for('soc_portal.api_saved_search_run', sid=0)|tojson }}.replace(/\/0\/run$/, '/' + id + '/run');
+    var r = await fetch(url, {
+      method: 'POST',
+      headers: {'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content},
+    });
+    var data = await r.json();
+    if (!data.ok) { out.textContent = data.message || 'Failed.'; return; }
+    out.innerHTML = data.count + ' match(es)' +
+      (data.events.length ? ' — first: <code>' + escapeHtml(data.events[0].action) + '</code>' : '');
+  } catch (e) { out.textContent = 'Request failed.'; }
+}
+</script>
+{% endblock %}
+{% block extra_js %}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['soc-run-search'] = function (event, el) { runSearch(el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

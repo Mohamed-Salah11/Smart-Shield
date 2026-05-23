@@ -328,8 +328,8 @@ def _save_known_good_dhcpd() -> bool:
         if os.path.exists(_DHCPD_CONF_PATH):
             with open(_DHCPD_CONF_PATH) as fh:
                 current = fh.read()
-            with open(_DHCPD_KNOWN_GOOD_PATH, "w") as fh:
-                fh.write(current)
+            from app.services.config_file_utils import atomic_write
+            atomic_write(_DHCPD_KNOWN_GOOD_PATH, current, mode=0o644)
         return True
     except OSError:
         return False
@@ -342,8 +342,8 @@ def _rollback_dhcpd() -> dict:
     try:
         with open(_DHCPD_KNOWN_GOOD_PATH) as fh:
             old_conf = fh.read()
-        with open(_DHCPD_CONF_PATH, "w") as fh:
-            fh.write(old_conf)
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_DHCPD_CONF_PATH, old_conf, mode=0o644)
         from app.services.service_manager import service_action
         result = service_action("isc-dhcpd", "restart")
         if result["ok"]:
@@ -362,8 +362,8 @@ def write_dhcpd_conf(conn) -> dict:
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — dhcpd.conf generated but not written.", "conf": conf}
     try:
-        with open(_DHCPD_CONF_PATH, "w") as fh:
-            fh.write(conf)
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_DHCPD_CONF_PATH, conf, mode=0o644)
         return {"ok": True, "message": f"Written to {_DHCPD_CONF_PATH}", "conf": conf}
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
@@ -375,10 +375,32 @@ def write_dhcpd_conf(conn) -> dict:
 
 def apply_dhcpd(conn) -> dict:
     """
-    Validate config, write dhcpd.conf, and restart isc-dhcpd.
+    Validate config, atomically write dhcpd.conf, and restart isc-dhcpd.
+    When no DHCP pools are enabled in the DB, stop the service and clear
+    its rc.conf enable so it does not auto-start.
     On non-FreeBSD: validate + generate only (no filesystem writes, no restart).
     Returns ``{"ok": bool, "message": str, "conf": str, "errors": list}``.
     """
+    # 0. If no pools are enabled, treat DHCP as disabled: stop the service and
+    #    clear its rc.conf knob so a stale config can't serve the wrong subnet.
+    enabled_pools = _rows(conn, "SELECT id FROM dhcp_pools WHERE enabled=1 LIMIT 1")
+    if not enabled_pools:
+        if not sys.platform.startswith("freebsd"):
+            return {
+                "ok": True, "skipped": True,
+                "message": "DHCP disabled (no enabled pools) — non-FreeBSD, nothing to stop.",
+                "conf": "", "errors": [],
+            }
+        from app.services.service_manager import service_action, sysrc_set
+        # The pkg's rc script reads `dhcpd_enable` (not `isc_dhcpd_enable`).
+        sysrc_set("dhcpd_enable", "NO")
+        service_action("isc-dhcpd", "stop")
+        return {
+            "ok": True, "skipped": True,
+            "message": "DHCP disabled in DB — isc-dhcpd stopped and disabled in rc.conf.",
+            "conf": "", "errors": [],
+        }
+
     # 1. Validate
     errors = validate_dhcp_config(conn)
     conf   = generate_dhcpd_conf(conn)
@@ -413,16 +435,17 @@ def apply_dhcpd(conn) -> dict:
     # 4. Backup current config as known-good
     _save_known_good_dhcpd()
 
-    # 5. Write new config
+    # 5. Atomic write of new config — guarantees the live file is never partial.
     try:
-        with open(_DHCPD_CONF_PATH, "w") as fh:
-            fh.write(conf)
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_DHCPD_CONF_PATH, conf, mode=0o644)
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf, "errors": []}
 
     # 6. Enable service in rc.conf so it starts on reboot, then restart it
     from app.services.service_manager import service_action, sysrc_set
-    sysrc_set("isc_dhcpd_enable", "YES")
+    # The pkg's rc script reads `dhcpd_enable` (not `isc_dhcpd_enable`).
+    sysrc_set("dhcpd_enable", "YES")
     result = service_action("isc-dhcpd", "restart")
     if not result["ok"]:
         rb = _rollback_dhcpd()

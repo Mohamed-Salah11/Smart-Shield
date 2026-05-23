@@ -55,6 +55,9 @@ def _upstream_dns(conn) -> list:
                 return servers
     except Exception:
         pass
+    env_dns = os.getenv("SMARTSHIELD_DEFAULT_DNS", "").strip()
+    if env_dns:
+        return [s.strip() for s in env_dns.split(",") if s.strip()]
     return ["1.1.1.1", "8.8.8.8"]
 
 
@@ -150,6 +153,26 @@ def generate_unbound_conf(conn) -> str:
         for _ip in whitelisted_ips:
             lines.append(f"    access-control-view: {_ip}/32 whitelist_view")
 
+    # Phase 3.3 — policy_exemption_view: clients flagged is_policy_exempt get a
+    # view with NO local-zone overrides, so blocked domains resolve normally.
+    # The view block itself is emitted below (after the forward-zone) only when
+    # there is at least one exempt client. Each /32 access-control-view line
+    # routes that client into the empty view; Unbound applies global server-block
+    # local-zones for everyone else.
+    try:
+        policy_exempt_ips = [
+            r["ip_address"]
+            for r in conn.execute(
+                "SELECT ip_address FROM tracked_hosts WHERE is_policy_exempt=1"
+            ).fetchall()
+        ]
+    except Exception:
+        policy_exempt_ips = []
+
+    if policy_exempt_ips:
+        for _ip in policy_exempt_ips:
+            lines.append(f"    access-control-view: {_ip}/32 policy_exemption_view")
+
     # SIEM DNS query logging (off by default — admin must enable)
     siem_dns = _load_service_state(conn, "siem_settings")
     dns_query_logging = bool(siem_dns.get("dns_query_logging", False))
@@ -199,23 +222,34 @@ def generate_unbound_conf(conn) -> str:
                 lines.append(f'    local-data-ptr: "{ip} {fqdn}"')
         lines.append("")
 
-    # DNS filter zones (Security Profiles)
-    for module, fn_name, label in [
-        ("app.services.dns_filter",  "generate_dns_filter_zones",  "DNS Filter"),
-        ("app.services.web_filter",  "generate_web_filter_zones",  "Web Filter"),
-        ("app.services.app_filter",  "generate_app_filter_dns_zones", "App Filter DNS"),
-    ]:
-        try:
-            import importlib
-            mod   = importlib.import_module(module)
-            fn    = getattr(mod, fn_name)
-            zones = fn(conn)
-            if zones:
-                lines.append(f"    # ── {label} (Security Profiles) ──")
-                lines.extend(zones)
-                lines.append("")
-        except Exception:
-            pass
+    # Content Policy zones — single deduplicated pass over the unified
+    # DomainPolicy map so an entry shared by DNS / Web / App filters emits
+    # exactly one local-zone record (unbound-checkconf rejects duplicates).
+    try:
+        from app.services.content_policy import (
+            emit_unbound_policy_zones, get_block_page_ip,
+        )
+        zones = emit_unbound_policy_zones(conn, get_block_page_ip(conn))
+        if zones:
+            lines.append("    # ── Content Policy (Security Profiles) ──")
+            lines.extend(zones)
+            lines.append("")
+    except Exception:
+        pass
+
+    # Phase 4.2 — block known DNS-over-HTTPS provider endpoints so clients
+    # can't trivially bypass DNS filtering by enabling DoH in their browser.
+    # Gated on content_policy_settings.block_known_doh (default ON whenever
+    # any content/DNS/web/app rule is active).
+    try:
+        from app.services.dns_filter import generate_doh_block_zones
+        doh_zones = generate_doh_block_zones(conn)
+        if doh_zones:
+            lines.append("    # ── DNS-over-HTTPS provider blocks (Phase 4.2) ──")
+            lines.extend(doh_zones)
+            lines.append("")
+    except Exception:
+        pass
 
     # Forward zone
     lines.append("forward-zone:")
@@ -229,6 +263,29 @@ def generate_unbound_conf(conn) -> str:
         lines.append("view:")
         lines.append('    name: "whitelist_view"')
         lines.extend(whitelist_overrides)
+        lines.append("")
+
+    # Policy-exemption view — emits `local-zone: ... transparent` for every
+    # currently-blocked domain so clients in tracked_hosts.is_policy_exempt
+    # bypass content/DNS/app blocks. Unbound's default view-first: no semantics
+    # mean the view's local-zones take precedence over server-scope ones for
+    # matching clients; transparent tells Unbound to forward the query
+    # upstream rather than synthesizing the block answer.
+    if policy_exempt_ips:
+        try:
+            from app.services.content_policy import emit_policy_exemption_overrides
+            exemption_overrides = emit_policy_exemption_overrides(conn)
+        except Exception:
+            exemption_overrides = []
+        lines.append("view:")
+        lines.append('    name: "policy_exemption_view"')
+        if exemption_overrides:
+            lines.extend(exemption_overrides)
+        else:
+            # No blocked domains right now — emit a harmless placeholder so the
+            # view block isn't empty (unbound-checkconf accepts empty views,
+            # but keeping a comment makes the generated file easier to read).
+            lines.append("    # No blocked domains currently — view is a no-op.")
         lines.append("")
 
     return "\n".join(lines)
@@ -293,8 +350,26 @@ def _save_known_good_unbound() -> bool:
         return False
 
 
+def _unbound_is_running() -> bool:
+    """Best-effort check: is the unbound daemon currently running?"""
+    from app.services.service_manager import service_action
+    r = service_action("unbound", "status")
+    return r.get("ok", False) and "is running" in (r.get("message") or "").lower()
+
+
+def _start_or_reload_unbound() -> dict:
+    """
+    Reload unbound when it's running, otherwise start it. A fresh install has
+    unbound enabled in rc.conf but the daemon was never up, so a bare `reload`
+    would error with "unbound not running? (check ...unbound.pid)".
+    """
+    from app.services.service_manager import service_action
+    action = "reload" if _unbound_is_running() else "start"
+    return service_action("unbound", action)
+
+
 def _rollback_unbound() -> dict:
-    """Restore the known-good unbound.conf and reload Unbound."""
+    """Restore the known-good unbound.conf and reload/start Unbound."""
     if not os.path.exists(_UNBOUND_KNOWN_GOOD_PATH):
         return {"ok": False, "message": "No known-good unbound.conf backup found."}
     try:
@@ -302,8 +377,7 @@ def _rollback_unbound() -> dict:
             old_conf = fh.read()
         with open(_UNBOUND_CONF_PATH, "w") as fh:
             fh.write(old_conf)
-        from app.services.service_manager import service_action
-        result = service_action("unbound", "reload")
+        result = _start_or_reload_unbound()
         if result["ok"]:
             return {"ok": True, "message": "Rolled back to last known-good unbound.conf."}
         return {"ok": False, "message": f"Rollback file restored but reload failed: {result['message']}"}
@@ -319,10 +393,11 @@ def write_unbound_conf(conn) -> dict:
     conf = generate_unbound_conf(conn)
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — unbound.conf generated but not written.", "conf": conf}
-    os.makedirs(os.path.dirname(_UNBOUND_CONF_PATH), exist_ok=True)
+    # Phase 5.4: atomic write so a crash mid-flush leaves the previous valid
+    # unbound.conf intact rather than a truncated file Unbound refuses to load.
     try:
-        with open(_UNBOUND_CONF_PATH, "w") as fh:
-            fh.write(conf)
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_UNBOUND_CONF_PATH, conf)
         return {"ok": True, "message": f"Written to {_UNBOUND_CONF_PATH}", "conf": conf}
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
@@ -354,18 +429,17 @@ def apply_unbound(conn) -> dict:
     # Backup current config as known-good before overwriting
     _save_known_good_unbound()
 
-    # Write
-    os.makedirs(os.path.dirname(_UNBOUND_CONF_PATH), exist_ok=True)
+    # Write atomically (Phase 5.4) — same rationale as write_unbound_conf above.
     try:
-        with open(_UNBOUND_CONF_PATH, "w") as fh:
-            fh.write(conf)
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_UNBOUND_CONF_PATH, conf)
     except OSError as exc:
         return {"ok": False, "message": str(exc), "conf": conf}
 
-    # Enable in rc.conf for reboot persistence, then reload
-    from app.services.service_manager import service_action, sysrc_set
+    # Enable in rc.conf for reboot persistence, then reload (or start if dead).
+    from app.services.service_manager import sysrc_set
     sysrc_set("unbound_enable", "YES")
-    result = service_action("unbound", "reload")
+    result = _start_or_reload_unbound()
     if not result["ok"]:
         rb = _rollback_unbound()
         rb_msg = rb.get("message", "rollback status unknown")

@@ -5,11 +5,11 @@
     <!-- Page Header -->
     <div class="ss-page-header">
         <div>
-            <h1 class="ss-page-title">Firewall Rules</h1>
+            <h1 class="ss-page-title">Traffic Rules</h1>
             <p class="ss-page-desc">Floating, WAN and LAN packet filter rules</p>
         </div>
         <div>
-            <button class="btn btn-primary" onclick="applyFirewall()" id="applyFirewallBtn">
+            <button class="btn btn-primary" data-action="h_2969860620" id="applyFirewallBtn">
                 <i class="fa-solid fa-shield-halved me-1"></i>Apply Firewall
             </button>
         </div>
@@ -18,13 +18,13 @@
     <!-- Tabs Navigation -->
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
-            <a class="nav-link active" data-tab="floating" href="#" onclick="openTab(event, 'floating')">Floating</a>
+            <a class="nav-link active" data-tab="floating" href="#" data-action="h_9c7ded0091">Floating</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" data-tab="wan" href="#" onclick="openTab(event, 'wan')">WAN</a>
+            <a class="nav-link" data-tab="wan" href="#" data-action="h_8841a5731c">WAN</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" data-tab="lan" href="#" onclick="openTab(event, 'lan')">LAN</a>
+            <a class="nav-link" data-tab="lan" href="#" data-action="h_e911961fb4">LAN</a>
         </li>
     </ul>
 
@@ -196,7 +196,7 @@
                         <label for="floating_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
                             <select id="floating_protocol" class="form-select"
-                                    onchange="_syncPortFields('floating_protocol','floating_source_port','floating_dest_port')">
+                                    data-action-change="h_2ecfec34ab">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -220,7 +220,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="floating_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'floating_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_31057f28bf" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -235,7 +235,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="floating_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'floating_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_b9e606f86c" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -306,7 +306,7 @@
                         <label for="wan_rule_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
                             <select id="wan_rule_protocol" class="form-select"
-                                    onchange="_syncPortFields('wan_rule_protocol','wan_source_port','wan_dest_port')">
+                                    data-action-change="h_a8bc7b832d">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -330,7 +330,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="wan_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'wan_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_d9efb12fe7" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -345,7 +345,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="wan_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'wan_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_10875f95ec" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -406,7 +406,7 @@
                         <label for="lan_protocol" class="col-sm-3 col-form-label fw-semibold">Protocol</label>
                         <div class="col-sm-9">
                             <select id="lan_protocol" class="form-select"
-                                    onchange="_syncPortFields('lan_protocol','lan_source_port','lan_dest_port')">
+                                    data-action-change="h_f507b004a3">
                                 <option value="any">Any</option>
                                 <option value="tcp">TCP</option>
                                 <option value="udp">UDP</option>
@@ -430,7 +430,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="lan_source_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'lan_source_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_06c27d2e5d" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -445,7 +445,7 @@
                         <div class="col-sm-9">
                             <div class="input-group">
                                 <input type="text" id="lan_dest_port" class="form-control" placeholder="any, 80, 443, 80:443 …">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showPortPicker(this,'lan_dest_port')" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" data-action="h_7eb90aa1c6" title="Pick known port"><i class="fa-solid fa-list-ol"></i></button>
                             </div>
                         </div>
                     </div>
@@ -465,7 +465,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce() }}">
 .port-picker-dropdown {
   position: absolute; z-index: 9999;
   background: var(--panel, #fff); border: 1px solid var(--border-color, #ccc);
@@ -482,7 +482,7 @@
 .port-picker-name { color:var(--muted,#888); font-size:.78rem; }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     // ── Known Ports quick-select ────────────────────────────────────────────
     const KNOWN_PORTS = {
       "Web":         [["80","HTTP"],["443","HTTPS"],["8080","HTTP-alt"],["8443","HTTPS-alt"]],
@@ -540,8 +540,10 @@
         document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
         // Add active class to selected tab content
         document.getElementById('tab-' + tabName).classList.add('active');
-        // Add active class to clicked tab
-        evt.currentTarget.classList.add('active');
+        // Add active class to clicked tab. evt.currentTarget is the document
+        // under the SSActions delegator, so walk up from evt.target instead.
+        const clickedLink = evt.target && evt.target.closest ? evt.target.closest('.nav-link') : null;
+        if (clickedLink) clickedLink.classList.add('active');
     }
 
     // --- UTILITY FUNCTION: SEND TO BACKEND ---
@@ -769,10 +771,10 @@
                         <td>${rule.schedule || '-'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('floating', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('floating', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('floating', ${rule.id})"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('floating', ${rule.id})"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="floating" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="floating" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="floating" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="floating" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -804,10 +806,10 @@
                         <td>${rule.dest_port || '*'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('wan', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('wan', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('wan', ${rule.id})"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('wan', ${rule.id})"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="wan" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="wan" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="wan" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="wan" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -837,10 +839,10 @@
                         <td>${rule.destination || 'any'}</td>
                         <td>${rule.description || ''}</td>
                         <td>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('lan', ${rule.id}, 'up')" title="Move Up"><i class="fas fa-arrow-up"></i></button>
-                            <button class="btn btn-sm btn-secondary" onclick="moveRule('lan', ${rule.id}, 'down')" title="Move Down"><i class="fas fa-arrow-down"></i></button>
-                            <button class="btn btn-sm btn-primary" onclick="editRule('lan', ${rule.id})"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRule('lan', ${rule.id})"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="lan" data-id="${rule.id}" data-dir="up" title="Move Up"><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="btn btn-sm btn-secondary" data-action="rule-move" data-tab="lan" data-id="${rule.id}" data-dir="down" title="Move Down"><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="btn btn-sm btn-primary" data-action="rule-edit" data-tab="lan" data-id="${rule.id}"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="rule-delete" data-tab="lan" data-id="${rule.id}"><i class="fas fa-trash"></i></button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -970,3 +972,30 @@
     }
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_2969860620'] = function (event, el) { applyFirewall() };
+  R['h_9c7ded0091'] = function (event, el) { openTab(event, 'floating') };
+  R['h_8841a5731c'] = function (event, el) { openTab(event, 'wan') };
+  R['h_e911961fb4'] = function (event, el) { openTab(event, 'lan') };
+  R['h_2ecfec34ab'] = function (event, el) { _syncPortFields('floating_protocol','floating_source_port','floating_dest_port') };
+  R['h_31057f28bf'] = function (event, el) { showPortPicker(this,'floating_source_port') };
+  R['h_b9e606f86c'] = function (event, el) { showPortPicker(this,'floating_dest_port') };
+  R['h_a8bc7b832d'] = function (event, el) { _syncPortFields('wan_rule_protocol','wan_source_port','wan_dest_port') };
+  R['h_d9efb12fe7'] = function (event, el) { showPortPicker(this,'wan_source_port') };
+  R['h_10875f95ec'] = function (event, el) { showPortPicker(this,'wan_dest_port') };
+  R['h_f507b004a3'] = function (event, el) { _syncPortFields('lan_protocol','lan_source_port','lan_dest_port') };
+  R['h_06c27d2e5d'] = function (event, el) { showPortPicker(this,'lan_source_port') };
+  R['h_7eb90aa1c6'] = function (event, el) { showPortPicker(this,'lan_dest_port') };
+  R['rule-move']   = function (event, el) { moveRule(el.dataset.tab, el.dataset.id, el.dataset.dir); };
+  R['rule-edit']   = function (event, el) { editRule(el.dataset.tab, el.dataset.id); };
+  R['rule-delete'] = function (event, el) { deleteRule(el.dataset.tab, el.dataset.id); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

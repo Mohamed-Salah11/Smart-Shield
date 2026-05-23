@@ -18,6 +18,7 @@
       </div>
       <div class="ss-card-body">
             <form method="post" action="{{ url_for('routing.gateway_group_edit', group_id=group_id) if group_id else url_for('routing.gateway_group_edit') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3 row align-items-center">
                     <label for="name" class="col-sm-3 col-form-label fw-semibold">Group Name</label>
                     <div class="col-sm-9">
@@ -52,7 +53,7 @@
                                 <td><span class="badge bg-primary">{{ gw.interface }}</span></td>
                                 <td><code>{{ gw.gateway }}</code></td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="tier_{{ gw.name }}" style="width:110px">
+                                    <select class="form-select form-select-sm ext-1a30558f" name="tier_{{ gw.name }}">
                                         <option value="never" {{ 'selected' if not mem }}>Never</option>
                                         {% for t in range(1, 6) %}
                                         <option value="{{ t }}" {{ 'selected' if mem.get('tier') == t }}>Tier {{ t }}</option>

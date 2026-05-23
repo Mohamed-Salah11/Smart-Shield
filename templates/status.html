@@ -5,7 +5,7 @@
 
   <div class="ss-page-header">
     <div>
-      <h1 class="ss-page-title">Monitoring</h1>
+      <h1 class="ss-page-title">Observability</h1>
       <p class="ss-page-desc">Quick access to runtime status pages and log tracking</p>
     </div>
   </div>
@@ -19,13 +19,13 @@
     ] %}
     {% for icon, title, href, desc in cards %}
     <div class="col-md-6 col-xl-3">
-      <div class="ss-card h-100" style="display:flex;flex-direction:column;">
+      <div class="ss-card h-100 ext-6b4bbac3">
         <div class="ss-card-head">
           <div class="ss-card-icon"><i class="{{ icon }}"></i></div>
           <div><div class="ss-card-title">{{ title }}</div></div>
         </div>
-        <div class="ss-card-body" style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
-          <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">{{ desc }}</p>
+        <div class="ss-card-body ext-9d9c130d">
+          <p class="ext-992b4b7e">{{ desc }}</p>
           <a href="{{ href }}" class="btn btn-primary btn-sm">Open →</a>
         </div>
       </div>

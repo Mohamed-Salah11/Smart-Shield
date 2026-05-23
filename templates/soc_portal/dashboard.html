@@ -1,0 +1,199 @@
+{% extends 'soc_portal/base.html' %}
+{% block title %}SOC Overview{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h2 class="ext-5d54ff35">SOC Overview</h2>
+    <p class="ext-6609c206">
+      <span class="live-dot"></span> Live — {{ soc_tier }} Analyst: <strong>{{ soc_username }}</strong>
+    </p>
+  </div>
+  <div class="ext-9fb8e23e" id="last-refreshed">
+    <i class="fa-solid fa-rotate me-1"></i> Refreshing…
+  </div>
+</div>
+
+<!-- KPI Row -->
+<div class="soc-kpi-grid">
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-6c0fabf5" id="kpi-open-cases">{{ open_cases }}</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-folder-open me-1"></i> Open Cases</div>
+  </div>
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-385c5811" id="kpi-my-cases">{{ my_cases }}</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-user-shield me-1"></i> Assigned to Me</div>
+  </div>
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-fe726ce2" id="kpi-alerts">—</div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-bell me-1"></i> Recent Alerts</div>
+  </div>
+  <div class="soc-kpi">
+    <div class="soc-kpi-value ext-58991e18">
+      <i class="fa-solid fa-circle-check ext-4a548d2f"></i>
+    </div>
+    <div class="soc-kpi-label"><i class="fa-solid fa-rss me-1"></i> Threat Feeds Active</div>
+  </div>
+</div>
+
+<!-- Recent Alerts + Open Cases -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-bell ext-385c5811"></i>
+        <div>
+          <div class="soc-card-title">Recent Alerts</div>
+          <div class="soc-card-subtitle">Latest security events — auto-refreshing</div>
+        </div>
+        <a href="{{ url_for('soc_portal.alerts') }}" class="btn-soc-secondary ms-auto ext-87419842">
+          View All <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="soc-card-body p-0">
+        <table class="soc-table" id="dash-alerts-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Sev</th>
+              <th>Category</th>
+              <th>Action</th>
+              <th>User / IP</th>
+            </tr>
+          </thead>
+          <tbody id="dash-alerts-body">
+            <tr><td colspan="5" class="text-center py-4 ext-a729d7fe">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-folder-open ext-e07b2ee9"></i>
+        <div>
+          <div class="soc-card-title">Open Cases</div>
+          <div class="soc-card-subtitle">Requires attention</div>
+        </div>
+        <a href="{{ url_for('soc_portal.cases') }}" class="btn-soc-secondary ms-auto ext-87419842">
+          All Cases <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="soc-card-body p-0" id="dash-cases-body">
+        <div class="text-center py-4 ext-a729d7fe">Loading…</div>
+      </div>
+    </div>
+
+    <div class="soc-card">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-clock-rotate-left ext-a729d7fe"></i>
+        <div>
+          <div class="soc-card-title">Threat Feed</div>
+          <div class="soc-card-subtitle">Last updated: {{ threat_feed_updated or 'Never' }}</div>
+        </div>
+      </div>
+      <div class="soc-card-body">
+        <p class="ext-7c13afb9">
+          abuse.ch URLhaus · MalwareBazaar · ThreatFox<br>
+          {% if soc_tier in ('L2','L3') %}
+          <a class="ext-e07b2ee9" href="{{ url_for('soc_portal.threat_intel') }}">View Intelligence →</a>
+          {% else %}
+          <span class="ext-a729d7fe">(L2+ required to view details)</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+const CAT_COLOR = {
+  security: 'var(--soc-danger)',
+  ids:      '#ff4d6d',
+  session:  'var(--soc-accent)',
+  system:   '#a78bfa',
+  network:  '#22d3ee',
+};
+const SEV_COLOR = {
+  critical: { bg: 'rgba(255,77,109,.15)', color: '#ff4d6d' },
+  high:     { bg: 'rgba(239,68,68,.15)',  color: '#ef4444' },
+  medium:   { bg: 'rgba(245,158,11,.15)', color: '#f59e0b' },
+  low:      { bg: 'rgba(16,185,129,.15)', color: '#10b981' },
+  info:     { bg: 'rgba(148,163,184,.1)', color: '#94a3b8' },
+};
+
+function timeFmt(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  } catch { return ts; }
+}
+
+async function loadAlerts() {
+  try {
+    const r = await fetch('/soc-portal/api/alerts?limit=8');
+    const data = await r.json();
+    document.getElementById('kpi-alerts').textContent = data.length;
+    const tbody = document.getElementById('dash-alerts-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 ext-a729d7fe">No recent alerts</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.slice(0, 8).map(e => {
+      const cat  = (e.category || '').toLowerCase();
+      const act  = e.action || '—';
+      const sev  = (e.effective_severity || 'info').toLowerCase();
+      const user = e.username || e.remote_addr || '—';
+      const sc   = SEV_COLOR[sev] || SEV_COLOR.info;
+      return `<tr>
+        <td class="soc-mono">${timeFmt(e.timestamp)}</td>
+        <td><span class="ext-566906a5">${sev}</span></td>
+        <td><span class="ext-53c89aeb">${cat}</span></td>
+        <td class="ext-588de81f">${act}</td>
+        <td class="ext-0fcb75b9">${user}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('dash-alerts-body').innerHTML =
+      '<tr><td colspan="5" class="text-center ext-a729d7fe">Failed to load alerts</td></tr>';
+  }
+}
+
+async function loadCases() {
+  try {
+    const r = await fetch('/soc-portal/api/cases?status=open');
+    const cases = await r.json();
+    document.getElementById('kpi-open-cases').textContent = cases.length;
+    const el = document.getElementById('dash-cases-body');
+    if (!cases.length) {
+      el.innerHTML = '<div class="soc-empty ext-2e0f4558"><i class="fa-solid fa-circle-check ext-58991e18"></i><p class="ext-75797c4c">No open cases</p></div>';
+      return;
+    }
+    const SEV_COLORS = {critical:'#ff4d6d',high:'#ef4444',medium:'#f59e0b',low:'#10b981'};
+    el.innerHTML = '<table class="soc-table">' +
+      cases.slice(0, 6).map(c => {
+        const col = SEV_COLORS[c.severity] || '#94a3b8';
+        return `<tr>
+          <td><a class="ext-9982219f" href="/soc-portal/cases/${c.id}">${c.title}</a></td>
+          <td><span class="ext-530fd97c">${c.severity}</span></td>
+        </tr>`;
+      }).join('') + '</table>';
+  } catch {}
+}
+
+function refresh() {
+  loadAlerts();
+  loadCases();
+  document.getElementById('last-refreshed').innerHTML =
+    '<i class="fa-solid fa-rotate me-1"></i> Updated ' + new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 15000);
+</script>
+{% endblock %}

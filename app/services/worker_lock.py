@@ -2,13 +2,17 @@
 worker_lock.py
 --------------
 Ensures only one Gunicorn worker process runs background daemon threads.
-Uses an exclusive fcntl.flock on a lock file under /var/run/smart-shield/.
+Uses an exclusive fcntl.flock on a lock file under the SmartShield runtime
+state dir (/var/run/smartshield by default; legacy /var/run/smart-shield is
+honored when present).
 On non-FreeBSD (dev/Windows): always returns True (single process assumed).
 """
 import os
 import sys
 
-_LOCK_FILE = "/var/run/smart-shield/worker.lock"
+from app.config import _ss_dir
+
+_LOCK_FILE = os.path.join(_ss_dir("/var/run"), "worker.lock")
 _lock_fd = None  # module-level file descriptor; held for process lifetime
 
 

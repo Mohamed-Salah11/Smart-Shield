@@ -36,6 +36,7 @@
       </div>
       <div class="ss-card-body">
             <form method="POST" action="{{ url_for('system.advanced_system_tunables_save') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 {% if index is not none %}
                 <input type="hidden" name="index" value="{{ index }}">
                 {% endif %}
@@ -43,7 +44,7 @@
                 <div class="mb-3 row">
                     <label for="tunable_name" class="col-sm-3 col-form-label fw-semibold">Tunable</label>
                     <div class="col-sm-9">
-                        <input type="text" id="tunable_name" name="tunable_name" class="form-control" style="max-width: 500px;" value="{{ tunable.name if tunable else '' }}" required>
+                        <input type="text" id="tunable_name" name="tunable_name" class="form-control ext-1357bbd5" value="{{ tunable.name if tunable else '' }}" required>
                         <small class="text-muted">The name of the sysctl tunable (e.g., net.inet.ip.forwarding)</small>
                     </div>
                 </div>
@@ -51,7 +52,7 @@
                 <div class="mb-3 row">
                     <label for="tunable_value" class="col-sm-3 col-form-label fw-semibold">Value</label>
                     <div class="col-sm-9">
-                        <input type="text" id="tunable_value" name="tunable_value" class="form-control" style="max-width: 500px;" value="{{ tunable.value if tunable else '' }}" required>
+                        <input type="text" id="tunable_value" name="tunable_value" class="form-control ext-1357bbd5" value="{{ tunable.value if tunable else '' }}" required>
                         <small class="text-muted">The value to set for this tunable</small>
                     </div>
                 </div>
@@ -59,7 +60,7 @@
                 <div class="mb-3 row">
                     <label for="tunable_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
                     <div class="col-sm-9">
-                        <input type="text" id="tunable_description" name="tunable_description" class="form-control" style="max-width: 500px;" value="{{ tunable.description if tunable else '' }}">
+                        <input type="text" id="tunable_description" name="tunable_description" class="form-control ext-1357bbd5" value="{{ tunable.description if tunable else '' }}">
                         <small class="text-muted">Optional description for this tunable</small>
                     </div>
                 </div>

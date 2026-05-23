@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block head %}
-<style>
+<style nonce="{{ csp_nonce() }}">
 .page-card { background:var(--panel);border:1px solid var(--border-color);border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:var(--shadow-soft); }
 .page-title { font-size:1.15rem;font-weight:700;color:var(--text-color);margin:0 0 4px; }
 .page-sub   { font-size:.82rem;color:var(--muted);margin:0; }
@@ -51,14 +51,16 @@
 <div class="container-fluid py-4 px-4">
 
   <div class="page-card">
-    <p class="page-title">Application Filter</p>
+    <p class="page-title">App Guard</p>
     <p class="page-sub">Block applications via DNS (known domains) and PF firewall rules (known ports). Use the signature library for one-click blocking of popular apps.</p>
   </div>
 
+  {% include '_content_policy_mode.html' %}
+
   <div class="toolbar">
-    <button class="btn btn-sm btn-primary" onclick="openModal('libModal')">Add from Library</button>
-    <button class="btn btn-sm btn-outline-secondary" onclick="openModal('addModal')">Add Custom Rule</button>
-    <button class="btn btn-sm btn-success" onclick="applyFilter()">Apply (DNS + PF)</button>
+    <button class="btn btn-sm btn-primary" data-action="h_50a44fb5cd">Add from Library</button>
+    <button class="btn btn-sm btn-outline-secondary" data-action="h_0886153780">Add Custom Rule</button>
+    <button class="btn btn-sm btn-success" data-action="h_dd1c2f2790">Apply (DNS + PF)</button>
   </div>
 
   <div class="card shadow-sm">
@@ -66,21 +68,21 @@
       <table class="ftbl">
         <thead>
           <tr>
-            <th style="width:40px;">On</th>
+            <th class="ext-93de2d4b">On</th>
             <th>Application</th>
             <th>Action</th>
             <th>Category</th>
             <th>Block DNS</th>
             <th>Block Ports</th>
             <th>Ports</th>
-            <th style="width:110px;">Actions</th>
+            <th class="ext-1a30558f">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rules %}
           <tr id="row-{{ r.id }}"
               data-app-name="{{ r.app_name }}"
-              data-action="{{ r.action }}"
+              data-rule-action="{{ r.action }}"
               data-category="{{ r.category }}"
               data-block-dns="{{ r.block_dns }}"
               data-block-ports="{{ r.block_ports }}"
@@ -91,11 +93,11 @@
             <td>
               <label class="sw">
                 <input type="checkbox" {% if r.enabled %}checked{% endif %}
-                  onchange="toggleRule({{ r.id }}, this.checked)">
+                  data-action-change="rule-toggle" data-id="{{ r.id }}">
                 <span class="sw-track"><span class="sw-thumb"></span></span>
               </label>
             </td>
-            <td style="font-weight:600;">{{ r.app_name }}</td>
+            <td class="ext-e634e6da">{{ r.app_name }}</td>
             <td><span class="badge-action badge-{{ r.action }}">{{ 'Redirect to block page' if r.action == 'block' else ('Allow whitelist only' if r.action == 'allow' else r.action) }}</span></td>
             <td><span class="badge-cat">{{ r.category }}</span></td>
             <td class="text-center">
@@ -110,12 +112,12 @@
             </td>
             <td class="mono">{{ r.ports or '—' }}</td>
             <td>
-              <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
-                onclick="openEdit({{ r.id }})" title="Edit">
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 me-1"
+                data-action="rule-edit" data-id="{{ r.id }}" title="Edit">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger py-0 px-2"
-                onclick="deleteRule({{ r.id }})">Delete</button>
+              <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                data-action="rule-delete" data-id="{{ r.id }}">Delete</button>
             </td>
           </tr>
           {% else %}
@@ -135,9 +137,9 @@
         <h5 class="modal-title">Application Signature Library</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="max-height:72vh;overflow-y:auto;">
+      <div class="modal-body ext-410556ab">
         <input type="text" class="form-control form-control-sm sig-search"
-          placeholder="Search applications…" oninput="filterSigs(this.value)">
+          placeholder="Search applications…" data-action-input="h_22d0800864">
         {% for cat, sigs in sig_by_category.items() %}
         <span class="sig-cat" data-cat="{{ cat }}">{{ cat|capitalize }}</span>
         {% for sig in sigs %}
@@ -149,8 +151,8 @@
               {% if sig.ports %} &nbsp;|&nbsp; Ports: {{ sig.ports }}{% endif %}
             </div>
           </div>
-          <button class="sig-add-btn" id="sig-btn-{{ sig.key }}"
-            onclick="addFromSig('{{ sig.key }}', this)">Block</button>
+          <button type="button" class="sig-add-btn" id="sig-btn-{{ sig.key }}"
+            data-action="sig-add" data-key="{{ sig.key }}">Block</button>
         </div>
         {% endfor %}
         {% endfor %}
@@ -221,7 +223,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="submitAdd()">Add Rule</button>
+        <button type="button" class="btn btn-primary" data-action="h_e8d195d7e0">Add Rule</button>
       </div>
     </div>
   </div>
@@ -285,7 +287,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+        <button type="button" class="btn btn-primary" data-action="h_bd2040ef78">Save Changes</button>
       </div>
     </div>
   </div>
@@ -293,7 +295,7 @@
 
 <div id="toast"></div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 const esc = t => String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
 function openModal(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
@@ -365,7 +367,7 @@ async function addFromSig(sigKey, btn) {
 function _buildRuleRow(v) {
   return `<tr id="row-${v.id}"
       data-app-name="${esc(v.app_name)}"
-      data-action="${esc(v.action)}"
+      data-rule-action="${esc(v.action)}"
       data-category="${esc(v.category)}"
       data-block-dns="${v.block_dns}"
       data-block-ports="${v.block_ports}"
@@ -375,21 +377,21 @@ function _buildRuleRow(v) {
       data-description="${esc(v.description||'')}">
     <td>
       <label class="sw">
-        <input type="checkbox" checked onchange="toggleRule(${v.id}, this.checked)">
+        <input type="checkbox" checked data-action-change="rule-toggle" data-id="${v.id}">
         <span class="sw-track"><span class="sw-thumb"></span></span>
       </label>
     </td>
-    <td style="font-weight:600;">${esc(v.app_name)}</td>
+    <td class="ext-e634e6da">${esc(v.app_name)}</td>
     <td><span class="badge-action badge-${esc(v.action)}">${esc(v.action)}</span></td>
     <td><span class="badge-cat">${esc(v.category)}</span></td>
     <td class="text-center"><span class="${v.block_dns ? 'check-yes' : 'check-no'}">${v.block_dns ? 'Yes' : 'No'}</span></td>
     <td class="text-center"><span class="${v.block_ports ? 'check-yes' : 'check-no'}">${v.block_ports ? 'Yes' : 'No'}</span></td>
     <td class="mono">${esc(v.ports || '—')}</td>
     <td>
-      <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1" onclick="openEdit(${v.id})" title="Edit">
+      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 me-1" data-action="rule-edit" data-id="${v.id}" title="Edit">
         <i class="fa-solid fa-pen-to-square"></i>
       </button>
-      <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteRule(${v.id})">Delete</button>
+      <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" data-action="rule-delete" data-id="${v.id}">Delete</button>
     </td>
   </tr>`;
 }
@@ -401,7 +403,7 @@ function openEdit(id) {
   document.getElementById('e-name').value = row.dataset.appName || '';
   document.getElementById('e-domains').value = row.dataset.domains || '';
   document.getElementById('e-ports').value = row.dataset.ports || '';
-  document.getElementById('e-action').value = row.dataset.action || 'block';
+  document.getElementById('e-action').value = row.dataset.ruleAction || 'block';
   document.getElementById('e-protocol').value = row.dataset.protocol || 'tcp+udp';
   document.getElementById('e-category').value = row.dataset.category || 'custom';
   document.getElementById('e-description').value = row.dataset.description || '';
@@ -488,3 +490,25 @@ function filterSigs(q) {
 }
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_50a44fb5cd'] = function (event, el) { openModal('libModal') };
+  R['h_0886153780'] = function (event, el) { openModal('addModal') };
+  R['h_dd1c2f2790'] = function (event, el) { applyFilter() };
+  R['h_22d0800864'] = function (event, el) { filterSigs(this.value) };
+  R['h_e8d195d7e0'] = function (event, el) { submitAdd() };
+  R['h_bd2040ef78'] = function (event, el) { submitEdit() };
+  // Per-row handlers (server- and client-rendered rows share these stable ids).
+  R['rule-toggle'] = function (event, el) { toggleRule(el.dataset.id, el.checked); };
+  R['rule-edit']   = function (event, el) { openEdit(el.dataset.id); };
+  R['rule-delete'] = function (event, el) { deleteRule(el.dataset.id); };
+  R['sig-add']     = function (event, el) { addFromSig(el.dataset.key, el); };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

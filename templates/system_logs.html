@@ -1,29 +1,29 @@
 {% extends 'base.html' %}
 
 {% block head %}
-<style>
-/* ═══════════════════════════════════════════════════
-   SMART-SHIELD SIEM
-═══════════════════════════════════════════════════ */
-
-/* ── SIEM Header ── */
-.siem-header {
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+<script src="{{ static_v('js/chart.umd.min.js') }}"></script>
+<style nonce="{{ csp_nonce() }}">
+/* ── Charts panel ── */
+.lm-charts {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 0;
+  padding: 10px 14px; background: var(--panel);
+  border: 1px solid var(--border-color); border-top: none; border-bottom: none;
 }
-.siem-title-block { display: flex; align-items: center; gap: 12px; }
-.siem-brand { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: var(--text-color); }
-.siem-sub   { font-size: .78rem; color: var(--muted); margin-top: 1px; }
-.siem-threat-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.siem-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 6px;
-  font-size: .75rem; font-weight: 700; letter-spacing: .04em;
+.lm-chart-card {
+  background: var(--bg); border: 1px solid var(--border-color);
+  border-radius: 8px; padding: 8px 12px; min-width: 220px;
 }
-.siem-badge-crit { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
-.siem-badge-high { background: rgba(249,115,22,.15); color: #fb923c; border: 1px solid rgba(249,115,22,.3); }
-.siem-badge-total { background: rgba(148,163,184,.1); color: var(--muted); border: 1px solid var(--border-color); }
-
+.lm-chart-title {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); margin-bottom: 6px;
+}
+/* ── MITRE ATT&CK tag ── */
+.lm-mitre {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  border-radius: 4px; font-size: .64rem; font-weight: 700;
+  background: rgba(139,92,246,.18); color: #a78bfa;
+  border: 1px solid rgba(139,92,246,.35); vertical-align: middle;
+}
 /* ── Toolbar ── */
 .lm-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -41,7 +41,6 @@
 }
 .lm-search:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); background-color:var(--panel); }
 
-/* Category pills */
 .lm-cats { display: flex; gap: 5px; flex-wrap: wrap; }
 .lm-cat {
   padding: 3px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700;
@@ -56,7 +55,6 @@
 .lm-cat[data-cat="security,ids"].active { background:#ef4444; border-color:#ef4444; }
 .lm-cat[data-cat="connection"].active { background:#0ea5e9; border-color:#0ea5e9; }
 
-/* Severity pills */
 .lm-sevs { display: flex; gap: 5px; flex-wrap: wrap; }
 .lm-sev {
   padding: 2px 9px; border-radius: 99px; font-size: .68rem; font-weight: 700;
@@ -71,7 +69,6 @@
 .lm-sev.active[data-sev="low"]      { background:#3b82f6; color:#fff; border-color:#3b82f6; }
 .lm-sev.active[data-sev=""]         { background:var(--primary); color:#fff; border-color:var(--primary); }
 
-/* Time-range tabs */
 .lm-time { display: flex; gap: 4px; }
 .lm-tr {
   padding: 3px 9px; border-radius: 6px; font-size: .72rem; font-weight: 600;
@@ -81,7 +78,6 @@
 .lm-tr:hover { border-color: var(--primary); color: var(--primary); }
 .lm-tr.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
 
-/* Right controls */
 .lm-controls { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
 .lm-live-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -121,7 +117,7 @@
 /* ── Log rows ── */
 .lm-row {
   display: grid;
-  grid-template-columns: 152px 76px 70px 155px 105px 110px 1fr;
+  grid-template-columns: 152px 76px 70px 155px 105px 110px 1fr 28px;
   gap: 0; padding: 4px 14px;
   border-bottom: 1px solid rgba(255,255,255,.03);
   align-items: baseline; cursor: pointer; transition: background .1s;
@@ -130,14 +126,12 @@
 .lm-row.lm-new { animation: lm-slide-in .25s ease; }
 @keyframes lm-slide-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
-/* Severity-driven row highlights */
 .lm-row.sev-critical { border-left: 3px solid #ef4444; background: rgba(239,68,68,.06); }
 .lm-row.sev-high     { border-left: 3px solid #f97316; background: rgba(249,115,22,.04); }
 .lm-row.sev-medium   { border-left: 2px solid #eab308; }
 .lm-row.sev-low      { border-left: 2px solid #3b82f6; }
 .lm-row.sev-info     { border-left: 2px solid #1e3a5f; }
 
-/* Columns */
 .lm-ts       { color:#475569; font-size:.75rem; padding-right:8px; white-space:nowrap; }
 .lm-sev-col  { padding-right:6px; white-space:nowrap; }
 .lm-cat-col  { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding-right:6px; white-space:nowrap; }
@@ -147,15 +141,14 @@
 .lm-detail   { color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lm-detail .lm-hi { color:#cbd5e1; }
 
-/* Category colours */
 .cat-col-session    { color:#3b82f6; }
 .cat-col-system     { color:#f59e0b; }
 .cat-col-security   { color:#ef4444; }
 .cat-col-ids        { color:#8b5cf6; }
 .cat-col-connection { color:#0ea5e9; }
+.cat-col-network    { color:#0ea5e9; }
 .cat-col-default    { color:#94a3b8; }
 
-/* Severity badge */
 .sev-badge {
   display:inline-block; padding:1px 5px; border-radius:4px; font-size:.62rem;
   font-weight:800; letter-spacing:.05em; text-transform:uppercase; vertical-align:middle;
@@ -166,7 +159,6 @@
 .sev-low      { background:#3b82f6; color:#fff; }
 .sev-info     { background:#1e3a5f; color:#94a3b8; }
 
-/* Expanded detail panel */
 .lm-expanded {
   display:none; padding:8px 14px 10px 14px;
   background:rgba(255,255,255,.025);
@@ -178,11 +170,9 @@
 }
 .lm-row.open + .lm-expanded { display:block; }
 
-/* Empty state */
 .lm-empty { padding:60px 0; text-align:center; color:#475569; font-size:.85rem; }
 .lm-empty i { font-size:2.5rem; margin-bottom:12px; display:block; opacity:.4; }
 
-/* Pause overlay */
 .lm-pause-overlay {
   position:absolute; top:10px; right:14px;
   background:rgba(15,23,41,.85); border:1px solid rgba(255,255,255,.1);
@@ -191,32 +181,36 @@
 }
 .lm-viewport.paused .lm-pause-overlay { display:block; }
 
-/* Footer bar */
 .lm-foot {
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:8px 14px; background:var(--panel);
   border:1px solid var(--border-color); border-top:none;
   border-radius:0 0 10px 10px; font-size:.78rem; color:var(--muted);
 }
+
 </style>
 {% endblock %}
 
 {% block main %}
 <div class="container-fluid px-3">
 
-  <!-- SIEM Header -->
-  <div class="siem-header mb-3">
-    <div class="siem-title-block">
-      <i class="fa-solid fa-shield-halved fa-xl text-primary"></i>
-      <div>
-        <div class="siem-brand">Smart-Shield SIEM</div>
-        <div class="siem-sub">Security Information and Event Management · LAN: <code id="siem-lan-iface">—</code></div>
-      </div>
+  <!-- Page Header -->
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <i class="fa-solid fa-scroll fa-xl text-primary"></i>
+    <div>
+      <div class="ext-862eee6a">SmartShield Logs</div>
+      <div class="ext-eac8f080">Appliance audit log and event monitor</div>
     </div>
-    <div class="siem-threat-bar">
-      <span class="siem-badge siem-badge-crit"><i class="fa-solid fa-circle me-1" style="font-size:.55rem;"></i><span id="cnt-critical">0</span> Critical</span>
-      <span class="siem-badge siem-badge-high"><i class="fa-solid fa-circle me-1" style="font-size:.55rem;"></i><span id="cnt-high">0</span> High</span>
-      <span class="siem-badge siem-badge-total"><span id="cnt-total">0</span> Total events</span>
+    <div class="ms-auto d-flex gap-2">
+      <span class="ext-2cd86b5e">
+        <i class="fa-solid fa-circle me-1 ext-d9303a02"></i><span id="cnt-critical">0</span> Critical
+      </span>
+      <span class="ext-2011e096">
+        <i class="fa-solid fa-circle me-1 ext-d9303a02"></i><span id="cnt-high">0</span> High
+      </span>
+      <span class="ext-d36eac28">
+        <span id="cnt-total">0</span> Total
+      </span>
     </div>
   </div>
 
@@ -224,32 +218,36 @@
   <div class="lm-bar">
     <input class="lm-search" id="searchInput" type="search"
            placeholder="Search hostname, IP, signature, action…"
-           oninput="onSearch(this.value)">
+           data-action-input="h_7e70e81dfb">
 
     <div class="lm-cats">
-      <span class="lm-cat active" data-cat="" onclick="setCat(this)">All Events</span>
-      <span class="lm-cat" data-cat="connection"   onclick="setCat(this)">Network Traffic</span>
-      <span class="lm-cat" data-cat="security,ids" onclick="setCat(this)">Security Alerts</span>
-      <span class="lm-cat" data-cat="system,connection"
-            data-actions="firewall_rule_added,firewall_rule_deleted,firewall_rule_updated,pf_reload,pf_rollback,pf_new_conn"
-            onclick="setCat(this)">Firewall</span>
-      <span class="lm-cat" data-cat="system"       onclick="setCat(this)">Config Changes</span>
-      <span class="lm-cat" data-cat="session"      onclick="setCat(this)">Sessions</span>
+      <span class="lm-cat" data-cat="" data-action="h_8d68d2871b">All Events</span>
+      <span class="lm-cat" data-cat="connection"   data-action="h_2a015a1a2b">Network</span>
+      <span class="lm-cat" data-cat="security,ids" data-action="h_509bf229f2">Security</span>
+      <span class="lm-cat active" data-cat="system,firewall"
+            data-actions="firewall_rule_added,firewall_rule_deleted,firewall_rule_updated,nat_rule_add,nat_rule_del,alias_save,schedule_save,traffic_shaper_save,pf_reload,pf_rollback,dns_filter_apply,web_filter_apply,pf_block,pf_pass"
+            data-action="h_056fbd1e5b">Firewall</span>
+      <span class="lm-cat" data-cat="privileged,system"
+            data-actions="terminal_command,terminal_command_aborted,terminal_exec,terminal_session_opened,terminal_session_closed,run_command"
+            data-action="h_51f49bb081">Commands</span>
+      <span class="lm-cat" data-cat="system"       data-action="h_c24ebaf3a7">Config</span>
+      <span class="lm-cat" data-cat="session"      data-action="h_eb0630c87d">Sessions</span>
+      <span class="lm-cat" data-cat="network"      data-action="h_7f73beb408">Network Hw</span>
     </div>
 
     <div class="lm-time">
-      <span class="lm-tr active" data-range="live"  onclick="setRange(this)">Live</span>
-      <span class="lm-tr"        data-range="1h"    onclick="setRange(this)">1h</span>
-      <span class="lm-tr"        data-range="6h"    onclick="setRange(this)">6h</span>
-      <span class="lm-tr"        data-range="24h"   onclick="setRange(this)">24h</span>
-      <span class="lm-tr"        data-range="7d"    onclick="setRange(this)">7d</span>
+      <span class="lm-tr active" data-range="live"  data-action="h_f7b6fd4a01">Live</span>
+      <span class="lm-tr"        data-range="1h"    data-action="h_362941ffb2">1h</span>
+      <span class="lm-tr"        data-range="6h"    data-action="h_cd063b22b9">6h</span>
+      <span class="lm-tr"        data-range="24h"   data-action="h_9844b03ba5">24h</span>
+      <span class="lm-tr"        data-range="7d"    data-action="h_ba6fac9a97">7d</span>
     </div>
 
     <div class="lm-controls">
       <div class="lm-live-dot active" id="liveDot"></div>
       <span class="lm-live-label" id="liveLabel">Live</span>
-      <select class="form-select form-select-sm" style="width:80px;font-size:.78rem;"
-              onchange="setPollInterval(+this.value)">
+      <select class="form-select form-select-sm ext-f55c5499"
+              data-action-change="h_14661d6598">
         <option value="2000">2s</option>
         <option value="5000" selected>5s</option>
         <option value="10000">10s</option>
@@ -260,99 +258,121 @@
   </div>
 
   <!-- Toolbar row 2: severity filter -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;padding:7px 14px;background:var(--panel);border:1px solid var(--border-color);border-top:none;border-bottom:none;align-items:center;">
-    <span style="font-size:.72rem;font-weight:600;color:var(--muted);margin-right:2px;">SEVERITY</span>
+  <div class="ext-ae5d9122">
+    <span class="ext-f571910d">SEVERITY</span>
     <div class="lm-sevs">
-      <span class="lm-sev active" data-sev=""         onclick="setSev(this)">All</span>
-      <span class="lm-sev"        data-sev="critical"  onclick="setSev(this)">● Critical</span>
-      <span class="lm-sev"        data-sev="high"      onclick="setSev(this)">● High</span>
-      <span class="lm-sev"        data-sev="medium"    onclick="setSev(this)">● Medium</span>
-      <span class="lm-sev"        data-sev="low"       onclick="setSev(this)">● Low</span>
+      <span class="lm-sev active" data-sev=""         data-action="h_b850b53ba7">All</span>
+      <span class="lm-sev"        data-sev="critical"  data-action="h_41229b8c39">● Critical</span>
+      <span class="lm-sev"        data-sev="high"      data-action="h_e68026e516">● High</span>
+      <span class="lm-sev"        data-sev="medium"    data-action="h_17bfaa8c7d">● Medium</span>
+      <span class="lm-sev"        data-sev="low"       data-action="h_d7d3126963">● Low</span>
     </div>
-    <span id="lastPoll" style="font-size:.72rem;color:var(--muted);margin-left:auto;"></span>
+    <span class="ext-431a2342" id="lastPoll"></span>
   </div>
 
   <!-- Stats bar -->
   <div class="lm-stats">
     <div class="lm-stat-item">
-      <span class="lm-stat-dot" style="background:#0ea5e9;"></span>
+      <span class="lm-stat-dot ext-d1540f10"></span>
       <span class="lm-stat-val" id="st-connection">0</span>
       <span class="lm-stat-lbl">Network</span>
     </div>
     <div class="lm-stat-item">
-      <span class="lm-stat-dot" style="background:#ef4444;"></span>
+      <span class="lm-stat-dot ext-82b6eff3"></span>
       <span class="lm-stat-val" id="st-security">0</span>
       <span class="lm-stat-lbl">Security</span>
     </div>
     <div class="lm-stat-item">
-      <span class="lm-stat-dot" style="background:#8b5cf6;"></span>
+      <span class="lm-stat-dot ext-f186519d"></span>
       <span class="lm-stat-val" id="st-ids">0</span>
       <span class="lm-stat-lbl">IDS/IPS</span>
     </div>
     <div class="lm-stat-item">
-      <span class="lm-stat-dot" style="background:#f59e0b;"></span>
+      <span class="lm-stat-dot ext-a76e943b"></span>
       <span class="lm-stat-val" id="st-system">0</span>
       <span class="lm-stat-lbl">Config</span>
     </div>
     <div class="lm-stat-item">
-      <span class="lm-stat-dot" style="background:#3b82f6;"></span>
+      <span class="lm-stat-dot ext-0a80578d"></span>
       <span class="lm-stat-val" id="st-session">0</span>
       <span class="lm-stat-lbl">Sessions</span>
     </div>
-    <span id="rowCountLabel" style="font-size:.72rem;color:var(--muted);margin-left:auto;"></span>
+    <span class="ext-431a2342" id="rowCountLabel"></span>
+  </div>
+
+  <!-- Charts panel -->
+  <div class="lm-charts">
+    <div class="lm-chart-card ext-56fa4070">
+      <div class="lm-chart-title">Events over time — by severity</div>
+      <div class="ext-42e66744"><canvas id="chartTimeline"></canvas></div>
+    </div>
+    <div class="lm-chart-card ext-da5cd676">
+      <div class="lm-chart-title">Severity breakdown</div>
+      <div class="ext-42e66744"><canvas id="chartSeverity"></canvas></div>
+    </div>
   </div>
 
   <!-- Log viewport -->
   <div class="lm-viewport" id="viewport">
     <div class="lm-pause-overlay">⏸ Auto-scroll paused — scroll to top to resume</div>
     <div class="lm-scroll" id="logScroll">
-      <!-- Column header -->
-      <div class="lm-row" style="position:sticky;top:0;z-index:2;background:#0d1220;cursor:default;border-bottom:1px solid rgba(255,255,255,.08);">
-        <span class="lm-ts"     style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Timestamp</span>
-        <span class="lm-sev-col"  style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Sev</span>
-        <span class="lm-cat-col"  style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Cat</span>
-        <span class="lm-action"   style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Event</span>
-        <span class="lm-user"     style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Device / User</span>
-        <span class="lm-ip"       style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">IP Address</span>
-        <span class="lm-detail"   style="color:#64748b;font-size:.68rem;font-weight:700;text-transform:uppercase;">Details</span>
+      <div class="lm-row ext-fbec1ecf">
+        <span class="lm-ts ext-3520726b"     >Timestamp</span>
+        <span class="lm-sev-col ext-3520726b">Sev</span>
+        <span class="lm-cat-col ext-3520726b">Cat</span>
+        <span class="lm-action ext-3520726b" >Event</span>
+        <span class="lm-user ext-3520726b"   >Device / User</span>
+        <span class="lm-ip ext-3520726b"     >IP Address</span>
+        <span class="lm-detail ext-3520726b" >Details</span>
+        <span></span>
       </div>
       <div id="emptyState" class="lm-empty">
         <i class="fa-solid fa-satellite-dish"></i>
-        Waiting for events… SIEM collectors run on FreeBSD.
+        Waiting for events… Event collectors run on FreeBSD.
       </div>
     </div>
   </div>
 
   <!-- Footer bar -->
-  <div class="lm-foot">
-    <button class="btn btn-sm btn-outline-secondary" onclick="clearView()">
+  <div class="lm-foot" id="logFooter">
+    <button class="btn btn-sm btn-outline-secondary" data-action="h_a829bf9339">
       <i class="fa-solid fa-trash-can me-1"></i>Clear view
     </button>
-    <button class="btn btn-sm btn-outline-primary" onclick="exportLogs()">
+    <button class="btn btn-sm btn-outline-primary" data-action="h_7a01fc8c7d">
       <i class="fa-solid fa-file-arrow-down me-1"></i>Export
     </button>
-    <span id="exportMsg" style="color:var(--muted);"></span>
-    <span style="margin-left:auto;color:var(--muted);" id="rowCountFoot"></span>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('status.correlation_rules') }}">
+      <i class="fa-solid fa-diagram-project me-1"></i>Correlation Rules
+    </a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('status.log_forwarding_settings') }}">
+      <i class="fa-solid fa-share-from-square me-1"></i>Log Forwarding
+    </a>
+    <span class="ext-87ddc0dc" id="exportMsg"></span>
+    <span class="ext-7b7eef85" id="rowCountFoot"></span>
   </div>
 
 </div><!-- /container -->
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 const POLL_URL   = "{{ url_for('status.api_logs') }}";
 const STATS_URL  = "{{ url_for('status.api_logs_stats') }}";
 const EXPORT_URL = "{{ url_for('status.api_logs_export') }}";
+const TS_URL     = "{{ url_for('status.api_logs_timeseries') }}";
+const STREAM_URL = "{{ url_for('status.api_logs_stream') }}";
 const MAX_ROWS   = 1000;
+const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
 /* ── State ── */
 let latestTs      = "";
 let allRows       = [];
-let activeCat     = "";        // category filter
-let activeActions = "";        // action-level filter (used by Firewall pill)
-let activeSev     = "";        // severity filter
-let activeRange   = "live";    // time-range: live|1h|6h|24h|7d
+let activeCat     = "system,firewall";
+let activeActions = "firewall_rule_added,firewall_rule_deleted,firewall_rule_updated,nat_rule_add,nat_rule_del,alias_save,schedule_save,traffic_shaper_save,pf_reload,pf_rollback,dns_filter_apply,web_filter_apply,pf_block,pf_pass";
+let activeSev     = "";
+let activeRange   = "live";
 let searchText    = "";
 let pollTimer     = null;
 let pollInterval  = 5000;
+let _es           = null;   // EventSource for the live SSE stream
 let autoScroll    = true;
 let paused        = false;
 
@@ -368,76 +388,64 @@ const rowLabel  = document.getElementById("rowCountLabel");
 /* ── Helpers ── */
 const esc = s => String(s??'')
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
 const fmtTs = ts => (ts||'').replace('T',' ').slice(0,19);
+const apiFetch = (url, opts={}) => {
+  opts.headers = Object.assign({'X-CSRF-Token': csrf, 'Content-Type':'application/json'}, opts.headers||{});
+  return fetch(url, opts);
+};
 
 const catClass = c => ({
   session:'cat-col-session', system:'cat-col-system',
   security:'cat-col-security', ids:'cat-col-ids',
-  connection:'cat-col-connection',
+  connection:'cat-col-connection', network:'cat-col-network',
 }[c] || 'cat-col-default');
 
 const catLabel = c => ({
   session:'SESSION', system:'SYSTEM', security:'SECURITY',
-  ids:'IDS/IPS', connection:'NETWORK', browsing:'ADMIN',
+  ids:'IDS/IPS', connection:'NETWORK', network:'NET-HW', browsing:'ADMIN',
 }[c] || (c||'').toUpperCase());
 
 const ACTION_LABELS = {
-  pf_new_conn:                  'New Connection',
-  pf_blocked:                   'Blocked',
-  ids_alert:                    'IDS Alert',
-  ids_flood_detected:           'IDS Flood',
-  insecure_protocol_detected:   'Insecure Protocol',
-  brute_force_detected:         'Brute Force',
-  login_success:                'Login',
-  login_failed:                 'Failed Login',
-  logout:                       'Logout',
-  reauth_success:               'Re-auth OK',
-  reauth_failed:                'Re-auth Failed',
-  login_blocked_user_lockout:   'Account Locked',
-  captive_portal_login_success: 'Portal Auth',
-  captive_portal_login_failed:  'Portal Auth Fail',
-  captive_portal_logout:        'Portal Logout',
-  dhcp_lease_assigned:          'DHCP Lease',
-  dhcp_lease_expired:           'DHCP Expired',
-  dns_query:                    'DNS Query',
-  pf_reload:                    'PF Reload',
-  pf_rollback:                  'PF Rollback',
-  firewall_rule_added:          'Rule Added',
-  firewall_rule_deleted:        'Rule Deleted',
-  firewall_rule_updated:        'Rule Updated',
-  dhcp_apply:                   'DHCP Applied',
-  dns_apply:                    'DNS Applied',
-  dns_filter_apply:             'DNS Filter Applied',
-  web_filter_apply:             'Web Filter Applied',
-  ids_config_save:              'IDS Config Saved',
-  ids_toggle:                   'IDS Toggled',
-  captive_portal_apply:         'Portal Applied',
-  mrtg_apply:                   'MRTG Applied',
-  api_change:                   'Config Change',
-  page_view:                    'Page View',
-  diagnostic_cmd:               'Diagnostic Cmd',
-  db_migration:                 'DB Migration',
-  factory_reset:                'Factory Reset',
-  system_reboot:                'System Reboot',
+  pf_new_conn:'New Connection', pf_blocked:'Blocked',
+  ids_alert:'IDS Alert', ids_flood_detected:'IDS Flood',
+  insecure_protocol_detected:'Insecure Protocol', brute_force_detected:'Brute Force',
+  login_success:'Login', login_failed:'Failed Login',
+  logout:'Logout', reauth_success:'Re-auth OK', reauth_failed:'Re-auth Failed',
+  login_blocked_user_lockout:'Account Locked',
+  captive_portal_login_success:'Portal Auth', captive_portal_login_failed:'Portal Auth Fail',
+  captive_portal_logout:'Portal Logout', dhcp_lease_assigned:'DHCP Lease',
+  dhcp_lease_expired:'DHCP Expired', dns_query:'DNS Query',
+  pf_reload:'PF Reload', pf_rollback:'PF Rollback',
+  firewall_rule_added:'Rule Added', firewall_rule_deleted:'Rule Deleted',
+  firewall_rule_updated:'Rule Updated',
+  dhcp_apply:'DHCP Applied', dns_apply:'DNS Applied',
+  dns_filter_apply:'DNS Filter Applied', web_filter_apply:'Web Filter Applied',
+  ids_config_save:'IDS Config Saved', ids_toggle:'IDS Toggled',
+  captive_portal_apply:'Portal Applied', mrtg_apply:'MRTG Applied',
+  api_change:'Config Change', page_view:'Page View',
+  diagnostic_cmd:'Diagnostic Cmd', db_migration:'DB Migration',
+  factory_reset:'Factory Reset', system_reboot:'System Reboot',
+  ssh_login_failed:'SSH Failed', ssh_login_success:'SSH Login',
+  su_attempt_failed:'SU Failed', kernel_panic:'Kernel Panic',
+  link_state_change:'Link Change', pf_table_overload:'PF Overload',
+  carp_state_change:'CARP Change', out_of_memory:'Out of Memory',
 };
 const actionLabel = a =>
   ACTION_LABELS[a] || (a||'—').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 
-/* Build a rich one-line detail summary per event */
 function buildDetail(e) {
   const d = e.details || {};
   switch (e.action) {
     case 'pf_new_conn': {
       const host = d.hostname ? `<span class="lm-hi">${esc(d.hostname)}</span> ` : '';
-      const svc  = d.service  ? ` <span style="color:#7dd3fc">[${esc(d.service)}]</span>` : '';
-      const iface = d.interface ? `<span style="color:#475569">[${esc(d.interface)}]</span> ` : '';
+      const svc  = d.service  ? ` <span class="ext-3229dcb9">[${esc(d.service)}]</span>` : '';
+      const iface = d.interface ? `<span class="ext-53deb6e3">[${esc(d.interface)}]</span> ` : '';
       return `${iface}${host}(${esc(d.src_ip||e.remote_addr)}) → ${esc(d.dst_ip)}:${esc(d.dst_port)}${svc}`;
     }
     case 'insecure_protocol_detected':
-      return `<span style="color:#f87171">⚠ ${esc(d.protocol||'?')}</span> from <span class="lm-hi">${esc(d.hostname||d.src)}</span> to ${esc(d.dst)}`;
+      return `<span class="ext-124741b6">⚠ ${esc(d.protocol||'?')}</span> from <span class="lm-hi">${esc(d.hostname||d.src)}</span> to ${esc(d.dst)}`;
     case 'ids_alert':
-      return `<span style="color:#c084fc">${esc(d.signature||'Unknown sig')}</span> · ${esc(d.src_ip)}:${esc(d.src_port||'?')} → ${esc(d.dest_ip)}:${esc(d.dest_port||'?')}`;
+      return `<span class="ext-eed815a6">${esc(d.signature||'Unknown sig')}</span> · ${esc(d.src_ip)}:${esc(d.src_port||'?')} → ${esc(d.dest_ip)}:${esc(d.dest_port||'?')}`;
     case 'brute_force_detected':
       return `<span class="lm-hi">${esc(d.src_ip||e.remote_addr)}</span> — ${esc(d.count||'?')} failed logins in ${esc(d.window_minutes||'?')} min`;
     case 'ids_flood_detected':
@@ -445,22 +453,34 @@ function buildDetail(e) {
     case 'dhcp_lease_assigned':
       return `<span class="lm-hi">${esc(d.hostname||'unknown')}</span> @ ${esc(d.ip||e.remote_addr)} (${esc(d.mac||'?')})`;
     case 'dns_query':
-      return `${esc(e.remote_addr)} queried <span class="lm-hi">${esc(d.query||d.name||'?')}</span> ${d.blocked?'<span style="color:#f87171">BLOCKED</span>':''}`;
+      return `${esc(e.remote_addr)} queried <span class="lm-hi">${esc(d.query||d.name||'?')}</span> ${d.blocked?'<span class="ext-124741b6">BLOCKED</span>':''}`;
     case 'login_success': case 'login_failed':
     case 'captive_portal_login_success': case 'captive_portal_login_failed':
       return `${esc(d.username||e.username||'?')} from ${esc(e.remote_addr||'?')}${d.mac?' ('+esc(d.mac)+')':''}`;
+    case 'ssh_login_failed':
+      return `<span class="ext-124741b6">✗</span> <span class="lm-hi">${esc(d.user||'?')}</span> via ${esc(d.method||'?')} from ${esc(d.src_ip||e.remote_addr)}`;
+    case 'ssh_login_success':
+      return `<span class="ext-73272816">✓</span> <span class="lm-hi">${esc(d.user||'?')}</span> via ${esc(d.method||'?')} from ${esc(d.src_ip||e.remote_addr)}`;
+    case 'su_attempt_failed':
+      return `<span class="ext-124741b6">BAD SU</span> ${esc(d.from_user||'?')} → ${esc(d.to_user||'?')}`;
+    case 'link_state_change':
+      return `<span class="lm-hi">${esc(d.interface||'?')}</span> → <span class="ext-9ab33878">${esc(d.state||'?')}</span>`;
+    case 'kernel_panic': case 'out_of_memory': case 'pf_table_overload':
+      return `<span class="ext-124741b6">${esc((d.message||'').slice(0,120))}</span>`;
+    case 'carp_state_change':
+      return `<span class="lm-hi">${esc(d.interface||'?')}</span> → ${esc(d.state||'?')}`;
     case 'firewall_rule_added': case 'firewall_rule_deleted': case 'firewall_rule_updated': {
       const desc = d.description || d.desc || '';
       return `${esc(d.action||'?')} ${esc(d.protocol||'any')} ${esc(d.source||'any')} → ${esc(d.destination||'any')}${d.dest_port?':'+esc(d.dest_port):''} ${desc?'('+esc(desc)+')':''}`;
     }
     case 'pf_reload':
       return d.ok === false
-        ? `<span style="color:#f87171">FAILED</span> ${esc(d.message||'')}`
-        : `<span style="color:#4ade80">OK</span>${d.rule_count ? ' · ' + esc(d.rule_count) + ' rules' : ''}`;
+        ? `<span class="ext-124741b6">FAILED</span> ${esc(d.message||'')}`
+        : `<span class="ext-73272816">OK</span>${d.rule_count ? ' · ' + esc(d.rule_count) + ' rules' : ''}`;
     case 'pf_rollback':
       return d.ok === false
-        ? `<span style="color:#f87171">FAILED — ${esc(d.message||'')}</span>`
-        : `<span style="color:#fb923c">Rolled back</span> ${esc(d.message||'')}`;
+        ? `<span class="ext-124741b6">FAILED — ${esc(d.message||'')}</span>`
+        : `<span class="ext-483f44aa">Rolled back</span> ${esc(d.message||'')}`;
     case 'diagnostic_cmd':
       return `${esc(d.command||'?')}${d.interface?' on '+esc(d.interface):''}${d.filter?' filter: '+esc(d.filter):''}`;
     default: {
@@ -473,7 +493,6 @@ function buildDetail(e) {
   }
 }
 
-/* Severity badge HTML */
 function sevBadge(sev) {
   const s = (sev||'info').toLowerCase();
   return `<span class="sev-badge sev-${s}">${s.slice(0,4).toUpperCase()}</span>`;
@@ -482,92 +501,83 @@ function sevBadge(sev) {
 /* Render one log row + hidden expand panel */
 function renderRow(e, isNew) {
   const sev  = (e.severity || 'info').toLowerCase();
-  const ts   = fmtTs(e.timestamp);
-  const cat  = e.category || '';
-  const act  = e.action   || '';
-  const user = e.username === 'siem' ? '' : esc(e.username || '');
-  const ip   = esc(e.remote_addr || '');
+  const user = esc(e.username || '');
   const det  = buildDetail(e);
+  const mitre = (e.details && e.details.mitre_technique) ? e.details.mitre_technique : '';
+  const mitreBadge = mitre ? ` <span class="lm-mitre" title="MITRE ATT&CK technique">${esc(mitre)}</span>` : '';
 
   const rowEl = document.createElement('div');
   rowEl.className = `lm-row sev-${sev}${isNew?' lm-new':''}`;
   rowEl.innerHTML =
-    `<span class="lm-ts">${ts}</span>` +
+    `<span class="lm-ts">${fmtTs(e.timestamp)}</span>` +
     `<span class="lm-sev-col">${sevBadge(sev)}</span>` +
-    `<span class="lm-cat-col ${catClass(cat)}">${catLabel(cat)}</span>` +
-    `<span class="lm-action">${esc(actionLabel(act))}</span>` +
+    `<span class="lm-cat-col ${catClass(e.category||'')}">${catLabel(e.category||'')}</span>` +
+    `<span class="lm-action">${esc(actionLabel(e.action||''))}${mitreBadge}</span>` +
     `<span class="lm-user">${user}</span>` +
-    `<span class="lm-ip">${ip}</span>` +
+    `<span class="lm-ip">${esc(e.remote_addr||'')}</span>` +
     `<span class="lm-detail">${det}</span>`;
 
   const expEl = document.createElement('div');
   expEl.className = 'lm-expanded';
   expEl.innerHTML = `<pre>${esc(JSON.stringify(e, null, 2))}</pre>`;
 
-  rowEl.addEventListener('click', () => {
-    rowEl.classList.toggle('open');
-  });
-
+  rowEl.addEventListener('click', () => rowEl.classList.toggle('open'));
   return [rowEl, expEl];
 }
 
-/* Prepend rows into the log viewport */
 function prependRows(events) {
   if (!events.length) return;
   const frag = document.createDocumentFragment();
   for (const e of events) {
     const [r, x] = renderRow(e, true);
-    frag.appendChild(r);
-    frag.appendChild(x);
+    frag.appendChild(r); frag.appendChild(x);
   }
-
-  const firstRow = scroll.children[1]; // [0] is header
+  const firstRow = scroll.children[1];
   if (firstRow) scroll.insertBefore(frag, firstRow);
   else scroll.appendChild(frag);
-
   empty.style.display = 'none';
-
-  // Trim excess rows
   while (allRows.length > MAX_ROWS) allRows.pop();
   const rowEls = scroll.querySelectorAll('.lm-row:not(:first-child)');
   while (rowEls.length > MAX_ROWS * 2) {
     const last = scroll.lastElementChild;
-    if (last && last !== empty) scroll.removeChild(last);
-    else break;
+    if (last && last !== empty) scroll.removeChild(last); else break;
   }
-
   if (rowLabel) {
     rowLabel.textContent = `${allRows.length.toLocaleString()} events`;
     document.getElementById('rowCountFoot').textContent = rowLabel.textContent;
   }
 }
 
+/* The Firewall log view (the pill filtering on pf_block etc.) hides SOC-team
+   activity — events the SOC portal tagged details.soc_origin. */
+function isFirewallView() {
+  return !!activeActions && activeActions.indexOf('pf_block') !== -1;
+}
+
 /* ── Polling ── */
 function buildPollURL() {
-  const params = new URLSearchParams();
-  params.set('limit', '200');
-  if (activeCat)     params.set('categories', activeCat);
-  if (activeSev)     params.set('severities', activeSev);
-  if (activeActions) params.set('actions',    activeActions);
-  if (searchText)    params.set('search',     searchText);
-
+  const p = new URLSearchParams();
+  p.set('limit', '200');
+  if (activeCat)     p.set('categories', activeCat);
+  if (activeSev)     p.set('severities', activeSev);
+  if (activeActions) p.set('actions',    activeActions);
+  if (searchText)    p.set('search',     searchText);
+  if (isFirewallView()) p.set('hide_soc', '1');
   if (activeRange === 'live') {
-    if (latestTs) params.set('since', latestTs);
+    if (latestTs) p.set('since', latestTs);
   } else {
     const mins = {'1h':60,'6h':360,'24h':1440,'7d':10080}[activeRange] || 60;
-    const start = new Date(Date.now() - mins * 60000).toISOString();
-    params.set('start_ts', start);
+    p.set('start_ts', new Date(Date.now() - mins * 60000).toISOString());
   }
-  return POLL_URL + '?' + params.toString();
+  return POLL_URL + '?' + p.toString();
 }
 
 async function poll() {
   try {
     liveDot.classList.add('active');
-    const r  = await fetch(buildPollURL());
-    const d  = await r.json();
+    const r = await fetch(buildPollURL());
+    const d = await r.json();
     liveDot.classList.remove('active');
-
     if (!d.ok) return;
     const events = d.events || [];
     if (events.length) {
@@ -575,9 +585,7 @@ async function poll() {
       prependRows(events);
       if (d.latest_ts) latestTs = d.latest_ts;
     }
-
-    const now = new Date().toLocaleTimeString();
-    if (lastPoll) lastPoll.textContent = `Last poll: ${now}`;
+    if (lastPoll) lastPoll.textContent = `Last poll: ${new Date().toLocaleTimeString()}`;
     liveLabel.textContent = 'Live';
     liveDot.style.background = '#10b981';
     liveDot.classList.remove('paused');
@@ -588,101 +596,190 @@ async function poll() {
   }
 }
 
-function startPoll() {
+/* ── Live streaming (Server-Sent Events) ── */
+function stopStream() {
+  if (_es) { try { _es.close(); } catch(_) {} _es = null; }
+}
+
+/* Client-side action + free-text filter (server already filtered cat/sev). */
+function streamMatches(e) {
+  if (activeActions) {
+    if (!activeActions.split(',').includes(e.action)) return false;
+  }
+  if (isFirewallView() && e.details && e.details.soc_origin) return false;
+  if (searchText) {
+    const hay = [e.action, e.username, e.remote_addr, e.category, e.severity,
+                 JSON.stringify(e.details || {})].join(' ').toLowerCase();
+    if (!hay.includes(searchText)) return false;
+  }
+  return true;
+}
+
+function ingestEvent(e) {
+  if (!streamMatches(e)) return;
+  allRows = [e].concat(allRows).slice(0, MAX_ROWS);
+  prependRows([e]);
+  if (e.timestamp) latestTs = e.timestamp;
+  if (lastPoll) lastPoll.textContent = `Streaming · ${new Date().toLocaleTimeString()}`;
+}
+
+function startStream() {
+  stopStream();
+  const p = new URLSearchParams();
+  if (activeCat) p.set('categories', activeCat);
+  if (activeSev) p.set('severities', activeSev);
+  try {
+    _es = new EventSource(STREAM_URL + '?' + p.toString());
+  } catch (_) { _es = null; startPollTimer(); return; }
+  _es.addEventListener('log', ev => {
+    try { ingestEvent(JSON.parse(ev.data)); } catch (_) {}
+  });
+  _es.addEventListener('ready', () => {
+    liveLabel.textContent = 'Live'; liveDot.style.background = '#10b981';
+    liveDot.classList.remove('paused');
+  });
+  _es.onerror = () => {
+    // Permanently closed (server error / unsupported) — fall back to polling.
+    if (_es && _es.readyState === EventSource.CLOSED) {
+      stopStream();
+      startPollTimer();
+    }
+  };
+}
+
+function startPollTimer() {
   if (pollTimer) clearInterval(pollTimer);
-  if (pollInterval > 0) {
-    poll();
-    pollTimer = setInterval(poll, pollInterval);
+  pollTimer = null;
+  if (pollInterval > 0) { poll(); pollTimer = setInterval(poll, pollInterval); }
+}
+
+function startPoll() {
+  stopStream();
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (activeRange === 'live' && pollInterval > 0 && window.EventSource) {
+    poll();          // load the current backlog once
+    startStream();   // then stream new events live
+  } else {
+    startPollTimer();
   }
 }
 
 function setPollInterval(ms) {
   pollInterval = ms;
   if (ms === 0) {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
-    liveLabel.textContent = 'Paused';
-    liveDot.classList.add('paused');
+    if (pollTimer) clearInterval(pollTimer); pollTimer = null;
+    stopStream();
+    liveLabel.textContent = 'Paused'; liveDot.classList.add('paused');
   } else {
-    liveLabel.textContent = 'Live';
-    liveDot.classList.remove('paused');
-    startPoll();
+    liveLabel.textContent = 'Live'; liveDot.classList.remove('paused'); startPoll();
   }
 }
 
-/* ── Filter handlers ── */
 function setCat(el) {
   document.querySelectorAll('.lm-cat').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
-  activeCat     = el.dataset.cat;
-  activeActions = el.dataset.actions || '';
-  latestTs      = '';
-  allRows       = [];
-  clearViewport();
-  startPoll();
+  activeCat = el.dataset.cat; activeActions = el.dataset.actions || '';
+  latestTs = ''; allRows = []; clearViewport(); startPoll();
 }
-
 function setSev(el) {
   document.querySelectorAll('.lm-sev').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
-  activeSev  = el.dataset.sev;
-  latestTs   = '';
-  allRows    = [];
-  clearViewport();
-  startPoll();
+  activeSev = el.dataset.sev; latestTs = ''; allRows = []; clearViewport(); startPoll();
 }
-
 function setRange(el) {
   document.querySelectorAll('.lm-tr').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
-  activeRange = el.dataset.range;
-  latestTs    = '';
-  allRows     = [];
-  clearViewport();
+  activeRange = el.dataset.range; latestTs = ''; allRows = []; clearViewport();
+  stopStream();
   if (activeRange !== 'live') {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = null;
+    if (pollTimer) clearInterval(pollTimer); pollTimer = null;
     liveLabel.textContent = 'Snapshot';
+    poll();
+  } else {
+    startPoll();
   }
-  poll();
 }
-
 let _searchTimer = null;
 function onSearch(val) {
   searchText = val.toLowerCase().trim();
   clearTimeout(_searchTimer);
-  _searchTimer = setTimeout(() => {
-    latestTs = ''; allRows = []; clearViewport(); poll();
-  }, 400);
+  _searchTimer = setTimeout(() => { latestTs=''; allRows=[]; clearViewport(); poll(); }, 400);
 }
-
 function clearViewport() {
-  const rows = scroll.querySelectorAll('.lm-row:not(:first-child), .lm-expanded');
-  rows.forEach(r => r.remove());
+  scroll.querySelectorAll('.lm-row:not(:first-child), .lm-expanded').forEach(r=>r.remove());
   empty.style.display = 'block';
   if (rowLabel) rowLabel.textContent = '';
 }
+function clearView() { allRows=[]; latestTs=''; activeActions=''; clearViewport(); startPoll(); }
 
-function clearView() {
-  allRows = []; latestTs = ''; activeActions = '';
-  clearViewport();
-  startPoll();
-}
-
-/* ── Stats polling ── */
+/* ── Stats ── */
 async function pollStats() {
   try {
     const r = await fetch(STATS_URL);
     const d = await r.json();
-    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v||0).toLocaleString(); };
-    setVal('cnt-critical', d._critical || 0);
-    setVal('cnt-high',     d._high     || 0);
-    setVal('cnt-total',    d._total    || 0);
-    setVal('st-connection', (d.connection||0));
-    setVal('st-security',   d.security||0);
-    setVal('st-ids',        d.ids||0);
-    setVal('st-system',     d.system||0);
-    setVal('st-session',    d.session||0);
+    const sv = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=(v||0).toLocaleString(); };
+    sv('cnt-critical',  d._critical||0);
+    sv('cnt-high',      d._high||0);
+    sv('cnt-total',     d._total||0);
+    sv('st-connection', d.connection||0);
+    sv('st-security',   d.security||0);
+    sv('st-ids',        d.ids||0);
+    sv('st-system',     d.system||0);
+    sv('st-session',    d.session||0);
+  } catch(_) {}
+}
+
+/* ── Time-series charts ── */
+const SEV_COLORS = {critical:'#ef4444', high:'#fb923c', medium:'#f59e0b', low:'#3b82f6', info:'#64748b'};
+const SEV_ORDER  = ['critical','high','medium','low','info'];
+let chartTimeline = null, chartSeverity = null;
+
+async function pollTimeseries() {
+  if (typeof Chart === 'undefined') return;
+  try {
+    const params = new URLSearchParams({bucket:'hour'});
+    if (activeCat) params.set('categories', activeCat);
+    if (activeSev) params.set('severities', activeSev);
+    const r = await fetch(TS_URL + '?' + params.toString());
+    const d = await r.json();
+    if (!d || !d.ok) return;
+    const series  = d.series || {};
+    const labels  = (d.buckets || []).map(b => b.replace('T',' '));
+    const sevs    = SEV_ORDER.filter(s => series[s]);
+    const datasets = sevs.map(s => ({
+      label:s, data:series[s], backgroundColor:SEV_COLORS[s]||'#64748b',
+      stack:'sev', borderWidth:0,
+    }));
+    if (!chartTimeline) {
+      chartTimeline = new Chart(document.getElementById('chartTimeline'), {
+        type:'bar', data:{labels, datasets},
+        options:{responsive:true, maintainAspectRatio:false, animation:false,
+          plugins:{legend:{labels:{color:'#94a3b8',boxWidth:10,font:{size:10}}}},
+          scales:{x:{stacked:true,grid:{display:false},
+                     ticks:{color:'#64748b',font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:8}},
+                  y:{stacked:true,grid:{color:'rgba(255,255,255,.05)'},
+                     ticks:{color:'#64748b',font:{size:9},precision:0}}}}
+      });
+    } else {
+      chartTimeline.data.labels = labels;
+      chartTimeline.data.datasets = datasets;
+      chartTimeline.update('none');
+    }
+    const totals = sevs.map(s => (series[s]||[]).reduce((a,b)=>a+b,0));
+    if (!chartSeverity) {
+      chartSeverity = new Chart(document.getElementById('chartSeverity'), {
+        type:'doughnut',
+        data:{labels:sevs, datasets:[{data:totals,
+              backgroundColor:sevs.map(s=>SEV_COLORS[s]||'#64748b'), borderWidth:0}]},
+        options:{responsive:true, maintainAspectRatio:false, animation:false,
+          plugins:{legend:{position:'right',labels:{color:'#94a3b8',boxWidth:10,font:{size:10}}}}}
+      });
+    } else {
+      chartSeverity.data.labels = sevs;
+      chartSeverity.data.datasets[0].data = totals;
+      chartSeverity.data.datasets[0].backgroundColor = sevs.map(s=>SEV_COLORS[s]||'#64748b');
+      chartSeverity.update('none');
+    }
   } catch(_) {}
 }
 
@@ -690,50 +787,81 @@ async function pollStats() {
 async function exportLogs() {
   const msg = document.getElementById('exportMsg');
   msg.textContent = 'Preparing export…';
-  const params = new URLSearchParams();
-  if (activeCat)  params.set('categories', activeCat);
-  if (activeSev)  params.set('severities', activeSev);
-  if (searchText) params.set('search', searchText);
+  const p = new URLSearchParams();
+  if (activeCat)  p.set('categories', activeCat);
+  if (activeSev)  p.set('severities', activeSev);
+  if (searchText) p.set('search', searchText);
   if (activeRange !== 'live') {
-    const mins = {'1h':60,'6h':360,'24h':1440,'7d':10080}[activeRange] || 60;
-    params.set('start_ts', new Date(Date.now() - mins*60000).toISOString());
+    const mins = {'1h':60,'6h':360,'24h':1440,'7d':10080}[activeRange]||60;
+    p.set('start_ts', new Date(Date.now()-mins*60000).toISOString());
   }
   try {
-    const r = await fetch(EXPORT_URL + '?' + params.toString());
+    const r = await fetch(EXPORT_URL + '?' + p.toString());
     const blob = await r.blob();
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `smart-shield-siem-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    msg.textContent = 'Downloaded.';
-    setTimeout(() => { msg.textContent = ''; }, 3000);
-  } catch(e) {
-    msg.textContent = 'Export failed.';
-  }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `smartshield-logs-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    msg.textContent = 'Downloaded.'; setTimeout(()=>{ msg.textContent=''; }, 3000);
+  } catch(e) { msg.textContent = 'Export failed.'; }
 }
 
-/* ── Auto-scroll pause on user scroll ── */
+/* ── Auto-scroll ── */
 scroll.addEventListener('scroll', () => {
   if (scroll.scrollTop > 80) {
-    paused = true; viewport.classList.add('paused');
-    liveLabel.textContent = 'Paused ↕';
+    paused = true; viewport.classList.add('paused'); liveLabel.textContent = 'Paused ↕';
   } else {
-    paused = false; viewport.classList.remove('paused');
-    liveLabel.textContent = 'Live';
+    paused = false; viewport.classList.remove('paused'); liveLabel.textContent = 'Live';
   }
 });
 
-/* ── Set LAN interface name (injected server-side from lan_config) ── */
-(function () {
-  const el = document.getElementById('siem-lan-iface');
-  if (el) el.textContent = {{ lan_iface | tojson }};
-})();
-
 /* ── Boot ── */
+// Pre-fill search from URL ?ip= or ?search=
+(function() {
+  const p = new URLSearchParams(location.search);
+  const prefill = p.get('ip') || p.get('search');
+  if (prefill) {
+    const inp = document.getElementById('searchInput');
+    if (inp) { inp.value = prefill; searchText = prefill.toLowerCase(); }
+  }
+})();
 startPoll();
 window.setInterval(pollStats, 15000);
 pollStats();
+window.setInterval(pollTimeseries, 15000);
+pollTimeseries();
 </script>
 {% endblock %}
+{% block scripts %}{{ super() }}
+<!-- inline-handlers:auto -->
+<script nonce="{{ csp_nonce() }}">
+/* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['h_7e70e81dfb'] = function (event, el) { onSearch(this.value) };
+  R['h_8d68d2871b'] = function (event, el) { setCat(this) };
+  R['h_2a015a1a2b'] = function (event, el) { setCat(this) };
+  R['h_509bf229f2'] = function (event, el) { setCat(this) };
+  R['h_056fbd1e5b'] = function (event, el) { setCat(this) };
+  R['h_51f49bb081'] = function (event, el) { setCat(this) };
+  R['h_c24ebaf3a7'] = function (event, el) { setCat(this) };
+  R['h_eb0630c87d'] = function (event, el) { setCat(this) };
+  R['h_7f73beb408'] = function (event, el) { setCat(this) };
+  R['h_f7b6fd4a01'] = function (event, el) { setRange(this) };
+  R['h_362941ffb2'] = function (event, el) { setRange(this) };
+  R['h_cd063b22b9'] = function (event, el) { setRange(this) };
+  R['h_9844b03ba5'] = function (event, el) { setRange(this) };
+  R['h_ba6fac9a97'] = function (event, el) { setRange(this) };
+  R['h_14661d6598'] = function (event, el) { setPollInterval(+this.value) };
+  R['h_b850b53ba7'] = function (event, el) { setSev(this) };
+  R['h_41229b8c39'] = function (event, el) { setSev(this) };
+  R['h_e68026e516'] = function (event, el) { setSev(this) };
+  R['h_17bfaa8c7d'] = function (event, el) { setSev(this) };
+  R['h_d7d3126963'] = function (event, el) { setSev(this) };
+  R['h_a829bf9339'] = function (event, el) { clearView() };
+  R['h_7a01fc8c7d'] = function (event, el) { exportLogs() };
+})();
+</script>
+<!-- /inline-handlers:auto -->
+{% endblock %}
+

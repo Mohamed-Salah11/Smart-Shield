@@ -21,6 +21,7 @@
     <div class="card-header">Host Override Options</div>
     <div class="card-body">
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="row mb-3">
                 <label class="col-sm-2 col-form-label">Host</label>
@@ -69,10 +70,10 @@
                         <table class="table mb-2">
                             <thead>
                                 <tr>
-                                    <th style="width:30%">Host name</th>
-                                    <th style="width:30%">Domain</th>
-                                    <th style="width:30%">Description</th>
-                                    <th style="width:10%"> &nbsp; </th>
+                                    <th class="ext-59c8d6ff">Host name</th>
+                                    <th class="ext-59c8d6ff">Domain</th>
+                                    <th class="ext-59c8d6ff">Description</th>
+                                    <th class="ext-25feffff"> &nbsp; </th>
                                 </tr>
                             </thead>
                             <tbody id="additional-names">
@@ -93,7 +94,7 @@
             </div>
 
             <div class="mt-3">
-                <button class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+                <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
                 <a class="btn btn-success ms-2" href="{{ url_for('services.dns_resolver') }}">Cancel</a>
             </div>
 

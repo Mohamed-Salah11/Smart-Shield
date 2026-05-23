@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}VPN Portal{% endblock %} — SmartShield</title>
+  <link rel="stylesheet" href="{{ static_v('vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/smartshield-system.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/ext-inline.css') }}">
+  <script src="{{ static_v('js/inline-handlers.js') }}"></script>
+  <style nonce="{{ csp_nonce() }}">
+    :root {
+      --vp-bg:      #0f172a;
+      --vp-card:    #1e293b;
+      --vp-border:  #334155;
+      --vp-text:    #e2e8f0;
+      --vp-muted:   #94a3b8;
+      --vp-primary: #38bdf8;
+      --vp-danger:  #ef4444;
+      --vp-success: #10b981;
+    }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--vp-bg);
+      color: var(--vp-text);
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .vp-topbar {
+      background: var(--vp-card);
+      border-bottom: 1px solid var(--vp-border);
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .vp-brand {
+      font-weight: 600; font-size: 1.05rem;
+      color: var(--vp-primary);
+      text-decoration: none;
+    }
+    .vp-brand i { margin-right: .4rem; }
+    .vp-shell {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .vp-card {
+      background: var(--vp-card);
+      border: 1px solid var(--vp-border);
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .vp-card h1 {
+      font-size: 1.3rem;
+      margin-bottom: .25rem;
+    }
+    .vp-card p.subtitle {
+      color: var(--vp-muted);
+      margin-bottom: 1.5rem;
+      font-size: .9rem;
+    }
+    .form-control {
+      background: #0f172a;
+      border: 1px solid var(--vp-border);
+      color: var(--vp-text);
+    }
+    .form-control:focus {
+      background: #0f172a;
+      color: var(--vp-text);
+      border-color: var(--vp-primary);
+      box-shadow: 0 0 0 .2rem rgba(56,189,248,.15);
+    }
+    .form-label { color: var(--vp-muted); font-size: .85rem; }
+    .btn-vp {
+      background: var(--vp-primary);
+      border: none;
+      color: #0b1220;
+      font-weight: 600;
+    }
+    .btn-vp:hover { background: #0ea5e9; color: #fff; }
+    .alert-vp-danger {
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.4);
+      color: #fecaca;
+      padding: .6rem .8rem;
+      border-radius: 6px;
+      font-size: .875rem;
+    }
+    .vp-meta {
+      color: var(--vp-muted);
+      font-size: .8rem;
+      text-align: center;
+      margin-top: 1rem;
+    }
+    code {
+      background: #0f172a;
+      padding: .2rem .4rem;
+      border-radius: 4px;
+      color: var(--vp-primary);
+    }
+  </style>
+</head>
+<body>
+  <nav class="vp-topbar">
+    <a href="{{ url_for('vpn_portal.home') }}" class="vp-brand">
+      <i class="fas fa-shield-halved"></i> SmartShield VPN Portal
+    </a>
+    {% if vpn_username %}
+      <div class="d-flex align-items-center gap-3">
+        <span class="text-muted small">Signed in as <strong>{{ vpn_username }}</strong></span>
+        <form method="POST" action="{{ url_for('vpn_portal.logout') }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-right-from-bracket"></i> Log out
+          </button>
+        </form>
+      </div>
+    {% endif %}
+  </nav>
+
+  <main class="vp-shell">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ static_v('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

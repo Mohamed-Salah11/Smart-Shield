@@ -44,8 +44,8 @@
           <div class="ss-card-icon"><i class="fa-solid fa-list-check"></i></div>
           <div><div class="ss-card-title">Results</div></div>
         </div>
-        <div style="overflow-x:auto;">
-          <div id="dns-result" style="min-height:220px;padding:1rem;">
+        <div class="ext-df74e8d8">
+          <div class="ext-4a345dae" id="dns-result">
             <span class="text-muted">Enter a hostname and click Resolve.</span>
           </div>
         </div>
@@ -54,7 +54,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
 document.getElementById('btn-lookup').addEventListener('click', function () {
   const host = document.getElementById('dns-host').value.trim();
   const type = document.getElementById('dns-type').value;

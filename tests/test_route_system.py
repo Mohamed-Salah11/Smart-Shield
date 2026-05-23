@@ -85,3 +85,135 @@ class TestSetupWizard:
             "username": "admin", "password": "longpassword1", "confirm": "longpassword2"
         })
         assert r.status_code in (400, 403)
+
+
+# ─── All System Core pages (sidebar group 1) load for superuser ──────────────
+
+class TestSystemCorePages:
+    @pytest.mark.parametrize("path", [
+        "/system/dashboard",
+        "/system/general-setup",
+        "/system/admin-access",
+        "/system/certificates",
+        "/system/high-availability",
+        "/system/package-manager",
+        "/system/preflight",
+        "/system/routing/",
+        "/system/theme-editor",
+        "/system/update",
+        "/system/notifications",
+        "/system/user-manager/",
+        "/system/api-tokens",
+        "/system/reports",
+    ])
+    def test_page_loads(self, superuser, path):
+        client, _ = superuser
+        r = client.get(path, follow_redirects=True)
+        assert r.status_code == 200, f"{path} -> {r.status_code}"
+
+    def test_setup_wizard_redirects(self, superuser):
+        client, _ = superuser
+        # /system/setup-wizard redirects to /setup which then redirects to step1
+        # or to the setup_not_authorized page (since setup is already complete).
+        r = client.get("/system/setup-wizard", follow_redirects=False)
+        assert r.status_code == 302
+
+    def test_setup_wizard_step_redirects(self, superuser):
+        """Legacy /system/setup-wizard/step/<n> also redirects to /setup.
+        Pin this contract — base.html still resolves url_for('system.setup_wizard'),
+        so the endpoint must stay registered as a redirect even though no new
+        code links into it. If the endpoint is ever removed, the navbar breaks."""
+        client, _ = superuser
+        r = client.get("/system/setup-wizard/step/2", follow_redirects=False)
+        assert r.status_code == 302
+        assert "/setup" in (r.headers.get("Location") or "")
+
+
+# ─── System Core read endpoints ──────────────────────────────────────────────
+
+class TestSystemCoreReadEndpoints:
+    @pytest.mark.parametrize("path", [
+        "/system/dashboard/data",
+        "/system/api/packages",
+        "/system/api/preflight",
+        "/system/routing/api/live-routes",
+        "/system/routing/api/gateway-health",
+    ])
+    def test_get_endpoint(self, superuser, path):
+        client, _ = superuser
+        r = client.get(path)
+        assert r.status_code == 200
+
+
+# ─── System Core mutation permission gates ───────────────────────────────────
+
+class TestSystemCoreMutations:
+    @pytest.mark.parametrize("method,path,body", [
+        # Packages
+        ("POST", "/system/api/packages/install", {"name": "x"}),
+        # Certificates
+        ("POST",   "/system/api/certificates/1/revoke", {}),
+        ("POST",   "/system/api/certificates/ca/1/crl", {}),
+        ("POST",   "/system/api/certificates/acme/request", {}),
+        ("DELETE", "/system/api/certificates/1", None),
+        ("DELETE", "/system/api/certificates/ca/1", None),
+        # System tunables (advanced)
+        ("POST", "/system/advanced/system-tunables/save", {}),
+        ("POST", "/system/advanced/system-tunables/delete/0", {}),
+        # User Manager (superuser_required)
+        ("POST", "/system/user-manager/add", {}),
+        ("POST", "/system/user-manager/add-group", {}),
+        ("POST", "/system/user-manager/edit-group/1", {}),
+        ("POST", "/system/user-manager/delete-group/1", {}),
+        ("POST", "/system/user-manager/group/1/add-member", {}),
+        ("POST", "/system/user-manager/group/1/remove-member/1", {}),
+        ("POST", "/system/user-manager/group/1/permissions", {}),
+        ("POST", "/system/user-manager/delete/1", {}),
+        ("POST", "/system/user-manager/change-password/1", {}),
+        ("POST", "/system/user-manager/edit/1", {}),
+        # Routing
+        ("POST", "/system/routing/gateway/delete/1", {}),
+        ("POST", "/system/routing/gateway/set-default", {}),
+        ("POST", "/system/routing/gateway/apply/1", {}),
+        ("POST", "/system/routing/static/delete/1", {}),
+        ("POST", "/system/routing/group/delete/1", {}),
+        ("POST", "/system/routing/api/apply-all", {}),
+        ("POST", "/system/routing/api/gateway-failover/apply", {}),
+    ])
+    def test_mutation_rejects_plain_user(self, plain_user, method, path, body):
+        client, _ = plain_user
+        if method == "POST":
+            r = client.post(path, json=body or {})
+        else:
+            r = client.delete(path)
+        assert r.status_code in (401, 403), f"{method} {path} -> {r.status_code}"
+
+
+# ─── Route registration regression guard ─────────────────────────────────────
+
+class TestSystemCoreRouteRegistration:
+    def test_required_endpoints_registered(self, app):
+        rules = {str(r) for r in app.url_map.iter_rules()}
+        required = (
+            # Pages
+            "/system/dashboard", "/system/general-setup", "/system/admin-access",
+            "/system/certificates", "/system/high-availability",
+            "/system/package-manager", "/system/preflight",
+            "/system/setup-wizard", "/system/theme-editor", "/system/update",
+            "/system/notifications", "/system/api-tokens", "/system/reports",
+            "/system/routing/", "/system/user-manager/",
+            # APIs
+            "/system/dashboard/data",
+            "/system/api/packages", "/system/api/packages/search",
+            "/system/api/packages/install", "/system/api/preflight",
+            "/system/api/certificates/<int:cert_id>/revoke",
+            "/system/api/certificates/<int:cert_id>",
+            "/system/api/certificates/ca/<int:ca_id>",
+            "/system/api/certificates/ca/<int:ca_id>/crl",
+            "/system/api/certificates/acme/request",
+            "/system/routing/api/live-routes",
+            "/system/routing/api/apply-all",
+            "/system/routing/api/gateway-health",
+        )
+        missing = [p for p in required if p not in rules]
+        assert not missing, f"missing routes: {missing}"

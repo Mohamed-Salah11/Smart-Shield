@@ -1,12 +1,18 @@
-# Smart Shield — nginx TLS reverse proxy example
+# SmartShield — nginx TLS reverse proxy example
 #
 # Install:
-#   cp bsd/etc/nginx.conf.example /usr/local/etc/nginx/smart-shield.conf
+#   cp bsd/etc/nginx.conf.example /usr/local/etc/nginx/smartshield.conf
 #   Edit: ssl_certificate / ssl_certificate_key paths + server_name
 #   Include in /usr/local/etc/nginx/nginx.conf:
-#     include /usr/local/etc/nginx/smart-shield.conf;
+#     include /usr/local/etc/nginx/smartshield.conf;
 #   Test:  nginx -t
 #   Start: sysrc nginx_enable=YES && service nginx start
+#
+# IMPORTANT — Live CLI Terminal:
+#   The /terminal/ws location blocks below are REQUIRED for the Live CLI.
+#   Without them, nginx strips WebSocket upgrade headers and the CLI shows
+#   "[WebSocket connection error]". After any config update, reload nginx:
+#     nginx -t && service nginx reload
 #
 # Requires:
 #   pkg install nginx
@@ -14,19 +20,36 @@
 #
 # Self-signed cert (dev/testing only):
 #   openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-#     -keyout /usr/local/etc/smart-shield/ssl/key.pem \
-#     -out    /usr/local/etc/smart-shield/ssl/cert.pem \
-#     -subj "/CN=smart-shield.local"
+#     -keyout /usr/local/etc/smartshield/ssl/key.pem \
+#     -out    /usr/local/etc/smartshield/ssl/cert.pem \
+#     -subj "/CN=smartshield.local"
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Captive portal and content-policy block page must be reachable over plain HTTP
-# (no cert warning, mobile CNA detection works).  /portal/ is proxied directly
-# to Flask; everything else is redirected to HTTPS.
+# HTTP front-end — proxies ALL requests to Flask so that DNS-redirected blocked-domain
+# requests reach the content-filter intercept (app/__init__.py) and the captive portal.
+# Previously this block had "return 301 https://$host$request_uri" for location /,
+# which caused Firefox to show MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT instead of the
+# block page (the 301 pushed the browser to HTTPS on the LAN IP, where the admin
+# self-signed cert didn't match the blocked domain name).
 server {
     listen      80;
     server_name _;
 
-    location /portal/ {
+    # Live CLI WebSocket
+    location /terminal/ws {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto http;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
         proxy_pass         http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
@@ -35,20 +58,16 @@ server {
         proxy_set_header   X-Forwarded-Proto http;
         proxy_read_timeout 60s;
     }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
 }
 
 # HTTPS front-end — proxies to gunicorn on localhost:5000
 server {
     listen      443 ssl;
-    server_name smart-shield.local;   # ← change to your hostname or IP
+    server_name smartshield.local;   # ← change to your hostname or IP
 
     # ── TLS ──────────────────────────────────────────────────────────────────
-    ssl_certificate     /usr/local/etc/smart-shield/ssl/cert.pem;
-    ssl_certificate_key /usr/local/etc/smart-shield/ssl/key.pem;
+    ssl_certificate     /usr/local/etc/smartshield/ssl/cert.pem;
+    ssl_certificate_key /usr/local/etc/smartshield/ssl/key.pem;
 
     ssl_protocols             TLSv1.2 TLSv1.3;
     ssl_ciphers               ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
@@ -66,6 +85,31 @@ server {
 
     # ── Upload limit (must be >= SMARTSHIELD_BACKUP_MAX_BYTES, default 256 MB) ─
     client_max_body_size 260m;
+
+    # ── Live CLI WebSocket — long-lived connection with upgrade headers ─────
+    location /terminal/ws {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # ── Captive portal — also reachable over HTTPS ──────────────────────────
+    location /portal/ {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
 
     # ── Proxy to gunicorn ────────────────────────────────────────────────────
     location / {
@@ -89,3 +133,7 @@ server {
     # allow 10.0.0.0/8;
     # deny  all;
 }
+
+# SmartShield SOC Portal virtual host (auto-generated by SmartShield settings)
+# Activated when bind_ip is set in System Core → SOC Portal Control.
+include soc-portal.conf;
