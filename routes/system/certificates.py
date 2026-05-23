@@ -131,6 +131,7 @@ def api_revoke_cert(cert_id):
 
 @system_bp.route("/api/certificates/ca/<int:ca_id>/crl", methods=["POST"])
 @login_required
+@superuser_required
 def api_generate_crl(ca_id):
     from app.services.cert_manager import generate_crl
     conn   = get_db()
@@ -165,6 +166,7 @@ def api_fetch_ocsp(cert_id):
 
 @system_bp.route("/api/certificates/acme/request", methods=["POST"])
 @login_required
+@superuser_required
 def api_acme_request():
     from app.services.cert_manager import request_acme_cert
     data   = request.get_json(force=True) or {}
@@ -209,6 +211,7 @@ def api_delete_cert(cert_id):
 
 @system_bp.route("/api/certificates/ca/<int:ca_id>", methods=["DELETE"])
 @login_required
+@superuser_required
 def api_delete_ca(ca_id):
     from app.services.cert_manager import delete_ca
     conn   = get_db()

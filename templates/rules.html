@@ -540,8 +540,10 @@
         document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
         // Add active class to selected tab content
         document.getElementById('tab-' + tabName).classList.add('active');
-        // Add active class to clicked tab
-        evt.currentTarget.classList.add('active');
+        // Add active class to clicked tab. evt.currentTarget is the document
+        // under the SSActions delegator, so walk up from evt.target instead.
+        const clickedLink = evt.target && evt.target.closest ? evt.target.closest('.nav-link') : null;
+        if (clickedLink) clickedLink.classList.add('active');
     }
 
     // --- UTILITY FUNCTION: SEND TO BACKEND ---

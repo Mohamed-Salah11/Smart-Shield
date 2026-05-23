@@ -1,7 +1,7 @@
 import json
 import sys
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, flash
-from app.auth_utils import login_required
+from app.auth_utils import login_required, superuser_required
 from app.database import get_db
 from app.audit_log import log_event
 
@@ -418,6 +418,7 @@ def api_live_routes():
 
 @routing_bp.route("/api/apply-all", methods=["POST"])
 @login_required
+@superuser_required
 def api_apply_all_static_routes():
     """
     Apply all enabled static routes to the live OS and persist them in
@@ -472,6 +473,7 @@ def api_gateway_health():
 
 @routing_bp.route("/api/gateway-failover/apply", methods=["POST"])
 @login_required
+@superuser_required
 def api_gateway_failover_apply():
     """
     Probe all gateway-group members and switch the default route to the

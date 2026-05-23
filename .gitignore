@@ -147,6 +147,37 @@ yarn-error.log*
 # ── Claude Code project state (per-machine; never publish) ──
 .claude/
 
+# ── Other AI assistant / IDE state dirs (per-machine; never publish) ──
+.aider*
+.continue/
+.cursor/
+.codeium/
+.serena/
+.copilot/
+.history/
+
+# ── QA / analysis output (task-scoped reports, not part of the codebase) ──
+qa-reports/
+qa_reports/
+analysis-reports/
+
+# ── Local override files (everyone's allowed to keep a *.local.* sidecar) ──
+*.local
+*.local.*
+
+# ── Personal scratch dirs / files ────────────────────────────
+scratch/
+_scratch/
+_tmp/
+_temp/
+tmp/
+notes.local.md
+notes.local.txt
+TODO.local.md
+
+# ── In-repo leaked DB / temp test fixtures (caught by *.db* but pin name too) ──
+_routecheck_tmp*
+
 # ── Local working notes (personal scratch — keep out of GH) ─
 paper.bib
 edits.txt

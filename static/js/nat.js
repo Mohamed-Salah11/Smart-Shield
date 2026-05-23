@@ -15,7 +15,10 @@ function openTab(evt, tabName) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
     document.getElementById('tab-' + tabName).classList.add('active');
-    evt.currentTarget.classList.add('active');
+    // evt.currentTarget is `document` under the SSActions delegator, so resolve
+    // the clicked nav-link from evt.target's ancestry instead.
+    const clickedLink = evt.target && evt.target.closest ? evt.target.closest('.nav-link') : null;
+    if (clickedLink) clickedLink.classList.add('active');
 }
 
 // --- HELPER VARIABLES ---

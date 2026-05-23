@@ -5,7 +5,7 @@
  * attributes. scripts/migrate_handlers.py rewrites every inline handler into a
  * `data-action="<id>"` attribute and stores the original body as
  *
- *     SSActions['<id>'] = function (event, el) { /* original body */ };
+ *     SSActions['<id>'] = function (event, el) { ...original body... };
  *
  * This file installs a single delegator at the document level that dispatches
  * the matching SSActions entry on the corresponding event. New handlers can be

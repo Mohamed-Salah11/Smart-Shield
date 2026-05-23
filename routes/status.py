@@ -1067,6 +1067,7 @@ def api_dhcp_leases():
 
 @status_bp.route("/api/dns/apply", methods=["POST"])
 @login_required
+@api_permission_required("api.network.edit")
 def api_dns_apply():
     """Validate, write, and reload Unbound."""
     from app.database import get_db
@@ -1097,6 +1098,7 @@ def api_dns_preview():
 
 @status_bp.route("/api/dns/test")
 @login_required
+@api_permission_required("api.network.edit")
 def api_dns_test():
     """
     Resolve a hostname via the local DNS resolver.
@@ -1190,6 +1192,7 @@ def api_config_history_get(version_id: int):
 
 @status_bp.route("/api/config-history/<int:version_id>/rollback", methods=["POST"])
 @login_required
+@superuser_required
 def api_config_history_rollback(version_id: int):
     """
     Roll back a service config to a previously saved version.
@@ -1214,6 +1217,7 @@ def api_config_history_rollback(version_id: int):
 
 @status_bp.route("/api/config-history/<service>/prune", methods=["POST"])
 @login_required
+@superuser_required
 def api_config_history_prune(service: str):
     """
     Delete old config versions beyond the most-recent ``keep``.

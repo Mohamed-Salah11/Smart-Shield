@@ -280,6 +280,18 @@ def ids_status():
     return jsonify(get_ids_status(get_db()))
 
 
+# ── Diagnostics API — one-call snapshot for the GUI panel ─────────────────
+
+@ids_bp.route("/api/diagnostics", methods=["GET"])
+@login_required
+def ids_diagnostics():
+    """Live snapshot of every IDS-related runtime fact (phase, mode, rules,
+    config, netmap, log tail). Backs the collapsible Diagnostics panel.
+    """
+    from app.services.ids_writer import get_diagnostics
+    return jsonify(get_diagnostics(get_db()))
+
+
 # ── Threat Feeds (abuse.ch Auth-Key) ─────────────────────────────────────
 
 @ids_bp.route("/api/feeds", methods=["GET"])

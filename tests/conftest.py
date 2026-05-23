@@ -27,6 +27,34 @@ from app import create_app  # noqa: E402 — must be after env setup
 from app.database import get_db  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _isolate_volatile_env():
+    """Restore the apply-gating env vars after every test.
+
+    Several writer/migration test modules (test_phase5, test_*_writer, …) flip
+    ``SMARTSHIELD_NETWORK_DRY_RUN=1`` for isolation but never restore it. Because
+    the ``app`` fixture is session-scoped and shared, the leak makes later
+    modules order-dependent — the setup wizard's step-4 apply refuses to
+    complete once it sees a stray ``DRY_RUN=1`` (routes/setup.py rejects dry-run
+    as a real apply). Snapshot/restore only these apply-gating keys.
+
+    NOTE: ``SMARTSHIELD_DB_PATH`` is deliberately NOT restored here — the
+    reload-based DB fixtures destroy their in-memory DB on teardown, so forcing
+    the path back would point the shared session app at a dead database.
+    """
+    keys = (
+        "SMARTSHIELD_NETWORK_DRY_RUN",
+        "SMARTSHIELD_ENABLE_NETWORK_APPLY",
+    )
+    saved = {k: os.environ.get(k) for k in keys}
+    yield
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 @pytest.fixture(scope="session")
 def app():
     """Application instance backed by an in-memory database."""

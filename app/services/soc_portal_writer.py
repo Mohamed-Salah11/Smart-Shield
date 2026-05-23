@@ -280,19 +280,35 @@ def write_soc_portal_nginx_config(conn) -> dict:
     except Exception as exc:
         return {"ok": False, "message": f"Failed to write {_SOC_NGINX_CONF}: {exc}", "config": config}
 
-    from app.services.service_manager import service_action
-    r = service_action("nginx", "reload")
-    if r["ok"]:
+    # Regenerate the admin vhost too: the admin nginx.conf must now include a
+    # `location /soc-portal/ { return 404; }` block so /soc-portal/* is NOT
+    # reachable on the admin LAN IP — analysts must use the dedicated SOC IP.
+    # apply_nginx writes nginx.conf and reloads, so the SOC vhost file we just
+    # wrote also takes effect from the same reload (single reload, no race).
+    try:
+        from app.services.nginx_writer import apply_nginx
+        admin_result = apply_nginx(conn)
+    except Exception as exc:
         return {
-            "ok": True,
+            "ok": False,
+            "message": f"SOC config written but admin nginx regen failed: {exc}",
+            "config": config,
+        }
+    if not admin_result.get("ok"):
+        return {
+            "ok": False,
             "message": (
-                f"SOC portal now accessible at https://{bind_ip}:{bind_port}/soc-portal/ "
-                f"(alias added on {lan_port})."
+                "SOC config written but admin nginx regen failed: "
+                f"{admin_result.get('message', '')}"
             ),
             "config": config,
         }
     return {
-        "ok": False,
-        "message": f"Config written but nginx reload failed: {r.get('message', '')}",
+        "ok": True,
+        "message": (
+            f"SOC portal now accessible at https://{bind_ip}:{bind_port}/soc-portal/ "
+            f"(alias added on {lan_port}). Admin vhost regenerated to block "
+            "/soc-portal/* on the admin IP."
+        ),
         "config": config,
     }

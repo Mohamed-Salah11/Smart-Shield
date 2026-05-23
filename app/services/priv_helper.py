@@ -335,6 +335,12 @@ _ALLOWLIST: Dict[str, Dict[str, Any]] = {
         "params": {"key": _val_sysrc_key, "value": _val_sysrc_value},
         "custom_builder": "_build_sysrc_set",
     },
+    "sysrc.loader_set": {
+        "description": "Persistently set a /boot/loader.conf variable (for kernel module auto-load).",
+        "cmd": ["/usr/sbin/sysrc", "-f", "/boot/loader.conf", "{key}={value}"],
+        "params": {"key": _val_sysrc_key, "value": _val_sysrc_value},
+        "custom_builder": "_build_sysrc_loader_set",
+    },
     # Interface
     "ifconfig.inet": {
         "description": "Assign an IPv4 address to an interface.",
@@ -534,6 +540,11 @@ def run_privileged(priv_action: str, audit_username: str = "system", **params) -
     # Special case: sysrc.set — key=value must be a single token
     if action == "sysrc.set":
         cmd = ["/usr/sbin/sysrc", f"{validated['key']}={validated['value']}"]
+    # Same shape for loader.conf — the trailing key=value must remain one
+    # token so sudoers can match it against the explicit grant.
+    if action == "sysrc.loader_set":
+        cmd = ["/usr/sbin/sysrc", "-f", "/boot/loader.conf",
+               f"{validated['key']}={validated['value']}"]
 
     # Prepend sudo on FreeBSD non-root deployments (no-op when running as root)
     if sys.platform.startswith("freebsd") and not _network_dry_run_enabled():
