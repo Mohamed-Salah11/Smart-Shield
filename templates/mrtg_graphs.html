@@ -197,7 +197,7 @@ function _startStatusPoll() {
   }, 20000);
 }
 
-/* ── countdown to next MRTG cron run (*/5 * * * *) */
+// ── countdown to next MRTG cron run (cron: */5 * * * *)
 function _nextMrtgMs() {
   const now       = new Date();
   const ms        = now.getSeconds() * 1000 + now.getMilliseconds();

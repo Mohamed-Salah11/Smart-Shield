@@ -2430,10 +2430,13 @@ function saveInterfaceGroup() {
         for (i = 0; i < tabLinks.length; i++) {
             tabLinks[i].classList.remove("active");
         }
-        // Show the selected tab content and add active class to the clicked link
+        // Show the selected tab content and add active class to the clicked link.
+        // Note: evt.currentTarget is the document under the SSActions delegator,
+        // so we resolve the nav-link from evt.target's ancestry instead.
         document.getElementById(tabName).style.display = "block";
         document.getElementById(tabName).classList.add("active");
-        evt.currentTarget.classList.add("active");
+        const clickedLink = evt.target && evt.target.closest ? evt.target.closest(".nav-link") : null;
+        if (clickedLink) clickedLink.classList.add("active");
         evt.preventDefault();
     }
 

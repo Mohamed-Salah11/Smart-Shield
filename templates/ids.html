@@ -125,14 +125,41 @@
       <h1 class="ss-page-title">Threat Detection</h1>
       <p class="ss-page-desc">Intrusion detection and prevention with Suricata</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
+      <span id="phasePill" class="badge bg-secondary d-none ext-phase-pill"></span>
       <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" id="btnDiagnostics" type="button">
+          <i class="fa-solid fa-stethoscope"></i> Diagnostics
+        </button>
         <button class="btn btn-sm btn-primary" id="btnRefreshStatus"><i class="fa-solid fa-rotate"></i> Refresh</button>
         <button class="btn btn-sm {% if status.running %}btn-danger{% else %}btn-success{% endif %}" id="btnToggle"
                 data-enabled="{{ 1 if status.running else 0 }}">
           {% if status.running %}<i class="fa-solid fa-stop"></i> Disable{% else %}<i class="fa-solid fa-play"></i> Enable{% endif %}
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Diagnostics panel — collapsed by default; auto-expands on toggle error -->
+  <div id="diagnosticsPanel" class="card mt-2 d-none">
+    <div class="card-body py-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong><i class="fa-solid fa-stethoscope"></i> IDS Diagnostics</strong>
+        <button class="btn btn-sm btn-outline-secondary" id="btnDiagRefresh" type="button">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless mb-1" id="diagTable">
+          <tbody>
+            <tr><td colspan="2" class="text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="mt-1">
+        <summary class="text-muted small">Suricata log tail (last 20 lines)</summary>
+        <pre class="ext-diag-log" id="diagLogTail"></pre>
+      </details>
     </div>
   </div>
 
@@ -707,32 +734,128 @@ setInterval(async () => {
   } catch {}
 }, 15000);
 
+/* ── Phase pill + diagnostics panel ── */
+const PHASE_LABEL = {
+  STOPPED:            ['Stopped',           'bg-secondary'],
+  UPDATING_RULES:     ['Updating rules…',   'bg-info'],
+  VALIDATING_CONFIG:  ['Validating config…','bg-info'],
+  LOADING_KMOD:       ['Loading netmap…',   'bg-info'],
+  STARTING:           ['Starting…',         'bg-info'],
+  RUNNING:            ['Running',           'bg-success'],
+  ERROR:              ['Error',             'bg-danger'],
+};
+
+function setPhasePill(phase) {
+  const pill = document.getElementById('phasePill');
+  if (!pill) return;
+  if (!phase) { pill.classList.add('d-none'); return; }
+  const [label, cls] = PHASE_LABEL[phase] || [phase, 'bg-secondary'];
+  pill.className = 'badge ext-phase-pill ' + cls;
+  pill.textContent = label;
+  pill.classList.remove('d-none');
+}
+
+function _escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function loadDiagnostics() {
+  const tbody = document.querySelector('#diagTable tbody');
+  const logEl = document.getElementById('diagLogTail');
+  tbody.innerHTML = '<tr><td colspan="2" class="text-muted">Loading…</td></tr>';
+  let d;
+  try {
+    d = await fetch('{{ url_for("ids.ids_diagnostics") }}').then(r => r.json());
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="2" class="text-danger">Failed to load diagnostics: ' + _escapeHtml(e) + '</td></tr>';
+    return null;
+  }
+  const yn = v => v ? '<span class="text-success">yes</span>' : '<span class="text-danger">no</span>';
+  const rows = [
+    ['Phase', _escapeHtml(d.phase || '—')],
+    ['Last error', d.error ? '<span class="text-danger">' + _escapeHtml(d.error) + '</span>' : '<span class="text-muted">—</span>'],
+    ['Mode', _escapeHtml((d.mode || '').toUpperCase())],
+    ['Interface', _escapeHtml(d.interface || '—')],
+    ['Process running (pgrep)', yn(d.running)],
+    ['rc.conf enabled', yn(d.rc_enabled)],
+    ['Config DB enabled', yn(d.cfg_enabled)],
+    ['Signatures loaded', _escapeHtml(d.signatures_loaded)],
+    ['Rules file', _escapeHtml(d.rules_file) + ' (' + _escapeHtml(d.rules_size) + ' bytes)'],
+    ['Config file', _escapeHtml(d.config_path) + ' ' + yn(d.config_exists)],
+    ['netmap.ko loaded', yn(d.netmap_loaded)],
+  ];
+  tbody.innerHTML = rows.map(([k, v]) =>
+    '<tr><td class="text-muted ext-diag-k">' + _escapeHtml(k) + '</td><td>' + v + '</td></tr>'
+  ).join('');
+  logEl.textContent = (d.log_tail || []).join('\n') || '(no log lines)';
+  return d;
+}
+
+document.getElementById('btnDiagnostics').addEventListener('click', async function() {
+  const panel = document.getElementById('diagnosticsPanel');
+  if (panel.classList.contains('d-none')) {
+    panel.classList.remove('d-none');
+    await loadDiagnostics();
+  } else {
+    panel.classList.add('d-none');
+  }
+});
+
+document.getElementById('btnDiagRefresh').addEventListener('click', loadDiagnostics);
+
 /* ── Toggle IDS on/off ── */
 document.getElementById('btnToggle').addEventListener('click', async function() {
   const curEnabled = parseInt(this.dataset.enabled || '0');
   const newEnabled = curEnabled ? false : true;
   const btn = this;
   btn.disabled = true;
+  setPhasePill(newEnabled ? 'STARTING' : 'STOPPED');
   btn.innerHTML = newEnabled
     ? '<i class="fa-solid fa-spinner fa-spin"></i> Starting…'
     : '<i class="fa-solid fa-spinner fa-spin"></i> Stopping…';
+
+  // Light-touch phase poll while the toggle request is in flight so the
+  // operator sees Loading netmap… / Updating rules… / Validating config…
+  // as the backend marches through them, instead of a single spinner.
+  let polling = true;
+  const pollPhase = async () => {
+    while (polling) {
+      try {
+        const d = await fetch('{{ url_for("ids.ids_diagnostics") }}').then(r => r.json());
+        if (d && d.phase) setPhasePill(d.phase);
+      } catch (e) { /* ignore transient errors */ }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+  };
+  pollPhase();
 
   const res = await apiFetch('{{ url_for("ids.ids_toggle") }}', {
     method: 'POST',
     body: JSON.stringify({enabled: newEnabled}),
   }).then(r => r.json()).catch(e => ({ok: false, message: String(e)}));
 
+  polling = false;
   btn.disabled = false;
+
+  // Reflect the authoritative phase from the response (or fall back).
+  if (res.phase) setPhasePill(res.phase);
+  else setPhasePill(res.ok ? (newEnabled ? 'RUNNING' : 'STOPPED') : 'ERROR');
 
   if (!res.ok) {
     const errDiv = document.createElement('div');
     errDiv.className = 'alert alert-danger alert-dismissible mt-2';
-    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + (res.message || 'Unknown error') +
+    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + _escapeHtml(res.message || 'Unknown error') +
       ' <button type="button" class="btn-close" data-action="h_f78e2a0dc3"></button>';
     document.querySelector('.ss-page-header').after(errDiv);
     btn.innerHTML = newEnabled
       ? '<i class="fa-solid fa-play"></i> Enable'
       : '<i class="fa-solid fa-stop"></i> Disable';
+    // Auto-expand diagnostics so the operator can see *which* step broke.
+    const panel = document.getElementById('diagnosticsPanel');
+    panel.classList.remove('d-none');
+    loadDiagnostics();
     return;
   }
 

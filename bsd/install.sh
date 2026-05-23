@@ -531,6 +531,16 @@ if [ ! -f /etc/pf.conf ]; then
     info "Created: /etc/pf.conf (minimal bootstrap — wizard will replace)"
 fi
 
+# Captive-portal PF anchor — empty placeholder so the first toggle-on doesn't
+# trip `pfctl -a captive_portal -f /etc/pf.captive_portal.conf` with ENOENT.
+# app/services/captive_portal.apply_captive_portal rewrites this with the
+# real rdr/anchor rules on first apply.
+if [ ! -f /etc/pf.captive_portal.conf ]; then
+    printf '# Smart Shield captive portal anchor — apply_captive_portal replaces this\n' \
+        | stage_write /etc/pf.captive_portal.conf
+    info "Created: /etc/pf.captive_portal.conf (empty placeholder — apply_captive_portal will replace)"
+fi
+
 # ─── Legacy-path migration ────────────────────────────────────────────────────
 # Phase 11 renamed every runtime dir from `smart-shield` to `smartshield`.
 # If the operator is upgrading an old install, move the directory contents
@@ -1611,15 +1621,28 @@ if [ -f "${CLAIM_TOKEN_FILE}" ]; then
 fi
 if [ -n "${CLAIM_TOKEN}" ]; then
     printf "${BOLD}━━━ Setup Claim Token ━━━${NC}\n"
-    printf "The first-boot wizard is protected by this one-time token (shown once):\n\n"
+    printf "The first-boot wizard is protected by this one-time token:\n\n"
     printf "    ${GREEN}%s${NC}\n\n" "${CLAIM_TOKEN}"
-    printf "Enter it at https://%s when prompted, to claim this appliance.\n" "${LAN_IP}"
-    printf "It is consumed automatically once setup completes.\n\n"
+    printf "Enter it at https://%s (or /setup) when prompted, to claim this appliance.\n" "${LAN_IP}"
+    printf "It is consumed automatically once setup completes.\n"
+    printf "If this output scrolls past, the token is also readable at:\n"
+    printf "    %s   (mode 0600, deleted on setup completion)\n\n" "${CLAIM_TOKEN_FILE}"
 elif [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
     warn "No setup claim token at ${CLAIM_TOKEN_FILE} — appliance may already be claimed."
     warn "  If setup is not yet done, the token is (re)generated and printed to the"
     warn "  console on the next 'service smart_shield start'."
 fi
+
+# ── IPS-mode hint ─────────────────────────────────────────────────────────────
+# Feature-dependent kernel modules (netmap for IPS, dummynet for limiters, etc.)
+# are left unloaded at install time by design (see §6a). The GUI now loads
+# netmap on demand via priv_helper.kldload when IPS is enabled, and persists
+# netmap_load="YES" to /boot/loader.conf so reboots survive. Operators do NOT
+# need to run kldload manually — say so out loud so they don't try.
+printf "${BOLD}━━━ IPS mode ━━━${NC}\n"
+printf "Switching Threat Detection to IPS in the GUI will auto-load netmap.ko\n"
+printf "and persist netmap_load=\"YES\" to /boot/loader.conf for reboot survival.\n"
+printf "No manual 'kldload netmap' or loader.conf edit is required.\n\n"
 
 # ── Post-install readiness summary ─────────────────────────────────────────
 # One glanceable table so the operator immediately sees what is in place and

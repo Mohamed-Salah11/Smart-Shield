@@ -126,9 +126,14 @@ def test_app_filter_pf_port_blocks_skip_authenticated_clients(conn):
     )
     conn.commit()
 
-    rules = generate_app_filter_pf_rules(conn)
-    assert "block quick proto tcp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
-    assert "block quick proto udp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
+    # Pass an explicit LAN interface so the output is deterministic. When omitted,
+    # the generator falls back to lan_config.assigned_port from the DB, which the
+    # session-scoped suite may have set to a different value — making the emitted
+    # "on <iface>" scope order-dependent. Block rules use "in log quick on <iface>"
+    # (see app_filter.py:410) so blocked app traffic is logged to pflog0.
+    rules = generate_app_filter_pf_rules(conn, lan_iface="em1")
+    assert "block in log quick on em1 proto tcp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
+    assert "block in log quick on em1 proto udp from !<admin_bypass_clients> to any port { 6881:6889 6969 }" in rules
     assert "from any to any port" not in rules
 
 

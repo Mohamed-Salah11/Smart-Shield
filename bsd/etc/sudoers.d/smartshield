@@ -4,9 +4,17 @@
 # Install:
 #   install -m 0440 smartshield /usr/local/etc/sudoers.d/smartshield
 #
-# The Smart Shield web application runs as an unprivileged `smartshield` user.
-# This file grants that user the ability to run specific system commands as
-# root WITHOUT a password, via the priv_helper module.
+# Deployment model
+# ----------------
+# This file is the DEFENSE-IN-DEPTH FALLBACK for non-root deployments.
+#
+# The default appliance shipped by bsd/rc.d/smart_shield runs the Flask/gunicorn
+# process as `root`, so the rules below are not consulted at runtime — root
+# never needs sudo. They remain installed so an operator who hardens the box by
+# running the service as the unprivileged `smartshield` user (e.g.
+# `pw useradd -n smartshield` and edit rc.d to `daemon -u smartshield ...`)
+# gets least-privilege escalation automatically via priv_helper without code
+# changes. Until that hardening is done, the rules sit dormant.
 #
 # Defense-in-depth architecture
 # -----------------------------
@@ -252,6 +260,12 @@ smartshield ALL=(root) NOPASSWD: /sbin/kldload carp
 smartshield ALL=(root) NOPASSWD: /sbin/kldload pfsync
 smartshield ALL=(root) NOPASSWD: /sbin/kldload pf
 smartshield ALL=(root) NOPASSWD: /sbin/kldload pflog
+
+# ── /boot/loader.conf persistence (priv_helper "sysrc.loader_set") ─────────────
+# Only the kernel-module-load knobs we actually flip from the GUI. Each grant
+# matches the literal single-token `key=value` argv that priv_helper builds.
+smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc -f /boot/loader.conf netmap_load=YES
+smartshield ALL=(root) NOPASSWD: /usr/sbin/sysrc -f /boot/loader.conf netmap_load=NO
 
 # ── Package management: intentionally NOT granted via sudo ────────────────────
 # priv_helper defines pkg.install / pkg.delete, but granting `pkg install/delete`

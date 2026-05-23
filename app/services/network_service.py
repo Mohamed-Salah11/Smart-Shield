@@ -845,6 +845,35 @@ def _verify_default_route() -> bool:
     return False
 
 
+def _iface_has_ipv4_lease(iface: str) -> bool:
+    """Return True iff *iface* currently has a non-link-local IPv4 address.
+
+    Used to distinguish "DHCP client wedged" from "DHCP client already
+    serving a perfectly good lease". Reads `ifconfig <iface>` (cheap) and
+    parses the `inet <addr>` line. Returns False for any error so callers
+    fall back to the hard-error path.
+    """
+    try:
+        r = run_command(["/sbin/ifconfig", iface], check=False, timeout_seconds=5)
+    except Exception:
+        return False
+    if r.returncode != 0:
+        return False
+    for line in (r.stdout or "").splitlines():
+        s = line.strip()
+        if not s.startswith("inet "):
+            continue
+        parts = s.split()
+        if len(parts) < 2:
+            continue
+        addr = parts[1]
+        # Skip APIPA (169.254.x.x) — that's a self-assigned address, not a real lease.
+        if addr.startswith("169.254."):
+            continue
+        return True
+    return False
+
+
 def _kick_dhcp_client(iface: str) -> dict:
     """
     Bring *iface* up and request a DHCP lease using whichever client is present.
@@ -853,6 +882,13 @@ def _kick_dhcp_client(iface: str) -> dict:
       - ok=True (lease acquired and default route confirmed)
       - ok="pending" (lease/route not yet visible — caller treats as warning)
       - ok=False (no client found OR dhclient returned non-zero)
+
+    If a previous dhclient/dhcpcd is already running on this iface (e.g. from
+    rc.conf's ifconfig_<iface>="DHCP" at boot, or a prior wizard apply), the
+    fresh invocation hard-errors with "dhclient already running, pid: X.
+    exiting." (rc=1). We pre-emptively stop any existing client via -x so the
+    new one starts cleanly, and reinterpret a residual "already running"
+    response as success when the iface has a working lease + default route.
     """
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": f"{iface}: dhcp skipped (non-FreeBSD)"}
@@ -869,6 +905,14 @@ def _kick_dhcp_client(iface: str) -> dict:
         run_command(["/sbin/ifconfig", iface, "up"], check=False, timeout_seconds=5)
     except Exception:
         pass
+    # Best-effort: stop any existing client for this iface so the next call
+    # doesn't hit "already running, exiting". -x works for both FreeBSD's
+    # dhclient (exit without releasing) and dhcpcd (exit). A non-zero rc
+    # here just means there was nothing to stop — that's fine.
+    try:
+        run_command([dhcp_bin, "-x", iface], check=False, timeout_seconds=5)
+    except Exception:
+        pass
     try:
         r = run_command([dhcp_bin, iface], check=False, timeout_seconds=15)
     except Exception as exc:
@@ -879,6 +923,22 @@ def _kick_dhcp_client(iface: str) -> dict:
         }
 
     if r.returncode != 0:
+        combined_out = (r.stderr or r.stdout or "").lower()
+        # If the dhclient binary stubbornly says "already running" even after
+        # the -x pass (race with another wizard click, or the pidfile is on a
+        # tmpfs path the -x couldn't see) AND the interface actually has a
+        # lease + default route, the existing client is doing its job. Don't
+        # block the wizard on a phantom collision.
+        if ("already running" in combined_out
+                and _iface_has_ipv4_lease(iface)
+                and _verify_default_route()):
+            return {
+                "ok": True,
+                "message": (
+                    f"{iface}: DHCP client was already running with a working "
+                    f"lease + default route — kept it instead of restarting"
+                ),
+            }
         return {
             "ok": False,
             "pending": True,

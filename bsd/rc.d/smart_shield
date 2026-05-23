@@ -29,9 +29,12 @@ rcvar="${name}_enable"
 load_rc_config "${name}"
 
 : ${smart_shield_enable:="NO"}
-# The service runs as root. Privileged commands (pfctl, service, sysrc, etc.)
-# are executed directly. sudo remains installed as a fallback for non-root
-# deployments.
+# The service runs as root by default. Privileged commands (pfctl, service,
+# sysrc, etc.) are executed directly via priv_helper. To harden the
+# deployment, run the gunicorn process as the unprivileged `smartshield` user
+# (add `-u smartshield` to the daemon args below) — priv_helper will then
+# transparently route privileged actions through sudo, gated by the rules in
+# bsd/etc/sudoers.d/smartshield. No app-side code change needed.
 #
 # Security consequence: the web terminal feature gives root-equivalent shell
 # access to anyone who can authenticate as a superuser. It is disabled by

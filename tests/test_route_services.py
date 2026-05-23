@@ -9,7 +9,9 @@ class TestServicesRoutes:
 
     def test_services_home_accessible(self, superuser):
         client, _ = superuser
-        r = client.get("/services/")
+        # /services/ redirects to a real sub-page (DHCP server); follow it and
+        # confirm the landing page renders.
+        r = client.get("/services/", follow_redirects=True)
         assert r.status_code == 200
 
     def test_dhcp_server_page(self, superuser):
@@ -85,6 +87,101 @@ class TestServicesRoutes:
             "/services/api/ntp/force-sync",
         ):
             assert path in rules, f"missing route: {path}"
+
+
+# ─── All 16 Service Engine sidebar pages load ────────────────────────────────
+
+class TestServiceEnginePages:
+    @pytest.mark.parametrize("path", [
+        "/services/auto-config-backup",
+        "/services/captive-portal",
+        "/services/dhcp-server",
+        "/services/dhcp-relay",
+        "/services/dhcpv6-server",
+        "/services/dhcpv6-relay",
+        "/services/dns-resolver",
+        "/services/dns-forwarder",
+        "/services/dynamic-dns",
+        "/services/igmp-proxy",
+        "/services/ntp",
+        "/services/openvpn-server",
+        "/services/router-advertisement",
+        "/services/snmp",
+        "/services/upnp-igd-pcp",
+        "/services/wake-on-lan",
+    ])
+    def test_page_loads(self, superuser, path):
+        client, _ = superuser
+        r = client.get(path, follow_redirects=True)
+        assert r.status_code == 200, f"{path} -> {r.status_code}"
+
+
+# ─── Service Engine apply endpoints — round-trip in dry-run as superuser ─────
+
+class TestServiceEngineApply:
+    @pytest.mark.parametrize("path", [
+        "/services/api/ntp/apply",
+        "/services/api/captive-portal/apply",
+        "/services/api/pppoe/apply",
+    ])
+    def test_apply_endpoint(self, superuser, path):
+        client, _ = superuser
+        r = client.post(path, json={})
+        assert r.status_code == 200, f"{path} -> {r.status_code}"
+
+
+# ─── Service Engine mutation permission gates (high-value endpoints) ─────────
+
+class TestServiceEngineMutations:
+    @pytest.mark.parametrize("method,path,body", [
+        ("POST", "/services/api/config-backup", {}),
+        ("POST", "/services/api/config-backup/1/restore", {}),
+        ("POST", "/services/api/dhcp-relay", {}),
+        ("POST", "/services/api/dhcp-server/em1", {}),
+        ("POST", "/services/api/ntp", {"servers": ["pool.ntp.org"]}),
+        ("POST", "/services/api/ntp/apply", {}),
+        ("POST", "/services/api/captive-portal/settings", {"enabled": False}),
+        ("POST", "/services/api/captive-portal/apply", {}),
+        ("POST", "/services/api/captive-portal/sessions/1/logout", {}),
+        ("POST", "/services/api/captive-portal/sessions/logout-all", {}),
+        ("POST", "/services/api/captive-portal/vouchers", {}),
+        ("DELETE", "/services/api/captive-portal/vouchers/1", None),
+        ("POST", "/services/api/pppoe/apply", {}),
+        ("POST", "/services/api/pppoe/disconnect", {}),
+    ])
+    def test_mutation_rejects_plain_user(self, plain_user, method, path, body):
+        client, _ = plain_user
+        if method == "POST":
+            r = client.post(path, json=body or {})
+        else:
+            r = client.delete(path)
+        assert r.status_code in (401, 403), f"{method} {path} -> {r.status_code}"
+
+
+# ─── Route registration regression guard ─────────────────────────────────────
+
+class TestServiceEngineRouteRegistration:
+    def test_required_endpoints_registered(self, app):
+        rules = {str(r) for r in app.url_map.iter_rules()}
+        required = (
+            # All 16 sidebar pages
+            "/services/auto-config-backup", "/services/captive-portal",
+            "/services/dhcp-server", "/services/dhcp-relay",
+            "/services/dhcpv6-server", "/services/dhcpv6-relay",
+            "/services/dns-resolver", "/services/dns-forwarder",
+            "/services/dynamic-dns", "/services/igmp-proxy",
+            "/services/ntp", "/services/openvpn-server",
+            "/services/router-advertisement", "/services/snmp",
+            "/services/upnp-igd-pcp", "/services/wake-on-lan",
+            # Apply endpoints
+            "/services/api/ntp/apply", "/services/api/captive-portal/apply",
+            "/services/api/pppoe/apply",
+            # Config backup
+            "/services/api/config-backup", "/services/api/config-backup/list",
+            "/services/api/config-backup/<int:version_id>/restore",
+        )
+        missing = [p for p in required if p not in rules]
+        assert not missing, f"missing routes: {missing}"
 
 
 class TestTemplateHandlerHygiene:

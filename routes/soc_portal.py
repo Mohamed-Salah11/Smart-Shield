@@ -44,6 +44,43 @@ from app.soc_portal_auth import (
 soc_portal_bp = Blueprint("soc_portal", __name__, url_prefix="/soc-portal")
 
 
+@soc_portal_bp.before_request
+def _enforce_soc_bind_ip():
+    """Defense-in-depth: refuse SOC portal requests that arrive on a host
+    other than the configured SOC bind_ip.
+
+    The admin nginx vhost is configured to 404 /soc-portal/* on the admin IP
+    (see ``nginx_writer._soc_isolation_block``), but if nginx is bypassed,
+    misconfigured, or not in front (dev runs), gunicorn would still serve the
+    blueprint from any host. This check makes the boundary an app-side
+    invariant.
+
+    Behavior:
+      * bind_ip unset / "" / "0.0.0.0"     → allow (legacy single-IP mode)
+      * request host IP matches bind_ip    → allow
+      * request host IP differs            → 404 (look like the route doesn't exist)
+    """
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT enabled, bind_ip FROM soc_portal_config WHERE id=1"
+        ).fetchone()
+    except Exception:
+        return None
+    if not row or not bool(row["enabled"]):
+        return None
+    bind_ip = (row["bind_ip"] or "").strip()
+    if not bind_ip or bind_ip == "0.0.0.0":
+        return None
+    # request.host is "ip[:port]"; split off the port if present. The full URL
+    # never carries a username/credential so a simple rsplit is safe.
+    host_value = (request.host or "").rsplit(":", 1)[0].strip("[]")
+    if host_value == bind_ip:
+        return None
+    from flask import abort
+    abort(404)
+
+
 # SOC alert feed allowlist. Anything not listed here is treated as routine
 # non-SOC noise and excluded from /soc-portal/api/alerts. Default-deny — a
 # new SIEM action joins the SOC view only after deliberate review.

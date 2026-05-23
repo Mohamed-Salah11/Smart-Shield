@@ -447,3 +447,284 @@ class TestApplyIds:
         assert result["ok"] is False
         assert called["write"] is False
         assert called["restart"] is False
+
+
+# ---------------------------------------------------------------------------
+# Phase tracker
+# ---------------------------------------------------------------------------
+
+class TestPhaseTracker:
+
+    def test_set_phase_updates_snapshot(self):
+        from app.services.ids_writer import _set_phase, get_ids_phase
+        _set_phase("STOPPED")
+        _set_phase("UPDATING_RULES")
+        snap = get_ids_phase()
+        assert snap["phase"] == "UPDATING_RULES"
+        assert snap["error"] is None
+
+    def test_set_phase_records_error(self):
+        from app.services.ids_writer import _set_phase, get_ids_phase
+        _set_phase("ERROR", "boom")
+        snap = get_ids_phase()
+        assert snap["phase"] == "ERROR"
+        assert snap["error"] == "boom"
+
+    def test_set_phase_rejects_unknown(self):
+        from app.services.ids_writer import _set_phase, get_ids_phase
+        _set_phase("RUNNING")
+        before = get_ids_phase()["phase"]
+        _set_phase("BOGUS_PHASE")
+        assert get_ids_phase()["phase"] == before  # unchanged
+
+    def test_toggle_emits_phase_in_response(self, conn):
+        from app.services.ids_writer import toggle_ids
+        result = toggle_ids(conn, True)
+        # Non-FreeBSD short-circuit: phase should still be present in result.
+        assert "phase" in result
+        assert result["phase"] in ("RUNNING", "STOPPED")
+
+    def test_toggle_ips_failure_sets_error_phase(self, conn):
+        """An IPS toggle that can't find an interface drives phase=ERROR."""
+        from app.services.ids_writer import toggle_ids, get_ids_phase, _set_phase
+        _set_phase("STOPPED")  # reset
+        conn.execute("UPDATE ids_config SET mode='ips', interface='' WHERE id=1")
+        conn.commit()
+        result = toggle_ids(conn, True)
+        assert result["ok"] is False
+        assert result["phase"] == "ERROR"
+        assert get_ids_phase()["phase"] == "ERROR"
+        assert get_ids_phase()["error"]  # non-empty
+
+
+# ---------------------------------------------------------------------------
+# Netmap auto-load on IPS Enable (the screenshot bug fix)
+# ---------------------------------------------------------------------------
+
+class _FakeResult:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class TestEnsureNetmapLoaded:
+
+    def test_short_circuits_when_already_loaded(self, monkeypatch):
+        """If kldstat already reports netmap loaded, don't call kldload."""
+        import app.services.ids_writer as iw
+        # Force the FreeBSD branch even on dev hosts so we exercise the path.
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: True)
+        called = {"kldload": False, "persist": False}
+
+        def _no_kldload(*a, **k):
+            called["kldload"] = True
+            raise AssertionError("kldload should not be called when already loaded")
+
+        def _persist_stub():
+            called["persist"] = True
+            return {"ok": True, "warning": ""}
+
+        # Patch the priv_helper import in the helper.
+        import app.services.priv_helper as ph
+        monkeypatch.setattr(ph, "run_privileged", _no_kldload)
+        monkeypatch.setattr(iw, "_persist_netmap_load_yes", _persist_stub)
+
+        result = iw._ensure_netmap_loaded(None)
+        assert result["ok"] is True
+        assert called["kldload"] is False
+        assert called["persist"] is True
+
+    def test_auto_loads_when_missing(self, monkeypatch):
+        """kldstat reports missing first, then loaded after kldload — ok=True."""
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        loaded_calls = iter([False, True])  # before kldload, after kldload
+        monkeypatch.setattr(iw, "_kldstat_netmap_loaded",
+                            lambda: next(loaded_calls))
+        kldload_args = {}
+
+        def _fake_run_priv(name, **kw):
+            kldload_args["name"] = name
+            kldload_args["kw"] = kw
+            return _FakeResult(returncode=0, stdout="")
+
+        import app.services.priv_helper as ph
+        monkeypatch.setattr(ph, "run_privileged", _fake_run_priv)
+        monkeypatch.setattr(iw, "_persist_netmap_load_yes",
+                            lambda: {"ok": True, "warning": ""})
+
+        result = iw._ensure_netmap_loaded(None)
+        assert result["ok"] is True
+        assert kldload_args["name"] == "kldload"
+        assert kldload_args["kw"] == {"module": "netmap"}
+
+    def test_hard_fails_when_kldload_still_misses(self, monkeypatch):
+        """If kldstat STILL reports missing after kldload, return ok=False."""
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: False)
+
+        import app.services.priv_helper as ph
+        monkeypatch.setattr(ph, "run_privileged",
+                            lambda *a, **kw: _FakeResult(0, "", "no error but no load either"))
+        monkeypatch.setattr(iw, "_persist_netmap_load_yes",
+                            lambda: {"ok": True, "warning": ""})
+
+        result = iw._ensure_netmap_loaded(None)
+        assert result["ok"] is False
+        assert "netmap" in result["message"].lower()
+
+    def test_propagates_priv_helper_exception(self, monkeypatch):
+        """A PrivilegedActionError surfaces as ok=False with the error text."""
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: False)
+
+        import app.services.priv_helper as ph
+
+        def _boom(*a, **kw):
+            raise ph.PrivilegedActionError("kldload not in allowlist (test)")
+
+        monkeypatch.setattr(ph, "run_privileged", _boom)
+        result = iw._ensure_netmap_loaded(None)
+        assert result["ok"] is False
+        assert "kldload" in result["message"].lower() or "load" in result["message"].lower()
+
+    def test_persist_warning_passes_through(self, monkeypatch):
+        """Live-load works but loader.conf persist fails → ok=True with warning."""
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        loaded_calls = iter([False, True])
+        monkeypatch.setattr(iw, "_kldstat_netmap_loaded",
+                            lambda: next(loaded_calls))
+        import app.services.priv_helper as ph
+        monkeypatch.setattr(ph, "run_privileged",
+                            lambda *a, **kw: _FakeResult(0, "", ""))
+        monkeypatch.setattr(iw, "_persist_netmap_load_yes",
+                            lambda: {"ok": False, "warning": "sysrc dropped on the floor"})
+
+        result = iw._ensure_netmap_loaded(None)
+        assert result["ok"] is True
+        assert "sysrc dropped on the floor" in result["warning"]
+
+
+class TestValidateIpsSafetyAutoLoad:
+
+    def test_passes_when_ensure_netmap_succeeds(self, conn, monkeypatch):
+        """validate_ips_safety uses _ensure_netmap_loaded — when it returns
+        ok=True, no error rises even on FreeBSD."""
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_ensure_netmap_loaded",
+                            lambda _c: {"ok": True, "warning": "", "message": "ok"})
+
+        safety = iw.validate_ips_safety(conn)
+        assert safety["ok"] is True
+        assert safety["errors"] == []
+
+    def test_fails_when_ensure_netmap_errors(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_ensure_netmap_loaded",
+                            lambda _c: {"ok": False, "warning": "",
+                                        "message": "netmap.ko could not be loaded; IPS mode is unavailable."})
+
+        safety = iw.validate_ips_safety(conn)
+        assert safety["ok"] is False
+        assert any("netmap" in e.lower() for e in safety["errors"])
+
+    def test_persist_warning_is_warning_not_error(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw.sys, "platform", "freebsd14")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_ensure_netmap_loaded",
+                            lambda _c: {"ok": True,
+                                        "warning": "loader.conf persist failed",
+                                        "message": "ok"})
+
+        safety = iw.validate_ips_safety(conn)
+        assert safety["ok"] is True
+        assert safety["errors"] == []
+        assert any("loader.conf" in w for w in safety["warnings"])
+
+
+# ---------------------------------------------------------------------------
+# Signature counter
+# ---------------------------------------------------------------------------
+
+class TestCountSignatures:
+
+    def test_counts_only_rule_actions(self, tmp_path, monkeypatch):
+        import app.services.ids_writer as iw
+        rules = tmp_path / "suricata.rules"
+        rules.write_text(
+            "# comment line — must be ignored\n"
+            "alert tcp any any -> any any (msg:\"a\"; sid:1;)\n"
+            "drop tcp any any -> any any (msg:\"b\"; sid:2;)\n"
+            "reject tcp any any -> any any (msg:\"c\"; sid:3;)\n"
+            "pass tcp any any -> any any (msg:\"d\"; sid:4;)\n"
+            "include other.rules\n"            # non-action prefix → ignored
+            "\n"                               # blank → ignored
+            "alert tcp 2.3.4.5 any -> any any (msg:\"e\"; sid:5;)\n"
+        )
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES", str(rules))
+        assert iw._count_signatures() == 5
+
+    def test_zero_when_file_missing(self, tmp_path, monkeypatch):
+        import app.services.ids_writer as iw
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES",
+                            str(tmp_path / "does-not-exist.rules"))
+        assert iw._count_signatures() == 0
+
+
+# ---------------------------------------------------------------------------
+# Diagnostics snapshot
+# ---------------------------------------------------------------------------
+
+class TestGetDiagnostics:
+
+    REQUIRED_KEYS = {
+        "ok", "phase", "error", "last_phase_at", "last_success_at",
+        "mode", "interface", "cfg_enabled", "running", "rc_enabled",
+        "signatures_loaded", "rules_file", "rules_size",
+        "config_path", "config_exists", "netmap_loaded", "log_tail",
+    }
+
+    def test_returns_stable_shape(self, conn):
+        from app.services.ids_writer import get_diagnostics
+        d = get_diagnostics(conn)
+        assert set(d.keys()) >= self.REQUIRED_KEYS
+        assert d["ok"] is True
+        assert isinstance(d["log_tail"], list)
+        assert d["mode"] in ("ids", "ips")
+
+    def test_reflects_db_mode(self, conn):
+        from app.services.ids_writer import get_diagnostics
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em7' WHERE id=1")
+        conn.commit()
+        d = get_diagnostics(conn)
+        assert d["mode"] == "ips"
+        assert d["interface"] == "em7"
+
+    def test_signature_count_uses_helper(self, conn, tmp_path, monkeypatch):
+        import app.services.ids_writer as iw
+        rules = tmp_path / "suricata.rules"
+        rules.write_text("alert tcp any any -> any any (sid:1;)\n")
+        monkeypatch.setattr(iw, "_SURICATA_UPDATE_RULES", str(rules))
+        d = iw.get_diagnostics(conn)
+        assert d["signatures_loaded"] == 1
+        assert d["rules_size"] > 0
+
+    def test_no_conn_does_not_raise(self):
+        from app.services.ids_writer import get_diagnostics
+        d = get_diagnostics(None)
+        assert d["ok"] is True
+        # No conn means default mode reading falls through to "ids".
+        assert d["mode"] == "ids"

@@ -37,6 +37,43 @@ _SURICATA_RUN_DIR     = "/var/run/suricata"
 _SERVICE_NAME         = "suricata"
 
 
+# ---------------------------------------------------------------------------
+# In-memory phase tracker for the Enable button lifecycle
+# ---------------------------------------------------------------------------
+# Surfaces the toggle lifecycle to the GUI without persisting to SQLite.
+# Process state is a runtime concern — keeping it in memory avoids the
+# "DB says enabled but daemon isn't running" divergence that the rest of
+# this module carefully avoids by deriving running-state from pgrep every
+# call. The GUI calls /ids/api/diagnostics to read this between requests.
+
+_PHASES = ("STOPPED", "UPDATING_RULES", "VALIDATING_CONFIG",
+           "LOADING_KMOD", "STARTING", "RUNNING", "ERROR")
+
+_IDS_STATE = {
+    "phase": "STOPPED",
+    "error": None,
+    "last_phase_at": None,
+    "last_success_at": None,
+}
+
+
+def _set_phase(phase, error=None):
+    """Update the in-memory IDS phase. Unknown phases are silently dropped."""
+    import time
+    if phase not in _PHASES:
+        return
+    _IDS_STATE["phase"] = phase
+    _IDS_STATE["error"] = error
+    _IDS_STATE["last_phase_at"] = time.time()
+    if phase == "RUNNING":
+        _IDS_STATE["last_success_at"] = _IDS_STATE["last_phase_at"]
+
+
+def get_ids_phase():
+    """Return a snapshot copy of the phase tracker — safe to JSON-serialize."""
+    return dict(_IDS_STATE)
+
+
 def _find_suricata_update() -> "str | None":
     """Return the absolute path to suricata-update, or None if absent.
 
@@ -724,14 +761,139 @@ def validate_suricata_yaml(text: str) -> tuple:
                 pass
 
 
+def _kldstat_netmap_loaded() -> bool:
+    """Return True when `kldstat -n netmap` reports the module is loaded.
+
+    Wrapped in its own helper so callers (validate_ips_safety, get_diagnostics)
+    and tests can stub a single call site.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return False
+    try:
+        r = run_command(["kldstat", "-n", "netmap"], check=False)
+        return r.returncode == 0
+    except FreeBSDNetworkError:
+        return False
+
+
+def _persist_netmap_load_yes() -> dict:
+    """Write `netmap_load="YES"` to /boot/loader.conf so the live kldload
+    survives reboot. Best-effort: a failure here does not undo the live load —
+    we return a warning string that the caller can surface to the operator.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "warning": ""}
+    try:
+        from app.services.priv_helper import run_privileged, PrivilegedActionError
+        from app.services.network_service import FreeBSDNetworkError as _FBNE
+        try:
+            result = run_privileged(
+                "sysrc.loader_set",
+                key="netmap_load",
+                value="YES",
+            )
+            if result.returncode == 0:
+                return {"ok": True, "warning": ""}
+            err = (result.stderr or result.stdout or "").strip()
+            return {
+                "ok": False,
+                "warning": (
+                    "netmap is loaded for this boot, but persisting "
+                    f"netmap_load=\"YES\" to /boot/loader.conf failed: {err or 'unknown error'}. "
+                    "A reboot will revert the IPS-mode kernel module."
+                ),
+            }
+        except (PrivilegedActionError, _FBNE) as exc:
+            return {
+                "ok": False,
+                "warning": (
+                    "netmap is loaded for this boot, but persisting "
+                    f"netmap_load=\"YES\" to /boot/loader.conf failed: {exc}. "
+                    "A reboot will revert the IPS-mode kernel module."
+                ),
+            }
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"ok": False,
+                "warning": f"Could not call sysrc.loader_set: {exc}"}
+
+
+def _ensure_netmap_loaded(conn) -> dict:
+    """Make sure netmap.ko is loaded, kldload'ing it on demand if not.
+
+    The install policy at bsd/install.sh deliberately leaves feature-dependent
+    kernel modules (netmap, dummynet, carp/pfsync) unloaded at install time
+    so a fresh box doesn't carry capabilities it isn't using. priv_helper's
+    "kldload" action + the sudoers grant for `/sbin/kldload netmap` exist
+    precisely so we can load it on demand from this code path.
+
+    Returns:
+        {"ok": True/False, "warning": str or "", "message": str}
+
+    `ok=True` means netmap is loaded now (either it already was, or we just
+    loaded it). `warning` carries non-fatal info such as "live load worked
+    but persisting to loader.conf failed". `message` is the hard-error text
+    when `ok=False` (used verbatim in validate_ips_safety's errors list).
+    """
+    _set_phase("LOADING_KMOD")
+    if _kldstat_netmap_loaded():
+        # Already loaded — still try to persist so a reboot keeps it. Failure
+        # is a warning, not an error.
+        persist = _persist_netmap_load_yes()
+        return {"ok": True,
+                "warning": persist.get("warning", ""),
+                "message": "netmap already loaded"}
+
+    if not sys.platform.startswith("freebsd"):
+        # No way to load on dev hosts — caller decides whether to hard-fail.
+        return {"ok": False, "warning": "",
+                "message": "netmap.ko cannot be auto-loaded on non-FreeBSD."}
+
+    # Auto-load via priv_helper. sudoers grants `/sbin/kldload netmap`.
+    try:
+        from app.services.priv_helper import run_privileged, PrivilegedActionError
+        load_result = run_privileged("kldload", module="netmap")
+        load_err = (load_result.stderr or load_result.stdout or "").strip()
+    except (PrivilegedActionError, FreeBSDNetworkError) as exc:
+        return {
+            "ok": False, "warning": "",
+            "message": (
+                f"Could not load netmap.ko: {exc}. "
+                "Run 'kldload netmap' manually or add 'netmap_load=\"YES\"' "
+                "to /boot/loader.conf."
+            ),
+        }
+
+    # Re-check — kldload exit code doesn't always reflect actual load state
+    # on some FreeBSD builds (e.g. when the module is already loaded by
+    # another process between the first kldstat and the kldload call).
+    if not _kldstat_netmap_loaded():
+        return {
+            "ok": False, "warning": "",
+            "message": (
+                "Tried to auto-load netmap.ko but kldstat still reports it as "
+                f"missing. kldload output: {load_err or 'empty'}. "
+                "Run 'kldload netmap' manually to diagnose."
+            ),
+        }
+
+    # Loaded successfully — persist to loader.conf for next boot.
+    persist = _persist_netmap_load_yes()
+    return {"ok": True,
+            "warning": persist.get("warning", ""),
+            "message": "netmap.ko loaded on demand"}
+
+
 def validate_ips_safety(conn) -> dict:
     """
     Additional safety checks required before enabling IPS mode.
 
-    Performs three checks on FreeBSD:
+    Performs these checks on FreeBSD:
     1. Interface is selected.       (hard error — IPS cannot bind)
-    2. netmap.ko kernel module loaded (kldstat -n netmap).  (hard error — inline
-       capture is impossible without it; missing netmap silently drops traffic)
+    2. netmap.ko kernel module loaded. If missing, *auto-load* via
+       `priv_helper.kldload` and persist `netmap_load="YES"` to
+       /boot/loader.conf. Only a load failure is a hard error now; a
+       loader.conf persist failure is just a warning so the operator
+       knows reboot will revert.
     3. The NIC driver is in the known-good netmap driver list. (warning — the
        list is non-exhaustive, so an unknown driver is surfaced, not blocked)
 
@@ -760,16 +922,13 @@ def validate_ips_safety(conn) -> dict:
         )
         return {"ok": True, "errors": errors, "warnings": warnings}
 
-    # Check 1: netmap kernel module loaded — hard error.
-    try:
-        r = run_command(["kldstat", "-n", "netmap"], check=False)
-        if r.returncode != 0:
-            errors.append(
-                "netmap.ko kernel module is not loaded. "
-                "Run 'kldload netmap' or add 'netmap_load=\"YES\"' to /boot/loader.conf."
-            )
-    except FreeBSDNetworkError as exc:
-        errors.append(f"Could not check netmap module: {exc}")
+    # Check 1: netmap kernel module — try to auto-load if missing.
+    netmap = _ensure_netmap_loaded(conn)
+    if not netmap.get("ok"):
+        errors.append(netmap.get("message") or
+                      "netmap.ko could not be loaded; IPS mode is unavailable.")
+    elif netmap.get("warning"):
+        warnings.append(netmap["warning"])
 
     # Check 2: NIC driver compatibility — warning (list is non-exhaustive).
     _NETMAP_SUPPORTED_PREFIXES = (
@@ -949,22 +1108,7 @@ def get_ids_status(conn=None) -> dict:
         except Exception:
             pass
 
-    # Signature-coverage gauge. Counts real rule actions only (alert/drop/
-    # reject/pass) so include-files and comments do not inflate the apparent
-    # coverage. A running suricata with 0 signatures is the failure mode we
-    # warn about in install.sh (§Fv12 P1-02): the daemon happily starts on an
-    # empty ruleset and the UI must not call that state "ready".
-    signatures_loaded = 0
-    try:
-        if os.path.exists(_SURICATA_UPDATE_RULES):
-            with open(_SURICATA_UPDATE_RULES, "r", errors="replace") as f:
-                for line in f:
-                    head = line[:8]
-                    if (head.startswith("alert ") or head.startswith("drop ")
-                            or head.startswith("reject ") or head.startswith("pass ")):
-                        signatures_loaded += 1
-    except Exception:
-        signatures_loaded = 0
+    signatures_loaded = _count_signatures()
 
     if not signatures_loaded:
         message = "Running, NO signatures loaded" if running else "Stopped, NO signatures loaded"
@@ -979,6 +1123,98 @@ def get_ids_status(conn=None) -> dict:
         "alerts_today": alerts_today,
         "cfg_enabled": cfg_enabled,
         "signatures_loaded": signatures_loaded,
+    }
+
+
+def _count_signatures() -> int:
+    """Count real Suricata rule actions in the merged rules file.
+
+    Signature-coverage gauge. Counts real rule actions only (alert/drop/
+    reject/pass) so include-files and comments do not inflate the apparent
+    coverage. A running suricata with 0 signatures is the failure mode we
+    warn about in install.sh (§Fv12 P1-02): the daemon happily starts on an
+    empty ruleset and the UI must not call that state "ready".
+    """
+    try:
+        if not os.path.exists(_SURICATA_UPDATE_RULES):
+            return 0
+        count = 0
+        with open(_SURICATA_UPDATE_RULES, "r", errors="replace") as f:
+            for line in f:
+                head = line[:8]
+                if (head.startswith("alert ") or head.startswith("drop ")
+                        or head.startswith("reject ") or head.startswith("pass ")):
+                    count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def get_diagnostics(conn=None) -> dict:
+    """One-call snapshot of every IDS-related runtime fact for the GUI panel.
+
+    Shape is stable so the panel can render a 2-column table without
+    case-splitting on which fields are present. Never raises.
+    """
+    cfg = {}
+    if conn is not None:
+        try:
+            cfg = _cfg(conn) or {}
+        except Exception:
+            cfg = {}
+
+    rules_path = _SURICATA_UPDATE_RULES
+    try:
+        rules_size = os.path.getsize(rules_path) if os.path.exists(rules_path) else 0
+    except OSError:
+        rules_size = 0
+
+    config_path = _SURICATA_CONF_PATH
+    config_exists = os.path.exists(config_path)
+
+    running = False
+    try:
+        if sys.platform.startswith("freebsd"):
+            r = run_command(["pgrep", "-x", "suricata"], check=False)
+            running = r.returncode == 0
+    except FreeBSDNetworkError:
+        running = False
+
+    rc_enabled = False
+    try:
+        from app.services.service_manager import sysrc_get
+        rc_enabled = (sysrc_get("suricata_enable") or "").strip().upper() == "YES"
+    except Exception:
+        rc_enabled = False
+
+    log_tail = []
+    try:
+        t = tail_suricata_log(lines=20)
+        if t.get("ok"):
+            log_tail = t.get("lines", []) or []
+    except Exception:
+        log_tail = []
+
+    phase_state = get_ids_phase()
+
+    return {
+        "ok": True,
+        "phase": phase_state.get("phase"),
+        "error": phase_state.get("error"),
+        "last_phase_at": phase_state.get("last_phase_at"),
+        "last_success_at": phase_state.get("last_success_at"),
+        "mode": (cfg.get("mode") or "ids").lower(),
+        "interface": (cfg.get("interface") or "").strip(),
+        "cfg_enabled": bool(cfg.get("enabled")),
+        "running": running,
+        "rc_enabled": rc_enabled,
+        "signatures_loaded": _count_signatures(),
+        "rules_file": rules_path,
+        "rules_size": rules_size,
+        "config_path": config_path,
+        "config_exists": config_exists,
+        "netmap_loaded": _kldstat_netmap_loaded(),
+        "log_tail": log_tail,
     }
 
 
@@ -1010,14 +1246,19 @@ def toggle_ids(conn, enabled: bool) -> dict:
     if enabled and mode == "ips":
         safety = validate_ips_safety(conn)
         if not safety["ok"]:
+            err_msg = " | ".join(safety["errors"])
+            _set_phase("ERROR", err_msg)
             return {"ok": False, "rolled_back": False,
-                    "message": " | ".join(safety["errors"]),
+                    "phase": "ERROR",
+                    "message": err_msg,
                     "warnings": safety.get("warnings", [])}
 
     # Non-FreeBSD: update DB directly (no service to manage)
     if not sys.platform.startswith("freebsd"):
         _write_enabled(conn, enabled)
+        _set_phase("RUNNING" if enabled else "STOPPED")
         return {"ok": True, "rolled_back": False,
+                "phase": "RUNNING" if enabled else "STOPPED",
                 "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
 
     if enabled:
@@ -1029,6 +1270,7 @@ def toggle_ids(conn, enabled: bool) -> dict:
         # strand the auto-fetch behind it. Keep the result so we can surface a
         # zero-rule "degraded" start to the operator instead of claiming a
         # clean success.
+        _set_phase("UPDATING_RULES")
         rules_state = ensure_rules_present(conn)
 
         # Explicit local_path rulesets must exist — these are operator-set.
@@ -1038,28 +1280,40 @@ def toggle_ids(conn, enabled: bool) -> dict:
             if lp and not os.path.exists(lp):
                 missing.append(lp)
         if missing:
+            err_msg = f"Rule file(s) not found: {', '.join(missing)}. Check local_path settings."
+            _set_phase("ERROR", err_msg)
             return {
                 "ok": False,
                 "rolled_back": False,
-                "message": f"Rule file(s) not found: {', '.join(missing)}. Check local_path settings.",
+                "phase": "ERROR",
+                "message": err_msg,
             }
 
         # --- Deep check, then write config --------------------------------
+        _set_phase("VALIDATING_CONFIG")
         conf_text = generate_suricata_yaml(conn)
         ok, err   = validate_suricata_yaml(conf_text)
         if not ok:
+            err_msg = f"Suricata YAML validation failed: {err}"
+            _set_phase("ERROR", err_msg)
             return {"ok": False, "rolled_back": False,
-                    "message": f"Suricata YAML validation failed: {err}"}
+                    "phase": "ERROR",
+                    "message": err_msg}
         write_result = write_suricata_config(conn)
         if not write_result["ok"]:
-            return {**write_result, "rolled_back": False}
+            _set_phase("ERROR", write_result.get("message", "config write failed"))
+            return {**write_result, "rolled_back": False, "phase": "ERROR"}
 
         # Persist rc.conf FIRST — fail fast if sysrc is unavailable
         sysrc_result = sysrc_set("suricata_enable", "YES")
         if not sysrc_result["ok"]:
+            err_msg = f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"
+            _set_phase("ERROR", err_msg)
             return {"ok": False, "rolled_back": False,
-                    "message": f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"}
+                    "phase": "ERROR",
+                    "message": err_msg}
 
+        _set_phase("STARTING")
         r = service_action(_SERVICE_NAME, "restart")
         if not r["ok"]:
             # Service failed — revert rc.conf and config file; leave DB as disabled
@@ -1079,9 +1333,11 @@ def toggle_ids(conn, enabled: bool) -> dict:
                         r2 = service_action(_SERVICE_NAME, "restart")
                         if r2["ok"]:
                             _write_enabled(conn, True)
+                            _set_phase("RUNNING")
                             return {
                                 **r2,
                                 "rolled_back": False,
+                                "phase": "RUNNING",
                                 "fallback": True,
                                 "message": r2["message"] + " — fell back to IDS (pcap) mode after IPS start failure",
                             }
@@ -1089,8 +1345,11 @@ def toggle_ids(conn, enabled: bool) -> dict:
                         pass
                 sysrc_set("suricata_enable", "NO")
 
+            err_msg = r.get("message", "restart failed")
+            _set_phase("ERROR", err_msg)
             return {"ok": False, "rolled_back": rb.get("ok", False),
-                    "message": r.get("message", "restart failed"),
+                    "phase": "ERROR",
+                    "message": err_msg,
                     "rollback_message": rb.get("message", "")}
 
         # service command exited 0, but FreeBSD's init script exits 0 even when
@@ -1145,14 +1404,17 @@ def toggle_ids(conn, enabled: bool) -> dict:
                     "Open the Daemon log panel for the full reason."
                 )
 
+            err_msg = (
+                f"{headline} "
+                f"Service output: {r.get('message', '').strip()}"
+                + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
+            )
+            _set_phase("ERROR", err_msg)
             return {
                 "ok": False,
                 "rolled_back": rb.get("ok", False),
-                "message": (
-                    f"{headline} "
-                    f"Service output: {r.get('message', '').strip()}"
-                    + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
-                ),
+                "phase": "ERROR",
+                "message": err_msg,
                 "rollback_message": rb.get("message", ""),
                 "log_tail": log_snippet,
                 "oom_killed": bool(oom),
@@ -1160,6 +1422,7 @@ def toggle_ids(conn, enabled: bool) -> dict:
 
         # Confirmed running — persist enabled=1 and surface the startup banner.
         _write_enabled(conn, True)
+        _set_phase("RUNNING")
         startup_tail = tail_suricata_log(lines=12)
         degraded   = bool(rules_state.get("degraded"))
         base_msg   = r.get("message", "")
@@ -1170,6 +1433,7 @@ def toggle_ids(conn, enabled: bool) -> dict:
                   "appliance is online so the IDS can actually detect threats."
             )
         return {**r, "rolled_back": False,
+                "phase": "RUNNING",
                 "message": base_msg,
                 "degraded": degraded,
                 "rules_size": rules_state.get("rules_size", 0),
@@ -1181,7 +1445,8 @@ def toggle_ids(conn, enabled: bool) -> dict:
         sysrc_set("suricata_enable", "NO")
         r = service_action(_SERVICE_NAME, "stop")
         _write_enabled(conn, False)
-        return {**r, "rolled_back": False}
+        _set_phase("STOPPED")
+        return {**r, "rolled_back": False, "phase": "STOPPED"}
 
 
 def apply_ids(conn) -> dict:
