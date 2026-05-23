@@ -389,7 +389,7 @@ async function takeCaseSelf(caseId, userId) {
   });
   const d = await r.json();
   if (d.ok) window.location.reload();
-  else alert(d.message || 'Failed to self-assign case.');
+  else SOC.toast(d.message || 'Failed to self-assign case.', 'error');
 }
 
 /* ── Full assign (L2/L3 dropdown) ────────────────────────────────────── */
@@ -403,7 +403,7 @@ async function assignCase(caseId) {
   });
   const d = await r.json();
   if (d.ok) window.location.reload();
-  else alert(d.message || 'Failed to assign case.');
+  else SOC.toast(d.message || 'Failed to assign case.', 'error');
 }
 
 /* ── 5W form helpers ─────────────────────────────────────────────────── */
@@ -440,7 +440,7 @@ function openEscalateModal(targetTier) {
 async function confirmEscalate(caseId) {
   const { values, missing } = readW5('esc-w-');
   if (missing.length) {
-    alert('All 5 W\'s are required. Missing: ' + missing.join(', '));
+    SOC.toast('All 5 W\'s are required. Missing: ' + missing.join(', '), 'error');
     return;
   }
   const r = await fetch(`/soc-portal/cases/${caseId}/escalate`, {
@@ -450,7 +450,7 @@ async function confirmEscalate(caseId) {
   });
   const d = await r.json();
   if (d.ok) { escalateModal.hide(); window.location.reload(); }
-  else alert(d.message || 'Failed to escalate case.');
+  else SOC.toast(d.message || 'Failed to escalate case.', 'error');
 }
 
 /* ── Close ───────────────────────────────────────────────────────────── */
@@ -497,10 +497,10 @@ function openCloseModal(closureType) {
 
 async function confirmClose(caseId) {
   const chosen = document.querySelector('input[name="close-verdict"]:checked');
-  if (!chosen) { alert('Choose True Positive or False Positive.'); return; }
+  if (!chosen) { SOC.toast('Choose True Positive or False Positive.', 'error'); return; }
   const { values, missing } = readW5('cls-w-');
   if (missing.length) {
-    alert('All 5 W\'s are required. Missing: ' + missing.join(', '));
+    SOC.toast('All 5 W\'s are required. Missing: ' + missing.join(', '), 'error');
     return;
   }
   const payload = {
@@ -515,7 +515,7 @@ async function confirmClose(caseId) {
   });
   const d = await r.json();
   if (d.ok) { closeModal.hide(); window.location.reload(); }
-  else alert(d.message || 'Failed to close case.');
+  else SOC.toast(d.message || 'Failed to close case.', 'error');
 }
 
 document.addEventListener('DOMContentLoaded', wireVerdictCards);
@@ -531,7 +531,7 @@ async function addNote(caseId) {
   });
   const d = await r.json();
   if (d.ok) window.location.reload();
-  else alert(d.message || 'Failed to add note.');
+  else SOC.toast(d.message || 'Failed to add note.', 'error');
 }
 </script>
 <!-- inline-handlers:auto -->

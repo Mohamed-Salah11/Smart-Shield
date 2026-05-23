@@ -99,17 +99,48 @@
                     color:var(--muted); }
 .fwl-drawer-body  { padding:14px 16px; overflow:auto; flex:1;
                     font-size:.82rem; }
+.fwl-drawer-foot  { display:flex; justify-content:flex-end; gap:8px;
+                    padding:10px 16px; border-top:1px solid var(--border-color);
+                    background:var(--bg); }
+.fwl-drawer-foot .fwl-kbd-hint { color:var(--muted); font-size:.72rem;
+                    font-family:ui-monospace,Menlo,monospace;
+                    padding:2px 6px; border:1px solid var(--border-color);
+                    border-radius:4px; }
+.fwl-drawer-section { margin-bottom:14px; }
+.fwl-drawer-section:last-of-type { margin-bottom:0; }
+.fwl-drawer-section-title { font-size:.72rem; font-weight:700;
+                    text-transform:uppercase; letter-spacing:.06em;
+                    color:var(--muted); padding-bottom:4px;
+                    border-bottom:1px solid var(--border-color);
+                    margin-bottom:6px; }
 .fwl-drawer-row   { display:flex; gap:8px; padding:4px 0;
-                    border-bottom:1px dashed var(--border-color); }
+                    border-bottom:1px dashed var(--border-color); align-items:center; }
+.fwl-drawer-row:last-child { border-bottom:none; }
 .fwl-drawer-row .k { color:var(--muted); min-width:120px; font-weight:600; }
-.fwl-drawer-row .v { word-break:break-all; font-family:ui-monospace,Menlo,monospace; }
-.fwl-drawer-raw   { margin-top:14px; padding:10px; background:var(--bg);
+.fwl-drawer-row .v { word-break:break-all; font-family:ui-monospace,Menlo,monospace;
+                    flex:1; }
+.fwl-copy-btn     { background:none; border:none; cursor:pointer; padding:2px 6px;
+                    color:var(--muted); font-size:.75rem; border-radius:4px; }
+.fwl-copy-btn:hover { background:rgba(37,99,235,.1); color:var(--primary); }
+.fwl-drawer-raw   { margin-top:6px; padding:10px; background:var(--bg);
                     border-radius:6px; border:1px solid var(--border-color);
                     font-family:ui-monospace,Menlo,monospace; font-size:.74rem;
                     white-space:pre-wrap; word-break:break-all; }
 .fwl-drawer-why   { margin-top:12px; padding:10px; border-radius:6px;
                     background:rgba(13,148,136,.08); border:1px solid rgba(13,148,136,.3);
                     font-size:.78rem; color:#0d9488; }
+.fwl-drawer-backdrop {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,.35);
+  opacity:0;
+  transition:opacity .18s ease;
+  pointer-events:none;
+  z-index:49;
+}
+.fwl-drawer-backdrop.open {
+  opacity:1;
+  pointer-events:auto;
+}
 </style>
 {% endblock %}
 
@@ -217,12 +248,17 @@
 </div>
 
 <!-- Row-detail drawer (Wave L) — slides in when a row is clicked. -->
+<div id="fwlDrawerBackdrop" class="fwl-drawer-backdrop" data-action="fwlog-close"></div>
 <aside id="fwlDrawer" class="fwl-drawer" aria-hidden="true">
   <div class="fwl-drawer-head">
     <h3>Firewall event detail</h3>
-    <button class="fwl-drawer-close" data-action="h_bd554ab9a4">×</button>
+    <button class="fwl-drawer-close" data-action="h_bd554ab9a4" title="Close (Esc)">×</button>
   </div>
   <div class="fwl-drawer-body" id="fwlDrawerBody"></div>
+  <div class="fwl-drawer-foot">
+    <span class="fwl-kbd-hint">Esc</span>
+    <button type="button" class="primary" data-action="fwlog-close">Close</button>
+  </div>
 </aside>
 
 <script nonce="{{ csp_nonce() }}">
@@ -378,56 +414,102 @@ function exportCsv() {
   window.location = url;
 }
 
+// Semantic groups for the detail drawer. Each `kind:"ioc"` field gets a
+// one-click copy button. Empty fields are skipped per-group, and a group
+// with zero non-empty fields is hidden entirely.
+const FWL_GROUPS = [
+  { title: "Event", fields: [
+      ["ts","Time"],["action","Action"],["severity","Severity"],
+      ["policy_source","Policy source"],["event_uuid","Event UUID","ioc"]] },
+  { title: "Network", fields: [
+      ["direction","Direction"],["interface","Interface"],
+      ["protocol","Protocol"],["ip_version","IP version"]] },
+  { title: "Source", fields: [
+      ["src_ip","IP","ioc"],["src_port","Port"],
+      ["hostname","Hostname"],["mac","MAC","ioc"]] },
+  { title: "Destination", fields: [
+      ["dst_ip","IP","ioc"],["dst_port","Port"]] },
+  { title: "NAT translation", fields: [
+      ["nat_src_ip","NAT source IP","ioc"],["nat_src_port","NAT source port"],
+      ["nat_dst_ip","NAT dest IP","ioc"],["nat_dst_port","NAT dest port"]] },
+  { title: "Rule & anchor", fields: [
+      ["rule_id","Rule ID"],["rule_label","Rule label"],
+      ["anchor","Anchor"],["reason","Reason"]] },
+  { title: "Protocol detail", fields: [
+      ["tcp_flags","TCP flags"],["icmp_type","ICMP type"],
+      ["icmp_code","ICMP code"],["packet_length","Packet length"]] },
+];
+
+function fwlFmtValue(key, val) {
+  if (val === null || val === undefined || val === "") return "";
+  if (key === "ts") return String(val).replace("T", " ").slice(0, 19);
+  if (key === "ip_version") return val === 6 ? "IPv6" : "IPv" + val;
+  return String(val);
+}
+
+function fwlCopyBtn(value) {
+  return `<button class="fwl-copy-btn" type="button" data-action="fwl-copy" data-value="${htmlEscape(value)}" title="Copy"><i class="fa-regular fa-copy"></i> copy</button>`;
+}
+
+function fwlRow(label, value, kind) {
+  const v = String(value);
+  const esc = htmlEscape(v);
+  const copy = (kind === "ioc") ? fwlCopyBtn(v) : "";
+  return `<div class="fwl-drawer-row"><span class="k">${htmlEscape(label)}</span><span class="v">${esc}</span>${copy}</div>`;
+}
+
+function fwlRenderGroup(group, r) {
+  const rows = group.fields
+    .map(([k, label, kind]) => [label, fwlFmtValue(k, r[k]), kind])
+    .filter(([_, v]) => v !== "" && v !== null && v !== undefined);
+  if (!rows.length) return "";
+  const body = rows.map(([label, v, kind]) => fwlRow(label, v, kind)).join("");
+  return `<section class="fwl-drawer-section">
+            <div class="fwl-drawer-section-title">${htmlEscape(group.title)}</div>
+            ${body}
+          </section>`;
+}
+
+function fwlCopy(btn) {
+  if (!navigator.clipboard) return;
+  const value = btn.dataset.value || "";
+  navigator.clipboard.writeText(value).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> copied';
+    btn.style.color = '#10b981';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 900);
+  });
+}
+
 function openDrawer(idx) {
   const r = lastRows[idx];
   if (!r) return;
-  const fields = [
-    ["Time",           (r.ts || "").replace("T", " ")],
-    ["Action",         r.action || ""],
-    ["Direction",      r.direction || ""],
-    ["Interface",      r.interface || ""],
-    ["Severity",       r.severity || ""],
-    ["Policy source",  r.policy_source || ""],
-    ["Rule label",     r.rule_label || ""],
-    ["Rule id",        r.rule_id != null ? r.rule_id : ""],
-    ["Policy id",      r.policy_id || ""],
-    ["Policy name",    r.policy_name || ""],
-    ["Protocol",       (r.protocol || "") + (r.ip_version === 6 ? " (v6)" : "")],
-    ["Source",         (r.src_ip || "") + (r.src_port ? ":" + r.src_port : "")],
-    ["Destination",    (r.dst_ip || "") + (r.dst_port ? ":" + r.dst_port : "")],
-    ["NAT src",        r.nat_translated_src || ""],
-    ["NAT dst",        r.nat_translated_dst || ""],
-    ["Zone in",        r.zone_in || ""],
-    ["Zone out",       r.zone_out || ""],
-    ["TCP flags",      r.tcp_flags || ""],
-    ["ICMP type",      r.icmp_type || ""],
-    ["Packet length",  r.packet_length != null ? r.packet_length : ""],
-    ["Hostname",       r.hostname || ""],
-    ["MAC",            r.mac || ""],
-    ["Event uuid",     r.event_uuid || ""],
-  ];
-  const body = fields
-    .filter(([_, v]) => v !== "" && v !== null && v !== undefined)
-    .map(([k, v]) => `<div class="fwl-drawer-row"><span class="k">${htmlEscape(k)}</span><span class="v">${htmlEscape(String(v))}</span></div>`)
-    .join("");
+  const sections = FWL_GROUPS.map(g => fwlRenderGroup(g, r)).join("");
   const explain = POLICY_EXPLAIN[r.policy_source || ""] || "";
   const explainBlock = explain
     ? `<div class="fwl-drawer-why"><strong>Why ${htmlEscape(r.policy_source || "")}?</strong><br>${htmlEscape(explain)}</div>`
     : "";
   const raw = r.raw_line || "";
   const rawBlock = raw
-    ? `<h4 class="ext-974ca506">Raw pflog line</h4><div class="fwl-drawer-raw">${htmlEscape(raw)}</div>`
+    ? `<details class="ext-7f51845c" style="margin-top:14px;">
+         <summary class="ext-5002f698" style="cursor:pointer; color:var(--muted); font-size:.78rem;"><i class="fa-solid fa-code"></i> Show raw pflog line</summary>
+         <div class="fwl-drawer-raw">${htmlEscape(raw)}</div>
+       </details>`
     : "";
-  document.getElementById("fwlDrawerBody").innerHTML = body + explainBlock + rawBlock;
-  const drawer = document.getElementById("fwlDrawer");
+  document.getElementById("fwlDrawerBody").innerHTML = sections + explainBlock + rawBlock;
+  const drawer   = document.getElementById("fwlDrawer");
+  const backdrop = document.getElementById("fwlDrawerBackdrop");
   drawer.classList.add("open");
   drawer.setAttribute("aria-hidden", "false");
+  backdrop.classList.add("open");
 }
 
 function closeDrawer() {
-  const drawer = document.getElementById("fwlDrawer");
+  const drawer   = document.getElementById("fwlDrawer");
+  const backdrop = document.getElementById("fwlDrawerBackdrop");
   drawer.classList.remove("open");
   drawer.setAttribute("aria-hidden", "true");
+  backdrop.classList.remove("open");
 }
 
 document.addEventListener("keydown", (e) => {
@@ -454,7 +536,9 @@ document.addEventListener("DOMContentLoaded", () => {
   R['h_c378eaa479'] = function (event, el) { changePage(-1) };
   R['h_7792b64127'] = function (event, el) { changePage(+1) };
   R['h_bd554ab9a4'] = function (event, el) { closeDrawer() };
-  R['fwlog-open'] = function (event, el) { openDrawer(el.dataset.idx); };
+  R['fwlog-open']   = function (event, el) { openDrawer(el.dataset.idx); };
+  R['fwlog-close']  = function (event, el) { closeDrawer(); };
+  R['fwl-copy']     = function (event, el) { event.stopPropagation(); fwlCopy(el); };
 })();
 </script>
 <!-- /inline-handlers:auto -->

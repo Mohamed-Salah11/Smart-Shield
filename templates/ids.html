@@ -131,6 +131,9 @@
         <button class="btn btn-sm btn-outline-secondary" id="btnDiagnostics" type="button">
           <i class="fa-solid fa-stethoscope"></i> Diagnostics
         </button>
+        <button class="btn btn-sm btn-outline-primary" id="btnUpdateRulesHeader" type="button">
+          <i class="fa-solid fa-cloud-arrow-down"></i> Update Rules
+        </button>
         <button class="btn btn-sm btn-primary" id="btnRefreshStatus"><i class="fa-solid fa-rotate"></i> Refresh</button>
         <button class="btn btn-sm {% if status.running %}btn-danger{% else %}btn-success{% endif %}" id="btnToggle"
                 data-enabled="{{ 1 if status.running else 0 }}">
@@ -218,7 +221,7 @@
     <i class="fa-solid fa-triangle-exclamation"></i>
     <span>Suricata is installed but no signatures are loaded — IDS has
     <strong>no detection coverage</strong>. Click <strong>Update Rules</strong>
-    on the Rulesets tab before relying on IDS/IPS alerts.</span>
+    in the page header before relying on IDS/IPS alerts.</span>
   </div>
   {% endif %}
 
@@ -979,25 +982,62 @@ document.getElementById('btnAddRuleset').addEventListener('click', async functio
   else alert('Error: ' + (res.message||''));
 });
 
-/* ── Update rules ── */
-document.getElementById('btnUpdateRules').addEventListener('click', async function() {
-  this.disabled = true;
-  this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching…';
+/* ── Update rules — shared by header + Rulesets-tab buttons ── */
+function _idsToast(msg, ok) {
+  // Transient alert near the page header; used when the in-tab #updateLog
+  // pane isn't visible (header button on the Status tab).
+  let host = document.getElementById('idsToastHost');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'idsToastHost';
+    host.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:1080;max-width:480px;';
+    document.body.appendChild(host);
+  }
+  const div = document.createElement('div');
+  div.className = 'alert alert-' + (ok ? 'success' : 'danger') + ' shadow';
+  div.style.whiteSpace = 'pre-wrap';
+  div.textContent = msg;
+  host.appendChild(div);
+  setTimeout(() => div.remove(), 8000);
+}
+
+async function runUpdateRules(btn) {
+  const origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching…';
+
   const log = document.getElementById('updateLog');
   const logContent = document.getElementById('updateLogContent');
-  log.classList.remove('d-none');
-  log.className = 'mt-3 alert alert-info';
-  logContent.textContent = 'Running suricata-update — this may take a minute on first run…\n';
-  const res = await apiFetch('{{ url_for("ids.ids_update_rules") }}', {method:'POST'})
-    .then(r=>r.json()).catch(e=>({ok:false,message:String(e)}));
-  log.className = 'mt-3 alert ' + (res.ok ? 'alert-success' : 'alert-danger');
-  logContent.textContent = res.message || (res.ok ? 'Rules updated.' : 'Update failed.');
-  if (res.rules_path) {
-    logContent.textContent += `\nRules path: ${res.rules_path}`;
+  const inTabVisible = log && !log.closest('.tab-pane')?.classList.contains('d-none');
+  if (log && logContent && inTabVisible) {
+    log.classList.remove('d-none');
+    log.className = 'mt-3 alert alert-info';
+    logContent.textContent = 'Running suricata-update — this may take a minute on first run…\n';
   }
-  this.disabled = false;
-  this.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Update Rules';
-});
+
+  const res = await apiFetch('{{ url_for("ids.ids_update_rules") }}', {method:'POST'})
+    .then(r => r.json()).catch(e => ({ok:false, message:String(e)}));
+
+  const baseMsg = res.message || (res.ok ? 'Rules updated.' : 'Update failed.');
+  const fullMsg = baseMsg + (res.rules_path ? `\nRules path: ${res.rules_path}` : '');
+
+  if (log && logContent && inTabVisible) {
+    log.className = 'mt-3 alert ' + (res.ok ? 'alert-success' : 'alert-danger');
+    logContent.textContent = fullMsg;
+  } else {
+    _idsToast(fullMsg, !!res.ok);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = origHTML;
+
+  // Refresh the Status / Signatures KPI tile without a page reload.
+  const refresh = document.getElementById('btnRefreshStatus');
+  if (refresh) refresh.click();
+}
+
+document.getElementById('btnUpdateRules')?.addEventListener('click', function(){ runUpdateRules(this); });
+document.getElementById('btnUpdateRulesHeader')?.addEventListener('click', function(){ runUpdateRules(this); });
 
 /* Init */
 if (document.getElementById('tab-status').classList.contains('d-block')) {

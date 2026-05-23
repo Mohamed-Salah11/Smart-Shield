@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 _log = logging.getLogger(__name__)
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 43
+CURRENT_SCHEMA_VERSION = 44
 
 
 class SchemaVersionError(RuntimeError):
@@ -1013,7 +1013,7 @@ def _migration_v30(conn):
     conn.execute("""
     CREATE TABLE IF NOT EXISTS mail_alerts_config (
         id                INTEGER PRIMARY KEY CHECK (id = 1),
-        enabled           INTEGER DEFAULT 0,
+        enabled           INTEGER DEFAULT 1,
         smtp_host         TEXT    DEFAULT 'smtp.gmail.com',
         smtp_port         INTEGER DEFAULT 587,
         smtp_security     TEXT    DEFAULT 'starttls',
@@ -1847,6 +1847,31 @@ def _migration_v43(conn):
     )
 
 
+def _migration_v44(conn):
+    """v44 — turn mail alerts on by default when the admin hasn't configured SMTP.
+
+    The Smart Shield ships with a built-in fallback Gmail account (see
+    ``_DEFAULT_SMTP_USERNAME`` / ``_DEFAULT_SMTP_APP_PASSWORD`` in
+    ``app/services/mail_alerts.py``) so a fresh install can email alerts
+    without any GUI setup. Existing installs created before that change
+    have ``mail_alerts_config.enabled = 0`` and blank credentials — flip
+    them to ``enabled = 1`` so the fallback actually takes effect.
+
+    Idempotent and conservative: only fires when the row is still in its
+    untouched factory state (no username, no app password). Any admin who
+    has already saved their own credentials, or deliberately disabled
+    mail with their own credentials in place, is left alone.
+    """
+    conn.execute(
+        "UPDATE mail_alerts_config "
+        "SET enabled = 1 "
+        "WHERE id = 1 "
+        "  AND COALESCE(enabled, 0) = 0 "
+        "  AND COALESCE(TRIM(smtp_username), '') = '' "
+        "  AND COALESCE(TRIM(smtp_app_password), '') = ''"
+    )
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -1892,6 +1917,7 @@ MIGRATIONS = [
     (41, _migration_v41),
     (42, _migration_v42),
     (43, _migration_v43),
+    (44, _migration_v44),
 ]
 
 

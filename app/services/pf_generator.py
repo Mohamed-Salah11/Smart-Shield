@@ -127,11 +127,25 @@ def _build_alias_tables(conn) -> str:
 # ---------------------------------------------------------------------------
 
 def _build_nat_rules(conn, wan_iface: str) -> str:
+    # The NAT UI stores `interface` as the symbolic "WAN"/"LAN". PF needs the
+    # real interface name (em0/em1/…) — mirrors the translation in
+    # _build_firewall_rules. Without this, pfctl rejects the ruleset.
+    lan_rows = _rows(conn, "SELECT assigned_port FROM lan_config LIMIT 1")
+    lan_iface = (lan_rows[0].get("assigned_port") or "em1") if lan_rows else "em1"
+
+    def _resolve_iface(raw) -> str:
+        v = (raw or "").strip()
+        if v.upper() == "WAN":
+            return wan_iface
+        if v.upper() == "LAN":
+            return lan_iface
+        return v or wan_iface
+
     lines = ["# ── NAT Rules ──"]
 
     # Outbound NAT
     for r in _rows(conn, "SELECT * FROM nat_outbound WHERE disabled=0 ORDER BY rule_order, id"):
-        iface   = (r.get("interface") or wan_iface).strip() or wan_iface
+        iface   = _resolve_iface(r.get("interface"))
         src     = _addr(r.get("src_address"))
         dst     = _addr(r.get("dst_address"))
         nat_addr = (r.get("nat_address") or "").strip()
@@ -144,7 +158,7 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
     # 1:1 NAT
     for r in _rows(conn, "SELECT * FROM nat_1to1 WHERE disabled=0 ORDER BY rule_order, id"):
-        iface    = (r.get("interface") or wan_iface).strip() or wan_iface
+        iface    = _resolve_iface(r.get("interface"))
         ext      = _addr(r.get("external_address"))
         internal = _addr(r.get("internal_address"))
         desc     = (r.get("description") or "").strip()
@@ -154,7 +168,7 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
     # Port forwards (rdr)
     for r in _rows(conn, "SELECT * FROM nat_pf WHERE disabled=0 ORDER BY rule_order, id"):
-        iface       = (r.get("interface") or wan_iface).strip() or wan_iface
+        iface       = _resolve_iface(r.get("interface"))
         proto       = (r.get("protocol") or "tcp").lower()
         src         = _addr(r.get("src_address"))
         redirect    = _addr(r.get("redirect_ip"))
@@ -204,7 +218,7 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
 
     # NPt — Network Prefix Translation (IPv6)
     for r in _rows(conn, "SELECT * FROM nat_npt WHERE disabled=0 ORDER BY rule_order, id"):
-        iface    = (r.get("interface") or wan_iface).strip() or wan_iface
+        iface    = _resolve_iface(r.get("interface"))
         src_not  = "!" if r.get("src_not") else ""
         src_pfx  = (r.get("src_prefix") or "").strip()
         dst_not  = "!" if r.get("dst_not") else ""
@@ -1019,12 +1033,15 @@ def generate_pf_conf(conn) -> str:
     if _afn.get("disable_firewall"):
         return macros + base_tables + "# Firewall disabled — pass all traffic\npass all\n"
 
-    # Default outbound masquerade only when no explicit outbound rules
-    out_count = _rows(conn, "SELECT COUNT(*) AS c FROM nat_outbound WHERE disabled=0")[0]["c"]
+    # Default LAN→WAN masquerade is always emitted. PF NAT uses last-match
+    # semantics and explicit outbound rules from nat_outbound are emitted by
+    # _build_nat_rules below this line, so they still override the default
+    # for any traffic they match. The default acts as the safety net so LAN
+    # clients never lose internet just because an admin added a NAT rule.
     default_nat = (
-        f"# Default masquerade — LAN to WAN\n"
-        f"nat on $WAN from $LAN_NET to any -> ($WAN)\n\n"
-    ) if out_count == 0 else ""
+        "# Default masquerade — LAN to WAN\n"
+        "nat on $WAN from $LAN_NET to any -> ($WAN)\n\n"
+    )
 
     import json as _json
     _cp_row = conn.execute(

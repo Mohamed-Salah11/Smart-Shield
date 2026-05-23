@@ -1373,12 +1373,15 @@ def toggle_ids(conn, enabled: bool) -> dict:
             _time.sleep(0.5)
 
         if not alive:
-            sysrc_set("suricata_enable", "NO")
-            from app.services.config_file_utils import rollback_config
-            rb = rollback_config(_SURICATA_CONF_PATH)
-            # DB must reflect reality — Suricata isn't running, so enabled=0.
+            # `service suricata restart` exited 0 and `suricata -T` validated
+            # the YAML, so the daemon's death is a runtime fault (empty rules,
+            # OOM, bad HOME_NET, interface gone). Keep the operator's intent
+            # intact — enabled=1 in DB, suricata_enable=YES in rc.conf,
+            # validated config on disk — so ids_watchdog.attempt_recovery()
+            # can actually retry on its 60s tick. Rolling those back here is
+            # what previously blinded the watchdog.
             try:
-                _write_enabled(conn, False)
+                _write_enabled(conn, True)
             except Exception:
                 pass
 
@@ -1405,17 +1408,18 @@ def toggle_ids(conn, enabled: bool) -> dict:
                 )
 
             err_msg = (
-                f"{headline} "
+                f"{headline} Watchdog will retry every 60s. "
                 f"Service output: {r.get('message', '').strip()}"
                 + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
             )
             _set_phase("ERROR", err_msg)
             return {
                 "ok": False,
-                "rolled_back": rb.get("ok", False),
+                "rolled_back": False,
                 "phase": "ERROR",
+                "enabled": True,
+                "watchdog_will_retry": True,
                 "message": err_msg,
-                "rollback_message": rb.get("message", ""),
                 "log_tail": log_snippet,
                 "oom_killed": bool(oom),
             }

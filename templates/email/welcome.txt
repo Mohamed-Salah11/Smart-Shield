@@ -1,0 +1,23 @@
+Welcome to Smart Shield
+=======================
+
+Smart Shield finished installing on your network. To finish setup, open
+the first-run wizard and paste the claim code below.
+
+  Setup claim code:
+  {{ claim_token }}
+
+  (One-time use. The code becomes invalid once the wizard is completed.)
+
+Open the Setup Wizard:
+  {{ setup_url }}
+
+Appliance LAN IP: {{ lan_ip }}
+
+If the wizard URL doesn't load, confirm you're on the same network as
+the appliance and that your browser trusts the self-signed certificate
+the installer generated.
+
+--
+Sent by Smart Shield from {{ support_email }}.
+This is an automated message — please don't reply.
