@@ -151,6 +151,95 @@ class TestMigrationV11:
 
 
 # ---------------------------------------------------------------------------
+# Upgrade path: init_db() on a pre-v34 DB must not crash on event_uuid indexes
+# ---------------------------------------------------------------------------
+
+class TestEventUuidIndexUpgrade:
+    """init_db() builds idx_events_event_uuid BEFORE run_migrations() runs. When
+    an `events` table already exists from a pre-v34 install it has no event_uuid
+    column yet, so that index creation must be guarded — otherwise the first
+    upgrade boot crashes with 'no such column: event_uuid' before migration v34
+    can ALTER the column in. Regression guard for that crash.
+
+    The DB is left at version 0 (no schema_version row) so init_db() runs the
+    full v1→v45 chain exactly as a fresh install does; the only seeded
+    difference is the old `events` table, which is what triggers the bug."""
+
+    # The events table exactly as migrations.py first created it (pre-v34).
+    _PRE_V34_EVENTS = """
+    CREATE TABLE events (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts          TEXT NOT NULL,
+        severity    TEXT DEFAULT 'info',
+        category    TEXT,
+        action      TEXT,
+        username    TEXT,
+        remote_addr TEXT,
+        details     TEXT
+    );
+    """
+
+    def _init_db_with_anchor(self, uri, seed_old_events):
+        """Open a persistent anchor on a private shared-cache memory DB (so it
+        survives init_db()'s internal close), optionally seed the pre-v34
+        `events` table, run init_db(), and return the anchor for asserting."""
+        import sqlite3
+        anchor = sqlite3.connect(uri, uri=True)
+        anchor.row_factory = sqlite3.Row
+        if seed_old_events:
+            anchor.executescript(self._PRE_V34_EVENTS)
+            anchor.commit()
+            assert "event_uuid" not in _col_names(anchor, "events")
+        from app.database import init_db
+        init_db()  # must NOT raise 'no such column: event_uuid'
+        return anchor
+
+    def _assert_uuid_indexed(self, anchor):
+        assert "event_uuid" in _col_names(anchor, "events"), \
+            "migration v34 must add event_uuid"
+        idx = {r[0] for r in anchor.execute(
+            "SELECT name FROM sqlite_master WHERE type='index'"
+        ).fetchall()}
+        assert "idx_events_event_uuid" in idx, "uuid index must exist"
+
+    def test_init_db_survives_pre_v34_events(self):
+        import secrets
+        _prev = os.environ.get("SMARTSHIELD_DB_PATH")
+        uri = f"file:upg_{secrets.token_hex(6)}?mode=memory&cache=shared"
+        os.environ["SMARTSHIELD_DB_PATH"] = uri
+        anchor = None
+        try:
+            anchor = self._init_db_with_anchor(uri, seed_old_events=True)
+            self._assert_uuid_indexed(anchor)
+        finally:
+            if anchor is not None:
+                anchor.close()
+            if _prev is None:
+                os.environ.pop("SMARTSHIELD_DB_PATH", None)
+            else:
+                os.environ["SMARTSHIELD_DB_PATH"] = _prev
+
+    def test_init_db_fresh_still_builds_uuid_index(self):
+        """The guard must not regress the fresh-install path: a brand-new DB
+        still gets idx_events_event_uuid directly from init_db()."""
+        import secrets
+        _prev = os.environ.get("SMARTSHIELD_DB_PATH")
+        uri = f"file:fresh_{secrets.token_hex(6)}?mode=memory&cache=shared"
+        os.environ["SMARTSHIELD_DB_PATH"] = uri
+        anchor = None
+        try:
+            anchor = self._init_db_with_anchor(uri, seed_old_events=False)
+            self._assert_uuid_indexed(anchor)
+        finally:
+            if anchor is not None:
+                anchor.close()
+            if _prev is None:
+                os.environ.pop("SMARTSHIELD_DB_PATH", None)
+            else:
+                os.environ["SMARTSHIELD_DB_PATH"] = _prev
+
+
+# ---------------------------------------------------------------------------
 # DNS filter: redirect action round-trip
 # ---------------------------------------------------------------------------
 

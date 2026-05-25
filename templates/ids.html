@@ -110,6 +110,12 @@
 .ruleset-url  { font-size: .75rem; color: var(--muted); font-family: ui-monospace, monospace; word-break: break-all; margin-top: 2px; }
 .ruleset-desc { font-size: .78rem; color: var(--secondary); margin-top: 1px; }
 
+/* Suricata daemon-log severity highlighting (per-line classes set by _classifyLine). */
+.log-error { color: #fca5a5; }
+.log-warn  { color: #fbbf24; }
+.log-info  { color: #93c5fd; }
+.log-default { color: inherit; }
+
 [data-theme="dark"] .ids-status-card { background: #060a12; border-color: rgba(255,255,255,.04); }
 [data-theme="dark"] .ids-kpi  { background: var(--panel); }
 [data-theme="dark"] .ruleset-row { background: #0d1117; border-color: var(--border-color); }
@@ -196,7 +202,7 @@
       <div class="ids-kpi-lbl">Alerts Today</div>
     </div>
     <div class="ids-kpi">
-      <div class="ids-kpi-val {{ 'is-running' if status.running else 'is-stopped' }}">
+      <div class="ids-kpi-val {{ 'is-running' if status.running else 'is-stopped' }}" id="kpiState">
         {{ 'Running' if status.running else 'Stopped' }}
       </div>
       <div class="ids-kpi-lbl">State</div>
@@ -210,20 +216,18 @@
       <div class="ids-kpi-lbl">Active Rulesets</div>
     </div>
     <div class="ids-kpi">
-      <div class="ids-kpi-val {{ 'is-stopped' if (status.signatures_loaded or 0) == 0 else '' }}">
+      <div class="ids-kpi-val {{ 'is-stopped' if (status.signatures_loaded or 0) == 0 else '' }}" id="kpiSignatures">
         {{ status.signatures_loaded or 0 }}
       </div>
       <div class="ids-kpi-lbl">Signatures</div>
     </div>
   </div>
-  {% if (status.signatures_loaded or 0) == 0 %}
-  <div class="alert alert-warning d-flex align-items-center gap-2 mt-2 mb-2">
+  <div class="alert alert-danger d-flex align-items-center gap-2 mt-2 mb-2" id="rulesDegradedBanner"
+       {% if (status.signatures_loaded or 0) != 0 and not status.rules_degraded %}style="display:none"{% endif %}>
     <i class="fa-solid fa-triangle-exclamation"></i>
-    <span>Suricata is installed but no signatures are loaded — IDS has
-    <strong>no detection coverage</strong>. Click <strong>Update Rules</strong>
-    in the page header before relying on IDS/IPS alerts.</span>
+    <span>IDS is running with <strong>zero loaded signatures</strong> — detection coverage is
+    inactive. Go to <strong>Rulesets</strong> and click <strong>Update Rules</strong>.</span>
   </div>
-  {% endif %}
 
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="idsTabs">
@@ -387,6 +391,15 @@
         <div><div class="ss-card-title">IDS / IPS Settings</div></div>
       </div>
       <div class="ss-card-body">
+        {% if cfg.mode == 'ips' and (not cfg.ips_peer_interface or cfg.ips_peer_interface == cfg.interface) %}
+        <div class="alert alert-danger d-flex align-items-center gap-2 mt-2 mb-3">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>
+            IPS mode is selected but the inline peer interface is missing or invalid.
+            Choose two different interfaces, or switch to IDS mode.
+          </span>
+        </div>
+        {% endif %}
         <form method="POST" action="{{ url_for('ids.ids_save') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -398,10 +411,13 @@
                   IDS — Detection only (passive, no blocking)
                 </option>
                 <option value="ips" {% if cfg.mode=='ips' %}selected{% endif %}>
-                  IPS — Inline prevention (blocks matching traffic)
+                  IPS — Inline prevention (requires two different inline interfaces)
                 </option>
               </select>
-              <small class="text-muted">IPS requires netmap support and inline interface configuration.</small>
+              <small class="text-muted">
+                IDS is passive and works on one interface. IPS is inline and requires netmap plus
+                two different bridged interfaces. Use IDS unless this appliance is physically inline.
+              </small>
             </div>
           </div>
 
@@ -409,7 +425,7 @@
             <label class="col-sm-3 col-form-label fw-semibold">Interface</label>
             <div class="col-sm-9">
               <select name="interface" class="form-select ext-4d14681b">
-                <option value="">— Auto (WAN) —</option>
+                <option value="">— Auto (LAN) —</option>
                 {% for nic in nics %}
                 <option value="{{ nic.name }}" {% if cfg.interface == nic.name %}selected{% endif %}>
                   {{ nic.name }}{% if nic.inet %} — {{ nic.inet }}{% endif %}
@@ -419,7 +435,28 @@
                 <option value="{{ cfg.interface or 'em0' }}" selected>{{ cfg.interface or 'em0' }}</option>
                 {% endif %}
               </select>
-              <small class="text-muted">Interface Suricata will listen on. Usually WAN (em0).</small>
+              <small class="text-muted">
+                Interface Suricata will listen on. Usually LAN for internal host attribution.
+                Use IPS only when the appliance has two physical inline interfaces.
+              </small>
+            </div>
+          </div>
+
+          <div class="mb-3 row align-items-center" id="ipsPeerRow">
+            <label class="col-sm-3 col-form-label fw-semibold">IPS Peer Interface</label>
+            <div class="col-sm-9">
+              <select name="ips_peer_interface" class="form-select ext-4d14681b">
+                <option value="">— Required for IPS mode —</option>
+                {% for nic in nics %}
+                <option value="{{ nic.name }}" {% if cfg.ips_peer_interface == nic.name %}selected{% endif %}>
+                  {{ nic.name }}{% if nic.inet %} — {{ nic.inet }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">
+                IPS mode bridges traffic between Interface and IPS Peer Interface.
+                The two interfaces must be different. Leave empty for IDS mode.
+              </small>
             </div>
           </div>
 
@@ -707,9 +744,39 @@ const apiFetch = (url, opts={}) => {
 
 /* ── Shared status updater (used by Refresh + auto-refresh) ── */
 function updateStatus(res) {
+  // Keep the status banner accent class in sync with running state (it was
+  // previously only set at render time, so an AJAX refresh left it stale).
+  const banner = document.getElementById('statusBanner');
+  if (banner) {
+    banner.classList.toggle('is-running', !!res.running);
+    banner.classList.toggle('is-stopped', !res.running);
+  }
+
   document.getElementById('statusDot').className = 'ids-status-dot' + (res.running ? ' running' : '');
-  document.getElementById('statusMsg').textContent = res.message + ' · Interface: {{ cfg.interface or "—" }}';
-  document.getElementById('kpiAlerts').textContent = res.alerts_today;
+  // textContent is XSS-safe; prefer the live interface from the status payload.
+  const iface = res.interface || '{{ cfg.interface or "—" }}';
+  document.getElementById('statusMsg').textContent = res.message + ' · Interface: ' + iface;
+  document.getElementById('kpiAlerts').textContent = res.alerts_today ?? 0;
+
+  // Sync the "State" KPI tile (Running/Stopped + colour).
+  const stateEl = document.getElementById('kpiState');
+  if (stateEl) {
+    stateEl.textContent = res.running ? 'Running' : 'Stopped';
+    stateEl.classList.toggle('is-running', !!res.running);
+    stateEl.classList.toggle('is-stopped', !res.running);
+  }
+
+  // Sync the Signatures KPI + the degraded banner so a 0-signature box can't
+  // look "covered" after an AJAX refresh.
+  const sigs = Number(res.signatures_loaded || 0);
+  const sigEl = document.getElementById('kpiSignatures');
+  if (sigEl) {
+    sigEl.textContent = sigs;
+    sigEl.classList.toggle('is-stopped', sigs === 0);
+  }
+  const degraded = document.getElementById('rulesDegradedBanner');
+  if (degraded) degraded.style.display = (sigs === 0 || res.rules_degraded) ? '' : 'none';
+
   const btn = document.getElementById('btnToggle');
   btn.dataset.enabled = res.running ? '1' : '0';
   if (res.running) {
@@ -787,7 +854,8 @@ async function loadDiagnostics() {
     ['Signatures loaded', _escapeHtml(d.signatures_loaded)],
     ['Rules file', _escapeHtml(d.rules_file) + ' (' + _escapeHtml(d.rules_size) + ' bytes)'],
     ['Config file', _escapeHtml(d.config_path) + ' ' + yn(d.config_exists)],
-    ['netmap.ko loaded', yn(d.netmap_loaded)],
+    ['netmap available', yn(d.netmap_loaded || (d.netmap && d.netmap.available))],
+    ['netmap signal', _escapeHtml((d.netmap && d.netmap.message) || '—')],
   ];
   tbody.innerHTML = rows.map(([k, v]) =>
     '<tr><td class="text-muted ext-diag-k">' + _escapeHtml(k) + '</td><td>' + v + '</td></tr>'
@@ -813,6 +881,20 @@ document.getElementById('btnToggle').addEventListener('click', async function() 
   const curEnabled = parseInt(this.dataset.enabled || '0');
   const newEnabled = curEnabled ? false : true;
   const btn = this;
+
+  // Before enabling, warn if Suricata has no signatures — it will run but with
+  // zero detection coverage. (Backend also blocks 0-rule enable unless degraded
+  // mode is opted into; this is extra clarity so the click isn't a surprise.)
+  if (newEnabled) {
+    const diag = await fetch('{{ url_for("ids.ids_diagnostics") }}').then(r => r.json()).catch(() => null);
+    if (diag && Number(diag.signatures_loaded || 0) === 0) {
+      const proceed = confirm(
+        'No Suricata signatures are loaded. IDS/IPS will have no detection coverage. Continue anyway?'
+      );
+      if (!proceed) return;
+    }
+  }
+
   btn.disabled = true;
   setPhasePill(newEnabled ? 'STARTING' : 'STOPPED');
   btn.innerHTML = newEnabled
@@ -847,9 +929,22 @@ document.getElementById('btnToggle').addEventListener('click', async function() 
   else setPhasePill(res.ok ? (newEnabled ? 'RUNNING' : 'STOPPED') : 'ERROR');
 
   if (!res.ok) {
+    const warnings = (res.warnings || []).length
+      ? '<div class="mt-1"><strong>Warnings:</strong><ul>' +
+        res.warnings.map(w => '<li>' + _escapeHtml(w) + '</li>').join('') +
+        '</ul></div>'
+      : '';
+    const logTail = (res.log_tail || []).length
+      ? '<details class="mt-2"><summary>Daemon log tail</summary><pre class="ext-diag-log">' +
+        _escapeHtml((res.log_tail || []).join('\n')) +
+        '</pre></details>'
+      : '';
+
     const errDiv = document.createElement('div');
     errDiv.className = 'alert alert-danger alert-dismissible mt-2';
-    errDiv.innerHTML = '<strong>IDS toggle failed:</strong> ' + _escapeHtml(res.message || 'Unknown error') +
+    errDiv.innerHTML =
+      '<strong>IDS toggle failed:</strong> ' + _escapeHtml(res.message || 'Unknown error') +
+      warnings + logTail +
       ' <button type="button" class="btn-close" data-action="h_f78e2a0dc3"></button>';
     document.querySelector('.ss-page-header').after(errDiv);
     btn.innerHTML = newEnabled
@@ -866,6 +961,24 @@ document.getElementById('btnToggle').addEventListener('click', async function() 
   // After Disable: reload immediately.
   // 4 s: server sleeps 1.5 s for pgrep verification + network roundtrip buffer
   setTimeout(() => location.reload(), newEnabled ? 4000 : 0);
+});
+
+/* ── Config form: client-side IPS validation (backend re-validates) ── */
+document.querySelector('form[action="{{ url_for("ids.ids_save") }}"]')?.addEventListener('submit', function(e) {
+  const mode  = this.querySelector('[name="mode"]')?.value || 'ids';
+  const iface = this.querySelector('[name="interface"]')?.value || '';
+  const peer  = this.querySelector('[name="ips_peer_interface"]')?.value || '';
+  if (mode === 'ips') {
+    if (!iface || !peer) {
+      e.preventDefault();
+      alert('IPS mode requires both Interface and IPS Peer Interface. Use IDS mode for single-interface monitoring.');
+      return;
+    }
+    if (iface === peer) {
+      e.preventDefault();
+      alert('IPS Interface and IPS Peer Interface must be different.');
+    }
+  }
 });
 
 /* ── Load alerts ── */
@@ -951,10 +1064,26 @@ async function loadAuthEvents() {
 document.querySelectorAll('.ruleset-toggle').forEach(cb => {
   cb.addEventListener('change', async function() {
     const id = this.dataset.id;
-    await apiFetch(`/ids/api/rulesets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({enabled: this.checked}),
-    });
+    const wanted = this.checked;
+    this.disabled = true;
+    // Revert the checkbox + tell the operator if the backend rejected the
+    // change, instead of silently lying about the ruleset state.
+    try {
+      const r = await apiFetch(`/ids/api/rulesets/${encodeURIComponent(id)}`, {
+        method: 'PUT',                       // route ids_ruleset_update is PUT-only
+        body: JSON.stringify({enabled: wanted}),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        this.checked = !wanted;
+        alert((d && d.message) || 'Failed to update ruleset.');
+      }
+    } catch (e) {
+      this.checked = !wanted;
+      alert('Failed to update ruleset: ' + e.message);
+    } finally {
+      this.disabled = false;
+    }
   });
 });
 
@@ -1050,10 +1179,10 @@ if (document.getElementById('tab-status').classList.contains('d-block')) {
 function _ansiEscape(s){return String(s==null?'':s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function _classifyLine(line){
-  if (/<Error>|\bERROR\b|\bFATAL\b/.test(line)) return 'color:#ff7a7a;';
-  if (/<Warning>|\bWARN\b/.test(line))          return 'color:#f1c14a;';
-  if (/<Notice>|<Info>|\bINFO\b/.test(line))    return 'color:#9ad4ff;';
-  return '';
+  if (/<Error>|\bERROR\b|\bFATAL\b/.test(line)) return 'log-error';
+  if (/<Warning>|\bWARN\b/.test(line))          return 'log-warn';
+  if (/<Notice>|<Info>|\bINFO\b/.test(line))    return 'log-info';
+  return 'log-default';
 }
 async function loadSuricataLog(){
   const body   = document.getElementById('idsLogBody');
@@ -1088,10 +1217,7 @@ async function loadSuricataLog(){
       + (svc ? ' &middot; service: ' + _ansiEscape(svc).split('\\n')[0] : '');
     body.innerHTML = lines.length
       ? lines.map(function(l){
-          const style = _classifyLine(l);
-          return style
-            ? '<span class="ext-476156c4">' + _ansiEscape(l) + '</span>'
-            : _ansiEscape(l);
+          return '<span class="' + _classifyLine(l) + '">' + _ansiEscape(l) + '</span>';
         }).join('\n')
       : '(log is empty)';
     body.scrollTop = body.scrollHeight;
@@ -1300,17 +1426,17 @@ if (btnClearFeeds) {
 /* Auto-generated by scripts/migrate_handlers.py — DO NOT EDIT BY HAND. */
 (function () {
   var R = window.SSActions || (window.SSActions = {});
-  R['h_9c6d5d0c2a'] = function (event, el) { showTab('status',this);return false; };
-  R['h_6c357e1795'] = function (event, el) { showTab('config',this);return false; };
-  R['h_5692699ca5'] = function (event, el) { showTab('rules',this);return false; };
-  R['h_86c05a16fc'] = function (event, el) { showTab('feeds',this);return false; };
+  R['h_9c6d5d0c2a'] = function (event, el) { showTab('status',el);return false; };
+  R['h_6c357e1795'] = function (event, el) { showTab('config',el);return false; };
+  R['h_5692699ca5'] = function (event, el) { showTab('rules',el);return false; };
+  R['h_86c05a16fc'] = function (event, el) { showTab('feeds',el);return false; };
   R['h_d395db77f7'] = function (event, el) { loadSuricataLog() };
   R['h_b1cd5af14b'] = function (event, el) { loadAlerts() };
   R['h_86fe8ca97b'] = function (event, el) { debounceAlerts() };
   R['h_84218f5783'] = function (event, el) { loadAlerts() };
   R['h_aaf6f9ec21'] = function (event, el) { loadAlerts() };
   R['h_25310002bb'] = function (event, el) { loadAuthEvents() };
-  R['h_f78e2a0dc3'] = function (event, el) { this.parentElement.remove() };
+  R['h_f78e2a0dc3'] = function (event, el) { el.parentElement.remove() };
 })();
 </script>
 <!-- /inline-handlers:auto -->

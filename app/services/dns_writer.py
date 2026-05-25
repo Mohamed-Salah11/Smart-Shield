@@ -449,6 +449,32 @@ def apply_unbound(conn) -> dict:
             "conf": conf,
             "rolled_back": rb["ok"],
         }
+
+    # A successful rc `start`/`reload` exit code does NOT prove the daemon
+    # actually bound :53 — a bad chroot/permissions setup, or the FreeBSD base
+    # `local_unbound` shadowing the pkg `unbound`, can let the rc script exit 0
+    # while Unbound dies on startup. If we trusted the exit code alone, a router
+    # would ship with working NAT but dead DNS: LAN clients can ping IPs yet
+    # can't browse, and reload_all_services / the setup wizard would wrongly
+    # report the box as "ready". Verify the resolver is truly up before
+    # returning success. Skipped under network dry-run (no live work was done,
+    # so there's nothing to bind).
+    from app.services.network_service import is_network_dry_run
+    if not is_network_dry_run():
+        status = get_unbound_status()
+        if not status.get("running"):
+            return {
+                "ok": False,
+                "message": (
+                    f"Unbound {result['message']}, but the daemon is not listening "
+                    f"on :53 ({status.get('message') or 'no status'}). Check "
+                    f"`unbound-checkconf {_UNBOUND_CONF_PATH}` and confirm the pkg "
+                    f"`unbound` service (not base `local_unbound`) owns port 53."
+                ),
+                "conf": conf,
+                "rolled_back": False,
+            }
+
     return {
         "ok": True,
         "message": result["message"],

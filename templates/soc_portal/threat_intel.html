@@ -119,13 +119,13 @@ async function loadFeeds() {
       return;
     }
     tbody.innerHTML = d.rulesets.map(rs => `<tr>
-      <td class="ext-1e29eefb">${rs.name}</td>
+      <td class="ext-1e29eefb">${SOC.esc(rs.name)}</td>
       <td>
         <span class="ext-5cb45d86">
           ${rs.enabled ? '● Active' : '○ Disabled'}
         </span>
       </td>
-      <td class="ext-f5cf6105">${rs.url||'—'}</td>
+      <td class="ext-f5cf6105">${SOC.esc(rs.url || '—')}</td>
     </tr>`).join('');
   } catch {
     document.getElementById('ruleset-tbody').innerHTML =

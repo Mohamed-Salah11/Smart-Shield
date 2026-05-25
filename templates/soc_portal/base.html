@@ -355,6 +355,11 @@
 
 <!-- ── Top bar ───────────────────────────────────────────────────────────── -->
 <nav class="soc-topbar">
+  <button class="soc-nav-link soc-nav-button d-lg-none" type="button"
+          data-bs-toggle="offcanvas" data-bs-target="#socMobileNav"
+          aria-controls="socMobileNav" title="Menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
   <a href="{{ url_for('soc_portal.dashboard') }}" class="soc-topbar-brand">
     <i class="fa-solid fa-shield-halved"></i>
     SOC Portal
@@ -398,6 +403,55 @@
     </form>
   </div>
 </nav>
+
+<!-- ── Mobile navigation (offcanvas) — reachable below lg where the sidebar
+     and (below md) the topbar nav are hidden. ───────────────────────────── -->
+<div class="offcanvas offcanvas-start text-bg-dark d-lg-none" tabindex="-1" id="socMobileNav"
+     aria-labelledby="socMobileNavLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="socMobileNavLabel"><i class="fa-solid fa-shield-halved me-2"></i>SOC Portal</h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="soc-sidebar-section">Monitor</div>
+    <a href="{{ url_for('soc_portal.dashboard') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.dashboard' %}active{% endif %}">
+      <i class="fa-solid fa-gauge-high"></i> SOC Overview</a>
+    <a href="{{ url_for('soc_portal.alerts') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.alerts' %}active{% endif %}">
+      <i class="fa-solid fa-bell"></i> Alert Queue</a>
+
+    <div class="soc-sidebar-section">Incidents</div>
+    <a href="{{ url_for('soc_portal.cases') }}"
+       class="soc-sidebar-link {% if 'case' in (request.endpoint or '') %}active{% endif %}">
+      <i class="fa-solid fa-folder-open"></i> Cases</a>
+    <a href="{{ url_for('soc_portal.saved_searches') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.saved_searches' %}active{% endif %}">
+      <i class="fa-solid fa-bookmark"></i> Saved Searches</a>
+    <a href="{{ url_for('soc_portal.recommendations') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.recommendations' %}active{% endif %}">
+      <i class="fa-solid fa-clipboard-check"></i> Response Recommendations</a>
+
+    {% if soc_tier in ('L2','L3') %}
+    <div class="soc-sidebar-section">Intelligence</div>
+    <a href="{{ url_for('soc_portal.threat_intel') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.threat_intel' %}active{% endif %}">
+      <i class="fa-solid fa-bug-slash"></i> Threat Intel</a>
+    {% endif %}
+
+    {% if soc_tier == 'L3' %}
+    <div class="soc-sidebar-section">Response</div>
+    <a href="{{ url_for('soc_portal.actions') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.actions' %}active{% endif %}">
+      <i class="fa-solid fa-bolt"></i> Quick Actions</a>
+    {% endif %}
+
+    <div class="soc-sidebar-section">Account</div>
+    <a href="{{ url_for('soc_portal.security') }}"
+       class="soc-sidebar-link {% if request.endpoint == 'soc_portal.security' %}active{% endif %}">
+      <i class="fa-solid fa-lock"></i> Security &amp; MFA</a>
+  </div>
+</div>
 
 <!-- ── Body ─────────────────────────────────────────────────────────────── -->
 <div class="soc-layout">
@@ -473,6 +527,18 @@
 
 /* ── SOC.* polish kit — toasts, live chip, row diff, shortcuts ─────────── */
 window.SOC = window.SOC || {};
+
+/* Shared HTML escaper — every dynamic field interpolated into innerHTML on a
+   SOC page MUST go through this (defends against stored XSS via event/case/
+   ruleset fields). Use as SOC.esc(value). */
+SOC.esc = function(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
 
 SOC.toast = function(msg, kind /* 'success'|'error'|'info' */) {
   let host = document.getElementById('soc-toast-host');

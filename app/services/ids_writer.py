@@ -469,9 +469,23 @@ def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
     # IDS mode uses pcap (portable, works on FreeBSD via BPF).
     # IPS mode uses netmap (FreeBSD-native inline capture).
     if mode == "ips":
+        # netmap inline IPS bridges two DIFFERENT interfaces: packets captured
+        # on `interface` are forwarded out `peer` and vice-versa. The previous
+        # config set copy-iface == interface, which is not a valid inline
+        # bridge. Require a distinct peer and emit both directions.
+        peer = _ips_peer_interface(cfg)
+        if not peer or peer == interface:
+            raise ValueError(
+                "IPS mode requires two different inline interfaces. "
+                "Set ips_peer_interface (≠ interface) or switch to IDS mode."
+            )
         capture_section = textwrap.dedent(f"""\
             netmap:
               - interface: {interface}
+                threads: auto
+                copy-mode: ips
+                copy-iface: {peer}
+              - interface: {peer}
                 threads: auto
                 copy-mode: ips
                 copy-iface: {interface}
@@ -761,19 +775,52 @@ def validate_suricata_yaml(text: str) -> tuple:
                 pass
 
 
-def _kldstat_netmap_loaded() -> bool:
-    """Return True when `kldstat -n netmap` reports the module is loaded.
+def _netmap_available() -> bool:
+    """Return True when netmap is usable/present on FreeBSD.
 
-    Wrapped in its own helper so callers (validate_ips_safety, get_diagnostics)
-    and tests can stub a single call site.
+    Do not rely only on ``kldstat -n netmap``. On some FreeBSD builds netmap can
+    be compiled into the kernel, visible only through module metadata
+    (``kldstat -m``), or exposed by ``/dev/netmap`` even when ``kldstat -n``
+    does not return 0. Trusting the single signal produced false "netmap
+    missing" failures that blocked IPS mode on otherwise-capable boxes.
     """
     if not sys.platform.startswith("freebsd"):
         return False
+
+    checks = (
+        ["kldstat", "-n", "netmap"],
+        ["kldstat", "-m", "netmap"],
+    )
+    for cmd in checks:
+        try:
+            r = run_command(cmd, check=False)
+            if r.returncode == 0:
+                return True
+        except Exception:
+            pass
+
     try:
-        r = run_command(["kldstat", "-n", "netmap"], check=False)
-        return r.returncode == 0
-    except FreeBSDNetworkError:
-        return False
+        if os.path.exists("/dev/netmap"):
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _kldstat_netmap_loaded() -> bool:
+    """Compatibility wrapper used by diagnostics and older call sites/tests."""
+    return _netmap_available()
+
+
+def _already_loaded_or_builtin(text: str) -> bool:
+    """True when kldload output means netmap is already usable (loaded/built-in)."""
+    low = (text or "").lower()
+    return (
+        "already loaded" in low
+        or "in kernel" in low
+        or "file exists" in low
+    )
 
 
 def _persist_netmap_load_yes() -> dict:
@@ -818,30 +865,29 @@ def _persist_netmap_load_yes() -> dict:
 
 
 def _ensure_netmap_loaded(conn) -> dict:
-    """Make sure netmap.ko is loaded, kldload'ing it on demand if not.
+    """Make sure netmap is available for IPS mode, kldload'ing on demand if not.
 
-    The install policy at bsd/install.sh deliberately leaves feature-dependent
-    kernel modules (netmap, dummynet, carp/pfsync) unloaded at install time
-    so a fresh box doesn't carry capabilities it isn't using. priv_helper's
-    "kldload" action + the sudoers grant for `/sbin/kldload netmap` exist
-    precisely so we can load it on demand from this code path.
+    Success means netmap is usable *now*, not necessarily that ``kldstat -n
+    netmap`` reported success — built-in kernel support and ``/dev/netmap`` also
+    count (see :func:`_netmap_available`). The install policy at bsd/install.sh
+    deliberately leaves feature-dependent kernel modules unloaded, and
+    priv_helper's "kldload" action + the sudoers grant for `/sbin/kldload
+    netmap` exist precisely so we can load it on demand here.
 
-    Returns:
-        {"ok": True/False, "warning": str or "", "message": str}
-
-    `ok=True` means netmap is loaded now (either it already was, or we just
-    loaded it). `warning` carries non-fatal info such as "live load worked
-    but persisting to loader.conf failed". `message` is the hard-error text
-    when `ok=False` (used verbatim in validate_ips_safety's errors list).
+    Returns ``{"ok": bool, "warning": str, "message": str}``. ``ok=True`` means
+    netmap is usable now; ``warning`` carries non-fatal info (e.g. live load
+    worked but persisting to loader.conf failed); ``message`` is the hard-error
+    text when ``ok=False`` (used verbatim in validate_ips_safety's errors list).
     """
     _set_phase("LOADING_KMOD")
-    if _kldstat_netmap_loaded():
-        # Already loaded — still try to persist so a reboot keeps it. Failure
+
+    if _netmap_available():
+        # Already usable — still try to persist so a reboot keeps it. Failure
         # is a warning, not an error.
         persist = _persist_netmap_load_yes()
         return {"ok": True,
                 "warning": persist.get("warning", ""),
-                "message": "netmap already loaded"}
+                "message": "netmap already available"}
 
     if not sys.platform.startswith("freebsd"):
         # No way to load on dev hosts — caller decides whether to hard-fail.
@@ -849,11 +895,19 @@ def _ensure_netmap_loaded(conn) -> dict:
                 "message": "netmap.ko cannot be auto-loaded on non-FreeBSD."}
 
     # Auto-load via priv_helper. sudoers grants `/sbin/kldload netmap`.
+    load_err = ""
     try:
         from app.services.priv_helper import run_privileged, PrivilegedActionError
         load_result = run_privileged("kldload", module="netmap")
         load_err = (load_result.stderr or load_result.stdout or "").strip()
     except (PrivilegedActionError, FreeBSDNetworkError) as exc:
+        load_err = str(exc)
+        # "already loaded / in kernel" is success, not failure.
+        if _already_loaded_or_builtin(load_err) or _netmap_available():
+            persist = _persist_netmap_load_yes()
+            return {"ok": True,
+                    "warning": persist.get("warning", ""),
+                    "message": "netmap already loaded or built into kernel"}
         return {
             "ok": False, "warning": "",
             "message": (
@@ -863,24 +917,214 @@ def _ensure_netmap_loaded(conn) -> dict:
             ),
         }
 
-    # Re-check — kldload exit code doesn't always reflect actual load state
-    # on some FreeBSD builds (e.g. when the module is already loaded by
-    # another process between the first kldstat and the kldload call).
-    if not _kldstat_netmap_loaded():
+    # Re-check — kldload exit code doesn't always reflect actual load state.
+    # Treat an "already loaded / built-in" message as success too.
+    if _already_loaded_or_builtin(load_err) or _netmap_available():
+        persist = _persist_netmap_load_yes()
+        return {"ok": True,
+                "warning": persist.get("warning", ""),
+                "message": "netmap available"}
+
+    return {
+        "ok": False, "warning": "",
+        "message": (
+            "Tried to auto-load netmap.ko but it is still not visible. "
+            f"kldload output: {load_err or 'empty'}. "
+            "Run 'kldload netmap' manually to diagnose."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Process-state + verified-restart helpers
+# ---------------------------------------------------------------------------
+# Many enable/recovery paths can return an error while leaving the DB and
+# rc.conf saying "enabled". These helpers let every path verify the daemon
+# actually stayed up and clear stale intent when it did not.
+
+def _suricata_alive() -> bool:
+    """Return True when the Suricata daemon process is currently alive."""
+    if not sys.platform.startswith("freebsd"):
+        return False
+    try:
+        r = run_command(["pgrep", "-x", "suricata"], check=False)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _wait_suricata_alive(seconds: float = 15.0, interval: float = 0.5,
+                         consecutive: int = 2) -> bool:
+    """Wait until Suricata is seen alive on *consecutive* checks.
+
+    FreeBSD's rc script exits 0 even when the daemon dies right after fork().
+    Requiring consecutive sightings avoids declaring success during that
+    fork-then-crash window.
+    """
+    import time as _time
+    deadline = _time.time() + float(seconds)
+    seen = 0
+    while _time.time() < deadline:
+        if _suricata_alive():
+            seen += 1
+            if seen >= consecutive:
+                return True
+        else:
+            seen = 0
+        _time.sleep(interval)
+    return False
+
+
+def _mark_disabled_if_not_running(conn) -> None:
+    """Clear stale enabled state when Suricata is not actually running.
+
+    Prevents the "DB says enabled but daemon is dead" divergence that several
+    failed enable paths used to leave behind.
+    """
+    if _suricata_alive():
+        return
+    try:
+        if sys.platform.startswith("freebsd"):
+            sysrc_set("suricata_enable", "NO")
+    except Exception:
+        pass
+    try:
+        _write_enabled(conn, False)
+    except Exception:
+        pass
+
+
+def _restart_and_verify_suricata(conn, action: str = "restart") -> dict:
+    """Run a service action, then verify Suricata stayed alive.
+
+    Returns a structured result with daemon log + OOM information when the
+    daemon does not stay up, so callers can surface an actionable message
+    instead of a bare "restart failed".
+    """
+    r = service_action(_SERVICE_NAME, action)
+    if not r.get("ok"):
+        _mark_disabled_if_not_running(conn)
         return {
-            "ok": False, "warning": "",
-            "message": (
-                "Tried to auto-load netmap.ko but kldstat still reports it as "
-                f"missing. kldload output: {load_err or 'empty'}. "
-                "Run 'kldload netmap' manually to diagnose."
-            ),
+            "ok": False,
+            "phase": "ERROR",
+            "message": r.get("message", f"service {action} failed"),
+            "service_message": r.get("message", ""),
         }
 
-    # Loaded successfully — persist to loader.conf for next boot.
-    persist = _persist_netmap_load_yes()
-    return {"ok": True,
-            "warning": persist.get("warning", ""),
-            "message": "netmap.ko loaded on demand"}
+    if _wait_suricata_alive(seconds=15.0, interval=0.5, consecutive=2):
+        return {
+            "ok": True,
+            "phase": "RUNNING",
+            "message": r.get("message", "Suricata is running"),
+            "service_message": r.get("message", ""),
+        }
+
+    _mark_disabled_if_not_running(conn)
+
+    tail = tail_suricata_log(lines=12)
+    log_lines = tail.get("lines", []) if tail.get("ok") else []
+    log_snippet = "\n".join(log_lines)
+
+    oom = _scan_dmesg_for_oom()
+    if oom:
+        headline = (
+            "Suricata was killed by the kernel — out of memory. "
+            "Reduce enabled rulesets or lower memcaps. "
+            f"dmesg: {oom}"
+        )
+        reason = "oom_killed"
+    else:
+        headline = (
+            "Suricata service command returned, but the daemon did not stay "
+            "running. Open the Daemon log panel for the full reason."
+        )
+        reason = "did_not_start"
+
+    return {
+        "ok": False,
+        "phase": "ERROR",
+        "reason": reason,
+        "message": (
+            f"{headline} Service output: {(r.get('message') or '').strip()}"
+            + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
+        ),
+        "service_message": r.get("message", ""),
+        "log_tail": log_lines,
+        "oom_killed": bool(oom),
+        "dmesg": oom,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Rule readiness policy
+# ---------------------------------------------------------------------------
+# Suricata can start with zero signatures (useful as a degraded first-boot
+# state) but that is no detection coverage — it must not be called "ready".
+
+_MIN_SIGNATURES_FOR_READY = 1
+
+
+def _rules_ready(conn) -> "tuple[bool, str]":
+    """Return ``(ok, error)`` for whether enabled IDS/IPS has detection coverage.
+
+    Blocks enable when the merged rules file is empty unless the operator has
+    explicitly opted into degraded mode via ``ids_config.allow_degraded_rules``.
+    """
+    cfg = _cfg(conn)
+    allow_degraded = bool(cfg.get("allow_degraded_rules", 0))
+    sigs = _count_signatures()
+    if sigs < _MIN_SIGNATURES_FOR_READY and not allow_degraded:
+        return (
+            False,
+            "No Suricata signatures are loaded. Run 'Update Rules' before "
+            "enabling IDS/IPS (or set allow_degraded_rules to start anyway).",
+        )
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
+# IPS inline peer interface
+# ---------------------------------------------------------------------------
+
+def _ips_peer_interface(cfg: dict) -> str:
+    """Return the configured IPS peer/copy interface (kernel name), if any."""
+    return _clean_iface(
+        (cfg.get("ips_peer_interface") or cfg.get("copy_iface") or "").strip()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Netmap diagnostics — surface which signal proved availability
+# ---------------------------------------------------------------------------
+
+def _netmap_diagnostics() -> dict:
+    """Return netmap availability + the signals that proved it, for the GUI panel."""
+    if not sys.platform.startswith("freebsd"):
+        return {"available": False, "signals": [], "message": "non-FreeBSD"}
+
+    signals = []
+    for label, cmd in (
+        ("kldstat -n netmap", ["kldstat", "-n", "netmap"]),
+        ("kldstat -m netmap", ["kldstat", "-m", "netmap"]),
+    ):
+        try:
+            r = run_command(cmd, check=False)
+            if r.returncode == 0:
+                signals.append(label)
+        except Exception:
+            pass
+
+    try:
+        if os.path.exists("/dev/netmap"):
+            signals.append("/dev/netmap")
+    except Exception:
+        pass
+
+    return {
+        "available": bool(signals),
+        "signals": signals,
+        "message": ", ".join(signals) if signals else "netmap not detected",
+    }
 
 
 def validate_ips_safety(conn) -> dict:
@@ -914,9 +1158,26 @@ def validate_ips_safety(conn) -> dict:
         errors.append("IPS mode requires an interface to be selected.")
         return {"ok": False, "errors": errors, "warnings": warnings}
 
+    # IPS bridges traffic between the capture interface and a second inline
+    # peer. A single interface (or a peer equal to the capture interface) is
+    # not a valid netmap inline bridge, so both are hard errors here.
+    peer = _ips_peer_interface(cfg)
+    if not peer:
+        errors.append(
+            "IPS mode requires a second inline peer interface. "
+            "Use IDS mode unless this appliance is physically inline."
+        )
+        return {"ok": False, "errors": errors, "warnings": warnings}
+    if peer == _clean_iface(interface):
+        errors.append(
+            "IPS peer interface cannot be the same as the capture interface. "
+            "Choose two different inline interfaces or switch to IDS mode."
+        )
+        return {"ok": False, "errors": errors, "warnings": warnings}
+
     if not sys.platform.startswith("freebsd"):
         warnings.append(
-            "IPS mode uses netmap(4) inline capture. Verify your NIC supports netmap "
+            "IPS mode uses netmap(4) inline capture. Verify your NICs support netmap "
             "before enabling IPS (check: kldload netmap). IPS mode will drop traffic on "
             "misconfiguration."
         )
@@ -931,16 +1192,20 @@ def validate_ips_safety(conn) -> dict:
         warnings.append(netmap["warning"])
 
     # Check 2: NIC driver compatibility — warning (list is non-exhaustive).
+    # Both inline interfaces carry traffic, so check the capture interface AND
+    # the peer; an unknown driver on either side can silently drop packets.
     _NETMAP_SUPPORTED_PREFIXES = (
         "em", "igb", "ixgbe", "ixl", "re", "vtnet", "vmx", "bnxt", "ix",
     )
     import re as _re
-    driver = _re.match(r"^([a-z]+)", interface)
-    if driver:
+    for iface in (interface, peer):
+        driver = _re.match(r"^([a-z]+)", _clean_iface(iface))
+        if not driver:
+            continue
         drv = driver.group(1)
         if not any(drv.startswith(p) for p in _NETMAP_SUPPORTED_PREFIXES):
             warnings.append(
-                f"NIC driver '{drv}' may not support netmap(4). "
+                f"NIC driver '{drv}' (interface {iface}) may not support netmap(4). "
                 f"Known-good drivers: {', '.join(_NETMAP_SUPPORTED_PREFIXES)}. "
                 "Test carefully — IPS mode will silently drop traffic if netmap fails."
             )
@@ -949,7 +1214,13 @@ def validate_ips_safety(conn) -> dict:
 
 
 def write_suricata_config(conn) -> dict:
-    conf = generate_suricata_yaml(conn)
+    # generate_suricata_yaml raises ValueError for an invalid IPS config
+    # (missing/duplicate peer interface). Surface it as a structured failure
+    # so direct callers (e.g. ids_save when IDS is enabled) don't 500.
+    try:
+        conf = generate_suricata_yaml(conn)
+    except ValueError as exc:
+        return {"ok": False, "message": str(exc), "conf": ""}
 
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "Non-FreeBSD — suricata.yaml generated but not written.", "conf": conf}
@@ -1011,22 +1282,44 @@ def update_rules(conn) -> dict:
     # The default 20s ceiling can trip on slow links; bump to 180s for the index fetch.
     run_command([su_bin, "update-sources"], check=False, timeout_seconds=180)
 
-    # Enable/register each managed ruleset source. Capture per-source failures
-    # so the UI can show exactly which feed could not be added/enabled instead
-    # of silently merging fewer rulesets than the operator configured.
+    # Reconcile every managed ruleset source with its DB enabled flag. We must
+    # iterate ALL rulesets (not just enabled ones): a source turned OFF in the
+    # UI has to be `disable-source`d in suricata-update, otherwise it stays in
+    # the merged rules file and the UI lies about coverage. Capture per-source
+    # failures so the UI can show exactly which feed could not be reconciled.
     source_warnings: list = []
-    rulesets = _rows(conn, "SELECT * FROM ids_rulesets WHERE enabled=1")
-    for rs in rulesets:
-        url  = (rs.get("url") or "").strip()
-        name = (rs.get("name") or "").strip()
-        lp   = (rs.get("local_path") or "").strip()
-        if not name or lp:
-            continue  # skip local-path-only rulesets and unnamed entries
-        cmd = [su_bin, "add-source", name, url] if url else [su_bin, "enable-source", name]
-        rc = run_command(cmd, check=False)
-        if rc.returncode != 0:
-            detail = (rc.stderr or rc.stdout or "").strip().replace("\n", " ")
-            source_warnings.append(f"{name}: {detail[:200]}" if detail else name)
+    all_rulesets = _rows(conn, "SELECT * FROM ids_rulesets ORDER BY id")
+    for rs in all_rulesets:
+        url     = (rs.get("url") or "").strip()
+        name    = (rs.get("name") or "").strip()
+        lp      = (rs.get("local_path") or "").strip()
+        enabled = bool(rs.get("enabled"))
+        # Local files are referenced directly via rule-files in the YAML, not
+        # managed by suricata-update — skip them and unnamed rows.
+        if lp or not name:
+            continue
+        if enabled:
+            if url:
+                add = run_command([su_bin, "add-source", name, url], check=False)
+                # A source that already exists is not a failure.
+                out = (add.stderr or add.stdout or "").lower()
+                if add.returncode != 0 and "already exists" not in out:
+                    detail = (add.stderr or add.stdout or "").strip().replace("\n", " ")
+                    source_warnings.append(
+                        f"add {name}: {detail[:200]}" if detail else f"add {name}")
+            en = run_command([su_bin, "enable-source", name], check=False)
+            if en.returncode != 0:
+                detail = (en.stderr or en.stdout or "").strip().replace("\n", " ")
+                source_warnings.append(
+                    f"enable {name}: {detail[:200]}" if detail else f"enable {name}")
+        else:
+            # Disable a source the operator turned off. An unknown/not-installed
+            # source is not fatal, but surface a non-empty error for diagnostics.
+            dis = run_command([su_bin, "disable-source", name], check=False)
+            if dis.returncode != 0:
+                detail = (dis.stderr or dis.stdout or "").strip().replace("\n", " ")
+                if detail:
+                    source_warnings.append(f"disable {name}: {detail[:200]}")
 
     # Run the actual download + merge. Pin --output so the merged file lands at
     # the path the generated YAML reads (the tool's default has drifted across
@@ -1110,6 +1403,15 @@ def get_ids_status(conn=None) -> dict:
 
     signatures_loaded = _count_signatures()
 
+    # Rules-coverage facts for the UI degraded banner. A running Suricata with
+    # a missing/empty merged rules file has zero detection coverage and must be
+    # surfaced loudly (see the rulesDegradedBanner in templates/ids.html).
+    try:
+        rules_size = os.path.getsize(_SURICATA_UPDATE_RULES) if os.path.exists(_SURICATA_UPDATE_RULES) else 0
+    except OSError:
+        rules_size = 0
+    rules_degraded = (rules_size == 0) or (signatures_loaded == 0)
+
     if not signatures_loaded:
         message = "Running, NO signatures loaded" if running else "Stopped, NO signatures loaded"
     else:
@@ -1123,6 +1425,9 @@ def get_ids_status(conn=None) -> dict:
         "alerts_today": alerts_today,
         "cfg_enabled": cfg_enabled,
         "signatures_loaded": signatures_loaded,
+        "rules_path": _SURICATA_UPDATE_RULES,
+        "rules_size": rules_size,
+        "rules_degraded": rules_degraded,
     }
 
 
@@ -1213,7 +1518,8 @@ def get_diagnostics(conn=None) -> dict:
         "rules_size": rules_size,
         "config_path": config_path,
         "config_exists": config_exists,
-        "netmap_loaded": _kldstat_netmap_loaded(),
+        "netmap_loaded": _netmap_available(),
+        "netmap": _netmap_diagnostics(),
         "log_tail": log_tail,
     }
 
@@ -1232,21 +1538,164 @@ def _write_enabled(conn, enabled: bool) -> None:
     conn.commit()
 
 
+def _enable_pipeline(conn, *, actor: str = "system") -> dict:
+    """Shared, safety-ordered enable sequence for Suricata (FreeBSD live path).
+
+    Order: rules bootstrap → rules-ready gate → operator local-rule-file check →
+    YAML generate (handles invalid IPS config) → deep validate → write →
+    rc.conf enable → restart-and-verify. Sets the in-memory phase throughout and
+    clears stale enabled state (``_mark_disabled_if_not_running``) on every
+    failure before the daemon is confirmed alive — so a failed enable can never
+    leave ``enabled=1`` / ``suricata_enable=YES`` while Suricata is dead.
+
+    Does NOT run the IPS safety gate — callers (``toggle_ids``,
+    ``recover_ids_service``) run ``validate_ips_safety`` first so the gate runs
+    exactly once per entry point. Returns a rich structured dict.
+    """
+    # 1. Bootstrap rules before the deep check (a missing file fails -T).
+    _set_phase("UPDATING_RULES")
+    rules_state = ensure_rules_present(conn)
+    if not rules_state.get("ok"):
+        _mark_disabled_if_not_running(conn)
+        msg = rules_state.get("message", "rule bootstrap failed")
+        _set_phase("ERROR", msg)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "rules_bootstrap_failed", "message": msg}
+
+    # 2. Readiness gate — refuse a 0-signature start unless opted-in.
+    ready, rules_err = _rules_ready(conn)
+    if not ready:
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", rules_err)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "rules_not_ready", "message": rules_err}
+
+    # 3. Operator-set local_path rulesets must exist.
+    missing = []
+    for rs in _rows(conn, "SELECT local_path FROM ids_rulesets WHERE enabled=1"):
+        lp = (rs.get("local_path") or "").strip()
+        if lp and not os.path.exists(lp):
+            missing.append(lp)
+    if missing:
+        err_msg = f"Rule file(s) not found: {', '.join(missing)}. Check local_path settings."
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", err_msg)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "missing_local_rules", "message": err_msg}
+
+    # 4. Generate (invalid IPS config raises) + deep validate.
+    _set_phase("VALIDATING_CONFIG")
+    try:
+        conf_text = generate_suricata_yaml(conn)
+    except ValueError as exc:
+        err_msg = f"Suricata YAML generation failed: {exc}"
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", err_msg)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "invalid_config", "message": err_msg}
+
+    ok, err = validate_suricata_yaml(conf_text)
+    if not ok:
+        err_msg = f"Suricata YAML validation failed: {err}"
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", err_msg)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "invalid_yaml", "message": err_msg}
+
+    # 5. Write the validated config.
+    write_result = write_suricata_config(conn)
+    if not write_result.get("ok"):
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", write_result.get("message", "config write failed"))
+        return {**write_result, "rolled_back": False, "phase": "ERROR",
+                "reason": "config_write_failed"}
+
+    # 6. Persist rc.conf enable.
+    sysrc_result = sysrc_set("suricata_enable", "YES")
+    if not sysrc_result["ok"]:
+        err_msg = f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"
+        _mark_disabled_if_not_running(conn)
+        _set_phase("ERROR", err_msg)
+        return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                "reason": "sysrc_failed", "message": err_msg}
+
+    # 7. Restart and verify the daemon stayed up (clears stale state on failure).
+    _set_phase("STARTING")
+    started = _restart_and_verify_suricata(conn, action="restart")
+    if not started.get("ok"):
+        _set_phase("ERROR", started.get("message", "restart failed"))
+        return {**started, "rolled_back": False}
+
+    # 8. Confirmed running — persist enabled=1 and surface the startup banner.
+    _write_enabled(conn, True)
+    _set_phase("RUNNING")
+    startup_tail = tail_suricata_log(lines=12)
+    degraded = bool(rules_state.get("degraded"))
+    base_msg = started.get("message", "")
+    if degraded:
+        base_msg = (
+            (base_msg + " — " if base_msg else "")
+            + "WARNING: Suricata started with 0 rules. Run 'Update Rules' so the "
+              "IDS can actually detect threats."
+        )
+    return {**started, "rolled_back": False, "phase": "RUNNING",
+            "message": base_msg, "degraded": degraded,
+            "rules_size": rules_state.get("rules_size", 0),
+            "source_warnings": rules_state.get("source_warnings", []),
+            "startup_log": startup_tail.get("lines", []) if startup_tail.get("ok") else []}
+
+
+def _try_ids_fallback(conn) -> "dict | None":
+    """IPS→IDS safe fallback used by the interactive toggle.
+
+    Regenerates the config forced to IDS (pcap) mode, validates, writes, and
+    verifies a restart. Returns a success dict (``fallback: True``) when IDS
+    mode comes up, else ``None`` so the caller surfaces the original IPS error.
+    """
+    try:
+        ids_conf = generate_suricata_yaml(conn, force_ids_mode=True)
+    except ValueError:
+        return None
+    ok_ids, _ = validate_suricata_yaml(ids_conf)
+    if not ok_ids:
+        return None
+    try:
+        from app.services.config_file_utils import atomic_write
+        atomic_write(_SURICATA_CONF_PATH, ids_conf, mode=0o644)
+    except Exception:
+        return None
+    sysrc_set("suricata_enable", "YES")
+    started = _restart_and_verify_suricata(conn, action="restart")
+    if not started.get("ok"):
+        return None
+    _write_enabled(conn, True)
+    _set_phase("RUNNING")
+    return {
+        **started,
+        "rolled_back": False,
+        "phase": "RUNNING",
+        "fallback": True,
+        "message": started.get("message", "")
+        + " — fell back to IDS (pcap) mode after IPS start failure",
+    }
+
+
 def toggle_ids(conn, enabled: bool) -> dict:
     """
     Enable or disable Suricata.
-    DB is updated AFTER the service action succeeds so enabled state in the DB
-    always matches whether Suricata is actually running.
+    DB is updated AFTER the daemon is confirmed running so enabled state in the
+    DB always matches whether Suricata is actually up.
     """
     cfg = _cfg(conn)
     mode = (cfg.get("mode") or "ids").lower()
 
     # IPS mode safety gate — hard-block on any structured error (missing
-    # interface or unloaded netmap); pass warnings through for the UI.
+    # interface / peer or unloaded netmap); pass warnings through for the UI.
     if enabled and mode == "ips":
         safety = validate_ips_safety(conn)
         if not safety["ok"]:
             err_msg = " | ".join(safety["errors"])
+            _mark_disabled_if_not_running(conn)
             _set_phase("ERROR", err_msg)
             return {"ok": False, "rolled_back": False,
                     "phase": "ERROR",
@@ -1262,234 +1711,67 @@ def toggle_ids(conn, enabled: bool) -> dict:
                 "message": f"IDS {'enabled' if enabled else 'disabled'} (non-FreeBSD, not applied)"}
 
     if enabled:
-        ips_mode = (mode == "ips")
+        result = _enable_pipeline(conn, actor="ui")
+        # IPS→IDS safe fallback: keep detection coverage if an IPS enable fails.
+        if not result.get("ok") and mode == "ips":
+            fb = _try_ids_fallback(conn)
+            if fb:
+                return fb
+        return result
 
-        # --- Bootstrap rules BEFORE the deep check -------------------------
-        # The deep check (`suricata -T`) and the daemon both need a rules file
-        # present; fetch first so a missing file cannot fail validation and
-        # strand the auto-fetch behind it. Keep the result so we can surface a
-        # zero-rule "degraded" start to the operator instead of claiming a
-        # clean success.
-        _set_phase("UPDATING_RULES")
-        rules_state = ensure_rules_present(conn)
+    # Disabling: stop the service, then update DB (stop failures are non-fatal)
+    sysrc_set("suricata_enable", "NO")
+    r = service_action(_SERVICE_NAME, "stop")
+    _write_enabled(conn, False)
+    _set_phase("STOPPED")
+    return {**r, "rolled_back": False, "phase": "STOPPED"}
 
-        # Explicit local_path rulesets must exist — these are operator-set.
-        missing = []
-        for rs in _rows(conn, "SELECT local_path FROM ids_rulesets WHERE enabled=1"):
-            lp = (rs.get("local_path") or "").strip()
-            if lp and not os.path.exists(lp):
-                missing.append(lp)
-        if missing:
-            err_msg = f"Rule file(s) not found: {', '.join(missing)}. Check local_path settings."
+
+def recover_ids_service(conn, actor: str = "system") -> dict:
+    """One safe path to (re)start Suricata, shared by the UI apply and watchdog.
+
+    Runs the IPS safety gate (when in IPS mode) and then the full safety-ordered
+    enable pipeline (rule bootstrap, readiness, generate/validate/write, rc.conf
+    enable, verified restart), clearing stale enabled state on failure. Returns
+    the pipeline's structured result (``ok``, ``reason``, ``message``,
+    ``log_tail``, ``oom_killed``, …). A no-op success on non-FreeBSD.
+    """
+    if not sys.platform.startswith("freebsd"):
+        return {"ok": True, "phase": "RUNNING", "skipped": True,
+                "message": f"non-FreeBSD — recovery skipped ({actor})"}
+
+    cfg = _cfg(conn)
+    mode = (cfg.get("mode") or "ids").lower()
+    if mode == "ips":
+        safety = validate_ips_safety(conn)
+        if not safety["ok"]:
+            err_msg = " | ".join(safety["errors"]) or "IPS safety check failed"
+            _mark_disabled_if_not_running(conn)
             _set_phase("ERROR", err_msg)
-            return {
-                "ok": False,
-                "rolled_back": False,
-                "phase": "ERROR",
-                "message": err_msg,
-            }
+            return {"ok": False, "rolled_back": False, "phase": "ERROR",
+                    "reason": "ips_safety_failed", "message": err_msg,
+                    "warnings": safety.get("warnings", [])}
 
-        # --- Deep check, then write config --------------------------------
-        _set_phase("VALIDATING_CONFIG")
-        conf_text = generate_suricata_yaml(conn)
-        ok, err   = validate_suricata_yaml(conf_text)
-        if not ok:
-            err_msg = f"Suricata YAML validation failed: {err}"
-            _set_phase("ERROR", err_msg)
-            return {"ok": False, "rolled_back": False,
-                    "phase": "ERROR",
-                    "message": err_msg}
-        write_result = write_suricata_config(conn)
-        if not write_result["ok"]:
-            _set_phase("ERROR", write_result.get("message", "config write failed"))
-            return {**write_result, "rolled_back": False, "phase": "ERROR"}
-
-        # Persist rc.conf FIRST — fail fast if sysrc is unavailable
-        sysrc_result = sysrc_set("suricata_enable", "YES")
-        if not sysrc_result["ok"]:
-            err_msg = f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"
-            _set_phase("ERROR", err_msg)
-            return {"ok": False, "rolled_back": False,
-                    "phase": "ERROR",
-                    "message": err_msg}
-
-        _set_phase("STARTING")
-        r = service_action(_SERVICE_NAME, "restart")
-        if not r["ok"]:
-            # Service failed — revert rc.conf and config file; leave DB as disabled
-            sysrc_set("suricata_enable", "NO")
-            from app.services.config_file_utils import rollback_config
-            rb = rollback_config(_SURICATA_CONF_PATH)
-
-            # IPS→IDS safe fallback
-            if ips_mode:
-                ids_conf = generate_suricata_yaml(conn, force_ids_mode=True)
-                ok_ids, _ = validate_suricata_yaml(ids_conf)
-                if ok_ids:
-                    try:
-                        from app.services.config_file_utils import atomic_write
-                        atomic_write(_SURICATA_CONF_PATH, ids_conf, mode=0o644)
-                        sysrc_set("suricata_enable", "YES")
-                        r2 = service_action(_SERVICE_NAME, "restart")
-                        if r2["ok"]:
-                            _write_enabled(conn, True)
-                            _set_phase("RUNNING")
-                            return {
-                                **r2,
-                                "rolled_back": False,
-                                "phase": "RUNNING",
-                                "fallback": True,
-                                "message": r2["message"] + " — fell back to IDS (pcap) mode after IPS start failure",
-                            }
-                    except Exception:
-                        pass
-                sysrc_set("suricata_enable", "NO")
-
-            err_msg = r.get("message", "restart failed")
-            _set_phase("ERROR", err_msg)
-            return {"ok": False, "rolled_back": rb.get("ok", False),
-                    "phase": "ERROR",
-                    "message": err_msg,
-                    "rollback_message": rb.get("message", "")}
-
-        # service command exited 0, but FreeBSD's init script exits 0 even when
-        # the daemon crashes immediately on startup. Poll pgrep for up to 15s,
-        # accepting a result only after the process has been seen alive on
-        # two consecutive checks (otherwise we'd claim success during the
-        # tiny window between fork() and the child's exit on bad config).
-        import time as _time
-        deadline       = _time.time() + 15.0
-        consecutive_ok = 0
-        alive          = False
-        while _time.time() < deadline:
-            pgrep = run_command(["pgrep", "-x", "suricata"], check=False)
-            if pgrep.returncode == 0:
-                consecutive_ok += 1
-                if consecutive_ok >= 2:
-                    alive = True
-                    break
-            else:
-                consecutive_ok = 0
-            _time.sleep(0.5)
-
-        if not alive:
-            # `service suricata restart` exited 0 and `suricata -T` validated
-            # the YAML, so the daemon's death is a runtime fault (empty rules,
-            # OOM, bad HOME_NET, interface gone). Keep the operator's intent
-            # intact — enabled=1 in DB, suricata_enable=YES in rc.conf,
-            # validated config on disk — so ids_watchdog.attempt_recovery()
-            # can actually retry on its 60s tick. Rolling those back here is
-            # what previously blinded the watchdog.
-            try:
-                _write_enabled(conn, True)
-            except Exception:
-                pass
-
-            # Collect last lines of suricata log for actionable diagnostics.
-            log_snippet = ""
-            tail = tail_suricata_log(lines=12)
-            if tail.get("ok") and tail.get("lines"):
-                log_snippet = "\n".join(tail["lines"])
-
-            # If the kernel OOM-killed Suricata, say so — the cure is fewer
-            # rules / smaller memcaps, not "check the daemon log".
-            oom = _scan_dmesg_for_oom()
-            if oom:
-                headline = (
-                    "Suricata was killed by the kernel — out of memory. "
-                    "Reduce the enabled rulesets or lower the memcaps "
-                    f"(this box uses the '{_mem_budget()}' memory profile). "
-                    f"dmesg: {oom}"
-                )
-            else:
-                headline = (
-                    "Suricata process exited shortly after start. "
-                    "Open the Daemon log panel for the full reason."
-                )
-
-            err_msg = (
-                f"{headline} Watchdog will retry every 60s. "
-                f"Service output: {r.get('message', '').strip()}"
-                + (f" | Log: {log_snippet[:400]}" if log_snippet else "")
-            )
-            _set_phase("ERROR", err_msg)
-            return {
-                "ok": False,
-                "rolled_back": False,
-                "phase": "ERROR",
-                "enabled": True,
-                "watchdog_will_retry": True,
-                "message": err_msg,
-                "log_tail": log_snippet,
-                "oom_killed": bool(oom),
-            }
-
-        # Confirmed running — persist enabled=1 and surface the startup banner.
-        _write_enabled(conn, True)
-        _set_phase("RUNNING")
-        startup_tail = tail_suricata_log(lines=12)
-        degraded   = bool(rules_state.get("degraded"))
-        base_msg   = r.get("message", "")
-        if degraded:
-            base_msg = (
-                (base_msg + " — " if base_msg else "")
-                + "WARNING: Suricata started with 0 rules. Run 'Update Rules' once the "
-                  "appliance is online so the IDS can actually detect threats."
-            )
-        return {**r, "rolled_back": False,
-                "phase": "RUNNING",
-                "message": base_msg,
-                "degraded": degraded,
-                "rules_size": rules_state.get("rules_size", 0),
-                "source_warnings": rules_state.get("source_warnings", []),
-                "startup_log": startup_tail.get("lines", []) if startup_tail.get("ok") else []}
-
-    else:
-        # Disabling: stop the service, then update DB (stop failures are non-fatal)
-        sysrc_set("suricata_enable", "NO")
-        r = service_action(_SERVICE_NAME, "stop")
-        _write_enabled(conn, False)
-        _set_phase("STOPPED")
-        return {**r, "rolled_back": False, "phase": "STOPPED"}
+    return _enable_pipeline(conn, actor=actor)
 
 
 def apply_ids(conn) -> dict:
     """
     Re-apply the current IDS configuration to a running Suricata.
 
-    Composes the same ordering ``toggle_ids`` uses on enable — rules bootstrap
-    → yaml write → validate → restart — so reload-all picks up config changes
-    without bypassing the rule-file guarantee that caused first-time start to
-    fail. A no-op when ``ids_config.enabled`` is 0.
-
-    The ``suricata -T`` validation between write and restart matches the
-    pattern used by dhcp_writer / dns_writer / openvpn_writer / ipsec_writer:
-    a bad config must never reach ``service suricata restart``, which would
-    leave the IDS in the "marked enabled but not running" state that's
-    awkward to recover from via the web UI alone.
+    Delegates to the shared ``_enable_pipeline`` so reload-all picks up config
+    changes through the same safe order the GUI enable path uses (rules
+    bootstrap → readiness → validate → write → verified restart), and never
+    restarts into an unverified config or leaves stale enabled state behind.
+    A no-op when ``ids_config.enabled`` is 0.
     """
     cfg = _cfg(conn)
     if not cfg.get("enabled"):
         return {"ok": True, "message": "IDS disabled; skipped"}
 
-    rules = ensure_rules_present(conn)
-    if not rules.get("ok"):
-        return {"ok": False,
-                "message": rules.get("message", "rule bootstrap failed")}
-
-    written = write_suricata_config(conn)
-    if not written.get("ok"):
-        return written
-
-    ok, err = validate_suricata_yaml(written.get("conf", ""))
-    if not ok:
-        return {"ok": False,
-                "message": f"suricata.yaml validation failed: {err}",
-                "conf": written.get("conf", "")}
-
-    restart = service_action(_SERVICE_NAME, "restart")
-    return {"ok": bool(restart.get("ok")),
-            "message": restart.get("message", "")}
+    result = _enable_pipeline(conn, actor="apply")
+    return {"ok": bool(result.get("ok")),
+            "message": result.get("message", "")}
 
 
 # ---------------------------------------------------------------------------

@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 _log = logging.getLogger(__name__)
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 44
+CURRENT_SCHEMA_VERSION = 45
 
 
 class SchemaVersionError(RuntimeError):
@@ -1872,6 +1872,32 @@ def _migration_v44(conn):
     )
 
 
+def _migration_v45(conn):
+    """v45 — IPS inline peer interface + degraded-rules opt-in for the IDS.
+
+    Two new ids_config columns back the IDS/IPS hardening work:
+
+    * ``ips_peer_interface`` — netmap IPS bridges traffic between the capture
+      interface and a *second* inline interface. Without a distinct peer the
+      generated suricata.yaml used ``copy-iface == interface``, which is not a
+      valid inline bridge. The Configuration UI now exposes a peer selector and
+      ``generate_suricata_yaml`` requires the two to differ for IPS mode.
+
+    * ``allow_degraded_rules`` — Suricata will happily start with zero
+      signatures, but that is no detection coverage. ``_rules_ready`` now blocks
+      enable when the merged rules file is empty unless this opt-in flag is set,
+      so operators are steered to run "Update Rules" first.
+    """
+    for ddl in (
+        "ALTER TABLE ids_config ADD COLUMN ips_peer_interface TEXT DEFAULT ''",
+        "ALTER TABLE ids_config ADD COLUMN allow_degraded_rules INTEGER NOT NULL DEFAULT 0",
+    ):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -1918,6 +1944,7 @@ MIGRATIONS = [
     (42, _migration_v42),
     (43, _migration_v43),
     (44, _migration_v44),
+    (45, _migration_v45),
 ]
 
 

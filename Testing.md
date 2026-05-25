@@ -1269,11 +1269,11 @@ pfctl -t authenticated_clients -T show
 pfctl -t admin_bypass_clients -T show
 
 # BSD: check Unbound A-record (content policy)
-grep "local-data" /var/unbound/unbound.conf | head -10
+grep "local-data" /usr/local/etc/unbound/unbound.conf | head -10
 # Expected: "facebook.com. A 192.168.1.1" — bare IP only, never URL
 
 # BSD: validate Unbound config
-unbound-checkconf /var/unbound/unbound.conf
+unbound-checkconf /usr/local/etc/unbound/unbound.conf
 
 # BSD: reload Unbound after content policy change
 service unbound reload

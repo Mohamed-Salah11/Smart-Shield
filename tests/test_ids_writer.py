@@ -48,10 +48,49 @@ class TestGenerateSuricataYaml:
 
     def test_ips_mode_uses_netmap(self, conn):
         from app.services.ids_writer import generate_suricata_yaml
-        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.execute(
+            "UPDATE ids_config SET mode='ips', interface='em0', "
+            "ips_peer_interface='em1' WHERE id=1"
+        )
         conn.commit()
         yaml = generate_suricata_yaml(conn)
         assert "netmap:" in yaml
+
+    def test_ips_mode_bridges_two_distinct_interfaces(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute(
+            "UPDATE ids_config SET mode='ips', interface='em0', "
+            "ips_peer_interface='em1' WHERE id=1"
+        )
+        conn.commit()
+        yaml = generate_suricata_yaml(conn)
+        # Inline bridge: capture em0 -> copy out em1, and the reverse stanza.
+        assert "interface: em0" in yaml
+        assert "interface: em1" in yaml
+        assert "copy-iface: em1" in yaml
+        assert "copy-iface: em0" in yaml
+        # The broken self-copy must be gone.
+        assert "copy-iface: em0\n                threads: auto\n                copy-mode: ips\n                copy-iface: em0" not in yaml
+
+    def test_ips_mode_without_peer_raises(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute(
+            "UPDATE ids_config SET mode='ips', interface='em0', "
+            "ips_peer_interface='' WHERE id=1"
+        )
+        conn.commit()
+        with pytest.raises(ValueError):
+            generate_suricata_yaml(conn)
+
+    def test_ips_mode_with_peer_equal_interface_raises(self, conn):
+        from app.services.ids_writer import generate_suricata_yaml
+        conn.execute(
+            "UPDATE ids_config SET mode='ips', interface='em0', "
+            "ips_peer_interface='em0' WHERE id=1"
+        )
+        conn.commit()
+        with pytest.raises(ValueError):
+            generate_suricata_yaml(conn)
 
     def test_home_net_in_yaml(self, conn):
         from app.services.ids_writer import generate_suricata_yaml
@@ -111,7 +150,10 @@ class TestGenerateSuricataYaml:
 
     def test_inline_stream_in_ips_mode(self, conn):
         from app.services.ids_writer import generate_suricata_yaml
-        conn.execute("UPDATE ids_config SET mode='ips' WHERE id=1")
+        conn.execute(
+            "UPDATE ids_config SET mode='ips', interface='em0', "
+            "ips_peer_interface='em1' WHERE id=1"
+        )
         conn.commit()
         yaml = generate_suricata_yaml(conn)
         assert "inline: true" in yaml
@@ -154,14 +196,39 @@ class TestValidateIpsSafety:
 
     def test_interface_set_produces_only_informational_warning(self, conn):
         from app.services.ids_writer import validate_ips_safety
-        conn.execute("UPDATE ids_config SET interface='em0' WHERE id=1")
+        # IPS now requires a distinct inline peer too; provide one so this
+        # exercises the "all required fields present" path.
+        conn.execute(
+            "UPDATE ids_config SET interface='em0', ips_peer_interface='em1' WHERE id=1"
+        )
         conn.commit()
         safety = validate_ips_safety(conn)
-        # On non-FreeBSD with an interface set: no hard errors, just an
+        # On non-FreeBSD with interface + peer set: no hard errors, just an
         # informational netmap warning.
         assert safety["ok"] is True
         assert safety["errors"] == []
         assert len(safety["warnings"]) >= 1
+
+    def test_missing_peer_produces_error(self, conn):
+        from app.services.ids_writer import validate_ips_safety
+        conn.execute(
+            "UPDATE ids_config SET interface='em0', ips_peer_interface='' WHERE id=1"
+        )
+        conn.commit()
+        safety = validate_ips_safety(conn)
+        assert safety["ok"] is False
+        assert any("peer" in e.lower() for e in safety["errors"])
+
+    def test_peer_equal_interface_produces_error(self, conn):
+        from app.services.ids_writer import validate_ips_safety
+        conn.execute(
+            "UPDATE ids_config SET interface='em0', ips_peer_interface='em0' WHERE id=1"
+        )
+        conn.commit()
+        safety = validate_ips_safety(conn)
+        assert safety["ok"] is False
+        assert any("same" in e.lower() or "different" in e.lower()
+                   for e in safety["errors"])
 
 
 # ---------------------------------------------------------------------------
@@ -418,12 +485,18 @@ class TestApplyIds:
         monkeypatch.setattr(iw, "ensure_rules_present",
                             lambda _c: (order.append("rules"),
                                         {"ok": True, "message": ""})[1])
+        # Rules-ready gate would otherwise block on a 0-signature dev box.
+        monkeypatch.setattr(iw, "_rules_ready", lambda _c: (True, ""))
+        # Deep validation is a no-op off-FreeBSD, but pin it for determinism.
+        monkeypatch.setattr(iw, "validate_suricata_yaml", lambda _t: (True, ""))
         monkeypatch.setattr(iw, "write_suricata_config",
                             lambda _c: (order.append("write"),
                                         {"ok": True, "message": "", "conf": ""})[1])
-        monkeypatch.setattr(iw, "service_action",
-                            lambda *_a, **_k: (order.append("restart"),
-                                               {"ok": True, "message": "ok"})[1])
+        # The verified-restart helper checks pgrep (always False off-FreeBSD);
+        # stub it so the pipeline reaches the success path without waiting.
+        monkeypatch.setattr(iw, "_restart_and_verify_suricata",
+                            lambda _c, action="restart": (order.append("restart"),
+                                                          {"ok": True, "message": "ok"})[1])
 
         result = iw.apply_ids(conn)
 
@@ -511,11 +584,11 @@ class _FakeResult:
 class TestEnsureNetmapLoaded:
 
     def test_short_circuits_when_already_loaded(self, monkeypatch):
-        """If kldstat already reports netmap loaded, don't call kldload."""
+        """If netmap is already available, don't call kldload."""
         import app.services.ids_writer as iw
         # Force the FreeBSD branch even on dev hosts so we exercise the path.
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: True)
+        monkeypatch.setattr(iw, "_netmap_available", lambda: True)
         called = {"kldload": False, "persist": False}
 
         def _no_kldload(*a, **k):
@@ -537,11 +610,11 @@ class TestEnsureNetmapLoaded:
         assert called["persist"] is True
 
     def test_auto_loads_when_missing(self, monkeypatch):
-        """kldstat reports missing first, then loaded after kldload — ok=True."""
+        """netmap reports unavailable first, then available after kldload — ok=True."""
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
         loaded_calls = iter([False, True])  # before kldload, after kldload
-        monkeypatch.setattr(iw, "_kldstat_netmap_loaded",
+        monkeypatch.setattr(iw, "_netmap_available",
                             lambda: next(loaded_calls))
         kldload_args = {}
 
@@ -561,10 +634,10 @@ class TestEnsureNetmapLoaded:
         assert kldload_args["kw"] == {"module": "netmap"}
 
     def test_hard_fails_when_kldload_still_misses(self, monkeypatch):
-        """If kldstat STILL reports missing after kldload, return ok=False."""
+        """If netmap is STILL unavailable after kldload, return ok=False."""
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: False)
+        monkeypatch.setattr(iw, "_netmap_available", lambda: False)
 
         import app.services.priv_helper as ph
         monkeypatch.setattr(ph, "run_privileged",
@@ -580,7 +653,7 @@ class TestEnsureNetmapLoaded:
         """A PrivilegedActionError surfaces as ok=False with the error text."""
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        monkeypatch.setattr(iw, "_kldstat_netmap_loaded", lambda: False)
+        monkeypatch.setattr(iw, "_netmap_available", lambda: False)
 
         import app.services.priv_helper as ph
 
@@ -597,7 +670,7 @@ class TestEnsureNetmapLoaded:
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
         loaded_calls = iter([False, True])
-        monkeypatch.setattr(iw, "_kldstat_netmap_loaded",
+        monkeypatch.setattr(iw, "_netmap_available",
                             lambda: next(loaded_calls))
         import app.services.priv_helper as ph
         monkeypatch.setattr(ph, "run_privileged",
@@ -617,7 +690,8 @@ class TestValidateIpsSafetyAutoLoad:
         ok=True, no error rises even on FreeBSD."""
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0', "
+                     "ips_peer_interface='em1' WHERE id=1")
         conn.commit()
         monkeypatch.setattr(iw, "_ensure_netmap_loaded",
                             lambda _c: {"ok": True, "warning": "", "message": "ok"})
@@ -629,7 +703,8 @@ class TestValidateIpsSafetyAutoLoad:
     def test_fails_when_ensure_netmap_errors(self, conn, monkeypatch):
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0', "
+                     "ips_peer_interface='em1' WHERE id=1")
         conn.commit()
         monkeypatch.setattr(iw, "_ensure_netmap_loaded",
                             lambda _c: {"ok": False, "warning": "",
@@ -642,7 +717,8 @@ class TestValidateIpsSafetyAutoLoad:
     def test_persist_warning_is_warning_not_error(self, conn, monkeypatch):
         import app.services.ids_writer as iw
         monkeypatch.setattr(iw.sys, "platform", "freebsd14")
-        conn.execute("UPDATE ids_config SET mode='ips', interface='em0' WHERE id=1")
+        conn.execute("UPDATE ids_config SET mode='ips', interface='em0', "
+                     "ips_peer_interface='em1' WHERE id=1")
         conn.commit()
         monkeypatch.setattr(iw, "_ensure_netmap_loaded",
                             lambda _c: {"ok": True,
@@ -728,3 +804,60 @@ class TestGetDiagnostics:
         assert d["ok"] is True
         # No conn means default mode reading falls through to "ids".
         assert d["mode"] == "ids"
+
+    def test_includes_netmap_signal_block(self, conn):
+        from app.services.ids_writer import get_diagnostics
+        d = get_diagnostics(conn)
+        # Fix 11: structured netmap availability for the GUI panel.
+        assert "netmap" in d
+        assert "available" in d["netmap"]
+        assert "message" in d["netmap"]
+        assert isinstance(d["netmap_loaded"], bool)
+
+
+# ---------------------------------------------------------------------------
+# Rules-readiness gate (blocks 0-signature enable unless opted-in)
+# ---------------------------------------------------------------------------
+
+class TestRulesReady:
+
+    def test_blocks_when_zero_signatures(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET allow_degraded_rules=0 WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_count_signatures", lambda: 0)
+        ready, err = iw._rules_ready(conn)
+        assert ready is False
+        assert "signature" in err.lower()
+
+    def test_allows_when_degraded_opt_in(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET allow_degraded_rules=1 WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_count_signatures", lambda: 0)
+        ready, err = iw._rules_ready(conn)
+        assert ready is True
+        assert err == ""
+
+    def test_allows_when_signatures_present(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET allow_degraded_rules=0 WHERE id=1")
+        conn.commit()
+        monkeypatch.setattr(iw, "_count_signatures", lambda: 25)
+        ready, err = iw._rules_ready(conn)
+        assert ready is True
+        assert err == ""
+
+
+# ---------------------------------------------------------------------------
+# Shared recovery path (used by the UI apply + the watchdog)
+# ---------------------------------------------------------------------------
+
+class TestRecoverIdsService:
+
+    def test_non_freebsd_skips(self, conn):
+        from app.services.ids_writer import recover_ids_service
+        result = recover_ids_service(conn, actor="test")
+        # No service to manage off-FreeBSD — a no-op success, not a restart.
+        assert result["ok"] is True
+        assert result.get("skipped") is True

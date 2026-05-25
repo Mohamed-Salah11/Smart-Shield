@@ -713,11 +713,17 @@ def api_step4_apply():
     # On non-FreeBSD (dev/CI) _wizard_verify reports skipped=True and we can't
     # actually probe the kernel — fall back to trusting the apply steps.
     verify_skipped = bool(verification.get("skipped"))
+    # The DNS resolver is part of the router-critical set: the wizard's default
+    # flow always brings Unbound up and DHCP hands out the appliance itself as
+    # the resolver, so a box that routes but can't answer DNS is NOT "ready"
+    # (LAN clients can ping IPs but can't browse). Gating on unbound_listening
+    # here means a silently-dead resolver blocks completion instead of shipping.
     critical_ok = verify_skipped or all([
         verification.get("lan_ip_ok"),
         verification.get("forwarding_ok"),
         verification.get("pf_enabled"),
         verification.get("nat_present"),
+        verification.get("unbound_listening"),
     ])
     route_ok = verify_skipped or verification.get("default_route_ok") or wan_dhcp_pending
 
@@ -743,7 +749,7 @@ def api_step4_apply():
     return jsonify({
         "ok": overall_ok,
         "message": "Setup complete! Redirecting to dashboard." if overall_ok
-                   else "Setup cannot complete — routing is not live. See verify details.",
+                   else "Setup cannot complete — routing or DNS is not live. See verify details.",
         "results": results,
         "redirect": url_for("system.dashboard") if overall_ok else None,
     })
@@ -829,19 +835,29 @@ def _wizard_verify(conn) -> dict:
     except Exception:
         pass
 
-    # Unbound and nginx listeners
-    try:
-        r = run_command(["sockstat", "-4", "-l"], check=False, timeout_seconds=5)
-        stdout = r.stdout or ""
+    # Unbound and nginx listeners. Unbound can take a moment to bind :53 after a
+    # start/reload, so retry the probe a few times before declaring it down — a
+    # false negative here would now wrongly block setup completion (unbound is in
+    # the critical gate below).
+    import time as _time
+    stdout = ""
+    for _attempt in range(3):
+        try:
+            r = run_command(["sockstat", "-4", "-l"], check=False, timeout_seconds=5)
+            stdout = r.stdout or ""
+        except Exception:
+            stdout = ""
         out["unbound_listening"] = any(":53 " in ln or ":53\t" in ln for ln in stdout.splitlines())
-        if not out["unbound_listening"]:
-            out["messages"].append("Unbound is not listening on :53.")
-        out["nginx_listening"] = any(":80 " in ln or ":443 " in ln or ":80\t" in ln or ":443\t" in ln
-                                     for ln in stdout.splitlines())
-        if not out["nginx_listening"]:
-            out["messages"].append("Nginx is not listening on :80/:443.")
-    except Exception:
-        pass
+        if out["unbound_listening"]:
+            break
+        if _attempt < 2:
+            _time.sleep(1)
+    if not out["unbound_listening"]:
+        out["messages"].append("Unbound is not listening on :53.")
+    out["nginx_listening"] = any(":80 " in ln or ":443 " in ln or ":80\t" in ln or ":443\t" in ln
+                                 for ln in stdout.splitlines())
+    if not out["nginx_listening"]:
+        out["messages"].append("Nginx is not listening on :80/:443.")
 
     # Overall: anything advisory enough that the wizard should still complete —
     # but report ok=True only when every check passes.

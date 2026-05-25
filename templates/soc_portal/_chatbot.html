@@ -84,6 +84,12 @@
     return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  // CSRF token for the JSON POSTs below — required when CSRF protection is
+  // enforced globally, otherwise approvals/chat would be rejected.
+  function _csrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  }
+
   function _addMsg(text, cls) {
     const el = document.createElement('div');
     el.className = 'ss-cm ' + cls;
@@ -117,7 +123,7 @@
     try {
       const res = await fetch('/soc-portal/api/approve_action', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrf()},
         body: JSON.stringify({action: action, approved: true}),
       });
       let data;
@@ -190,7 +196,7 @@
     try {
       const res = await fetch('/soc-portal/api/chat', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrf()},
         body: JSON.stringify({messages: _msgs}),
       });
       thinking.remove();
@@ -238,8 +244,8 @@
   R['h_5cf27d0a9b'] = function (event, el) { ssChatToggle() };
   R['h_bf9b98e135'] = function (event, el) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ssChatSend();} };
   R['h_2830ee1e39'] = function (event, el) { ssChatSend() };
-  R['h_da8d188278'] = function (event, el) { ssChatApprove(this) };
-  R['h_2c498503a6'] = function (event, el) { ssChatCancel(this) };
+  R['h_da8d188278'] = function (event, el) { ssChatApprove(el) };
+  R['h_2c498503a6'] = function (event, el) { ssChatCancel(el) };
 })();
 </script>
 <!-- /inline-handlers:auto -->

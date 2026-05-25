@@ -353,7 +353,7 @@ function renderRows(data) {
       <td>${caseLink}</td>
       <td>${assignCell(e, ts)}</td>
     </tr>
-    <tr class="alert-detail ext-9b0eb096" id="detail-${idx}">
+    <tr class="alert-detail ext-9b0eb096 d-none" id="detail-${idx}">
       <td class="ext-80a303e3" colspan="10">${detailPanel}</td>
     </tr>`;
   }).join('');
@@ -362,7 +362,9 @@ function renderRows(data) {
 function toggleRow(idx) {
   const r = document.getElementById('detail-' + idx);
   if (!r) return;
-  r.style.display = r.style.display === 'none' ? 'table-row' : 'none';
+  // Toggle a class, not inline style — the row's initial hidden state comes
+  // from a class, so the first click now reliably opens it.
+  r.classList.toggle('d-none');
 }
 
 function applyFilters() {
