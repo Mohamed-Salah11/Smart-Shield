@@ -37,7 +37,14 @@ def set_mfa_pending(user_id: int, username: str, tier: str) -> None:
 def get_mfa_pending():
     """Return (user_id, username, tier) of the pending login, or (None, None, None)."""
     started = session.get("soc_pending_at")
-    if not started or (time.time() - int(started)) > _MFA_PENDING_TTL:
+    # Guard against a tampered/corrupt session value: a non-int soc_pending_at
+    # must restart the login cleanly, not 500 the MFA page.
+    try:
+        started_i = int(started)
+    except (TypeError, ValueError):
+        clear_mfa_pending()
+        return (None, None, None)
+    if not started_i or (time.time() - started_i) > _MFA_PENDING_TTL:
         clear_mfa_pending()
         return (None, None, None)
     return (

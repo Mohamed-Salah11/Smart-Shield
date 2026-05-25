@@ -169,11 +169,11 @@ async function loadAlerts() {
       const user = e.username || e.remote_addr || '—';
       const isNew = newKeys.has(keys[i]);
       return `<tr${isNew ? ' class="soc-row-enter"' : ''}>
-        <td class="soc-mono">${timeFmt(e.timestamp)}</td>
-        <td><span class="ext-566906a5">${sev}</span></td>
-        <td><span class="ext-53c89aeb">${cat}</span></td>
-        <td class="ext-588de81f">${act}</td>
-        <td class="ext-0fcb75b9">${user}</td>
+        <td class="soc-mono">${SOC.esc(timeFmt(e.timestamp))}</td>
+        <td><span class="ext-566906a5">${SOC.esc(sev)}</span></td>
+        <td><span class="ext-53c89aeb">${SOC.esc(cat)}</span></td>
+        <td class="ext-588de81f">${SOC.esc(act)}</td>
+        <td class="ext-0fcb75b9">${SOC.esc(user)}</td>
       </tr>`;
     }).join('');
   } catch(e) {
@@ -198,8 +198,8 @@ async function loadCases() {
       cases.slice(0, 6).map((c, i) => {
         const isNew = newKeys.has(keys[i]);
         return `<tr${isNew ? ' class="soc-row-enter"' : ''}>
-          <td><a class="ext-9982219f" href="/soc-portal/cases/${c.id}">${c.title}</a></td>
-          <td><span class="ext-530fd97c">${c.severity}</span></td>
+          <td><a class="ext-9982219f" href="/soc-portal/cases/${encodeURIComponent(c.id)}">${SOC.esc(c.title)}</a></td>
+          <td><span class="ext-530fd97c">${SOC.esc(c.severity)}</span></td>
         </tr>`;
       }).join('') + '</table>';
   } catch {}

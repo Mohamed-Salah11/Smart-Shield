@@ -63,6 +63,14 @@ def _gather(conn, start_ts: str, end_ts: str) -> dict:
         "crown_jewel_events": 0,
         "ti_hits":        0,
         "correlation_matches": 0,
+        # Live config facts so compliance controls reflect reality instead of
+        # being hardcoded "covered" (see _pci_dss_html / _iso_27001_html).
+        "config": {
+            "soc_users_total":   0,
+            "mfa_users_enabled": 0,
+            "ids_enabled":       False,
+            "retention_days":    None,
+        },
     }
 
     # Severity + category counts
@@ -109,24 +117,40 @@ def _gather(conn, start_ts: str, end_ts: str) -> dict:
     except Exception:
         pass
 
-    # Crown-jewel asset events (uses the asset enrichment annotation)
+    # Crown-jewel asset events (uses the asset enrichment annotation).
+    # Prefer JSON1 (robust to formatting); fall back to the fragile LIKE only
+    # if json_extract isn't compiled into this SQLite build.
     try:
-        cj = conn.execute(
-            "SELECT COUNT(*) FROM events "
-            "WHERE ts >= ? AND ts <= ? AND details LIKE '%\"criticality\": \"crown_jewel\"%'",
-            (start_ts, end_ts),
-        ).fetchone()[0]
+        try:
+            cj = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE ts >= ? AND ts <= ? "
+                "AND json_extract(details, '$.criticality') = 'crown_jewel'",
+                (start_ts, end_ts),
+            ).fetchone()[0]
+        except Exception:
+            cj = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE ts >= ? AND ts <= ? "
+                "AND details LIKE '%\"criticality\": \"crown_jewel\"%'",
+                (start_ts, end_ts),
+            ).fetchone()[0]
         data["crown_jewel_events"] = cj
     except Exception:
         pass
 
     # TI hits + correlation matches
     try:
-        data["ti_hits"] = conn.execute(
-            "SELECT COUNT(*) FROM events "
-            "WHERE ts >= ? AND ts <= ? AND details LIKE '%\"ti_hits\":%'",
-            (start_ts, end_ts),
-        ).fetchone()[0]
+        try:
+            data["ti_hits"] = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE ts >= ? AND ts <= ? "
+                "AND json_type(json_extract(details, '$.ti_hits')) IS NOT NULL",
+                (start_ts, end_ts),
+            ).fetchone()[0]
+        except Exception:
+            data["ti_hits"] = conn.execute(
+                "SELECT COUNT(*) FROM events WHERE ts >= ? AND ts <= ? "
+                "AND details LIKE '%\"ti_hits\":%'",
+                (start_ts, end_ts),
+            ).fetchone()[0]
         data["correlation_matches"] = conn.execute(
             "SELECT COUNT(*) FROM events "
             "WHERE ts >= ? AND ts <= ? AND action='correlation_match'",
@@ -139,6 +163,32 @@ def _gather(conn, start_ts: str, end_ts: str) -> dict:
     try:
         from app.services.risk_scoring import top_risky
         data["top_risky"] = top_risky(limit=10)
+    except Exception:
+        pass
+
+    # Live compliance-relevant config (best-effort; defaults stay on error).
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE soc_tier IS NOT NULL"
+        ).fetchone()
+        data["config"]["soc_users_total"] = row["c"] if row else 0
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM users "
+            "WHERE soc_tier IS NOT NULL AND COALESCE(totp_enabled, 0)=1"
+        ).fetchone()
+        data["config"]["mfa_users_enabled"] = row["c"] if row else 0
+    except Exception:
+        pass
+    try:
+        row = conn.execute("SELECT enabled FROM ids_config WHERE id=1").fetchone()
+        data["config"]["ids_enabled"] = bool(row and row["enabled"])
+    except Exception:
+        pass
+    try:
+        # Real retention key is the `events_retention` JSON blob (global `days`),
+        # not a flat `events_retention_days` row.
+        from app.services.events_retention import load_config as _ret_cfg
+        data["config"]["retention_days"] = int(_ret_cfg(conn).get("days") or 0) or None
     except Exception:
         pass
 
@@ -232,9 +282,33 @@ def _pci_dss_html(data: dict) -> str:
     """Map event-store coverage onto PCI-DSS v4.0 requirements."""
     has_admin_logins = any(c for c in data["by_category"] if c == "session")
     has_audit_log    = data["totals"]["all"] > 0
-    has_ids          = "ids" in data["by_category"]
+    # IDS coverage = Suricata events in window OR IDS enabled in config.
+    cfg              = data.get("config", {})
+    has_ids          = ("ids" in data["by_category"]) or bool(cfg.get("ids_enabled"))
     has_correlation  = data["correlation_matches"] > 0
     has_ti           = data["ti_hits"] > 0
+
+    # Real MFA coverage: every SOC user must have TOTP enabled (and there must
+    # be at least one SOC user) — no longer hardcoded "covered".
+    soc_total   = int(cfg.get("soc_users_total") or 0)
+    mfa_enabled = int(cfg.get("mfa_users_enabled") or 0)
+    mfa_ok      = soc_total > 0 and mfa_enabled == soc_total
+    if soc_total == 0:
+        mfa_hint = "No SOC users configured — enrol SOC analysts and require TOTP."
+    elif not mfa_ok:
+        mfa_hint = (f"Only {mfa_enabled}/{soc_total} SOC users have TOTP enabled — "
+                    "enable MFA for all SOC accounts under /soc-portal/security.")
+    else:
+        mfa_hint = f"All {soc_total} SOC users have TOTP MFA enabled."
+
+    # Real retention: PCI 10.7 wants >= 1 year.
+    retention_days = cfg.get("retention_days")
+    retention_ok   = bool(retention_days) and retention_days >= 365
+    if retention_days:
+        retention_hint = (f"events_retention.days = {retention_days}"
+                          + ("" if retention_ok else "; raise to 365 for a 1-year window"))
+    else:
+        retention_hint = "retention window unknown; set events_retention.days to 365"
 
     def line(req, name, ok, hint=""):
         klass = "ok" if ok else "gap"
@@ -254,8 +328,7 @@ def _pci_dss_html(data: dict) -> str:
 <h2>Requirement 8 — Identify and authenticate users</h2>
 {line("8.3", "Strong authentication", True,
       "Account lockout enforced (5 fails / 15 min) on both admin and SOC logins")}
-{line("8.4", "Multi-factor authentication", True,
-      "TOTP MFA available per-user under /soc-portal/security")}
+{line("8.4", "Multi-factor authentication", mfa_ok, mfa_hint)}
 
 <h2>Requirement 10 — Log and monitor all access</h2>
 {line("10.2", "Audit log entries for every action", has_audit_log,
@@ -263,8 +336,7 @@ def _pci_dss_html(data: dict) -> str:
 {line("10.4", "Time-synchronized clocks", True, "FreeBSD ntpd managed via System → NTP")}
 {line("10.6", "Daily audit log review", has_correlation,
       f"{data['correlation_matches']} correlation matches fired automatically")}
-{line("10.7", "Audit log retention ≥ 1 year", False,
-      "default retention is 90 days; raise events_retention.days to 365 in Log Forwarding")}
+{line("10.7", "Audit log retention ≥ 1 year", retention_ok, retention_hint)}
 
 <h2>Requirement 11 — Test security regularly</h2>
 {line("11.4", "Intrusion detection in place", has_ids, "Suricata events present in window")}
@@ -291,6 +363,14 @@ def _iso_27001_html(data: dict) -> str:
 
     has_audit = data["totals"]["all"] > 0
     has_corr  = data["correlation_matches"] > 0
+    cfg       = data.get("config", {})
+    soc_total   = int(cfg.get("soc_users_total") or 0)
+    mfa_enabled = int(cfg.get("mfa_users_enabled") or 0)
+    mfa_ok      = soc_total > 0 and mfa_enabled == soc_total
+    mfa_hint    = (f"All {soc_total} SOC users have TOTP MFA + per-account lockout"
+                   if mfa_ok else
+                   f"{mfa_enabled}/{soc_total} SOC users have TOTP enabled — "
+                   "enable MFA for all SOC accounts")
 
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>ISO 27001:2022 Annex A Coverage</title>{_STYLES}</head><body>
@@ -306,7 +386,7 @@ def _iso_27001_html(data: dict) -> str:
       "siem_alert_actions captures acknowledge / false-positive / escalate decisions")}
 
 <h2>A.8 Technological controls</h2>
-{line("A.8.5",  "Secure authentication", True, "TOTP MFA + per-account lockout")}
+{line("A.8.5",  "Secure authentication", mfa_ok, mfa_hint)}
 {line("A.8.15", "Logging", has_audit,
       f"{data['totals']['all']} events captured")}
 {line("A.8.16", "Monitoring activities", has_corr,

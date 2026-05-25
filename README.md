@@ -69,7 +69,8 @@ Browser (HTTPS)
   ├── Route blueprints — packaged under routes/
   │     firewall/  system/  services/  vpn/  diagnostics/  network_api/
   │     plus standalone: auth, status, ids, filters, portal, soc, soc_portal,
-  │     terminal, setup, users, chatbot, interfaces, routing, hec, vpn_portal
+  │     terminal, setup, users, chatbot, interfaces, routing, hec, vpn_portal,
+  │     dns_logs, firewall_logs
   ├── SQLite database (/var/db/smart-shield/data.db)
   ├── Audit log (/var/log/smart-shield/audit.log — NDJSON, indexed mirror in `events`)
   └── Background threads
@@ -121,6 +122,7 @@ The unified `ApplyResult` dataclass (added in Phase 8) gives the UI a typed stat
 
 ```
 python3  git  sqlite3  ca_root_nss  nginx  sudo  nano
+pkgconf  curl  rsync
 unbound  isc-dhcp44-server  kea
 openvpn  strongswan  mpd5
 suricata
@@ -133,7 +135,7 @@ mrtg  miniupnpd  igmpproxy  ddclient  bind-tools  tcpdump
 Flask==3.1.2          Werkzeug==3.1.3       gunicorn==22.0.0
 cryptography==46.0.3  requests==2.32.3      PyYAML==6.0.3
 python-dotenv==1.0.1  groq>=0.9.0           Jinja2==3.1.6
-flask-sock>=0.7
+flask-sock>=0.7       gevent>=24.0          fpdf2>=2.7.9
 ```
 
 ---
@@ -175,7 +177,7 @@ Smart-Shield/
 ├── app/
 │   ├── __init__.py             Flask app factory; loads SMARTSHIELD_ENV_FILE before config
 │   ├── config.py               Config classes; fails fast in production without SECRET_KEY
-│   ├── database.py             SQLite schema (70+ tables) + init_db()
+│   ├── database.py             SQLite schema (90+ tables) + init_db()
 │   ├── audit_log.py            Append-only NDJSON log + indexed events mirror + redact_secrets()
 │   ├── auth_utils.py           login_required, superuser_required, reauth_required
 │   ├── security.py             CSRF token store, validate_csrf_or_abort
@@ -209,11 +211,12 @@ Smart-Shield/
 │   ├── network_api/  interface/routing JSON for the UI
 │   ├── auth.py    login / logout / re-auth
 │   ├── status.py  dashboard cards + SIEM /api/logs (hides SOC events by default)
+│   ├── dns_logs.py / firewall_logs.py    log viewers for DNS queries / PF events
 │   ├── ids.py / filters.py / portal.py / chatbot.py / setup.py / users.py
 │   ├── soc.py / soc_portal.py / vpn_portal.py
 │   ├── terminal.py    Hardened web console (enable flag + reauth + WS ticket)
 │   └── hec.py     HTTP event collector
-├── templates/                  Jinja2 HTML templates (185+ files)
+├── templates/                  Jinja2 HTML templates (175+ files)
 │   ├── soc_portal/             Separate SOC analyst UI
 │   └── portal/                 Captive-portal block / login / success pages
 ├── static/                     CSS, JS, fonts, xterm.js

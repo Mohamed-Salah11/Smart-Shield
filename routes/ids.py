@@ -90,6 +90,10 @@ def ids_save():
 
     mode        = request.form.get("mode", "ids")
     interface   = request.form.get("interface", "")
+    # IPS inline peer interface — second bridged NIC required for IPS mode.
+    # generate_suricata_yaml / validate_ips_safety require it to differ from
+    # `interface`; persisted blank for IDS mode.
+    peer_iface  = request.form.get("ips_peer_interface", "").strip()
     # Blank = auto: generate_suricata_yaml derives HOME_NET from the LAN subnet.
     home_net    = request.form.get("home_net", "").strip()
     ext_net     = request.form.get("external_net", "!$HOME_NET").strip()
@@ -103,11 +107,11 @@ def ids_save():
 
     cur.execute("""
         UPDATE ids_config SET
-            mode=?, interface=?, home_net=?, external_net=?,
+            mode=?, interface=?, ips_peer_interface=?, home_net=?, external_net=?,
             eve_json_enabled=?, fast_log_enabled=?, block_list_enabled=?,
             max_pending_packets=?, updated_at=CURRENT_TIMESTAMP
         WHERE id=1
-    """, (mode, interface, home_net, ext_net, eve_json, fast_log, block_list, max_pending))
+    """, (mode, interface, peer_iface, home_net, ext_net, eve_json, fast_log, block_list, max_pending))
     conn.commit()
 
     log_event(

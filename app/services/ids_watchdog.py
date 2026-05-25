@@ -126,17 +126,17 @@ def _ids_settings(conn) -> "tuple[bool, bool]":
 
 def attempt_recovery() -> dict:
     """
-    One-shot recovery: validate the saved config, start Suricata, verify it.
+    One-shot recovery: delegate to the shared, safety-gated recovery path in
+    ``ids_writer`` so the watchdog can never drift from the UI's enable/apply
+    behavior (IPS safety gate, rule bootstrap + readiness, YAML validate, rc.conf
+    enable, verified restart, stale-state cleanup). This module keeps only the
+    cool-down/cap policy and the audit-event mapping.
 
     Returns ``{"ok", "skipped"?, "reason"?, "message"}``. Safe to call from
     any thread — it opens its own short-lived connection.
     """
     from app.audit_log import _events_db, log_event
-    from app.services.ids_writer import (
-        _scan_dmesg_for_oom, ensure_rules_present, generate_suricata_yaml,
-        tail_suricata_log, validate_suricata_yaml,
-    )
-    from app.services.service_manager import service_action
+    from app.services.ids_writer import recover_ids_service
 
     conn = _events_db()
     if conn is None:
@@ -159,79 +159,61 @@ def attempt_recovery() -> dict:
             return {"ok": True, "skipped": True, "reason": "rate_limited",
                     "message": reason}
 
-        # Bootstrap rules before validating — a missing/empty rules file is
-        # what blocks the deep check, so the watchdog must be able to recover
-        # from it rather than just bail.
-        try:
-            ensure_rules_present(conn)
-        except Exception:
-            pass
-
-        # Pre-flight: ensure the saved YAML still parses.
-        try:
-            conf = generate_suricata_yaml(conn)
-            valid, err = validate_suricata_yaml(conf)
-        except Exception as exc:
-            valid, err = False, str(exc)
-        if not valid:
-            log_event(
-                category="security", action="ids_auto_recovery_failed",
-                severity="high", username="watchdog", remote_addr="",
-                details={"stage": "validate", "error": err[:512]},
-            )
-            _write_state(conn, _LAST_TRY_KEY, str(_now_epoch()))
-            _bump_hour_counter(conn)
-            return {"ok": False, "reason": "invalid_yaml", "message": err}
-
-        # Bump counters BEFORE the start attempt so a crash doesn't leak
-        # an extra attempt past the rate limit.
+        # Bump counters BEFORE the attempt so a crash doesn't leak an extra
+        # attempt past the rate limit.
         _write_state(conn, _LAST_TRY_KEY, str(_now_epoch()))
         attempts = _bump_hour_counter(conn)
 
-        r = service_action("suricata", "start")
-        time.sleep(_VERIFY_SECS)
-        alive = _suricata_alive()
-        tail = tail_suricata_log(lines=12).get("lines", []) if alive is False else []
+        # Single safe path — same gating/validation/verified-restart/state-cleanup
+        # the UI uses. recover_ids_service clears stale enabled state on the
+        # failure reasons (ips_safety_failed / invalid_yaml / rules_not_ready / …)
+        # so we don't have to here.
+        try:
+            result = recover_ids_service(conn, actor="watchdog")
+        except Exception as exc:
+            log_event(
+                category="security", action="ids_auto_recovery_failed",
+                severity="high", username="watchdog", remote_addr="",
+                details={"stage": "recover", "error": str(exc)[:512],
+                         "attempts_this_hour": attempts},
+            )
+            return {"ok": False, "reason": "exception", "message": str(exc),
+                    "attempts_this_hour": attempts}
 
-        if alive:
+        if result.get("ok"):
             log_event(
                 category="security", action="ids_auto_recovered",
                 severity="medium", username="watchdog", remote_addr="",
                 details={
                     "attempts_this_hour": attempts,
-                    "service_message":    (r.get("message") or "")[:512],
+                    "service_message": (result.get("service_message")
+                                        or result.get("message") or "")[:512],
                 },
             )
             return {"ok": True, "message": "Suricata restarted by watchdog",
                     "attempts_this_hour": attempts}
 
-        # Name the real reason — a kernel OOM kill is the likely cause on a
-        # small box and needs a different fix (fewer rules / smaller memcaps)
-        # than a config error.
-        try:
-            oom = _scan_dmesg_for_oom()
-        except Exception:
-            oom = ""
-        message = ("Suricata was OOM-killed by the kernel — reduce the enabled "
-                   f"rulesets or memcaps. dmesg: {oom}") if oom else \
-                  "service start returned but daemon is not alive"
-
         log_event(
             category="security", action="ids_auto_recovery_failed",
             severity="high", username="watchdog", remote_addr="",
             details={
-                "stage":             "post_start",
+                "stage":             "recover",
+                "reason":            result.get("reason", "did_not_start"),
                 "attempts_this_hour": attempts,
-                "service_message":   (r.get("message") or "")[:512],
-                "log_tail":          tail,
-                "oom_killed":        bool(oom),
-                "dmesg":             oom,
+                "service_message":   (result.get("service_message") or "")[:512],
+                "log_tail":          result.get("log_tail", []),
+                "oom_killed":        bool(result.get("oom_killed")),
+                "dmesg":             result.get("dmesg", ""),
             },
         )
-        return {"ok": False, "reason": "oom_killed" if oom else "did_not_start",
-                "message": message,
-                "service_message": r.get("message", ""), "log_tail": tail,
-                "oom_killed": bool(oom)}
+        return {"ok": False,
+                "reason": result.get("reason", "did_not_start"),
+                "message": result.get("message",
+                                      "recovery returned but daemon is not alive"),
+                "service_message": result.get("service_message", ""),
+                "log_tail": result.get("log_tail", []),
+                "oom_killed": bool(result.get("oom_killed")),
+                "attempts_this_hour": attempts}
     finally:
         try: conn.close()
         except Exception: pass

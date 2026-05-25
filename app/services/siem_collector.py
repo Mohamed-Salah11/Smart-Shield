@@ -724,6 +724,21 @@ def _insert_dns_event(event_uuid: str, ts: str, client_ip: str,
             pass
 
 
+def _domain_matches_policy(query_name: str, blocked_domains: set) -> bool:
+    """True when *query_name* or any parent domain is in the blocked set.
+
+    Subdomain-aware: a policy on ``example.com`` matches ``ads.example.com``.
+    Used so the collector's blocked-mode filter and severity match what the
+    DNS policy actually enforces (not just exact-string equality).
+    """
+    q = (query_name or "").strip(".").lower()
+    if not q:
+        return False
+    parts = q.split(".")
+    candidates = [".".join(parts[i:]) for i in range(len(parts))]
+    return any(c in blocked_domains for c in candidates)
+
+
 def _collect_dns_queries(state: dict):
     if not os.path.exists(_UNBOUND_QUERY_LOG):
         return
@@ -739,52 +754,70 @@ def _collect_dns_queries(state: dict):
         return
 
     prev_offset = state.get("dns_offset", 0)
-    lines, state["dns_offset"] = _tail_file(_UNBOUND_QUERY_LOG, prev_offset)
-    if state["dns_offset"] != prev_offset:
-        _save_offset("dns_offset", state["dns_offset"])
+    lines, new_offset = _tail_file(_UNBOUND_QUERY_LOG, prev_offset)
 
     # Load blocked domains once per cycle for fast lookup
     blocked: set = state.get("blocked_domains", set())
 
-    for line in lines:
-        m = _UNBOUND_QUERY_RE.search(line)
-        if not m:
-            continue
+    # Only advance the saved offset once the whole batch processed — a
+    # transient DB/parse error must not skip unprocessed lines forever.
+    processed_ok = False
+    try:
+        for line in lines:
+            m = _UNBOUND_QUERY_RE.search(line)
+            if not m:
+                continue
+            try:
+                client_ip = m.group(1)
+                g2, g3    = m.group(2), m.group(3)
+                response  = m.group(4)
 
-        client_ip = m.group(1)
-        g2, g3    = m.group(2), m.group(3)
-        response  = m.group(4)
+                # Determine which token is the qtype vs the query name.
+                # Qtypes are short all-uppercase words (A, AAAA, MX, TXT, PTR…).
+                # Query names contain dots and mixed case.
+                if re.match(r'^[A-Z]{1,10}$', g2):
+                    qtype, query_name = g2, g3.rstrip(".")
+                else:
+                    query_name, qtype = g2.rstrip("."), g3
 
-        # Determine which token is the qtype vs the query name.
-        # Qtypes are short all-uppercase words (A, AAAA, MX, TXT, PTR, NS…).
-        # Query names contain dots and mixed case.
-        if re.match(r'^[A-Z]{1,10}$', g2):
-            qtype, query_name = g2, g3.rstrip(".")
-        else:
-            query_name, qtype = g2.rstrip("."), g3
+                # Policy match is subdomain-aware. NXDOMAIN/SERVFAIL are DNS
+                # outcomes, not proof of a policy block — counting them as
+                # blocked produced false security alerts, so they no longer do.
+                is_blocked = _domain_matches_policy(query_name, blocked)
 
-        is_blocked = query_name in blocked or response in ("NXDOMAIN", "SERVFAIL")
+                if mode == "blocked_only" and not is_blocked:
+                    continue
+                # mode == "all" — log every query
 
-        if mode == "blocked_only" and not is_blocked:
-            continue
-        # mode == "all" — log every query
-
-        host = _lookup_tracked_host(client_ip) if _is_lan_ip(client_ip) else {}
-        event_uuid = _log(
-            "connection", "dns_query", remote_addr=client_ip,
-            severity="medium" if is_blocked else "info",
-            details={
-                "query":    query_name,
-                "type":     qtype,
-                "response": response,
-                "blocked":  is_blocked,
-                "client_ip": client_ip,
-                "hostname": host.get("hostname", ""),
-                "mac":      host.get("mac_address", ""),
-            },
-        )
-        _insert_dns_event(event_uuid, _now_utc(), client_ip, query_name,
-                          qtype, response, is_blocked, host, line)
+                host = _lookup_tracked_host(client_ip) if _is_lan_ip(client_ip) else {}
+                event_uuid = _log(
+                    "connection", "dns_query", remote_addr=client_ip,
+                    severity="medium" if is_blocked else "info",
+                    details={
+                        "query":    query_name,
+                        "type":     qtype,
+                        "response": response,
+                        "blocked":  is_blocked,
+                        "client_ip": client_ip,
+                        "hostname": host.get("hostname", ""),
+                        "mac":      host.get("mac_address", ""),
+                    },
+                )
+                _insert_dns_event(event_uuid, _now_utc(), client_ip, query_name,
+                                  qtype, response, is_blocked, host, line)
+            except Exception as exc:
+                try:
+                    from app.services.collector_health import record_dead_letter
+                    record_dead_letter("dns_queries", source_type="dns",
+                                       reason=f"parse_failed: {exc}",
+                                       raw_payload=line)
+                except Exception:
+                    pass
+        processed_ok = True
+    finally:
+        if processed_ok and new_offset != prev_offset:
+            _save_offset("dns_offset", new_offset)
+            state["dns_offset"] = new_offset
 
 
 def _refresh_blocked_domains(state: dict):
@@ -1088,7 +1121,7 @@ def _handle_pflog_line(state: dict, line: str):
             "mac":        host.get("mac_address", ""),
             "raw_line":   parsed.get("raw_line"),
         },
-        severity=severity if severity != "info" else "low",
+        severity=severity,
     )
 
     # Mirror into the specialised firewall_events table so the upcoming
@@ -1254,44 +1287,57 @@ def _collect_syslog_events(state: dict):
         return
 
     prev_offset = state.get("syslog_offset", 0)
-    lines, state["syslog_offset"] = _tail_file(_AUTH_LOG, prev_offset)
-    if state["syslog_offset"] != prev_offset:
-        _save_offset("syslog_offset", state["syslog_offset"])
+    lines, new_offset = _tail_file(_AUTH_LOG, prev_offset)
 
-    for line in lines:
-        m = _SSH_FAIL_RE.search(line)
-        if m:
-            method, user, src_ip, port = m.group(1), m.group(2), m.group(3), m.group(4)
-            host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
-            _log("security", "ssh_login_failed", remote_addr=src_ip, severity="medium",
-                 details={
-                     "method":   method,
-                     "user":     user,
-                     "src_ip":   src_ip,
-                     "port":     int(port),
-                     "hostname": host.get("hostname", ""),
-                 })
-            continue
+    processed_ok = False
+    try:
+        for line in lines:
+          try:
+            m = _SSH_FAIL_RE.search(line)
+            if m:
+                method, user, src_ip, port = m.group(1), m.group(2), m.group(3), m.group(4)
+                host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
+                _log("security", "ssh_login_failed", remote_addr=src_ip, severity="medium",
+                     details={
+                         "method":   method,
+                         "user":     user,
+                         "src_ip":   src_ip,
+                         "port":     int(port),
+                         "hostname": host.get("hostname", ""),
+                     })
+                continue
 
-        m = _SSH_OK_RE.search(line)
-        if m:
-            method, user, src_ip, port = m.group(1), m.group(2), m.group(3), m.group(4)
-            host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
-            _log("session", "ssh_login_success", remote_addr=src_ip, severity="info",
-                 details={
-                     "method":   method,
-                     "user":     user,
-                     "src_ip":   src_ip,
-                     "port":     int(port),
-                     "hostname": host.get("hostname", ""),
-                 })
-            continue
+            m = _SSH_OK_RE.search(line)
+            if m:
+                method, user, src_ip, port = m.group(1), m.group(2), m.group(3), m.group(4)
+                host = _lookup_tracked_host(src_ip) if _is_lan_ip(src_ip) else {}
+                _log("session", "ssh_login_success", remote_addr=src_ip, severity="info",
+                     details={
+                         "method":   method,
+                         "user":     user,
+                         "src_ip":   src_ip,
+                         "port":     int(port),
+                         "hostname": host.get("hostname", ""),
+                     })
+                continue
 
-        m = _SU_FAIL_RE.search(line)
-        if m:
-            from_user, to_user = m.group(1), m.group(2)
-            _log("security", "su_attempt_failed", remote_addr="", severity="high",
-                 details={"from_user": from_user, "to_user": to_user})
+            m = _SU_FAIL_RE.search(line)
+            if m:
+                from_user, to_user = m.group(1), m.group(2)
+                _log("security", "su_attempt_failed", remote_addr="", severity="high",
+                     details={"from_user": from_user, "to_user": to_user})
+          except Exception as exc:
+            try:
+                from app.services.collector_health import record_dead_letter
+                record_dead_letter("auth_syslog", source_type="auth",
+                                   reason=f"parse_failed: {exc}", raw_payload=line)
+            except Exception:
+                pass
+        processed_ok = True
+    finally:
+        if processed_ok and new_offset != prev_offset:
+            _save_offset("syslog_offset", new_offset)
+            state["syslog_offset"] = new_offset
 
 
 # ---------------------------------------------------------------------------
@@ -1322,41 +1368,54 @@ def _collect_system_events(state: dict):
         return
 
     prev_offset = state.get("messages_offset", 0)
-    lines, state["messages_offset"] = _tail_file(_MESSAGES_LOG, prev_offset)
-    if state["messages_offset"] != prev_offset:
-        _save_offset("messages_offset", state["messages_offset"])
+    lines, new_offset = _tail_file(_MESSAGES_LOG, prev_offset)
 
-    for line in lines:
-        if _KERN_PANIC_RE.search(line):
-            _log("system", "kernel_panic", severity="critical",
-                 details={"message": line.strip()[-200:]})
-            continue
+    processed_ok = False
+    try:
+        for line in lines:
+          try:
+            if _KERN_PANIC_RE.search(line):
+                _log("system", "kernel_panic", severity="critical",
+                     details={"message": line.strip()[-200:]})
+                continue
 
-        m = _LINK_STATE_RE.search(line)
-        if m:
-            iface, new_state = m.group(1), m.group(2).upper()
-            sev = "high" if new_state == "DOWN" else "info"
-            _log("network", "link_state_change", severity=sev,
-                 details={"interface": iface, "state": new_state,
-                          "message": line.strip()[-200:]})
-            continue
+            m = _LINK_STATE_RE.search(line)
+            if m:
+                iface, new_state = m.group(1), m.group(2).upper()
+                sev = "high" if new_state == "DOWN" else "info"
+                _log("network", "link_state_change", severity=sev,
+                     details={"interface": iface, "state": new_state,
+                              "message": line.strip()[-200:]})
+                continue
 
-        if _PF_OVERLOAD_RE.search(line):
-            _log("security", "pf_table_overload", severity="high",
-                 details={"message": line.strip()[-200:]})
-            continue
+            if _PF_OVERLOAD_RE.search(line):
+                _log("security", "pf_table_overload", severity="high",
+                     details={"message": line.strip()[-200:]})
+                continue
 
-        m = _CARP_RE.search(line)
-        if m:
-            iface, new_state = m.group(1), m.group(2).upper()
-            _log("network", "carp_state_change", severity="medium",
-                 details={"interface": iface, "state": new_state,
-                          "message": line.strip()[-200:]})
-            continue
+            m = _CARP_RE.search(line)
+            if m:
+                iface, new_state = m.group(1), m.group(2).upper()
+                _log("network", "carp_state_change", severity="medium",
+                     details={"interface": iface, "state": new_state,
+                              "message": line.strip()[-200:]})
+                continue
 
-        if _OOM_RE.search(line):
-            _log("system", "out_of_memory", severity="critical",
-                 details={"message": line.strip()[-200:]})
+            if _OOM_RE.search(line):
+                _log("system", "out_of_memory", severity="critical",
+                     details={"message": line.strip()[-200:]})
+          except Exception as exc:
+            try:
+                from app.services.collector_health import record_dead_letter
+                record_dead_letter("system_messages", source_type="system",
+                                   reason=f"parse_failed: {exc}", raw_payload=line)
+            except Exception:
+                pass
+        processed_ok = True
+    finally:
+        if processed_ok and new_offset != prev_offset:
+            _save_offset("messages_offset", new_offset)
+            state["messages_offset"] = new_offset
 
 
 # ---------------------------------------------------------------------------
@@ -1400,30 +1459,42 @@ def _collect_strongswan_lines(state: dict):
     prev_offset = state.get("strongswan_offset",
                             _load_offset("strongswan_offset", 0))
     lines, new_offset = _tail_file(_STRONGSWAN_LOG, prev_offset)
-    if new_offset != prev_offset:
-        _save_offset("strongswan_offset", new_offset)
-        state["strongswan_offset"] = new_offset
 
-    for line in lines:
-        m = _IPSEC_AUTH_RE.search(line)
-        if not m:
-            continue
-        kind = m.group("kind").upper()
-        peer_match = _IPSEC_PEER_RE.search(line)
-        peer = peer_match.group("peer") if peer_match else ""
+    processed_ok = False
+    try:
+        for line in lines:
+            m = _IPSEC_AUTH_RE.search(line)
+            if not m:
+                continue
+            try:
+                kind = m.group("kind").upper()
+                peer_match = _IPSEC_PEER_RE.search(line)
+                peer = peer_match.group("peer") if peer_match else ""
 
-        if "FAIL" in kind:
-            action, severity = "vpn_auth_fail", "medium"
-        elif "INSTALLED" in kind or "ESTABLISHED" in kind:
-            action, severity = "vpn_connect", "info"
-        elif "DELETE" in kind:
-            action, severity = "vpn_disconnect", "info"
-        else:
-            action, severity = "vpn_event", "info"
+                if "FAIL" in kind:
+                    action, severity = "vpn_auth_fail", "medium"
+                elif "INSTALLED" in kind or "ESTABLISHED" in kind:
+                    action, severity = "vpn_connect", "info"
+                elif "DELETE" in kind:
+                    action, severity = "vpn_disconnect", "info"
+                else:
+                    action, severity = "vpn_event", "info"
 
-        _log("vpn", action, remote_addr=peer, severity=severity,
-             details={"vpn": "ipsec", "kind": kind,
-                      "message": line.strip()[-512:]})
+                _log("vpn", action, remote_addr=peer, severity=severity,
+                     details={"vpn": "ipsec", "kind": kind,
+                              "message": line.strip()[-512:]})
+            except Exception as exc:
+                try:
+                    from app.services.collector_health import record_dead_letter
+                    record_dead_letter("strongswan", source_type="vpn",
+                                       reason=f"parse_failed: {exc}", raw_payload=line)
+                except Exception:
+                    pass
+        processed_ok = True
+    finally:
+        if processed_ok and new_offset != prev_offset:
+            _save_offset("strongswan_offset", new_offset)
+            state["strongswan_offset"] = new_offset
 
 
 def _collect_mpd5_lines(state: dict):
@@ -1431,22 +1502,34 @@ def _collect_mpd5_lines(state: dict):
         return
     prev_offset = state.get("mpd5_offset", _load_offset("mpd5_offset", 0))
     lines, new_offset = _tail_file(_MPD5_LOG, prev_offset)
-    if new_offset != prev_offset:
-        _save_offset("mpd5_offset", new_offset)
-        state["mpd5_offset"] = new_offset
 
-    for line in lines:
-        m = _MPD_OPEN_RE.search(line)
-        if m:
-            _log("vpn", "vpn_connect", severity="info",
-                 details={"vpn": "l2tp", "bundle": m.group("bundle"),
-                          "message": line.strip()[-512:]})
-            continue
-        m = _MPD_CLOSE_RE.search(line)
-        if m:
-            _log("vpn", "vpn_disconnect", severity="info",
-                 details={"vpn": "l2tp", "bundle": m.group("bundle"),
-                          "message": line.strip()[-512:]})
+    processed_ok = False
+    try:
+        for line in lines:
+          try:
+            m = _MPD_OPEN_RE.search(line)
+            if m:
+                _log("vpn", "vpn_connect", severity="info",
+                     details={"vpn": "l2tp", "bundle": m.group("bundle"),
+                              "message": line.strip()[-512:]})
+                continue
+            m = _MPD_CLOSE_RE.search(line)
+            if m:
+                _log("vpn", "vpn_disconnect", severity="info",
+                     details={"vpn": "l2tp", "bundle": m.group("bundle"),
+                              "message": line.strip()[-512:]})
+          except Exception as exc:
+            try:
+                from app.services.collector_health import record_dead_letter
+                record_dead_letter("mpd5", source_type="vpn",
+                                   reason=f"parse_failed: {exc}", raw_payload=line)
+            except Exception:
+                pass
+        processed_ok = True
+    finally:
+        if processed_ok and new_offset != prev_offset:
+            _save_offset("mpd5_offset", new_offset)
+            state["mpd5_offset"] = new_offset
 
 
 # ---------------------------------------------------------------------------

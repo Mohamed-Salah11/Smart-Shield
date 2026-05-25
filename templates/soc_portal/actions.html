@@ -105,9 +105,9 @@ function renderHistory(newEntryId) {
     return;
   }
   tbody.innerHTML = actionHistory.map(a => `<tr${a.id === newEntryId ? ' class="soc-row-enter"' : ''}>
-    <td class="soc-mono ext-6c660c40">${a.time}</td>
-    <td class="ext-1e29eefb">${a.action}</td>
-    <td class="ext-60f36eb8">${a.detail}</td>
+    <td class="soc-mono ext-6c660c40">${SOC.esc(a.time)}</td>
+    <td class="ext-1e29eefb">${SOC.esc(a.action)}</td>
+    <td class="ext-60f36eb8">${SOC.esc(a.detail)}</td>
   </tr>`).join('');
   SOC.markUpdated(document.getElementById('actions-live-chip'));
 }

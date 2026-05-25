@@ -31,6 +31,20 @@ def _ensure_parent_dir(path: str):
         os.makedirs(parent_dir, exist_ok=True)
 
 
+def _column_exists(cursor, table: str, column: str) -> bool:
+    """True if ``column`` is present on ``table`` (via PRAGMA table_info).
+
+    Used to guard index creation in init_db() for columns that older databases
+    only gain via a later migration. On a fresh DB the base CREATE TABLE already
+    defines the column; on a pre-migration DB the column is absent and the
+    matching migration creates both the column and the index, so init_db() must
+    not try to index it first."""
+    return any(
+        row[1] == column
+        for row in cursor.execute(f"PRAGMA table_info({table})").fetchall()
+    )
+
+
 def get_db():
     """
     Return a SQLite connection for the current request (or call).
@@ -1582,10 +1596,14 @@ ON static_leases(mac_address)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_category ON events(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_action   ON events(action)")
-    cursor.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_uuid "
-        "ON events(event_uuid)"
-    )
+    # event_uuid arrives via migration v34 on pre-existing DBs; index it only
+    # once the column exists (the migration creates this same index after the
+    # ALTER + backfill). Guards the first-upgrade-boot crash on a pre-v34 DB.
+    if _column_exists(cursor, "events", "event_uuid"):
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_uuid "
+            "ON events(event_uuid)"
+        )
 
     # Correlation rules — drive correlation_engine.py (Phase 23)
     cursor.execute("""
@@ -1673,9 +1691,11 @@ ON static_leases(mac_address)
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_saa_event_key ON siem_alert_actions(event_key)"
     )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_saa_event_uuid ON siem_alert_actions(event_uuid)"
-    )
+    # event_uuid added by migration v35; index only when present (see events note above).
+    if _column_exists(cursor, "siem_alert_actions", "event_uuid"):
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_saa_event_uuid ON siem_alert_actions(event_uuid)"
+        )
 
     # SOC L3-blocked IPs — source of truth for the persistent <soc_blocklist> PF table
     cursor.execute("""
@@ -1701,10 +1721,12 @@ ON static_leases(mac_address)
         assigned_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_saasign_event_uuid "
-        "ON siem_alert_assignments(event_uuid)"
-    )
+    # event_uuid added by migration v35; index only when present (see events note above).
+    if _column_exists(cursor, "siem_alert_assignments", "event_uuid"):
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_saasign_event_uuid "
+            "ON siem_alert_assignments(event_uuid)"
+        )
 
     # SOC analyst presence heartbeat — which analysts are currently logged in
     cursor.execute("""

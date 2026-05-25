@@ -38,6 +38,25 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _validate_action_target(action_type: str, target_value: str) -> tuple:
+    """Return ``(ok, error)`` for an action's operand.
+
+    block/unblock require a real IP; reload_firewall takes no meaningful target
+    (empty, or the literals ``pf``/``firewall``). Stops a recommendation with a
+    bogus target from being filed, approved, and silently no-op'd by the PF push.
+    """
+    import ipaddress
+    if action_type in ("block_ip", "unblock_ip"):
+        try:
+            ipaddress.ip_address((target_value or "").strip())
+        except ValueError:
+            return False, "target_value must be a valid IP address"
+    if action_type == "reload_firewall" and target_value:
+        if target_value not in ("pf", "firewall"):
+            return False, "reload_firewall target must be empty, 'pf', or 'firewall'"
+    return True, ""
+
+
 def create_recommendation(conn, *, action_type: str, target_value: str,
                           reason: str = "", severity: str = "medium",
                           created_by: str = "", source_alert_id: str = "") -> dict:
@@ -53,6 +72,9 @@ def create_recommendation(conn, *, action_type: str, target_value: str,
                 "message": f"unknown action_type {action_type!r}"}
     if not target_value:
         return {"ok": False, "id": None, "message": "target_value is required"}
+    ok_target, target_err = _validate_action_target(action_type, target_value)
+    if not ok_target:
+        return {"ok": False, "id": None, "message": target_err}
     if severity not in ("critical", "high", "medium", "low", "info"):
         severity = "medium"
 
@@ -183,6 +205,9 @@ def _apply_action(conn, action_type: str, target_value: str,
     and then flushed into the ``<soc_blocklist>`` PF table — the same path the
     SOC portal's L3 quick-action uses.
     """
+    ok_target, target_err = _validate_action_target(action_type, target_value)
+    if not ok_target:
+        return False, target_err
     try:
         if action_type == "block_ip":
             conn.execute(

@@ -31,6 +31,7 @@ def push_soc_blocklist_to_pf(conn) -> dict:
     except Exception as exc:
         return {"ok": False, "count": 0, "message": f"DB query failed: {exc}"}
 
+    invalid = []
     for row in rows:
         ip = ((row["ip"] if hasattr(row, "keys") else row[0]) or "").strip()
         if not ip:
@@ -38,6 +39,7 @@ def push_soc_blocklist_to_pf(conn) -> dict:
         try:
             _ip.ip_address(ip)          # validate
         except ValueError:
+            invalid.append(ip)          # surface bad rows instead of hiding them
             continue
         ips.add(ip)
 
@@ -48,20 +50,24 @@ def push_soc_blocklist_to_pf(conn) -> dict:
     except Exception as exc:
         return {"ok": False, "count": 0, "message": f"Could not write IP file: {exc}"}
 
+    _invalid_note = (f"; ignored invalid IP(s): {', '.join(invalid[:10])}"
+                     if invalid else "")
+
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "count": len(ips),
+        return {"ok": not invalid, "count": len(ips), "invalid": invalid,
                 "message": f"Non-FreeBSD — {len(ips)} IP(s) written to file "
-                           f"(pfctl not called)"}
+                           f"(pfctl not called){_invalid_note}"}
 
     try:
         from app.services.priv_helper import run_privileged
         r = run_privileged("pf.table_replace_file", table="soc_blocklist",
                            file_path=_SOC_BLOCK_FILE)
         if r.returncode == 0:
-            return {"ok": True, "count": len(ips),
-                    "message": f"soc_blocklist table updated with {len(ips)} IP(s)"}
-        return {"ok": False, "count": len(ips),
+            return {"ok": not invalid, "count": len(ips), "invalid": invalid,
+                    "message": f"soc_blocklist table updated with {len(ips)} IP(s)"
+                               f"{_invalid_note}"}
+        return {"ok": False, "count": len(ips), "invalid": invalid,
                 "message": f"pfctl table replace failed: "
                            f"{(r.stderr or r.stdout or '').strip()}"}
     except Exception as exc:
-        return {"ok": False, "count": len(ips), "message": str(exc)}
+        return {"ok": False, "count": len(ips), "invalid": invalid, "message": str(exc)}

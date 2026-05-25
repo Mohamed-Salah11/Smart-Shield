@@ -88,7 +88,7 @@
           <td>{{ r['created_by'] or '—' }}</td>
           <td class="ext-9fb8e23e">{{ r['created_at'] }}</td>
           <td>
-            {% if r['status'] == 'pending' and tier in ('L2','L3') %}
+            {% if r['status'] == 'pending' and soc_tier in ('L2','L3') %}
             <div class="d-flex gap-1">
               <form method="POST" action="{{ url_for('soc_portal.recommendation_review', rec_id=r['id']) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
