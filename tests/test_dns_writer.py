@@ -212,3 +212,71 @@ class TestRecoverDnsService:
         res = dw.recover_dns_service(conn)
         assert res["ok"] is True
         assert res["reason"] == "recovered"
+
+
+class TestApplyUnboundRestartEscalation:
+    """A `reload` re-reads config but does NOT re-bind listening sockets, so an
+    Unbound started on the 127.0.0.1-only bootstrap config stays on loopback even
+    after we write a LAN-binding config. apply_unbound must escalate to a full
+    restart (which re-binds) when the LAN IP isn't actually being served."""
+
+    def _patch_freebsd_apply(self, monkeypatch):
+        """Stub out every FreeBSD-only side effect in apply_unbound so the
+        restart-escalation branch is reachable on a dev host."""
+        import app.services.dns_writer as dw
+        import app.services.service_manager as sm
+        import app.services.network_service as ns
+        import app.services.config_file_utils as cfu
+
+        monkeypatch.setattr("sys.platform", "freebsd")
+        monkeypatch.setattr("time.sleep", lambda *_a, **_k: None)
+        monkeypatch.setattr(dw, "validate_unbound_conf", lambda _c: (True, ""))
+        monkeypatch.setattr(dw, "_save_known_good_unbound", lambda: True)
+        monkeypatch.setattr(cfu, "atomic_write", lambda *_a, **_k: None)
+        monkeypatch.setattr(sm, "sysrc_set", lambda *_a, **_k: {"ok": True, "message": ""})
+        monkeypatch.setattr(ns, "is_network_dry_run", lambda: False)
+        # Daemon is "running" (true even for the loopback bootstrap config).
+        monkeypatch.setattr(dw, "get_unbound_status", lambda: {"running": True, "message": "running"})
+        # A reload "succeeds" at the rc level but doesn't re-bind.
+        monkeypatch.setattr(dw, "_start_or_reload_unbound", lambda: {"ok": True, "message": "reloaded"})
+
+    def test_escalates_to_restart_when_loopback_only(self, conn, monkeypatch):
+        import app.services.dns_writer as dw
+        self._patch_freebsd_apply(monkeypatch)
+
+        calls = {"restart": 0}
+        # Loopback-only after reload (False), bound after the restart (True).
+        bind_states = iter([False, True])
+        monkeypatch.setattr(dw, "unbound_listening_on_lan",
+                            lambda _c: next(bind_states, True))
+
+        def _restart():
+            calls["restart"] += 1
+            return {"ok": True, "message": "restarted"}
+        monkeypatch.setattr(dw, "_restart_unbound", _restart)
+
+        res = dw.apply_unbound(conn)
+        assert calls["restart"] == 1, "should escalate reload→restart"
+        assert res["ok"] is True
+        assert res["message"] == "restarted"
+
+    def test_restart_failure_rolls_back(self, conn, monkeypatch):
+        import app.services.dns_writer as dw
+        self._patch_freebsd_apply(monkeypatch)
+
+        # Never binds the LAN IP, even after the restart.
+        monkeypatch.setattr(dw, "unbound_listening_on_lan", lambda _c: False)
+        monkeypatch.setattr(dw, "_restart_unbound",
+                            lambda: {"ok": True, "message": "restarted"})
+        rolled = {"n": 0}
+
+        def _rb():
+            rolled["n"] += 1
+            return {"ok": True, "message": "rolled back to known-good"}
+        monkeypatch.setattr(dw, "_rollback_unbound", _rb)
+
+        res = dw.apply_unbound(conn)
+        assert res["ok"] is False
+        assert rolled["n"] == 1
+        assert res["rolled_back"] is True
+        assert "192.168.1.1" in res["message"]

@@ -48,6 +48,13 @@ class TestNtpWriter:
         conf = generate_ntp_conf({})
         assert "driftfile" in conf
 
+    def test_generate_tinker_panic_disabled(self):
+        # On a VM the boot-time clock offset can exceed ntpd's 1000s panic
+        # threshold; `tinker panic 0` lets ntpd step the clock instead of dying.
+        from app.services.ntp_writer import generate_ntp_conf
+        conf = generate_ntp_conf({})
+        assert "tinker panic 0" in conf
+
     def test_generate_local_clock(self):
         from app.services.ntp_writer import generate_ntp_conf
         conf = generate_ntp_conf({"serve_local": True})

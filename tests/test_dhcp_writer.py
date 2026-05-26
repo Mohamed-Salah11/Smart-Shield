@@ -120,6 +120,33 @@ class TestGenerateDhcpdConf:
 
 
 # ---------------------------------------------------------------------------
+# dhcpd_ifaces (interface binding) — keep dhcpd off the WAN
+# ---------------------------------------------------------------------------
+
+class TestDhcpIfaces:
+
+    def test_lan_pool_binds_lan_iface_only(self, conn):
+        # Seed fixture enables a LAN pool on em1 (WAN em0 has no pool), so dhcpd
+        # must bind em1 only — never the WAN, which is what caused the boot-log
+        # "No subnet declaration for em0 / Ignoring requests on em0".
+        from app.services.dhcp_writer import _dhcp_ifaces
+        assert _dhcp_ifaces(conn) == "em1"
+
+    def test_no_enabled_pool_returns_empty(self, conn):
+        from app.services.dhcp_writer import _dhcp_ifaces
+        conn.execute("UPDATE dhcp_pools SET enabled=0")
+        conn.commit()
+        assert _dhcp_ifaces(conn) == ""
+
+    def test_rc_conf_block_persists_dhcpd_ifaces(self, conn):
+        # The boot-time rcvar must match the live value apply_dhcpd sets.
+        from app.services.rc_conf_writer import generate_rc_conf_block
+        block = generate_rc_conf_block(conn)
+        assert 'dhcpd_enable="YES"' in block
+        assert 'dhcpd_ifaces="em1"' in block
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 

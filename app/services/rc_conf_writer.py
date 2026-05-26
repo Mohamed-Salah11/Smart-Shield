@@ -190,6 +190,14 @@ def generate_rc_conf_block(conn) -> str:
     if dhcp_on and dhcp_on[0]["c"] > 0:
         lines.append('dhcpd_enable="YES"')
         lines.append('dhcpd_flags="-q"')
+        # Bind dhcpd only to the LAN interface(s) that have an enabled pool.
+        # Without this, ISC dhcpd binds every broadcast interface (incl. the WAN)
+        # and logs "No subnet declaration for <wan>" / "Ignoring requests on
+        # <wan>" on every boot. Derived from the same pool→assigned_port mapping
+        # dhcp_writer uses; see app/services/dhcp_writer.py:_dhcp_ifaces.
+        dhcpd_ifaces = _dhcpd_ifaces(conn)
+        if dhcpd_ifaces:
+            lines.append(f'dhcpd_ifaces="{dhcpd_ifaces}"')
 
     # Unbound (DNS)
     try:
@@ -233,10 +241,23 @@ def generate_rc_conf_block(conn) -> str:
     except Exception:
         pass
 
-    # IDS/Suricata
-    ids_row = _rows(conn, "SELECT enabled FROM ids_config WHERE id=1")
+    # IDS/Suricata — enable PLUS the launch vars the FreeBSD rc script needs so
+    # the daemon survives a reboot the same way the live enable keeps it up.
+    # Without suricata_interface the service starts then exits. Mirrors
+    # ids_writer._apply_suricata_rcvars (single resolver, so YAML + rc agree).
+    ids_row = _rows(conn, "SELECT enabled, mode FROM ids_config WHERE id=1")
     if ids_row and ids_row[0].get("enabled"):
         lines.append('suricata_enable="YES"')
+        try:
+            from app.services.ids_writer import _resolve_capture_iface, _SURICATA_CONF_PATH
+            lines.append(f'suricata_conf="{_SURICATA_CONF_PATH}"')
+            if (ids_row[0].get("mode") or "ids").lower() == "ips":
+                # IPS: capture is YAML-driven netmap across two ifaces — no rc -i.
+                lines.append('suricata_interface=""')
+            else:
+                lines.append(f'suricata_interface="{_resolve_capture_iface(conn)}"')
+        except Exception:
+            pass
 
     return "\n".join(lines)
 
@@ -244,6 +265,20 @@ def generate_rc_conf_block(conn) -> str:
 def _rc_iface(name: str) -> str:
     """Convert interface name to rc.conf-safe form (dots → underscores)."""
     return re.sub(r"[^A-Za-z0-9_]", "_", name)
+
+
+def _dhcpd_ifaces(conn) -> str:
+    """Space-joined LAN interface list for the ``dhcpd_ifaces`` rcvar.
+
+    Delegates to ``dhcp_writer._dhcp_ifaces`` so the value persisted to rc.conf
+    for the next boot is identical to the one ``apply_dhcpd`` sets live — a
+    single source of truth. Best-effort: returns "" on any failure so a writer
+    hiccup never blocks rc.conf generation."""
+    try:
+        from app.services.dhcp_writer import _dhcp_ifaces
+        return _dhcp_ifaces(conn)
+    except Exception:
+        return ""
 
 
 # ---------------------------------------------------------------------------

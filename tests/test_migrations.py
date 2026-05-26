@@ -240,6 +240,63 @@ class TestEventUuidIndexUpgrade:
 
 
 # ---------------------------------------------------------------------------
+# v46 migration: siem_case_events evidence columns
+# ---------------------------------------------------------------------------
+
+class TestMigrationV46:
+    def _build_v45_case_events(self, conn):
+        """siem_case_events exactly as it existed at v45 (no evidence columns)."""
+        conn.execute("""
+        CREATE TABLE siem_case_events (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id         INTEGER NOT NULL,
+            event_timestamp TEXT    NOT NULL,
+            event_action    TEXT    NOT NULL DEFAULT '',
+            event_category  TEXT    NOT NULL DEFAULT '',
+            event_summary   TEXT    DEFAULT ''
+        )
+        """)
+        conn.execute(
+            "INSERT INTO siem_case_events (case_id, event_timestamp, event_action, event_summary) "
+            "VALUES (1, '2026-05-26T12:00:00', 'alert', 'pre-existing row')"
+        )
+        conn.commit()
+
+    def test_v46_adds_evidence_columns(self):
+        conn = _fresh_conn()
+        self._build_v45_case_events(conn)
+        from app.migrations import _migration_v46
+        _migration_v46(conn)
+        conn.commit()
+        cols = _col_names(conn, "siem_case_events")
+        assert "event_uuid" in cols
+        assert "event_details" in cols
+
+    def test_v46_preserves_existing_rows(self):
+        conn = _fresh_conn()
+        self._build_v45_case_events(conn)
+        from app.migrations import _migration_v46
+        _migration_v46(conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT event_summary, event_details FROM siem_case_events LIMIT 1"
+        ).fetchone()
+        assert row["event_summary"] == "pre-existing row"
+        assert (row["event_details"] or "") == ""   # new column defaults empty
+
+    def test_v46_idempotent(self):
+        """Re-running v46 (columns already present) must not raise."""
+        conn = _fresh_conn()
+        self._build_v45_case_events(conn)
+        from app.migrations import _migration_v46
+        _migration_v46(conn)
+        _migration_v46(conn)  # second run is a no-op
+        conn.commit()
+        cols = _col_names(conn, "siem_case_events")
+        assert "event_uuid" in cols and "event_details" in cols
+
+
+# ---------------------------------------------------------------------------
 # DNS filter: redirect action round-trip
 # ---------------------------------------------------------------------------
 
