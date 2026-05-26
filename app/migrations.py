@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 _log = logging.getLogger(__name__)
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 45
+CURRENT_SCHEMA_VERSION = 46
 
 
 class SchemaVersionError(RuntimeError):
@@ -454,6 +454,8 @@ def _migration_v17(conn):
         event_action    TEXT    NOT NULL DEFAULT '',
         event_category  TEXT    NOT NULL DEFAULT '',
         event_summary   TEXT    DEFAULT '',
+        event_uuid      TEXT    DEFAULT '',
+        event_details   TEXT    DEFAULT '',
         FOREIGN KEY(case_id) REFERENCES siem_cases(id) ON DELETE CASCADE
     )
     """)
@@ -1898,6 +1900,31 @@ def _migration_v45(conn):
             pass  # column already exists
 
 
+def _migration_v46(conn):
+    """v46 — store the full source log on a SOC case so it can be investigated.
+
+    ``siem_case_events`` previously held only a one-line ``event_summary``, so a
+    case opened from an alert kept no detail of the originating log — the case
+    page had nothing for the analyst to investigate. Two columns back the new
+    "Linked Logs / Evidence" view:
+
+    * ``event_uuid``    — the collision-safe join key to the audit-log event.
+    * ``event_details`` — a JSON snapshot of the full event, captured at
+      case-open time so the evidence survives audit-log retention eviction.
+
+    Idempotent: the ALTERs no-op when the columns already exist (fresh installs
+    create them inline in database.py / the v17 mirror).
+    """
+    for ddl in (
+        "ALTER TABLE siem_case_events ADD COLUMN event_uuid TEXT DEFAULT ''",
+        "ALTER TABLE siem_case_events ADD COLUMN event_details TEXT DEFAULT ''",
+    ):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -1945,6 +1972,7 @@ MIGRATIONS = [
     (43, _migration_v43),
     (44, _migration_v44),
     (45, _migration_v45),
+    (46, _migration_v46),
 ]
 
 

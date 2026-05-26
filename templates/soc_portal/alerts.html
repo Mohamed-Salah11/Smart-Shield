@@ -82,6 +82,7 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="case-source-event">
+        <input type="hidden" id="case-source-uuid">
         <div class="mb-3">
           <label class="form-label ext-e2c29c05">Title</label>
           <input type="text" id="case-title" class="form-control ext-4b1196ec" placeholder="Case title…">
@@ -114,6 +115,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 let allAlerts = [];
+let currentRows = [];      // events currently rendered (filtered) — the drawer indexes into this
 let activeAnalysts = [];   // SOC analysts currently logged in — assignable targets
 const caseModal = new bootstrap.Modal(document.getElementById('caseModal'));
 
@@ -164,90 +166,10 @@ function timeFmt(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
 
-// Splunk-style detail groups. Each `kind:"ioc"` field gets a copy button.
-// Every column returned by api_alerts() should be reachable here so SOC
-// analysts have full capture for investigation; anything not surfaced is
-// still in the raw-JSON <details> below.
-const DETAIL_GROUPS = [
-  { title: 'Event',          fields: [['event_uuid','Event UUID','ioc'],
-                                      ['timestamp','Time'],['category','Category'],
-                                      ['action','Action'],['severity','Severity'],
-                                      ['effective_severity','Effective severity'],
-                                      ['source_type','Source type'],
-                                      ['source_name','Source name']] },
-  { title: 'Signature',      fields: [['signature','Rule'],
-                                      ['mitre_tactic','MITRE tactic'],
-                                      ['mitre_technique','MITRE technique'],
-                                      ['sig_category','Class'],
-                                      ['gid','GID'],['sid','SID'],
-                                      ['rule_id','Rule ID'],
-                                      ['rule_name','Rule name']] },
-  { title: 'Network policy', fields: [['interface','Interface'],
-                                      ['direction','Direction'],
-                                      ['policy_id','Policy ID'],
-                                      ['policy_name','Policy name']] },
-  { title: 'Source',         fields: [['src_ip','IP','ioc'],['src_port','Port'],
-                                      ['hostname','Hostname'],['mac','MAC','ioc']] },
-  { title: 'Destination',    fields: [['dest_ip','IP','ioc'],['dest_port','Port'],
-                                      ['proto','Protocol'],
-                                      ['domain','Domain','ioc'],
-                                      ['url','URL','ioc']] },
-  { title: 'HTTP',           fields: [['http_method','Method'],['http_status','Status'],
-                                      ['http_url','URL','ioc'],['http_host','Host','ioc'],
-                                      ['http_hostname','Hostname','ioc'],
-                                      ['http_agent','User-Agent']] },
-  { title: 'TLS',            fields: [['tls_sni','SNI','ioc']] },
-  { title: 'File',           fields: [['filename','Filename'],['extension','Extension'],
-                                      ['mime','MIME'],['magic','Magic'],['size','Size'],
-                                      ['md5','MD5','ioc'],['sha256','SHA-256','ioc'],
-                                      ['state','State']] },
-  { title: 'User',           fields: [['username','Username'],['remote_addr','Remote IP','ioc']] },
-];
-
-function fieldRow(label, value, kind) {
-  const v   = String(value);
-  const esc = htmlEscape(v);
-  const copy = (kind === 'ioc')
-    ? `<button class="ext-83d31f7f" type="button" data-action="soc-copy-ioc" data-value="${esc}" title="Copy"><i class="fa-regular fa-copy"></i></button>`
-    : '';
-  return `<tr>
-            <td class="ext-9f7def3f">${label}</td>
-            <td class="soc-mono ext-dbda352d">${esc}${copy}</td>
-          </tr>`;
-}
-
-function copyToClipboard(btn, v) {
-  if (!navigator.clipboard) return;
-  navigator.clipboard.writeText(v).then(() => {
-    const i = btn.querySelector('i');
-    if (!i) return;
-    const orig = i.className;
-    i.className = 'fa-solid fa-check';
-    btn.style.color = '#10b981';
-    setTimeout(() => { i.className = orig; btn.style.color = '#64748b'; }, 900);
-  });
-}
-
-function renderDetailPanel(e) {
-  const d    = (e.details && typeof e.details === 'object') ? e.details : {};
-  const flat = Object.assign({}, e, d);
-  const blocks = DETAIL_GROUPS.map(g => {
-    const rows = g.fields
-      .filter(([k]) => flat[k] !== undefined && flat[k] !== null && flat[k] !== '')
-      .map(([k, label, kind]) => fieldRow(label, flat[k], kind));
-    if (!rows.length) return '';
-    return `<div class="ext-46a7d992">
-              <div class="ext-12c0dff8">${g.title}</div>
-              <table class="ext-aae8b9ef">${rows.join('')}</table>
-            </div>`;
-  }).filter(Boolean).join('');
-  const rawJson = htmlEscape(JSON.stringify(d, null, 2));
-  return `<div class="ext-bd1aaf60">${blocks || '<div class="ext-6f459758">No structured fields. See raw event below.</div>'}</div>
-          <details class="ext-7f51845c">
-            <summary class="ext-5002f698"><i class="fa-solid fa-code me-1"></i>Show raw event JSON</summary>
-            <pre class="soc-mono ext-2ac6e3c9">${rawJson}</pre>
-          </details>`;
-}
+// Full per-event detail is rendered by the shared SOC drawer
+// (SOC.openLogDetail / SOC.renderLogDetailHTML in soc_portal/base.html), so a
+// click opens a slide-in panel that the 3s auto-refresh cannot collapse — the
+// same UX as the firewall-logs page. The inline detail-row is gone.
 
 // ── Alert assignment ─────────────────────────────────────────────────────
 function assignCell(e, ts) {
@@ -312,7 +234,13 @@ async function loadAnalysts() {
 }
 
 function renderRows(data) {
+  // Don't rebuild the table while a detail drawer is open — the rebuild would
+  // re-key the rows under the analyst (and used to collapse the old inline
+  // detail). The drawer holds its own snapshot, so the table can safely wait
+  // until it's closed; the next 3s tick re-renders then.
+  if (SOC.isLogDetailOpen && SOC.isLogDetailOpen()) return;
   const tbody = document.getElementById('alert-tbody');
+  currentRows = data;
   if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="soc-empty"><i class="fa-solid fa-shield-check"></i><div>No alerts matching filters</div></div></td></tr>';
     return;
@@ -335,13 +263,12 @@ function renderRows(data) {
       : `<span class="ext-b267534b">New</span>`;
     const caseLink = aa && aa.case_id
       ? `<a class="ext-00d74da7" href="/soc-portal/cases/${aa.case_id}">#${aa.case_id}</a>`
-      : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${htmlEscape(ts)}" data-action-name="${htmlEscape(act)}">+ Case</button>`;
-    const detailPanel = renderDetailPanel(e);
+      : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${htmlEscape(ts)}" data-event-uuid="${htmlEscape(e.event_uuid || '')}" data-action-name="${htmlEscape(act)}">+ Case</button>`;
     const ipCell = (ip && ip !== '—')
       ? `<a href="#" data-soc-pivot-ip="${htmlEscape(ip)}" title="Filter by ${htmlEscape(ip)}">${htmlEscape(ip)}</a>`
       : '—';
     const enterCls = newKeys.has(keys[idx]) ? ' soc-row-enter' : '';
-    return `<tr class="alert-row ext-b202c6d4${enterCls}" data-idx="${idx}" data-action="alert-row-toggle">
+    return `<tr class="alert-row ext-b202c6d4${enterCls}" data-idx="${idx}" data-action="alert-open-detail" title="Click for full detail">
       <td class="soc-mono ext-6c660c40">${timeFmt(ts)}</td>
       <td>${sevBadge}</td>
       <td><span class="ext-179624b7">${cat}</span></td>
@@ -352,19 +279,13 @@ function renderRows(data) {
       <td>${statusBadge}</td>
       <td>${caseLink}</td>
       <td>${assignCell(e, ts)}</td>
-    </tr>
-    <tr class="alert-detail ext-9b0eb096 d-none" id="detail-${idx}">
-      <td class="ext-80a303e3" colspan="10">${detailPanel}</td>
     </tr>`;
   }).join('');
 }
 
-function toggleRow(idx) {
-  const r = document.getElementById('detail-' + idx);
-  if (!r) return;
-  // Toggle a class, not inline style — the row's initial hidden state comes
-  // from a class, so the first click now reliably opens it.
-  r.classList.toggle('d-none');
+function openAlertDetail(idx) {
+  const e = currentRows[idx];
+  if (e) SOC.openLogDetail(e);
 }
 
 function applyFilters() {
@@ -409,8 +330,9 @@ async function loadAlerts() {
   }
 }
 
-function openCaseModal(sourceEvent, action) {
+function openCaseModal(sourceEvent, action, eventUuid) {
   document.getElementById('case-source-event').value = sourceEvent;
+  document.getElementById('case-source-uuid').value  = eventUuid || '';
   document.getElementById('case-title').value = action ? `Investigate: ${action}` : '';
   document.getElementById('case-desc').value = '';
   caseModal.show();
@@ -422,6 +344,8 @@ async function submitCase() {
     description:  document.getElementById('case-desc').value.trim(),
     severity:     document.getElementById('case-severity').value,
     source_event: document.getElementById('case-source-event').value,
+    // event_uuid lets the backend snapshot the full source log onto the case.
+    event_uuid:   document.getElementById('case-source-uuid').value,
   };
   if (!payload.title) { SOC.toast('Title is required.', 'error'); return; }
   const r = await fetch('/soc-portal/cases/open', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -521,11 +445,11 @@ document.getElementById('ioc-input').addEventListener('keydown', function (e) {
   var R = window.SSActions || (window.SSActions = {});
   R['h_a6ba7141cd'] = function (event, el) { loadAlerts() };
   R['h_365f8ec3d4'] = function (event, el) { submitCase() };
-  R['soc-copy-ioc']     = function (event, el) { event.stopPropagation(); copyToClipboard(el, el.dataset.value); };
-  R['alert-stop-prop']  = function (event, el) { event.stopPropagation(); };
-  R['alert-assign']     = function (event, el) { assignAlert(el, el.dataset.eventUuid, el.dataset.eventKey, el.dataset.eventAction); };
-  R['soc-open-case']    = function (event, el) { event.stopPropagation(); openCaseModal(el.dataset.ts, el.dataset.actionName); };
-  R['alert-row-toggle'] = function (event, el) { toggleRow(Number(el.dataset.idx)); };
+  /* soc-copy-ioc + soc-drawer-close are registered globally in soc_portal/base.html. */
+  R['alert-stop-prop']   = function (event, el) { event.stopPropagation(); };
+  R['alert-assign']      = function (event, el) { assignAlert(el, el.dataset.eventUuid, el.dataset.eventKey, el.dataset.eventAction); };
+  R['soc-open-case']     = function (event, el) { event.stopPropagation(); openCaseModal(el.dataset.ts, el.dataset.actionName, el.dataset.eventUuid); };
+  R['alert-open-detail'] = function (event, el) { openAlertDetail(Number(el.dataset.idx)); };
 })();
 </script>
 <!-- /inline-handlers:auto -->

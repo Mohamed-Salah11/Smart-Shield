@@ -368,6 +368,15 @@ def _start_or_reload_unbound() -> dict:
     return service_action("unbound", action)
 
 
+def _restart_unbound() -> dict:
+    """Full restart of Unbound. Unlike ``reload`` (which only re-reads
+    caches/zones/ACLs), a restart re-opens listening sockets — required when the
+    set of bound interfaces changes (e.g. the install-time 127.0.0.1 bootstrap
+    config gaining the LAN IP, or a LAN-IP change). See ``apply_unbound``."""
+    from app.services.service_manager import service_action
+    return service_action("unbound", "restart")
+
+
 def _rollback_unbound() -> dict:
     """Restore the known-good unbound.conf and reload/start Unbound."""
     if not os.path.exists(_UNBOUND_KNOWN_GOOD_PATH):
@@ -474,6 +483,41 @@ def apply_unbound(conn) -> dict:
                 "conf": conf,
                 "rolled_back": False,
             }
+
+        # Running is not enough: a `reload` re-reads the config but does NOT
+        # re-open listening sockets, so an Unbound that started on the
+        # install-time 127.0.0.1-only bootstrap config stays bound to loopback
+        # even after we write a config that adds the LAN IP. LAN clients are
+        # handed this box as their resolver via DHCP, so "running on 127.0.0.1"
+        # leaves the whole LAN unable to browse. When the LAN IP isn't actually
+        # being served, escalate from reload to a full restart (which re-binds),
+        # then re-probe with a short bounded retry — Unbound takes a beat to bind
+        # after start (mirrors the probe in routes/setup.py:_wizard_verify).
+        import time as _time
+        lan_ip = _lan_ip(conn)
+        if lan_ip and lan_ip != "127.0.0.1" and not unbound_listening_on_lan(conn):
+            result = _restart_unbound()
+            bound = False
+            for _attempt in range(3):
+                if unbound_listening_on_lan(conn):
+                    bound = True
+                    break
+                if _attempt < 2:
+                    _time.sleep(1)
+            if not result.get("ok") or not bound:
+                rb = _rollback_unbound()
+                return {
+                    "ok": False,
+                    "message": (
+                        f"Unbound restarted ({result.get('message', 'no status')}) "
+                        f"but is still not listening on the LAN IP {lan_ip}:53. "
+                        f"Check `unbound-checkconf {_UNBOUND_CONF_PATH}` and confirm "
+                        f"the pkg `unbound` service (not base `local_unbound`) owns "
+                        f"port 53. {rb.get('message', '')}".strip()
+                    ),
+                    "conf": conf,
+                    "rolled_back": rb.get("ok", False),
+                }
 
     return {
         "ok": True,
