@@ -1667,6 +1667,8 @@ ON static_leases(mac_address)
         event_action    TEXT    NOT NULL DEFAULT '',
         event_category  TEXT    NOT NULL DEFAULT '',
         event_summary   TEXT    DEFAULT '',
+        event_uuid      TEXT    DEFAULT '',
+        event_details   TEXT    DEFAULT '',
         FOREIGN KEY(case_id) REFERENCES siem_cases(id) ON DELETE CASCADE
     )
     """)

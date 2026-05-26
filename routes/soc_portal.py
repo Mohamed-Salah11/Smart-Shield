@@ -25,7 +25,7 @@ from flask import (
 from werkzeug.security import check_password_hash
 
 from app.database import get_db
-from app.audit_log import log_soc_event
+from app.audit_log import log_soc_event, get_event_by_uuid
 from app.soc_portal_auth import (
     active_soc_analysts,
     clear_mfa_pending,
@@ -1177,6 +1177,39 @@ def cases():
     )
 
 
+def _snapshot_case_event(conn, case_id, event_uuid="", source_event=""):
+    """Capture the full originating log onto a case as a siem_case_events row.
+
+    A SOC case is a long-lived incident record, so the evidence must survive
+    audit-log retention eviction — we store a JSON snapshot of the whole event
+    (``event_details``) rather than just a pointer. The case page renders this
+    via the shared log-detail drawer. Best-effort: if the event can't be
+    resolved we still record a minimal row (timestamp only) when a source
+    timestamp is known, so the case at least lists the linked log.
+    """
+    evt = get_event_by_uuid(event_uuid=event_uuid, timestamp=source_event)
+    if evt:
+        severity = (evt.get("severity") or "info")
+        summary  = f"{evt.get('action', '')} ({severity})".strip()
+        conn.execute(
+            "INSERT INTO siem_case_events "
+            "(case_id, event_timestamp, event_action, event_category, "
+            " event_summary, event_uuid, event_details) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (case_id, evt.get("timestamp", ""), evt.get("action", ""),
+             evt.get("category", ""), summary, evt.get("event_uuid", "") or event_uuid,
+             _json.dumps(evt)),
+        )
+    elif source_event:
+        # Couldn't resolve the full event (e.g. aged out) — keep a stub so the
+        # case still shows the linked timestamp; detail falls back gracefully.
+        conn.execute(
+            "INSERT INTO siem_case_events "
+            "(case_id, event_timestamp, event_uuid) VALUES (?,?,?)",
+            (case_id, source_event, event_uuid),
+        )
+
+
 @soc_portal_bp.route("/cases/open", methods=["POST"])
 @soc_login_required
 def cases_open():
@@ -1186,6 +1219,7 @@ def cases_open():
     description = (data.get("description") or "").strip()
     severity    = data.get("severity", "medium")
     source_event = data.get("source_event", "")
+    event_uuid   = (data.get("event_uuid") or "").strip()
 
     if not title:
         return jsonify({"ok": False, "message": "Title is required."}), 400
@@ -1201,8 +1235,15 @@ def cases_open():
         """,
         (title, description, severity, username, source_event),
     )
-    conn.commit()
     case_id = cur.lastrowid
+    # Snapshot the originating log onto the case so it can be investigated on
+    # the case page (the source_event string alone isn't enough). Non-fatal.
+    if event_uuid or source_event:
+        try:
+            _snapshot_case_event(conn, case_id, event_uuid, source_event)
+        except Exception:
+            pass
+    conn.commit()
     _soc_log_event(
         category="security",
         action="soc_case_opened",
@@ -1229,6 +1270,35 @@ def case_detail(case_id):
         "SELECT * FROM siem_case_events WHERE case_id=? ORDER BY event_timestamp ASC",
         (case_id,),
     ).fetchall()
+    # Build the JSON the page hands to SOC.openLogDetail(): the full event object
+    # (top-level fields + nested details) snapshotted at case-open. Legacy rows
+    # (no event_details) fall back to the flat columns so the drawer still shows
+    # timestamp/action/category.
+    linked_events = []
+    for ev in events:
+        ev = dict(ev)
+        detail = {}
+        raw = ev.get("event_details") or ""
+        if raw:
+            try:
+                detail = _json.loads(raw)
+            except Exception:
+                detail = {}
+        if not isinstance(detail, dict) or not detail:
+            detail = {
+                "timestamp": ev.get("event_timestamp", ""),
+                "action":    ev.get("event_action", ""),
+                "category":  ev.get("event_category", ""),
+                "event_uuid": ev.get("event_uuid", "") or "",
+                "details":   {},
+            }
+        linked_events.append({
+            "timestamp": ev.get("event_timestamp", ""),
+            "action":    ev.get("event_action", "") or detail.get("action", ""),
+            "category":  ev.get("event_category", "") or detail.get("category", ""),
+            "summary":   ev.get("event_summary", "") or "",
+            "detail":    detail,
+        })
     analysts = conn.execute(
         """
         SELECT DISTINCT u.id, u.username
@@ -1246,6 +1316,7 @@ def case_detail(case_id):
         case=case,
         notes=notes,
         events=events,
+        linked_events=linked_events,
         analysts=analysts,
         username=username,
         tier=tier,

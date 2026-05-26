@@ -523,6 +523,118 @@ class TestApplyIds:
 
 
 # ---------------------------------------------------------------------------
+# Capture-interface resolver + rc.conf launch vars
+# ---------------------------------------------------------------------------
+
+class TestResolveCaptureIface:
+
+    def test_explicit_interface_wins(self, conn):
+        from app.services.ids_writer import _resolve_capture_iface
+        conn.execute("UPDATE ids_config SET interface='em2' WHERE id=1")
+        conn.commit()
+        assert _resolve_capture_iface(conn) == "em2"
+
+    def test_falls_back_to_lan_port(self, conn):
+        from app.services.ids_writer import _resolve_capture_iface
+        conn.execute("UPDATE ids_config SET interface='' WHERE id=1")
+        conn.execute("UPDATE lan_config SET assigned_port='em3' WHERE id=1")
+        conn.commit()
+        assert _resolve_capture_iface(conn) == "em3"
+
+    def test_matches_yaml_pcap_interface(self, conn):
+        # The rc.conf -i and the YAML capture iface must never disagree.
+        from app.services.ids_writer import _resolve_capture_iface, generate_suricata_yaml
+        conn.execute("UPDATE ids_config SET mode='ids', interface='em2' WHERE id=1")
+        conn.commit()
+        iface = _resolve_capture_iface(conn)
+        assert iface == "em2"
+        assert f"interface: {iface}" in generate_suricata_yaml(conn)
+
+
+class TestSuricataLaunchRcvars:
+    """The enable pipeline must set suricata_interface + suricata_conf, not just
+    suricata_enable — otherwise `service suricata start` launches with an
+    empty/missing -i and the daemon starts then exits."""
+
+    def _stub_enable(self, iw, monkeypatch):
+        monkeypatch.setattr(iw, "ensure_rules_present", lambda _c: {"ok": True, "message": ""})
+        monkeypatch.setattr(iw, "_rules_ready", lambda _c: (True, ""))
+        monkeypatch.setattr(iw, "validate_suricata_yaml", lambda _t: (True, ""))
+        monkeypatch.setattr(iw, "write_suricata_config", lambda _c: {"ok": True, "message": "", "conf": ""})
+        monkeypatch.setattr(iw, "_restart_and_verify_suricata",
+                            lambda _c, action="restart": {"ok": True, "message": "ok"})
+
+    def test_ids_enable_sets_interface_and_conf(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        conn.execute("UPDATE ids_config SET enabled=1, mode='ids', interface='em2' WHERE id=1")
+        conn.commit()
+        self._stub_enable(iw, monkeypatch)
+        calls = {}
+        monkeypatch.setattr(iw, "sysrc_set",
+                            lambda k, v: calls.__setitem__(k, v) or {"ok": True, "message": ""})
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is True
+        assert calls.get("suricata_enable") == "YES"
+        assert calls.get("suricata_interface") == "em2"
+        assert calls.get("suricata_conf") == iw._SURICATA_CONF_PATH
+
+    def test_ips_enable_clears_interface(self, conn, monkeypatch):
+        # IPS netmap capture is YAML-driven across two ifaces — a single rc -i
+        # would force pcap and break the inline bridge, so it must be cleared.
+        import app.services.ids_writer as iw
+        conn.execute(
+            "UPDATE ids_config SET enabled=1, mode='ips', interface='em0', "
+            "ips_peer_interface='em1' WHERE id=1"
+        )
+        conn.commit()
+        self._stub_enable(iw, monkeypatch)
+        calls = {}
+        monkeypatch.setattr(iw, "sysrc_set",
+                            lambda k, v: calls.__setitem__(k, v) or {"ok": True, "message": ""})
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is True
+        assert calls.get("suricata_interface") == ""
+        assert calls.get("suricata_conf") == iw._SURICATA_CONF_PATH
+
+
+class TestRcConfSuricataBoot:
+    """The boot block must carry the same launch vars so Suricata survives a
+    reboot the same way the live enable keeps it up."""
+
+    def test_ids_block_has_interface_and_conf(self, conn):
+        from app.services.rc_conf_writer import generate_rc_conf_block
+        conn.execute("UPDATE ids_config SET enabled=1, mode='ids', interface='em2' WHERE id=1")
+        conn.commit()
+        block = generate_rc_conf_block(conn)
+        assert 'suricata_enable="YES"' in block
+        assert 'suricata_interface="em2"' in block
+        assert 'suricata_conf=' in block
+
+    def test_ips_block_clears_interface(self, conn):
+        from app.services.rc_conf_writer import generate_rc_conf_block
+        conn.execute(
+            "UPDATE ids_config SET enabled=1, mode='ips', interface='em0', "
+            "ips_peer_interface='em1' WHERE id=1"
+        )
+        conn.commit()
+        block = generate_rc_conf_block(conn)
+        assert 'suricata_enable="YES"' in block
+        assert 'suricata_interface=""' in block
+
+    def test_disabled_emits_no_suricata(self, conn):
+        from app.services.rc_conf_writer import generate_rc_conf_block
+        conn.execute("UPDATE ids_config SET enabled=0 WHERE id=1")
+        conn.commit()
+        block = generate_rc_conf_block(conn)
+        assert "suricata_enable" not in block
+        assert "suricata_interface" not in block
+
+
+# ---------------------------------------------------------------------------
 # Phase tracker
 # ---------------------------------------------------------------------------
 

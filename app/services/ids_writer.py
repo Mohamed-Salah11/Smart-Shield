@@ -366,27 +366,26 @@ def tail_suricata_log(lines: int = 200, source: str = "suricata") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# YAML generator
+# Capture-interface resolution
 # ---------------------------------------------------------------------------
 
-def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
-    cfg = _cfg(conn)
-    if not cfg:
-        cfg = {}
+def _resolve_capture_iface(conn, cfg=None) -> str:
+    """Resolve the interface Suricata captures on.
 
-    mode        = cfg.get("mode", "ids") if not force_ids_mode else "ids"
-    # Interface resolution mirrors routes/ids.py display: an explicit ids_config
-    # value wins; otherwise the IDS monitors the LAN side by default. LAN-side
-    # inspection gives real internal-host attribution (WAN is post-NAT) and far
-    # less internet-scan noise, which is the higher-value detection on this
-    # appliance. Fall back to the configured LAN port, then "em1" (the LAN
-    # default used by pf_generator) as a last resort.
-    #
-    # NOTE: _clean_iface("") returns "em0", so the empty case is guarded
-    # explicitly here — otherwise the lan_config lookup below would be dead code
-    # and Suricata would silently bind to em0 regardless of the real LAN port.
-    raw_iface   = (cfg.get("interface") or "").strip()
-    interface   = _clean_iface(raw_iface) if raw_iface else ""
+    Single source of truth shared by the YAML generator and the rc.conf launch
+    (``suricata_interface``) so the live ``service suricata`` command can never
+    disagree with the interface the config was validated against. Resolution:
+    explicit ``ids_config.interface`` → ``lan_config.assigned_port`` → ``em1``.
+
+    LAN-side inspection gives real internal-host attribution (WAN is post-NAT)
+    and far less internet-scan noise — the higher-value detection here. Note
+    ``_clean_iface("")`` returns "em0", so the empty case is guarded explicitly;
+    otherwise the lan_config fallback would be dead code.
+    """
+    if cfg is None:
+        cfg = _cfg(conn) or {}
+    raw_iface = (cfg.get("interface") or "").strip()
+    interface = _clean_iface(raw_iface) if raw_iface else ""
     if not interface:
         try:
             row = conn.execute(
@@ -398,6 +397,22 @@ def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
             pass
     if not interface:
         interface = "em1"
+    return interface
+
+
+# ---------------------------------------------------------------------------
+# YAML generator
+# ---------------------------------------------------------------------------
+
+def generate_suricata_yaml(conn, force_ids_mode: bool = False) -> str:
+    cfg = _cfg(conn)
+    if not cfg:
+        cfg = {}
+
+    mode        = cfg.get("mode", "ids") if not force_ids_mode else "ids"
+    # Capture interface — shared resolver so the YAML and the rc.conf
+    # `suricata_interface` launch arg always agree (see _resolve_capture_iface).
+    interface   = _resolve_capture_iface(conn, cfg)
     # HOME_NET: explicit operator value wins; otherwise derive the LAN subnet
     # so EXTERNAL_NET (!$HOME_NET) is precise for LAN-side monitoring.
     home_net    = (cfg.get("home_net") or "").strip() or _derive_lan_home_net(conn)
@@ -1533,6 +1548,31 @@ def _write_enabled(conn, enabled: bool) -> None:
     conn.commit()
 
 
+def _apply_suricata_rcvars(conn, mode: str) -> None:
+    """Set the rc.conf vars the FreeBSD ``suricata`` rc script needs so
+    ``service suricata start`` reproduces the invocation the config was
+    validated against — otherwise the daemon launches with an empty/missing
+    ``-i`` and exits right after start ("starts then exits"), in both modes.
+
+    * ``suricata_conf`` — point the service at our generated YAML explicitly
+      (the rc default already matches this path, but being explicit is safe and
+      survives a future default change).
+    * IDS (pcap): ``suricata_interface`` = the resolved capture interface, so
+      the rc launch is ``suricata -c <yaml> -i <iface>`` (matches the YAML).
+    * IPS (netmap inline): capture is driven by the YAML netmap section across
+      ``interface`` + ``ips_peer_interface``; a single rc ``-i`` would force
+      pcap and break the inline bridge, so ``suricata_interface`` is cleared and
+      the YAML drives capture.
+
+    No-op off FreeBSD (``sysrc_set`` already no-ops there).
+    """
+    sysrc_set("suricata_conf", _SURICATA_CONF_PATH)
+    if (mode or "ids").lower() == "ips":
+        sysrc_set("suricata_interface", "")
+    else:
+        sysrc_set("suricata_interface", _resolve_capture_iface(conn))
+
+
 def _enable_pipeline(conn, *, actor: str = "system") -> dict:
     """Shared, safety-ordered enable sequence for Suricata (FreeBSD live path).
 
@@ -1605,7 +1645,10 @@ def _enable_pipeline(conn, *, actor: str = "system") -> dict:
         return {**write_result, "rolled_back": False, "phase": "ERROR",
                 "reason": "config_write_failed"}
 
-    # 6. Persist rc.conf enable.
+    # 6. Persist rc.conf enable + the launch vars the rc script needs so
+    #    `service suricata start` matches the validated invocation (without the
+    #    interface/conf vars the daemon starts then exits — see
+    #    _apply_suricata_rcvars).
     sysrc_result = sysrc_set("suricata_enable", "YES")
     if not sysrc_result["ok"]:
         err_msg = f"Failed to set suricata_enable in rc.conf: {sysrc_result.get('message', '')}"
@@ -1613,6 +1656,7 @@ def _enable_pipeline(conn, *, actor: str = "system") -> dict:
         _set_phase("ERROR", err_msg)
         return {"ok": False, "rolled_back": False, "phase": "ERROR",
                 "reason": "sysrc_failed", "message": err_msg}
+    _apply_suricata_rcvars(conn, (_cfg(conn).get("mode") or "ids").lower())
 
     # 7. Restart and verify the daemon stayed up (clears stale state on failure).
     _set_phase("STARTING")
@@ -1660,6 +1704,9 @@ def _try_ids_fallback(conn) -> "dict | None":
     except Exception:
         return None
     sysrc_set("suricata_enable", "YES")
+    # Forced IDS (pcap) mode — set the matching launch vars so the fallback
+    # daemon starts and stays up, not just enable=YES.
+    _apply_suricata_rcvars(conn, "ids")
     started = _restart_and_verify_suricata(conn, action="restart")
     if not started.get("ok"):
         return None

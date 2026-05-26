@@ -137,6 +137,46 @@
         {% endif %}
       </div>
     </div>
+
+    <!-- ── Linked Logs / Evidence ─────────────────────────────────────── -->
+    <div class="soc-card mb-3">
+      <div class="soc-card-head">
+        <i class="fa-solid fa-file-lines ext-e07b2ee9"></i>
+        <div>
+          <div class="soc-card-title">Linked Logs / Evidence</div>
+          <div class="soc-card-subtitle">{{ linked_events|length }} log{{ 's' if linked_events|length != 1 }} captured for investigation</div>
+        </div>
+      </div>
+      <div class="soc-card-body p-0">
+        {% if linked_events %}
+        <table class="soc-table">
+          <thead>
+            <tr><th>Time</th><th>Category</th><th>Action</th><th>Summary</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for ev in linked_events %}
+            <tr>
+              <td class="soc-mono">{{ ev.timestamp }}</td>
+              <td><span class="ext-179624b7">{{ ev.category }}</span></td>
+              <td>{{ ev.action }}</td>
+              <td class="text-soc-muted">{{ ev.summary }}</td>
+              <td>
+                <button type="button" class="btn-soc-secondary" data-action="cd-view-log" data-idx="{{ loop.index0 }}">
+                  <i class="fa-solid fa-magnifying-glass me-1"></i> View detail
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="soc-empty">
+          <i class="fa-solid fa-file-circle-question"></i>
+          <div>No logs linked to this case yet.</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
   <!-- ── Case Details Sidebar ─────────────────────────────────────────── -->
@@ -380,6 +420,14 @@ const escalateModal = new bootstrap.Modal(document.getElementById('escalateModal
 const closeModal    = new bootstrap.Modal(document.getElementById('closeModal'));
 let _escalateTarget = null;
 
+/* Logs linked to this case (full event snapshots). "View detail" opens the
+   same shared drawer the Alert Queue uses, so a case can be investigated here. */
+const CD_LINKED_EVENTS = {{ linked_events|tojson }};
+function cdViewLog(idx) {
+  const ev = CD_LINKED_EVENTS[idx];
+  if (ev && ev.detail) SOC.openLogDetail(ev.detail);
+}
+
 /* ── Self-assign ─────────────────────────────────────────────────────── */
 async function takeCaseSelf(caseId, userId) {
   const r = await fetch(`/soc-portal/cases/${caseId}/assign`, {
@@ -547,6 +595,7 @@ async function addNote(caseId) {
   R['h_c6862b73fa'] = function (event, el) { openCloseModal('false_positive') };
   var __cdCaseId = {{ case.id|tojson }};
   var __cdSocUserId = {{ soc_user_id|tojson }};
+  R['cd-view-log']  = function (event, el) { cdViewLog(Number(el.dataset.idx)); };
   R['cd-add-note']  = function (event, el) { addNote(__cdCaseId); };
   R['cd-take-self'] = function (event, el) { takeCaseSelf(__cdCaseId, __cdSocUserId); };
   R['cd-assign']    = function (event, el) { assignCase(__cdCaseId); };

@@ -471,6 +471,38 @@ def tail_events_since(after_ts: str = "", limit: int = 200,
         conn.close()
 
 
+def get_event_by_uuid(event_uuid: str = "", timestamp: str = ""):
+    """Return a single audit-log event in the legacy NDJSON shape, or ``None``.
+
+    Looks the event up by its stable ``event_uuid`` (preferred); falls back to
+    an exact ``ts`` match for callers that only have the timestamp key (e.g. a
+    pre-v34 alert). Used to snapshot the full source log onto a SOC case so the
+    evidence survives audit-log retention eviction.
+    """
+    event_uuid = (event_uuid or "").strip()
+    timestamp  = (timestamp or "").strip()
+    if not (event_uuid or timestamp):
+        return None
+    conn = _events_db()
+    if conn is None:
+        return None
+    try:
+        if event_uuid:
+            where, param = "event_uuid = ?", event_uuid
+        else:
+            where, param = "ts = ?", timestamp
+        row = conn.execute(
+            f"SELECT {_EVENT_READ_COLS} FROM events WHERE {where} "
+            f"ORDER BY id DESC LIMIT 1",
+            (param,),
+        ).fetchone()
+        return _row_to_event(row) if row else None
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
 def search_events_fts(query: str, limit: int = 200, categories=None,
                       severities=None, start_ts: str = "",
                       end_ts: str = "") -> list:
