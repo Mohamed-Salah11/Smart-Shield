@@ -84,7 +84,7 @@
                 </button>
                 <form class="ext-5677b988" method="post"
                       action="{{ url_for('routing.gateway_delete', gw_id=g.id) }}"
-                     
+
                       data-action-submit="confirm-delete"
                       data-confirm="Delete gateway {{ g.name }}?">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -243,4 +243,3 @@ document.getElementById('btn-refresh-routes').addEventListener('click', loadRout
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

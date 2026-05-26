@@ -2,7 +2,6 @@
 
 {% block main %}
 <div class="container-fluid">
-    <!-- Page Header -->
     <div class="row">
         <div class="col-12">
             <h2>System / Update / System Update</h2>
@@ -12,29 +11,28 @@
     <!-- Tab Navigation -->
     <ul class="nav nav-tabs" id="updateTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link {{ 'active' if active_tab == 'system' or not active_tab else '' }}" 
-                    id="system-update-tab" data-bs-toggle="tab" data-bs-target="#system-update" 
-                    type="button" role="tab" aria-controls="system-update" 
+            <button class="nav-link {{ 'active' if active_tab == 'system' or not active_tab else '' }}"
+                    id="system-update-tab" data-bs-toggle="tab" data-bs-target="#system-update"
+                    type="button" role="tab" aria-controls="system-update"
                     aria-selected="{{ 'true' if active_tab == 'system' or not active_tab else 'false' }}">
                 System Update
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link {{ 'active' if active_tab == 'settings' else '' }}" 
-                    id="update-settings-tab" data-bs-toggle="tab" data-bs-target="#update-settings" 
-                    type="button" role="tab" aria-controls="update-settings" 
+            <button class="nav-link {{ 'active' if active_tab == 'settings' else '' }}"
+                    id="update-settings-tab" data-bs-toggle="tab" data-bs-target="#update-settings"
+                    type="button" role="tab" aria-controls="update-settings"
                     aria-selected="{{ 'true' if active_tab == 'settings' else 'false' }}">
                 Update Settings
             </button>
         </li>
     </ul>
 
-    <!-- Tab Content -->
     <div class="tab-content" id="updateTabsContent">
         <!-- System Update Tab -->
-        <div class="tab-pane fade {{ 'show active' if active_tab == 'system' or not active_tab else '' }}" 
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'system' or not active_tab else '' }}"
              id="system-update" role="tabpanel" aria-labelledby="system-update-tab">
-            
+
             <div class="card mt-3">
                 <div class="card-header bg-dark text-white">
                     <h5 class="mb-0">Confirmation Required to update SmartShield system.</h5>
@@ -118,9 +116,9 @@
         </div>
 
         <!-- Update Settings Tab -->
-        <div class="tab-pane fade {{ 'show active' if active_tab == 'settings' else '' }}" 
+        <div class="tab-pane fade {{ 'show active' if active_tab == 'settings' else '' }}"
              id="update-settings" role="tabpanel" aria-labelledby="update-settings-tab">
-            
+
             <!-- Firmware Branch Section -->
             <div class="card mt-3">
                 <div class="card-header bg-dark text-white">
@@ -206,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var triggerTabList = [].slice.call(document.querySelectorAll('#updateTabs button'))
     triggerTabList.forEach(function (triggerEl) {
         var tabTrigger = new bootstrap.Tab(triggerEl)
-        
+
         triggerEl.addEventListener('click', function (event) {
             event.preventDefault()
             tabTrigger.show()

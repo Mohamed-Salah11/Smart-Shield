@@ -847,7 +847,7 @@ document.getElementById('wpModal')?.addEventListener('show.bs.modal',()=>renderW
 
 /* ── Live event stream ── */
 let evLatestTs='',evNewCount=0;
-const evMakeRow=(r,animate)=>`<tr class="ext-82079ad6"><td class="td-t">${esc(fmt(r.timestamp))}</td><td>${catBadge(r.category)}</td><td>${actBadge(r.action)}</td><td><strong class="ext-6869d900">${esc(r.username||'—')}</strong></td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td class="ext-6869d900">${detail(r)}</td></tr>`;
+const evMakeRow=(r,animate)=>`<tr class="${animate?'ext-82079ad6':''}"><td class="td-t">${esc(fmt(r.timestamp))}</td><td>${catBadge(r.category)}</td><td>${actBadge(r.action)}</td><td><strong class="ext-6869d900">${esc(r.username||'—')}</strong></td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td class="ext-6869d900">${detail(r)}</td></tr>`;
 
 const evPoll=async(initial=false)=>{
   const tb=$('tblEvents');if(!tb)return;
@@ -936,4 +936,3 @@ evPoll(true);setInterval(()=>evPoll(false),5000);
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

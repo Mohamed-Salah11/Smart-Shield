@@ -503,6 +503,108 @@ def get_unbound_status() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# LAN-serving checks
+# ---------------------------------------------------------------------------
+# `get_unbound_status()` only tells us the daemon is *running* — which is true
+# even for the install-time bootstrap config that binds 127.0.0.1 only. LAN
+# clients are pointed at the appliance's LAN IP for DNS (DHCP), so "running on
+# localhost" still leaves the whole LAN without name resolution. These helpers
+# answer the question that actually matters: can a LAN client resolve through us?
+
+def unbound_listening_on_lan(conn) -> bool:
+    """True when Unbound is bound to the LAN IP (or 0.0.0.0) on :53 — not merely
+    127.0.0.1. Off-FreeBSD we can't inspect sockets, so return True so dev hosts
+    and the test suite are unaffected."""
+    if not sys.platform.startswith("freebsd"):
+        return True
+    lan_ip = _lan_ip(conn)
+    if not lan_ip or lan_ip == "127.0.0.1":
+        return False
+    try:
+        from app.services.network_service import run_command
+        r = run_command(["sockstat", "-4", "-l"], check=False, timeout_seconds=5)
+        targets = {f"{lan_ip}:53", "*:53"}
+        for line in (r.stdout or "").splitlines():
+            # sockstat columns are whitespace-separated; the local address is a
+            # standalone token, so token equality avoids substring false hits
+            # (e.g. 192.168.1.1:53 vs 192.168.1.1:5353).
+            if targets & set(line.split()):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def unbound_serving_lan(conn) -> bool:
+    """Stronger check: Unbound both listens on the LAN IP:53 AND answers a query
+    there. Used by the recovery path / watchdog. Off-FreeBSD returns True."""
+    if not sys.platform.startswith("freebsd"):
+        return True
+    if not unbound_listening_on_lan(conn):
+        return False
+    res = test_dns_resolution("example.com", server=_lan_ip(conn))
+    return bool(res.get("ok"))
+
+
+# ---------------------------------------------------------------------------
+# Self-healing recovery (shared by the GUI apply path and the DNS watchdog)
+# ---------------------------------------------------------------------------
+
+def _disable_base_local_unbound() -> None:
+    """Ensure the FreeBSD base ``local_unbound`` is disabled so the pkg
+    ``unbound`` (the one Smart Shield manages) owns :53. A running base resolver
+    can win the port and let the pkg rc script exit 0 with the real resolver
+    dead. Best-effort, FreeBSD-only."""
+    if not sys.platform.startswith("freebsd"):
+        return
+    try:
+        from app.services.service_manager import sysrc_set, service_action
+        sysrc_set("local_unbound_enable", "NO")
+        service_action("local_unbound", "stop")   # usually already stopped — ignore result
+    except Exception:
+        pass
+
+
+def recover_dns_service(conn, actor: str = "watchdog") -> dict:
+    """Bring Unbound back to a state where it actually serves the LAN, idempotently.
+
+    No-op when it is already serving. Otherwise: disable the base resolver so it
+    can't shadow :53, run the full ``apply_unbound`` (regenerates the LAN-binding
+    config, validates with unbound-checkconf, enables in rc.conf, starts, and
+    verifies the daemon is up), and on success re-apply PF so the content-policy
+    DNS funnel re-engages (pf_generator gates it on ``unbound_listening_on_lan``).
+
+    Returns ``{"ok", "skipped"?, "reason"?, "message", "service_message"?}``.
+    Safe to call from any thread — uses only the passed connection + service
+    helpers.
+    """
+    if unbound_serving_lan(conn):
+        return {"ok": True, "skipped": True, "reason": "already_serving",
+                "message": "Unbound is already serving the LAN."}
+
+    _disable_base_local_unbound()
+
+    result = apply_unbound(conn)
+    if not result.get("ok"):
+        return {"ok": False, "reason": "apply_failed",
+                "message": result.get("message", "apply_unbound failed"),
+                "service_message": result.get("message", "")}
+
+    # Resolver is back — re-apply PF so the fail-open DNS funnel re-engages.
+    pf_msg = ""
+    try:
+        from app.services.pf_generator import reload_pf_rules
+        pf = reload_pf_rules(conn)
+        pf_msg = pf.get("message", "") if isinstance(pf, dict) else ""
+    except Exception as exc:
+        pf_msg = f"pf reload skipped: {exc}"
+
+    return {"ok": True, "reason": "recovered",
+            "message": f"Unbound recovered and serving the LAN. {pf_msg}".strip(),
+            "service_message": result.get("message", "")}
+
+
+# ---------------------------------------------------------------------------
 # DNS resolution test
 # ---------------------------------------------------------------------------
 

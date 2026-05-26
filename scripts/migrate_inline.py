@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -222,7 +223,76 @@ def write_ext_css() -> int:
     return len(_STYLE_CATALOG)
 
 
+# ─── Recovery: rebuild ext-inline.css from inline styles in git history ───────
+# The forward migration (1C) is destructive: once a template's `style="..."`
+# attributes are rewritten to `ext-<hash>` classes, the source styles only exist
+# in git history. If ext-inline.css is ever lost/emptied, the class references
+# survive in the templates but their rules are gone. This mode rebuilds the
+# catalog by harvesting every inline style ever committed under templates/, using
+# the SAME normalization + hash as the forward pass, so the regenerated tokens
+# match the class names already in the templates exactly.
+
+def _harvest_styles(html: str) -> int:
+    """Add every hashable inline style in *html* to the catalog. Mirrors the
+    skip rules in _extract_styles (Jinja-expression and empty styles are
+    skipped). Returns how many were added/seen."""
+    n = 0
+    for m in STYLE_ATTR_RE.finditer(html):
+        val = m.group("val")
+        if "{{" in val or "{%" in val or not val.strip():
+            continue
+        norm = re.sub(r"\s+", " ", val).strip().rstrip(";")
+        if not norm:
+            continue
+        _STYLE_CATALOG.setdefault(_class_token_for(norm), norm)
+        n += 1
+    return n
+
+
+def _git(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=str(ROOT), capture_output=True,
+        text=True, encoding="utf-8", errors="replace",
+    ).stdout or ""
+
+
+def recover_from_history() -> int:
+    """Rebuild _STYLE_CATALOG from all historical templates/**.html blobs and
+    write ext-inline.css. Each unique blob is read exactly once. Returns the
+    number of unique classes written."""
+    # Collect unique blob SHAs for every templates/*.html object across all refs.
+    seen: set[str] = set()
+    for line in _git("rev-list", "--all", "--objects").splitlines():
+        parts = line.split(" ", 1)
+        if len(parts) != 2:
+            continue
+        sha, path = parts
+        if path.startswith("templates/") and path.endswith(".html"):
+            seen.add(sha)
+
+    # Also fold in the current ext-inline.css (so a partial existing file is
+    # preserved) and the current working-tree templates (harmless — already
+    # migrated, so usually no inline styles remain).
+    _load_existing_css()
+
+    harvested = 0
+    for sha in seen:
+        blob = _git("cat-file", "-p", sha)
+        if "style=" in blob:
+            harvested += _harvest_styles(blob)
+
+    n_rules = write_ext_css()
+    print(f"Blobs scanned  : {len(seen)} unique historical template versions")
+    print(f"Styles seen    : {harvested}")
+    print(f"Unique classes : {n_rules}")
+    print(f"CSS written to : {EXT_CSS.relative_to(ROOT)}")
+    return n_rules
+
+
 def main() -> int:
+    if "--recover-from-history" in sys.argv:
+        return 0 if recover_from_history() >= 0 else 1
+
     if not TEMPLATES.is_dir():
         print(f"ERROR: templates dir not found at {TEMPLATES}", file=sys.stderr)
         return 1

@@ -3,7 +3,6 @@
 
 {% block main %}
 <div class="container">
-    <!-- Page Header -->
     <div class="ss-page-header">
         <div>
             <h1 class="ss-page-title">Address Objects</h1>
@@ -11,7 +10,6 @@
         </div>
     </div>
 
-    <!-- Tabs Navigation -->
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
             <a class="nav-link {{ 'active' if tab=='all' }}"
@@ -116,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Import Modal Save
     const impSave = document.getElementById('impSave');
     const importModal = document.getElementById('importModal');
-    
+
     if (impSave) {
         impSave.addEventListener('click', async function () {
             const name = document.getElementById('impName').value;
@@ -686,4 +684,3 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

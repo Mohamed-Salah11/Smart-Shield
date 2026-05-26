@@ -839,7 +839,13 @@ def _wizard_verify(conn) -> dict:
     # start/reload, so retry the probe a few times before declaring it down — a
     # false negative here would now wrongly block setup completion (unbound is in
     # the critical gate below).
+    #
+    # IMPORTANT: require Unbound on the LAN IP (or wildcard), NOT just any :53.
+    # LAN clients query the appliance's LAN IP for DNS (DHCP), so the install-time
+    # bootstrap config that binds 127.0.0.1 only would otherwise pass this gate
+    # while the LAN has no resolver — "ping works, can't browse" since setup.
     import time as _time
+    _dns_targets = {f"{expected_ip}:53", "*:53"} if expected_ip else {"*:53"}
     stdout = ""
     for _attempt in range(3):
         try:
@@ -847,13 +853,16 @@ def _wizard_verify(conn) -> dict:
             stdout = r.stdout or ""
         except Exception:
             stdout = ""
-        out["unbound_listening"] = any(":53 " in ln or ":53\t" in ln for ln in stdout.splitlines())
+        out["unbound_listening"] = any(
+            _dns_targets & set(ln.split()) for ln in stdout.splitlines()
+        )
         if out["unbound_listening"]:
             break
         if _attempt < 2:
             _time.sleep(1)
     if not out["unbound_listening"]:
-        out["messages"].append("Unbound is not listening on :53.")
+        _tgt = expected_ip or "the LAN IP"
+        out["messages"].append(f"Unbound is not listening on {_tgt}:53 (LAN DNS).")
     out["nginx_listening"] = any(":80 " in ln or ":443 " in ln or ":80\t" in ln or ":443\t" in ln
                                  for ln in stdout.splitlines())
     if not out["nginx_listening"]:

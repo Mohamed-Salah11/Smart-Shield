@@ -29,6 +29,14 @@
                  white-space:pre-wrap; word-break:break-word; max-width:600px;
                  max-height:120px; overflow:auto; color:var(--muted); }
 .ch-msg        { color:var(--muted); font-size:.8rem; padding:10px 14px; }
+.ch-dlq-head   { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.ch-btn        { font:inherit; font-size:.72rem; font-weight:600; cursor:pointer;
+                 padding:3px 10px; border-radius:6px; border:1px solid var(--border-color);
+                 background:var(--border-color-soft); color:var(--text-color); transition:all .12s; }
+.ch-btn:hover  { border-color:var(--primary); color:var(--primary); }
+.ch-btn:disabled { opacity:.5; cursor:default; }
+.ch-btn-danger:hover { border-color:#ef4444; color:#ef4444; }
+.ch-replay     { font-size:.7rem; }
 </style>
 {% endblock %}
 
@@ -41,19 +49,26 @@
 <div class="ch-grid" id="collectors"></div>
 
 <div class="ch-dlq-wrap">
-  <div class="ch-dlq-head">Dead-letter queue — recent parse failures</div>
+  <div class="ch-dlq-head">
+    <span>Dead-letter queue — recent parse failures</span>
+    {% if session.get('is_superuser') %}
+    <button type="button" class="ch-btn ch-btn-danger" id="dlqPurge">Purge all</button>
+    {% endif %}
+  </div>
   <table class="ch-dlq-table">
     <thead>
-      <tr><th>Time</th><th>Source</th><th>Reason</th><th>Raw payload</th></tr>
+      <tr><th>Time</th><th>Source</th><th>Reason</th><th>Raw payload</th>{% if session.get('is_superuser') %}<th>Actions</th>{% endif %}</tr>
     </thead>
     <tbody id="dlqBody">
-      <tr><td colspan="4" class="ch-msg">Loading…</td></tr>
+      <tr><td colspan="{% if session.get('is_superuser') %}5{% else %}4{% endif %}" class="ch-msg">Loading…</td></tr>
     </tbody>
   </table>
 </div>
 
 <script nonce="{{ csp_nonce() }}">
 const CH_URL = "{{ url_for('status.api_collector_health') }}";
+const IS_SUPER = {{ 'true' if session.get('is_superuser') else 'false' }};
+const DLQ_COLS = IS_SUPER ? 5 : 4;
 
 function htmlEscape(s) {
   if (s === null || s === undefined) return "";
@@ -101,16 +116,20 @@ function renderCollectors(rows) {
 
 function renderDlq(rows) {
   const tbody = document.getElementById("dlqBody");
+  const purgeBtn = document.getElementById("dlqPurge");
   if (!rows || !rows.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="ch-msg">No dead-letter rows — all parses successful so far.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${DLQ_COLS}" class="ch-msg">No dead-letter rows — all parses successful so far.</td></tr>`;
+    if (purgeBtn) purgeBtn.disabled = true;
     return;
   }
+  if (purgeBtn) purgeBtn.disabled = false;
   tbody.innerHTML = rows.map(d => `
     <tr>
       <td>${htmlEscape((d.ts||"").replace("T"," ").slice(0,19))}</td>
       <td>${htmlEscape(d.source_name||"")}<br><span class="ext-05a371bd">${htmlEscape(d.source_type||"")}</span></td>
       <td>${htmlEscape(d.reason||"")}</td>
       <td><div class="ch-raw">${htmlEscape(d.raw_payload||"")}</div></td>
+      ${IS_SUPER ? `<td><button type="button" class="ch-btn ch-replay" data-dlq-id="${d.id}">Replay</button></td>` : ""}
     </tr>`).join("");
 }
 
@@ -130,9 +149,50 @@ async function load() {
   }
 }
 
+async function replayRow(id, btn) {
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    const r = await fetch(`${CH_URL}/dlq/${id}/replay`, {
+      method: "POST", credentials: "same-origin",
+    });
+    const d = await r.json().catch(() => ({}));
+    document.getElementById("liveStatus").textContent =
+      d.ok ? "Replayed — re-ingested." : ("Replay failed: " + (d.message || r.status));
+  } catch (e) {
+    document.getElementById("liveStatus").textContent = "Replay error";
+  }
+  load();
+}
+
+async function purgeDlq() {
+  if (!window.confirm("Purge ALL dead-letter rows? This cannot be undone.")) return;
+  const btn = document.getElementById("dlqPurge");
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${CH_URL}/dlq/purge`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ older_than_days: 0 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    document.getElementById("liveStatus").textContent =
+      d.ok ? `Purged ${d.deleted || 0} row(s).` : ("Purge failed: " + r.status);
+  } catch (e) {
+    document.getElementById("liveStatus").textContent = "Purge error";
+  }
+  load();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   load();
   setInterval(load, 15000);
+  document.getElementById("dlqBody").addEventListener("click", (e) => {
+    const btn = e.target.closest(".ch-replay");
+    if (btn && btn.dataset.dlqId) replayRow(btn.dataset.dlqId, btn);
+  });
+  const purgeBtn = document.getElementById("dlqPurge");
+  if (purgeBtn) purgeBtn.addEventListener("click", purgeDlq);
 });
 </script>
 {% endblock %}

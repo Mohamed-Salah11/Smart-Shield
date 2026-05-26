@@ -69,7 +69,7 @@
                 <button data-action="h_3494fbf23b"
                         title="Open Appliance Console"
                         class="nav-link d-flex align-items-center gap-1 px-2 ext-eda3a2c4"
-                       
+
                         data-action-mouseover="h_e4fb6d24fb"
                         data-action-mouseout="h_c819892ba4">
                     <i class="fa-solid fa-terminal ext-facfb27e"></i>
@@ -85,7 +85,7 @@
                 <a href="/soc-portal/login" target="_blank" rel="noopener"
                    title="Open SOC Team Portal"
                    class="nav-link d-flex align-items-center gap-1 px-2 ext-79185bcf"
-                  
+
                    data-action-mouseover="h_c5f96fa1d4"
                    data-action-mouseout="h_bcd24499df">
                     <i class="fa-solid fa-shield-halved ext-614b825d"></i>
@@ -539,7 +539,6 @@
     <!-- Mobile backdrop -->
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <!-- Main content -->
     <main class="main-content">
         {% include "partials/mode_banner.html" ignore missing %}
         {% block content %}{% endblock %}
@@ -547,7 +546,6 @@
     </main>
 </div>
 
-<!-- Bootstrap JS -->
 <script src="{{ static_v('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ static_v('js/base-chrome.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ static_v('js/common.js') }}"></script>

@@ -497,8 +497,6 @@ install -d -m 0755 "${DATA_DIR}/mrtg"       2>/dev/null && info "Created: ${DATA
 
 # Log rotation (newsyslog)
 _NEWSYSLOG_SRC="$(dirname "$0")/etc/newsyslog.d/smartshield.conf"
-# Back-compat: older trees ship the file under the hyphenated name.
-[ -f "${_NEWSYSLOG_SRC}" ] || _NEWSYSLOG_SRC="$(dirname "$0")/etc/newsyslog.d/smart-shield.conf"
 if [ -f "${_NEWSYSLOG_SRC}" ]; then
     install -d -m 0755 /usr/local/etc/newsyslog.d 2>/dev/null || true
     install -m 0644 "${_NEWSYSLOG_SRC}" /usr/local/etc/newsyslog.d/smartshield.conf
@@ -1352,6 +1350,14 @@ info "smart_shield_enable=YES staged for rc.conf"
 # unbound must be running for content policy DNS blocking to work
 run_live sysrc unbound_enable=YES
 info "unbound_enable=YES staged for rc.conf"
+
+# The FreeBSD base `local_unbound` must NOT own :53 — the pkg `unbound` (which
+# Smart Shield manages) does. A running base resolver can win the port and let
+# the pkg rc script exit 0 while the real resolver is dead, giving the classic
+# "working NAT but dead DNS" failure (LAN clients ping IPs but can't browse).
+run_live sysrc local_unbound_enable=NO
+run_live service local_unbound onestop >/dev/null 2>&1 || true
+info "base local_unbound disabled (pkg unbound owns :53)"
 
 # Minimal bootstrap unbound.conf so `service unbound onestart` below has something
 # to load. The wizard's apply_unbound() overwrites this with the real config the

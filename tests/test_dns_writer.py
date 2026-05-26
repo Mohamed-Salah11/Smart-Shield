@@ -177,3 +177,38 @@ class TestTestDnsResolution:
         from app.services.dns_writer import test_dns_resolution
         result = test_dns_resolution("example.com")
         assert set(result.keys()) >= {"ok", "ip", "method", "message"}
+
+
+# ---------------------------------------------------------------------------
+# LAN-serving checks + self-healing recovery
+# ---------------------------------------------------------------------------
+
+class TestLanServingHelpers:
+    """Off-FreeBSD these short-circuit to True so dev/tests are unaffected;
+    the real sockstat/resolution probing only runs on the appliance."""
+
+    def test_listening_on_lan_true_off_freebsd(self, conn):
+        from app.services.dns_writer import unbound_listening_on_lan
+        assert unbound_listening_on_lan(conn) is True
+
+    def test_serving_lan_true_off_freebsd(self, conn):
+        from app.services.dns_writer import unbound_serving_lan
+        assert unbound_serving_lan(conn) is True
+
+
+class TestRecoverDnsService:
+    def test_skips_when_already_serving(self, conn):
+        from app.services.dns_writer import recover_dns_service
+        res = recover_dns_service(conn)
+        assert res["ok"] is True
+        assert res.get("skipped") is True
+        assert res["reason"] == "already_serving"
+
+    def test_recovers_when_not_serving(self, conn, monkeypatch):
+        # Force the "not serving" path; apply_unbound off-FreeBSD returns ok
+        # (generate + validate only), and PF reload is best-effort.
+        import app.services.dns_writer as dw
+        monkeypatch.setattr(dw, "unbound_serving_lan", lambda c: False)
+        res = dw.recover_dns_service(conn)
+        assert res["ok"] is True
+        assert res["reason"] == "recovered"

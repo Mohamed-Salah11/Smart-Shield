@@ -2,11 +2,9 @@
 {% block main %}
 <div class="container">
 
-  <!-- Toast -->
   <div id="cp-toast" class="alert d-none ext-cd6c86d1" role="alert"
       ></div>
 
-  <!-- Page Header -->
   <div class="ss-page-header">
     <div>
       <h1 class="ss-page-title">Access Gateway</h1>
@@ -17,7 +15,6 @@
     </button>
   </div>
 
-  <!-- Status bar -->
   <div class="ss-card mb-4">
     <div class="ss-card-body ext-d024bd23">
       <div class="ext-c367548a">
@@ -36,7 +33,6 @@
     </div>
   </div>
 
-  <!-- Tabs -->
   <ul class="nav nav-tabs mb-4">
     <li class="nav-item"><a class="nav-link active" id="tab-sessions" href="#"
         data-action="h_f68170d027"><i class="fa-solid fa-users me-1"></i>Sessions</a></li>
@@ -503,7 +499,7 @@ async function loadVouchers() {
           title="${isDisabled ? 'Enable voucher' : 'Disable voucher'}">
           <i class="fa-solid ${isDisabled ? 'fa-circle-check' : 'fa-ban'}"></i>
         </button>`;
-      return `<tr class="ext-fd88789f">
+      return `<tr class="${isDisabled ? 'ext-fd88789f' : ''}">
         <td class="ext-c8c51ace">${esc(v.code)}</td>
         <td>${esc(v.duration_minutes)} min</td>
         <td>${v.bandwidth_kbps ? esc(v.bandwidth_kbps) + ' kbps' : 'Unlimited'}</td>
@@ -659,4 +655,3 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

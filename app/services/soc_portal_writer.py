@@ -102,6 +102,19 @@ server {{
         proxy_read_timeout 300s;
     }}
 
+    # Static assets (CSS/JS/fonts/icons) — REQUIRED for the portal UI to render.
+    # Without this, /static/* falls into the catch-all 404 below and every page
+    # that extends the SOC base template loads with no Bootstrap, icons, or JS.
+    # Only non-sensitive assets are exposed here; admin *routes* stay 404.
+    location /static/ {{
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+    }}
+
     # Block everything else — admins must use port 443
     location / {{
         return 404;

@@ -222,14 +222,12 @@
       <div class="ids-kpi-lbl">Signatures</div>
     </div>
   </div>
-  <div class="alert alert-danger d-flex align-items-center gap-2 mt-2 mb-2" id="rulesDegradedBanner"
-       {% if (status.signatures_loaded or 0) != 0 and not status.rules_degraded %}style="display:none"{% endif %}>
+  <div class="alert alert-danger d-flex align-items-center gap-2 mt-2 mb-2{% if (status.signatures_loaded or 0) != 0 and not status.rules_degraded %} d-none{% endif %}" id="rulesDegradedBanner">
     <i class="fa-solid fa-triangle-exclamation"></i>
     <span>IDS is running with <strong>zero loaded signatures</strong> — detection coverage is
     inactive. Go to <strong>Rulesets</strong> and click <strong>Update Rules</strong>.</span>
   </div>
 
-  <!-- Tabs -->
   <ul class="nav nav-tabs" id="idsTabs">
     <li class="nav-item">
       <a class="nav-link {% if active_tab=='status' %}active{% endif %}"
@@ -639,7 +637,6 @@
           </div>
         </div>
 
-        <!-- Action buttons -->
         <div class="row">
           <div class="col-sm-9 offset-sm-3 d-flex gap-2">
             <button type="button" class="btn btn-primary" id="btnSaveFeeds">
@@ -775,7 +772,7 @@ function updateStatus(res) {
     sigEl.classList.toggle('is-stopped', sigs === 0);
   }
   const degraded = document.getElementById('rulesDegradedBanner');
-  if (degraded) degraded.style.display = (sigs === 0 || res.rules_degraded) ? '' : 'none';
+  if (degraded) degraded.classList.toggle('d-none', !(sigs === 0 || res.rules_degraded));
 
   const btn = document.getElementById('btnToggle');
   btn.dataset.enabled = res.running ? '1' : '0';
@@ -1441,4 +1438,3 @@ if (btnClearFeeds) {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

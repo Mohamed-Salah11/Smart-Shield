@@ -106,3 +106,25 @@
 }
 .ss-core-badge { background: rgba(0,180,160,.14);  color: #00897b; }
 .ss-soc-badge  { background: rgba(99,102,241,.15); color: #4f46e5; }
+
+/* ── Dark mode: severity chips / badges / status text ────────
+   The translucent backgrounds above stay dark in dark mode, so the
+   light-surface text colours (blue-700 / red-700 / indigo-600 …) drop to
+   ~2.2–2.5:1. Brighten the *text* to 400-level variants (backgrounds left
+   as-is). Each value verified ≥4.5:1 on the composited dark surface.
+   Mirrors the [data-theme="dark"] alert overrides in base.css. */
+[data-theme="dark"] .ss-risk-critical { color: #f87171; }
+[data-theme="dark"] .ss-risk-high     { color: #fb923c; }
+[data-theme="dark"] .ss-risk-medium   { color: #fbbf24; }
+[data-theme="dark"] .ss-risk-low      { color: #60a5fa; }
+[data-theme="dark"] .ss-risk-info     { color: #94a3b8; }
+
+[data-theme="dark"] .ss-core-badge { color: #2dd4bf; }
+[data-theme="dark"] .ss-soc-badge  { color: #818cf8; }
+
+[data-theme="dark"] .ss-danger-zone-title { color: #f87171; }
+
+/* .ss-status-ok (#0f9d6b) already clears 4.5:1 on dark; the rest do not. */
+[data-theme="dark"] .ss-status-warn   { color: #fbbf24; }
+[data-theme="dark"] .ss-status-danger { color: #f87171; }
+[data-theme="dark"] .ss-status-muted  { color: #94a3b8; }

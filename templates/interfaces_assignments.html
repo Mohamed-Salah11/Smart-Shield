@@ -3,7 +3,6 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
     <div class="ss-page-header">
         <div>
             <h1 class="ss-page-title">Interface Assignments</h1>
@@ -11,7 +10,6 @@
         </div>
     </div>
 
-    <!-- Navigation Tabs -->
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item"><a href="#" class="nav-link active" data-action="h_23cc335df8">Interface Assignments</a></li>
         <li class="nav-item"><a href="#" class="nav-link" data-action="h_c27bac4649">Interface Groups</a></li>
@@ -1016,12 +1014,12 @@ function displayInterfaceAssignments(assignments) {
 
 function saveWANAssignment() {
     const wanSelect = document.getElementById('wanSelect');
-    
+
     const formData = {
         interfaceType: 'WAN',
         networkPort: wanSelect.value
     };
-    
+
     fetch('/interfaces/save-interface-assignment', {
         method: 'POST',
         headers: {
@@ -1049,12 +1047,12 @@ function saveLANAssignment() {
         // LAN row is hidden, skip saving
         return;
     }
-    
+
     const formData = {
         interfaceType: 'LAN',
         networkPort: lanSelect.value
     };
-    
+
     fetch('/interfaces/save-interface-assignment', {
         method: 'POST',
         headers: {
@@ -1129,7 +1127,7 @@ function loadWirelessConfigs() {
 function displayWirelessConfigs(configs) {
     const tableBody = document.querySelector('#wireless-table tbody');
     tableBody.innerHTML = '';
-    
+
     configs.forEach(config => {
         const row = `
             <tr>
@@ -1149,7 +1147,7 @@ function displayWirelessConfigs(configs) {
 function saveWirelessConfig() {
     const modal = document.getElementById('wireless-modal');
     const configId = modal.dataset.configId;
-    
+
     const formData = {
         parentInterface: document.getElementById('wirelessParentInterface').value,
         mode: document.getElementById('wirelessMode').value,
@@ -1195,7 +1193,7 @@ function editWirelessConfig(configId) {
                 document.getElementById('wirelessParentInterface').value = config.parent_interface;
                 document.getElementById('wirelessMode').value = config.mode;
                 document.getElementById('wirelessDescription').value = config.description;
-                
+
                 document.getElementById('wireless-modal').dataset.configId = configId;
                 openModal('wireless-modal');
             } else {
@@ -1249,7 +1247,7 @@ function loadVLANConfigs() {
 function displayVLANConfigs(configs) {
     const tableBody = document.querySelector('#vlan-table tbody');
     tableBody.innerHTML = '';
-    
+
     configs.forEach(config => {
         const row = `
             <tr>
@@ -1270,7 +1268,7 @@ function displayVLANConfigs(configs) {
 function saveVLANConfig() {
     const modal = document.getElementById('vlan-modal');
     const configId = modal.dataset.configId;
-    
+
     const formData = {
         parentInterface: document.getElementById('vlanParentInterface').value,
         vlanTag: document.getElementById('vlanTag').value,
@@ -1337,7 +1335,7 @@ function editVLANConfig(configId) {
                 document.getElementById('vlanTag').value = config.vlan_tag;
                 document.getElementById('vlanPriority').value = config.vlan_priority;
                 document.getElementById('vlanDescription').value = config.description;
-                
+
                 document.getElementById('vlan-modal').dataset.configId = configId;
                 openModal('vlan-modal');
             } else {
@@ -1391,7 +1389,7 @@ function loadQinQConfigs() {
 function displayQinQConfigs(configs) {
     const tableBody = document.querySelector('#qinq-table tbody');
     tableBody.innerHTML = '';
-    
+
     configs.forEach(config => {
         const row = `
             <tr>
@@ -1421,10 +1419,10 @@ function addQinQTagInput() {
 function saveQinQConfig() {
     const modal = document.getElementById('qinq-modal');
     const configId = modal.dataset.configId;
-    
+
     const tagInputs = document.querySelectorAll('.qinq-tag-input');
     const memberTags = Array.from(tagInputs).map(input => input.value).filter(val => val.trim());
-    
+
     const formData = {
         parentInterface: document.getElementById('qinqParentInterface').value,
         firstLevelTag: document.getElementById('qinqFirstLevelTag').value,
@@ -1485,7 +1483,7 @@ function editQinQConfig(configId) {
                 document.getElementById('qinqFirstLevelTag').value = config.first_level_tag;
                 document.getElementById('qinqAddToGroups').checked = config.add_to_groups;
                 document.getElementById('qinqDescription').value = config.description;
-                
+
                 // Populate member tags
                 const container = document.getElementById('qinqTagsContainer');
                 container.innerHTML = '';
@@ -1497,7 +1495,7 @@ function editQinQConfig(configId) {
                     input.style.marginTop = '10px';
                     container.appendChild(input);
                 });
-                
+
                 document.getElementById('qinq-modal').dataset.configId = configId;
                 openModal('qinq-modal');
             } else {
@@ -1562,13 +1560,13 @@ function editGroup(groupId) {
                 // Populate modal with group data
                 document.getElementById('groupName').value = group.name;
                 document.getElementById('groupDescription').value = group.description;
-                
+
                 // Set selected members
                 const select = document.getElementById('groupMembers');
                 Array.from(select.options).forEach(option => {
                     option.selected = group.members.includes(option.value);
                 });
-                
+
                 // Store the groupId for update
                 document.getElementById('interface-group-modal').dataset.groupId = groupId;
                 openModal('interface-group-modal');
@@ -1600,7 +1598,7 @@ function loadInterfaceGroups() {
 function displayInterfaceGroups(groups) {
     const tableBody = document.querySelector('#interface-groups-table tbody');
     tableBody.innerHTML = '';
-    
+
     groups.forEach(group => {
         const row = `
             <tr>
@@ -1654,10 +1652,10 @@ function displayPPPConfigs(configs) {
 function savePPPConfig() {
     const modal = document.getElementById('ppp-modal');
     const configId = modal.dataset.configId;
-    
+
     const linkInterfacesSelect = document.getElementById('pppLinkInterfaces');
     const linkInterfaces = Array.from(linkInterfacesSelect.selectedOptions).map(opt => opt.value);
-    
+
     const formData = {
         linkType: document.getElementById('pppLinkType').value,
         linkInterfaces: linkInterfaces,
@@ -1724,13 +1722,13 @@ function editPPPConfig(configId) {
             if (data.status === 'success') {
                 const config = data.data;
                 document.getElementById('pppLinkType').value = config.link_type;
-                
+
                 // Set selected interfaces
                 const interfacesSelect = document.getElementById('pppLinkInterfaces');
                 Array.from(interfacesSelect.options).forEach(option => {
                     option.selected = config.link_interfaces.includes(option.value);
                 });
-                
+
                 document.getElementById('pppDescription').value = config.description;
                 document.getElementById('pppUsername').value = config.username;
                 document.getElementById('pppPassword').value = config.password;
@@ -1806,7 +1804,7 @@ function displayGREConfigs(configs) {
 function saveGREConfig() {
     const modal = document.getElementById('gre-modal');
     const configId = modal.dataset.configId;
-    
+
     const formData = {
         parentInterface: document.getElementById('greParentInterface').value,
         greRemoteAddress: document.getElementById('greRemoteAddress').value,
@@ -1949,7 +1947,7 @@ function displayGIFConfigs(configs) {
 function saveGIFConfig() {
     const modal = document.getElementById('gif-modal');
     const configId = modal.dataset.configId;
-    
+
     const formData = {
         parentInterface: document.getElementById('gifParentInterface').value,
         gifRemoteAddress: document.getElementById('gifRemoteAddress').value,
@@ -2079,22 +2077,22 @@ function displayBridgeConfigs(configs) {
 function saveBridgeConfig() {
     const modal = document.getElementById('bridge-modal');
     const configId = modal.dataset.configId;
-    
+
     const memberSelect = document.getElementById('bridgeMemberInterfaces');
     const memberInterfaces = Array.from(memberSelect.selectedOptions).map(opt => opt.value);
-    
+
     const spanSelect = document.getElementById('bridgeSpanInterfaces');
     const spanInterfaces = Array.from(spanSelect.selectedOptions).map(opt => opt.value);
-    
+
     const edgeSelect = document.getElementById('bridgeEdgeInterfaces');
     const edgeInterfaces = Array.from(edgeSelect.selectedOptions).map(opt => opt.value);
-    
+
     const autoEdgeSelect = document.getElementById('bridgeAutoEdgeInterfaces');
     const autoEdgeInterfaces = Array.from(autoEdgeSelect.selectedOptions).map(opt => opt.value);
-    
+
     const ptpSelect = document.getElementById('bridgePTPInterfaces');
     const ptpInterfaces = Array.from(ptpSelect.selectedOptions).map(opt => opt.value);
-    
+
     const formData = {
         memberInterfaces: memberInterfaces,
         description: document.getElementById('bridgeDescription').value,
@@ -2155,41 +2153,41 @@ function editBridgeConfig(configId) {
         .then(data => {
             if (data.status === 'success') {
                 const config = data.data;
-                
+
                 // Set member interfaces
                 let select = document.getElementById('bridgeMemberInterfaces');
                 Array.from(select.options).forEach(option => {
                     option.selected = config.member_interfaces.includes(option.value);
                 });
-                
+
                 document.getElementById('bridgeDescription').value = config.description;
                 document.getElementById('bridgeCacheSize').value = config.cache_size;
                 document.getElementById('bridgeCacheMaxAge').value = config.cache_max_age;
-                
+
                 // Set span interfaces
                 select = document.getElementById('bridgeSpanInterfaces');
                 Array.from(select.options).forEach(option => {
                     option.selected = config.span_interfaces.includes(option.value);
                 });
-                
+
                 // Set edge interfaces
                 select = document.getElementById('bridgeEdgeInterfaces');
                 Array.from(select.options).forEach(option => {
                     option.selected = config.edge_interfaces.includes(option.value);
                 });
-                
+
                 // Set auto edge interfaces
                 select = document.getElementById('bridgeAutoEdgeInterfaces');
                 Array.from(select.options).forEach(option => {
                     option.selected = config.auto_edge_interfaces.includes(option.value);
                 });
-                
+
                 // Set ptp interfaces
                 select = document.getElementById('bridgePTPInterfaces');
                 Array.from(select.options).forEach(option => {
                     option.selected = config.ptp_interfaces.includes(option.value);
                 });
-                
+
                 document.getElementById('bridgeStickyPorts').checked = config.sticky_ports;
                 document.getElementById('bridge-modal').dataset.configId = configId;
                 openModal('bridge-modal');
@@ -2242,7 +2240,7 @@ function loadLAGGConfigs() {
 function displayLAGGConfigs(configs) {
     const tbody = document.getElementById('lagg-table').getElementsByTagName('tbody')[0];
     tbody.innerHTML = '';
-    
+
     configs.forEach(config => {
         const row = tbody.insertRow();
         row.innerHTML = `
@@ -2269,7 +2267,7 @@ function openLAGGModal() {
 function saveLAGGConfig() {
     const modal = document.getElementById('lagg-modal');
     const configId = modal.dataset.configId;
-    
+
     const parentInterfaces = Array.from(document.getElementById('laggParentInterfaces').selectedOptions).map(opt => opt.value);
     const formData = {
         parentInterfaces: parentInterfaces,
@@ -2315,15 +2313,15 @@ function editLAGGConfig(configId) {
             if (data.status === 'success') {
                 const modal = document.getElementById('lagg-modal');
                 modal.dataset.configId = configId;
-                
+
                 const parentInterfacesSelect = document.getElementById('laggParentInterfaces');
                 Array.from(parentInterfacesSelect.options).forEach(option => {
                     option.selected = data.data.parent_interfaces.includes(option.value);
                 });
-                
+
                 document.getElementById('laggAggregationProtocol').value = data.data.aggregation_protocol;
                 document.getElementById('laggDescription').value = data.data.description;
-                
+
                 openModal('lagg-modal');
             }
         })
@@ -2373,7 +2371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function saveInterfaceGroup() {
     const modal = document.getElementById('interface-group-modal');
     const groupId = modal.dataset.groupId;
-    
+
     const formData = {
         groupName: document.getElementById('groupName').value,
         groupDescription: document.getElementById('groupDescription').value,
@@ -2415,7 +2413,7 @@ function saveInterfaceGroup() {
     });
 }
 
-// front end 
+// front end
 
     function openTab(evt, tabName) {
         var i, tabContent, tabLinks;
@@ -2623,4 +2621,3 @@ function saveInterfaceGroup() {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-
