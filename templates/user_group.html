@@ -26,7 +26,6 @@
 {% block main %}
 
 <div class="container">
-    <!-- Page Header -->
     <div class="ss-page-header">
       <div>
         <h1 class="ss-page-title">User Manager</h1>
@@ -34,7 +33,6 @@
       </div>
     </div>
 
-    <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
             <a class="nav-link" href="{{ url_for('users.user_manager') }}">Users</a>
@@ -398,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadGroupMembers(groupId) {
     const listContainer = document.getElementById('membersList' + groupId);
     const loadingDiv = document.getElementById('loadingMembers' + groupId);
-    
+
     fetch(GROUP_MEMBERS_TMPL.replace('/group/0/members', '/group/' + groupId + '/members'))
         .then(response => response.json())
         .then(data => {
@@ -595,4 +593,3 @@ function setupCreateGroupWhitelist() {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

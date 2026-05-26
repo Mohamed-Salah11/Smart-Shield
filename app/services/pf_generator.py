@@ -241,7 +241,14 @@ def _build_nat_rules(conn, wan_iface: str) -> str:
     except Exception:
         _policy_active = False
 
-    if _policy_active:
+    if _policy_active and not _unbound_lan_ready(conn):
+        # Fail-open: Unbound isn't serving the LAN, so funneling DNS into it would
+        # black-hole all LAN resolution. Skip the rdr until the resolver is back
+        # (the DNS watchdog re-applies PF on recovery — dns_watchdog.py).
+        lines.append("")
+        lines.append("# Content filtering active, but Unbound is NOT serving the LAN —")
+        lines.append("# DNS interception suppressed (fail-open) so the LAN keeps resolving.")
+    elif _policy_active:
         try:
             import ipaddress as _ipaddress
             _lan_row = conn.execute(
@@ -794,7 +801,10 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
         _policy_active_dns_block = bool(has_active_content_policy(conn))
     except Exception:
         _policy_active_dns_block = False
-    if _policy_active_dns_block and lan_net:
+    # Fail-open (same rationale as the DNS rdr): only block the LAN→WAN DNS
+    # escape hatch when Unbound is actually serving the LAN. Blocking it while
+    # the resolver is dead would leave clients with no DNS at all.
+    if _policy_active_dns_block and lan_net and _unbound_lan_ready(conn):
         lines.append("")
         lines.append("# Block LAN→WAN DNS when content filtering is active (Phase 3.1).")
         lines.append(
@@ -931,6 +941,24 @@ def _build_app_filter_rules(conn, lan_iface: str = "") -> str:
 # ---------------------------------------------------------------------------
 # 5. Canonical PF config generator
 # ---------------------------------------------------------------------------
+
+def _unbound_lan_ready(conn) -> bool:
+    """Fail-open gate for the content-policy DNS funnel.
+
+    The funnel (rdr all LAN :53 → Unbound, and block LAN→WAN :53) is only safe
+    when Unbound is actually serving the LAN. If it isn't (localhost-only
+    bootstrap config, base local_unbound shadowing it, daemon dead), funneling
+    would black-hole ALL LAN name resolution — strictly worse than momentarily
+    unenforced filtering. So we suppress those rules until Unbound is back; the
+    DNS watchdog re-applies PF on recovery. Defaults to True on any error and
+    off-FreeBSD (the helper itself returns True there), so dev hosts and the
+    test suite keep emitting the funnel and existing PF tests are unaffected."""
+    try:
+        from app.services.dns_writer import unbound_listening_on_lan
+        return bool(unbound_listening_on_lan(conn))
+    except Exception:
+        return True
+
 
 def generate_pf_conf(conn) -> str:
     """

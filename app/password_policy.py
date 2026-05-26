@@ -17,7 +17,7 @@ _COMMON_PASSWORDS = frozenset({
     "letmein", "welcome", "admin", "administrator",
     "smartshield", "smartshield1", "changeme", "default",
     "iloveyou", "monkey", "dragon", "football",
-    "superuser", "root", "freebsd", "pfsense", "opnsense",
+    "superuser", "root", "freebsd",
 })
 
 MIN_LENGTH = 12

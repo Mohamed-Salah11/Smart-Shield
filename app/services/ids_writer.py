@@ -808,11 +808,6 @@ def _netmap_available() -> bool:
     return False
 
 
-def _kldstat_netmap_loaded() -> bool:
-    """Compatibility wrapper used by diagnostics and older call sites/tests."""
-    return _netmap_available()
-
-
 def _already_loaded_or_builtin(text: str) -> bool:
     """True when kldload output means netmap is already usable (loaded/built-in)."""
     low = (text or "").lower()

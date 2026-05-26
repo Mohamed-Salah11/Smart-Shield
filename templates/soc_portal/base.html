@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{{ static_v('vendor/fontawesome/css/all.min.css') }}">
   <link rel="stylesheet" href="{{ static_v('css/smartshield-system.css') }}">
   <link rel="stylesheet" href="{{ static_v('css/ext-inline.css') }}">
+  <link rel="stylesheet" href="{{ static_v('css/soc-portal.css') }}">
   <script src="{{ static_v('js/inline-handlers.js') }}"></script>
   <!-- Inter font -->
   <link href="{{ static_v('vendor/inter/inter.css') }}" rel="stylesheet">
@@ -347,6 +348,8 @@
     }
     .soc-shortcut-row { display: flex; justify-content: space-between; padding: .4rem 0; border-bottom: 1px solid var(--soc-border); }
     .soc-shortcut-row:last-child { border-bottom: 0; }
+    .soc-modal-content { background: var(--soc-card); color: var(--soc-text); border: 1px solid var(--soc-border); }
+    .soc-modal-header  { border-bottom: 1px solid var(--soc-border); }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -498,7 +501,6 @@
     {% endif %}
   </aside>
 
-  <!-- Main content -->
   <main class="soc-content">
     {% block content %}{% endblock %}
   </main>
@@ -507,7 +509,6 @@
 <!-- SmartShield AI — SOC investigation assistant -->
 {% include 'soc_portal/_chatbot.html' %}
 
-<!-- Bootstrap JS -->
 <script src="{{ static_v('vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 
 <script nonce="{{ csp_nonce() }}">
@@ -680,8 +681,8 @@ SOC.bindHiddenBadge = function(hostEl) {
 <!-- ── Keyboard shortcuts modal (injected once for every SOC page) ───── -->
 <div class="modal fade" id="socShortcutsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background: var(--soc-card); color: var(--soc-text); border: 1px solid var(--soc-border);">
-      <div class="modal-header" style="border-bottom: 1px solid var(--soc-border);">
+    <div class="modal-content soc-modal-content">
+      <div class="modal-header soc-modal-header">
         <h5 class="modal-title"><i class="fa-solid fa-keyboard me-2"></i>Keyboard shortcuts</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>

@@ -189,16 +189,6 @@ def _val_iface_name(v: str) -> str:
     return v
 
 
-def _val_cidr(v: str) -> str:
-    import ipaddress
-    v = str(v).strip()
-    try:
-        iface = ipaddress.ip_interface(v)
-        return str(iface)
-    except ValueError:
-        raise ValueError(f"Invalid CIDR: {v!r}")
-
-
 def _val_gateway(v: str) -> str:
     return _val_ip(v)
 

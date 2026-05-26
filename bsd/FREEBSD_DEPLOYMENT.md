@@ -163,7 +163,7 @@ service nginx start
 
 2. **Log rotation (newsyslog)**
 ```sh
-cp bsd/etc/newsyslog.d/smart-shield.conf /usr/local/etc/newsyslog.d/smart-shield.conf
+cp bsd/etc/newsyslog.d/smartshield.conf /usr/local/etc/newsyslog.d/smartshield.conf
 newsyslog -v   # dry-run to verify
 ```
 

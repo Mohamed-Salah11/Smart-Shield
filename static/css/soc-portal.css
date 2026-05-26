@@ -1,0 +1,251 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   soc-portal.css — SOC Portal component styles.
+
+   These class names (ext-XXXXXXXX) are referenced by the SOC templates. They
+   were originally inline style="..." attributes extracted to hashed classes by
+   scripts/migrate_inline.py, but the generated rules were lost (ext-inline.css
+   shipped empty). The SOC templates never had their inline styles committed to
+   git, so the originals are unrecoverable; these definitions are reconstructed
+   from each class's usage context and the SOC design tokens declared in
+   templates/soc_portal/base.html (--soc-bg, --soc-card, --soc-border,
+   --soc-text, --soc-muted, --soc-primary, --soc-accent, --soc-heading,
+   --soc-danger, --soc-warning, --soc-success).
+
+   Grouped by role. Safe to edit by hand (unlike ext-inline.css).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* SOC design tokens — mirrors templates/soc_portal/base.html so this stylesheet
+   is self-contained on the standalone pages (login / MFA / disabled) that do not
+   include base.html and therefore would not otherwise define these variables. */
+:root {
+  --soc-bg:      #0a0f1e;
+  --soc-panel:   #111827;
+  --soc-card:    #1a2235;
+  --soc-border:  #2a3550;
+  --soc-primary: #00b4a0;
+  --soc-accent:  #3b82f6;
+  --soc-danger:  #ef4444;
+  --soc-warning: #f59e0b;
+  --soc-success: #10b981;
+  --soc-text:    #e2e8f0;
+  --soc-muted:   #94a3b8;
+  --soc-heading: #4dd9cd;
+}
+
+/* ── Page headers & subtitles ─────────────────────────────────────────────── */
+.ext-5d54ff35 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--soc-text); }
+.ext-43a67986 { margin: 0 0 .25rem; font-size: 1.5rem; font-weight: 700; color: var(--soc-text); }
+.ext-728869bd { margin: 0 0 .75rem; font-size: 1rem; font-weight: 700; color: var(--soc-heading); }
+.ext-af4ab7e5 { margin: .75rem 0 .25rem; color: var(--soc-text); font-size: 1.15rem; }
+.ext-3a5a569f { margin: .75rem 0 .25rem; color: var(--soc-text); font-size: 1.15rem; }
+.ext-6609c206 { color: var(--soc-muted); margin: .25rem 0 0; font-size: .9rem; }
+.ext-c9e1c6a9 { color: var(--soc-muted); margin: .25rem 0 1rem; font-size: .9rem; }
+
+/* ── Muted text / empty-state copy ────────────────────────────────────────── */
+.ext-a729d7fe { color: var(--soc-muted); }
+.ext-75797c4c { color: var(--soc-muted); margin: 0; }
+.ext-78a63f80 { color: var(--soc-muted); margin: 0; font-size: .85rem; }
+.ext-e5c48d14 { color: var(--soc-muted); margin: 0; }
+.ext-8e6686db { color: var(--soc-muted); margin: .25rem 0; }
+.ext-dc77f074 { color: var(--soc-muted); font-size: .85rem; margin: .75rem 0 0; }
+.ext-5d43a904 { color: var(--soc-muted); font-size: .85rem; }
+.ext-fe4d94cf { color: var(--soc-muted); font-size: .85rem; margin: .25rem 0 0; }
+.ext-0d7c7c90 { color: var(--soc-muted); font-size: .85rem; }
+.ext-be80f092 { color: var(--soc-muted); font-size: .875rem; }
+.ext-7c13afb9 { color: var(--soc-muted); font-size: .85rem; margin: 0; }
+.ext-0cdf73c7 { color: var(--soc-text); white-space: pre-wrap; margin: 0; line-height: 1.6; }
+.ext-578c7579 { color: var(--soc-muted); font-size: .78rem; }
+.ext-6f459758 { color: var(--soc-muted); font-style: italic; }
+
+/* ── KPI value colours & accent icons ─────────────────────────────────────── */
+.ext-6c0fabf5 { color: var(--soc-primary); }
+.ext-385c5811 { color: var(--soc-accent); }
+.ext-fe726ce2 { color: var(--soc-warning); }
+.ext-58991e18 { color: var(--soc-success); }
+.ext-4a548d2f { color: var(--soc-success); }
+.ext-822b5ada { font-size: 1.1rem; color: var(--soc-text); }
+.ext-e07b2ee9 { color: var(--soc-primary); text-decoration: none; }
+.ext-ca6a3f2f { color: var(--soc-danger); }
+.ext-eb8645b3 { color: var(--soc-primary); }
+.ext-8cba01a2 { color: var(--soc-accent); }
+.ext-dbd8a929 { color: var(--soc-warning); }
+.ext-b73baa6c { color: var(--soc-muted); }
+.ext-ea498639 { color: var(--soc-muted); }
+
+/* ── Form labels & required marker ────────────────────────────────────────── */
+.ext-e2c29c05,
+.ext-3b8e2be5,
+.ext-b5dfb31e,
+.ext-4a110a8a,
+.ext-64eb38a8,
+.ext-d5d00dda,
+.ext-d9739007,
+.ext-42962336 { display: block; color: var(--soc-muted); font-size: .8rem; font-weight: 600; margin-bottom: .3rem; }
+.ext-c9e34862 { color: var(--soc-danger); }
+
+/* ── Dark form controls (override Bootstrap's light defaults) ─────────────── */
+.ext-4b1196ec,
+.ext-0e0264e7,
+.ext-008d9e6c,
+.ext-0f9b0ed5,
+.ext-be0d0d35,
+.ext-4e5a07fb,
+.ext-9335ffa4 { background: var(--soc-bg); border: 1px solid var(--soc-border); color: var(--soc-text); }
+.ext-4b1196ec:focus,
+.ext-0e0264e7:focus,
+.ext-008d9e6c:focus,
+.ext-0f9b0ed5:focus,
+.ext-be0d0d35:focus,
+.ext-4e5a07fb:focus,
+.ext-9335ffa4:focus,
+.ext-2251fd7c:focus { background: var(--soc-bg); border-color: var(--soc-primary); color: var(--soc-text); box-shadow: 0 0 0 .15rem rgba(0,180,160,.2); }
+.ext-2251fd7c { background: var(--soc-bg); border: 1px solid var(--soc-border); color: var(--soc-text); text-align: center; letter-spacing: .3em; font-family: 'Courier New', monospace; font-size: 1.15rem; }
+
+/* ── Modals (dark theme) ──────────────────────────────────────────────────── */
+.ext-e7c1533d,
+.ext-fdeb8b96 { background: var(--soc-card); color: var(--soc-text); border: 1px solid var(--soc-border); }
+.ext-14d14377,
+.ext-e7785cba,
+.ext-2c85cfc0 { border-color: var(--soc-border); }
+.ext-8372ff89 { color: var(--soc-heading); font-weight: 700; font-size: 1rem; }
+
+/* ── Buttons & action links ───────────────────────────────────────────────── */
+.ext-87419842 { font-size: .8rem; text-decoration: none; }
+.ext-1ba8eb38,
+.ext-065da35a,
+.ext-4d34038f { font-size: .8rem; text-decoration: none; }
+.ext-1b32ae3a { width: 100%; }
+.ext-2b5af5e2,
+.ext-ceb54319 { width: 100%; margin-bottom: .5rem; }
+.ext-4e8dc42d { font-size: 1.1rem; line-height: 1; padding: .1rem .55rem; }
+.ext-45ee279c { padding: .35rem .55rem; }
+.ext-a4f64625 { width: 100%; }
+.ext-da62bb76 { font-size: .75rem; padding: .2rem .55rem; }
+.ext-83d31f7f { background: none; border: 0; color: var(--soc-muted); cursor: pointer; padding: 0 .25rem; }
+.ext-6f264a3d,
+.ext-d118642b { color: var(--soc-primary); text-decoration: none; }
+
+/* ── Table headers ────────────────────────────────────────────────────────── */
+.ext-c78f4943,
+.ext-8f77872c,
+.ext-729192c0,
+.ext-39248fe8,
+.ext-2f01efdd,
+.ext-69e6838d { white-space: nowrap; }
+.ext-9ab095ba { width: 48px; }
+
+/* ── Table cells ──────────────────────────────────────────────────────────── */
+.ext-1e29eefb { font-weight: 600; color: var(--soc-text); }
+.ext-60f36eb8 { color: var(--soc-muted); font-size: .85rem; }
+.ext-588de81f { color: var(--soc-text); }
+.ext-0fcb75b9 { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-muted); }
+.ext-76b0e39b { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-muted); }
+.ext-9f7def3f { color: var(--soc-muted); width: 140px; }
+.ext-dbda352d { color: var(--soc-text); }
+.ext-f01908f1 { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-15e075a4 { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-f5cf6105 { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-muted); word-break: break-all; }
+.ext-8767e6a8,
+.ext-80a303e3 { padding: 0; }
+.ext-468d7d84 { color: var(--soc-accent); }
+.ext-e3eeb9c4 { color: var(--soc-text); }
+.ext-0aef27fa { font-family: 'Courier New', monospace; color: var(--soc-muted); }
+.ext-0516bea9 { font-weight: 600; }
+.ext-9fb8e23e { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-muted); }
+.ext-f16a9fe7,
+.ext-d3fdd065 { color: var(--soc-muted); font-size: .8rem; padding: .3rem .75rem .3rem 0; white-space: nowrap; }
+.ext-b0f14564 { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-muted); }
+
+/* ── Links rendered inside tables ─────────────────────────────────────────── */
+.ext-9982219f,
+.ext-aaea965a,
+.ext-0f86a98c,
+.ext-00d74da7 { color: var(--soc-heading); text-decoration: none; font-weight: 600; }
+.ext-3b39d4a1 { color: var(--soc-muted); text-decoration: none; font-size: .85rem; }
+
+/* ── Badges / status chips ────────────────────────────────────────────────── */
+.ext-566906a5,
+.ext-b19834c2,
+.ext-530fd97c { font-weight: 700; text-transform: uppercase; font-size: .72rem; letter-spacing: .03em; }
+.ext-53c89aeb,
+.ext-179624b7 { color: var(--soc-muted); font-size: .8rem; text-transform: capitalize; }
+.ext-f59a3da2 { color: var(--soc-success); font-size: .78rem; font-weight: 600; }
+.ext-b267534b { color: var(--soc-accent); font-size: .78rem; font-weight: 600; }
+.ext-dd0f2908 { color: var(--soc-muted); font-size: .78rem; }
+.ext-6cc0f26a,
+.ext-af2f3834,
+.ext-55399a04,
+.ext-5cb45d86 { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .72rem; font-weight: 700; background: rgba(255,255,255,.06); }
+.ext-a8443049 { color: var(--soc-text); font-weight: 700; }
+
+/* ── Tier chips (login page) ──────────────────────────────────────────────── */
+.ext-48296923 { background: rgba(0,180,160,.15); color: var(--soc-primary); border: 1px solid rgba(0,180,160,.3); }
+.ext-4abe544f { background: rgba(245,158,11,.15); color: var(--soc-warning); border: 1px solid rgba(245,158,11,.3); }
+.ext-a84c3ce2 { background: rgba(239,68,68,.15); color: var(--soc-danger); border: 1px solid rgba(239,68,68,.3); }
+
+/* ── Alert investigate / IOC box ──────────────────────────────────────────── */
+.ext-1a9d540d { padding: .75rem 1rem; }
+.ext-889d0be9 { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ext-727130b2 { color: var(--soc-text); font-size: .85rem; }
+.ext-123f6076 { margin-top: .5rem; font-size: .85rem; }
+.ext-73329f82 { margin-top: .5rem; }
+
+/* ── Alert detail panel (expandable raw event) ────────────────────────────── */
+.ext-46a7d992 { margin-bottom: .75rem; }
+.ext-12c0dff8 { font-weight: 700; color: var(--soc-heading); font-size: .78rem; margin-bottom: .25rem; text-transform: uppercase; letter-spacing: .05em; }
+.ext-aae8b9ef { width: 100%; font-size: .85rem; }
+.ext-bd1aaf60 { font-size: .85rem; }
+.ext-7f51845c { margin-top: .75rem; }
+.ext-5002f698 { cursor: pointer; color: var(--soc-muted); font-size: .8rem; }
+.ext-2ac6e3c9 { background: var(--soc-bg); border: 1px solid var(--soc-border); border-radius: 6px; padding: .75rem; max-height: 300px; overflow: auto; font-size: .78rem; white-space: pre-wrap; word-break: break-all; }
+.ext-9b0eb096 { background: rgba(255,255,255,.02); }
+
+/* ── Case detail: timeline, notes, meta ───────────────────────────────────── */
+.ext-eec2a5d9 { position: relative; }
+.ext-f0b295ec { display: flex; gap: .75rem; padding-bottom: 1rem; }
+.ext-f0506952 { flex: 1; }
+.ext-ec4cb9e3,
+.ext-e462bfec { border-top: 1px solid var(--soc-border); padding-top: .75rem; }
+.ext-07653709 { width: 100%; font-size: .85rem; }
+.ext-b0d5b2fb { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--soc-primary); word-break: break-all; }
+.ext-26b89319 { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); color: var(--soc-warning); font-size: .85rem; }
+.ext-4bf7d4d9,
+.ext-6196a1ca { margin-top: .75rem; }
+.ext-220e693c { display: grid; gap: .5rem; }
+.ext-64a6fe32 { margin-bottom: .75rem; }
+.ext-24d717e3 { display: flex; flex-direction: column; gap: .5rem; }
+
+/* ── Security & MFA enrollment ────────────────────────────────────────────── */
+.ext-7646a058 { display: flex; align-items: center; gap: .75rem; padding: 1rem; background: var(--soc-card); border: 1px solid var(--soc-border); border-radius: 10px; }
+.ext-da07a484 { font-size: 1.5rem; }
+.ext-074c7b62 { flex: 1; }
+.ext-a8d00143 { margin-top: 1rem; }
+.ext-4d816a0e { color: var(--soc-muted); font-size: .875rem; line-height: 1.7; padding-left: 1.25rem; }
+.ext-a0e8876d { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+.ext-79ff0c9e { text-align: center; }
+.ext-b208f99f { background: #fff; padding: .75rem; border-radius: 8px; display: inline-block; }
+.ext-ddda2df0 { flex: 1; min-width: 220px; }
+.ext-51d7888a { font-size: .75rem; color: var(--soc-muted); margin-top: .5rem; }
+.ext-c875ac7d { text-transform: uppercase; font-size: .68rem; letter-spacing: .08em; color: var(--soc-muted); margin-bottom: .15rem; }
+.ext-5b8ae67e { text-transform: uppercase; font-size: .68rem; letter-spacing: .08em; color: var(--soc-muted); margin: .75rem 0 .15rem; }
+.ext-c20a0e95 { font-family: 'Courier New', monospace; color: var(--soc-text); margin-bottom: .5rem; }
+.ext-84e99946 { font-family: 'Courier New', monospace; background: var(--soc-bg); padding: .4rem .6rem; border-radius: 6px; color: var(--soc-primary); word-break: break-all; display: inline-block; }
+.ext-e963fb61 { color: var(--soc-text); font-size: .85rem; }
+.ext-284b8423 { margin-top: .5rem; }
+.ext-3c89972a { border: 0; border-top: 1px solid var(--soc-border); margin: 1.5rem 0; }
+
+/* ── Threat-intel feed cards ──────────────────────────────────────────────── */
+.ext-9df81006,
+.ext-05507912,
+.ext-bc337146 { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+.ext-2d857ec4,
+.ext-77600e26,
+.ext-9e6e10f3 { font-weight: 700; color: var(--soc-text); }
+
+/* ── Saved searches ───────────────────────────────────────────────────────── */
+.ext-50a1b3a9 { display: flex; align-items: center; gap: .5rem; margin: .75rem 0; }
+.ext-e7541461 { margin-top: .5rem; font-size: .85rem; }
+
+/* ── Empty-state wrappers ─────────────────────────────────────────────────── */
+.ext-51b71953 { text-align: center; padding: 3rem 1rem; }
+.ext-54d04e8a { margin-top: .5rem; }

@@ -472,3 +472,47 @@ class TestPfFreeBSDCorrectness:
         rdr_lines = [l for l in conf.splitlines() if "rdr on em0" in l and "10.0.0.5" in l]
         assert rdr_lines, "Port-forward rule not found"
         assert any("to any" in l for l in rdr_lines)
+
+
+# ---------------------------------------------------------------------------
+# Content-policy DNS funnel — fail-open when Unbound isn't serving the LAN
+# ---------------------------------------------------------------------------
+
+class TestContentPolicyDnsFailOpen:
+    """When content filtering is active, PF normally force-redirects all LAN
+    :53 to Unbound and blocks LAN→WAN DNS. That must FAIL OPEN when Unbound
+    isn't actually serving the LAN — otherwise a dead resolver black-holes all
+    LAN name resolution (ping works, nothing browses)."""
+
+    def _activate_policy(self, db):
+        db.execute("DELETE FROM filter_dns_rules")
+        db.execute(
+            "INSERT INTO filter_dns_rules (domain, action, enabled) "
+            "VALUES ('ads.example.com', 'block', 1)"
+        )
+        db.commit()
+
+    def test_funnel_present_when_unbound_serving(self, fresh_conn, monkeypatch):
+        import app.services.pf_generator as pf
+        monkeypatch.setattr(pf, "_unbound_lan_ready", lambda conn: True)
+        self._activate_policy(fresh_conn)
+        try:
+            conf = pf.generate_pf_conf(fresh_conn)
+            assert "port 53 -> 192.168.1.1 port 53" in conf          # rdr funnel
+            assert "Block LAN→WAN DNS" in conf                        # egress block
+        finally:
+            fresh_conn.execute("DELETE FROM filter_dns_rules")
+            fresh_conn.commit()
+
+    def test_funnel_suppressed_when_unbound_not_serving(self, fresh_conn, monkeypatch):
+        import app.services.pf_generator as pf
+        monkeypatch.setattr(pf, "_unbound_lan_ready", lambda conn: False)
+        self._activate_policy(fresh_conn)
+        try:
+            conf = pf.generate_pf_conf(fresh_conn)
+            assert "port 53 -> 192.168.1.1 port 53" not in conf       # rdr suppressed
+            assert "fail-open" in conf                                # explanatory comment
+            assert "Block LAN→WAN DNS" not in conf                    # egress block suppressed
+        finally:
+            fresh_conn.execute("DELETE FROM filter_dns_rules")
+            fresh_conn.commit()

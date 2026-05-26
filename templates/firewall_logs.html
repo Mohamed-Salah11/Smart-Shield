@@ -491,8 +491,8 @@ function openDrawer(idx) {
     : "";
   const raw = r.raw_line || "";
   const rawBlock = raw
-    ? `<details class="ext-7f51845c" style="margin-top:14px;">
-         <summary class="ext-5002f698" style="cursor:pointer; color:var(--muted); font-size:.78rem;"><i class="fa-solid fa-code"></i> Show raw pflog line</summary>
+    ? `<details class="ext-7f51845c">
+         <summary class="ext-5002f698"><i class="fa-solid fa-code"></i> Show raw pflog line</summary>
          <div class="fwl-drawer-raw">${htmlEscape(raw)}</div>
        </details>`
     : "";
@@ -543,4 +543,3 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

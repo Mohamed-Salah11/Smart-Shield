@@ -72,7 +72,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="vi_interface" class="col-sm-3 col-form-label fw-semibold">Interface</label>
                         <div class="col-sm-9">
@@ -84,7 +84,7 @@
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="vi_addr_type" class="col-sm-3 col-form-label fw-semibold">Address Type</label>
                         <div class="col-sm-9">
@@ -94,7 +94,7 @@
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="vi_address" class="col-sm-3 col-form-label fw-semibold">Address(es)</label>
                         <div class="col-sm-9">
@@ -127,7 +127,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label class="col-sm-3 col-form-label fw-semibold">Expansion</label>
                         <div class="col-sm-9">
@@ -140,7 +140,7 @@
                             <small class="text-muted">E.g. 192.168.1.0/24 expands to 256 entries</small>
                         </div>
                     </div>
-                    
+
                     <!-- CARP Fields -->
                     <div id="vi_password_row" class="mb-3 row ext-9c766357">
                         <label class="col-sm-3 col-form-label fw-semibold">Virtual IP Password</label>
@@ -156,7 +156,7 @@
                             <small class="text-muted">Enter the VHID group password</small>
                         </div>
                     </div>
-                    
+
                     <div id="vi_vhid_row" class="mb-3 row ext-9c766357">
                         <label for="vi_vhid" class="col-sm-3 col-form-label fw-semibold">VHID Group</label>
                         <div class="col-sm-9">
@@ -170,7 +170,7 @@
                             <small class="text-muted">VHID group that machines will share</small>
                         </div>
                     </div>
-                    
+
                     <div id="vi_adv_freq_row" class="mb-3 row ext-9c766357">
                         <label class="col-sm-3 col-form-label fw-semibold">Advertising Frequency</label>
                         <div class="col-sm-9">
@@ -196,7 +196,7 @@
                             <small class="text-muted">0 means usually master. Lowest combination determines master.</small>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row">
                         <label for="vi_description" class="col-sm-3 col-form-label fw-semibold">Description</label>
                         <div class="col-sm-9">
@@ -219,22 +219,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const virtualIpsAdd = document.getElementById('virtualIpsAdd');
     const viModalSave = document.getElementById('viModalSave');
     const viTypeRadios = document.querySelectorAll('input[name="vi_type"]');
-    
+
     loadVirtualIPsConfigs();
-    
+
     if (virtualIpsAdd) {
-        virtualIpsAdd.addEventListener('click', function(e) { 
+        virtualIpsAdd.addEventListener('click', function(e) {
             openNewVirtualIPForm();
         });
     }
-    
+
     if (viModalSave) {
         viModalSave.addEventListener('click', function(e) {
             e.preventDefault();
             saveVirtualIP();
         });
     }
-    
+
     viTypeRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             const isCarp = this.value === 'carp';
@@ -261,12 +261,12 @@ function loadVirtualIPsConfigs() {
 
 function displayVirtualIPsConfigs(configs) {
     const tbody = document.getElementById('virtual-ips-tbody');
-    
+
     if (configs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No virtual IPs configured</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = '';
     configs.forEach(config => {
         const row = document.createElement('tr');
@@ -289,7 +289,7 @@ function displayVirtualIPsConfigs(configs) {
 function openNewVirtualIPForm() {
     const modal = document.getElementById('viModal');
     modal.dataset.configId = '';
-    
+
     document.getElementById('viModalLabel').textContent = 'Add Virtual IP';
     document.getElementById('vi_type_alias').checked = true;
     document.getElementById('vi_interface').value = '';
@@ -303,7 +303,7 @@ function openNewVirtualIPForm() {
     document.getElementById('vi_vhid').value = '1';
     document.getElementById('vi_adv_base').value = '1';
     document.getElementById('vi_adv_skew').value = '0';
-    
+
     document.getElementById('vi_password_row').style.display = 'none';
     document.getElementById('vi_vhid_row').style.display = 'none';
     document.getElementById('vi_adv_freq_row').style.display = 'none';
@@ -320,24 +320,24 @@ function editVirtualIP(id) {
                 const config = data.data;
                 const modal = document.getElementById('viModal');
                 modal.dataset.configId = id;
-                
+
                 document.getElementById('viModalLabel').textContent = 'Edit Virtual IP';
-                
+
                 const typeRadio = document.querySelector(`input[name="vi_type"][value="${config.type}"]`);
                 if (typeRadio) typeRadio.checked = true;
-                
+
                 document.getElementById('vi_interface').value = config.interface || '';
                 document.getElementById('vi_addr_type').value = config.address_type || 'single';
                 document.getElementById('vi_address').value = config.address || '';
                 document.getElementById('vi_mask_bits').value = config.prefix || '32';
                 document.getElementById('vi_expansion').checked = config.expansion === true || config.expansion === 1;
                 document.getElementById('vi_description').value = config.description || '';
-                
+
                 const isCarp = config.type === 'carp';
                 document.getElementById('vi_password_row').style.display = isCarp ? '' : 'none';
                 document.getElementById('vi_vhid_row').style.display = isCarp ? '' : 'none';
                 document.getElementById('vi_adv_freq_row').style.display = isCarp ? '' : 'none';
-                
+
                 new bootstrap.Modal(modal).show();
             }
         })
@@ -347,7 +347,7 @@ function editVirtualIP(id) {
 function saveVirtualIP() {
     const modal = document.getElementById('viModal');
     const configId = modal.dataset.configId;
-    
+
     const formData = {
         type: document.querySelector('input[name="vi_type"]:checked').value,
         interface: document.getElementById('vi_interface').value,
@@ -357,16 +357,16 @@ function saveVirtualIP() {
         expansion: document.getElementById('vi_expansion').checked,
         description: document.getElementById('vi_description').value
     };
-    
+
     if (!formData.type || !formData.interface || !formData.address) {
         alert('Please fill in all required fields');
         return;
     }
-    
+
     const isUpdate = configId && configId !== "undefined" && configId !== "null" && configId !== "";
     const url = isUpdate ? `/firewall/update-virtual-ips-config/${configId}` : '/firewall/save-virtual-ips-config';
     const method = isUpdate ? 'PUT' : 'POST';
-    
+
     fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
@@ -393,7 +393,7 @@ function saveVirtualIP() {
 
 function deleteVirtualIP(id) {
     if (!confirm('Are you sure you want to delete this Virtual IP?')) return;
-    
+
     fetch(`/firewall/delete-virtual-ips-config/${id}`, { method: 'DELETE' })
         .then(response => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -433,4 +433,3 @@ function escapeHtml(text) {
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

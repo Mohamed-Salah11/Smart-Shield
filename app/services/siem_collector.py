@@ -1181,83 +1181,6 @@ def _run_anomaly_detector(state: dict):
         time.sleep(60)
 
 
-def _detect_anomalies(state: dict):
-    from app.audit_log import tail_events
-
-    recent = tail_events(limit=300)
-    now_ts = time.time()
-    window = 5 * 60   # 5-minute sliding window
-
-    alerted: dict = state.setdefault("alerted", {})
-
-    # Clean up old alert cooldowns (10-minute cooldown)
-    expired = [k for k, t in alerted.items() if now_ts - t > 600]
-    for k in expired:
-        del alerted[k]
-
-    # ── Brute-force detection: >5 login_failed from same IP in 5 min ──
-    fail_counts: dict = {}
-    for evt in recent:
-        if evt.get("action") != "login_failed":
-            continue
-        try:
-            ts = datetime.fromisoformat(evt.get("timestamp", "")).timestamp()
-        except (ValueError, TypeError):
-            continue
-        if now_ts - ts > window:
-            continue
-        ip = evt.get("remote_addr", "unknown")
-        fail_counts[ip] = fail_counts.get(ip, 0) + 1
-
-    for ip, count in fail_counts.items():
-        if count >= 5:
-            key = f"brute_force:{ip}"
-            if key not in alerted:
-                alerted[key] = now_ts
-                _log("security", "brute_force_detected", remote_addr=ip,
-                     severity="high",
-                     details={
-                         "count":          count,
-                         "window_minutes": 5,
-                         "target":         "admin login",
-                     })
-
-    # ── IDS flood: >10 ids_alert from same src_ip in 5 min ──
-    ids_counts: dict = {}
-    ids_sigs:   dict = {}
-    for evt in recent:
-        if evt.get("category") != "ids" or evt.get("action") != "ids_alert":
-            continue
-        try:
-            ts = datetime.fromisoformat(evt.get("timestamp", "")).timestamp()
-        except (ValueError, TypeError):
-            continue
-        if now_ts - ts > window:
-            continue
-        src = evt.get("remote_addr", "unknown")
-        ids_counts[src] = ids_counts.get(src, 0) + 1
-        sig = (evt.get("details") or {}).get("signature", "")
-        if sig:
-            ids_sigs.setdefault(src, []).append(sig)
-
-    for src, count in ids_counts.items():
-        if count >= 10:
-            key = f"ids_flood:{src}"
-            if key not in alerted:
-                alerted[key] = now_ts
-                top_sig = ""
-                sigs = ids_sigs.get(src, [])
-                if sigs:
-                    top_sig = max(set(sigs), key=sigs.count)
-                _log("security", "ids_flood_detected", remote_addr=src,
-                     severity="high",
-                     details={
-                         "count":          count,
-                         "window_minutes": 5,
-                         "top_signature":  top_sig,
-                     })
-
-
 # ---------------------------------------------------------------------------
 # 6. SSH / Auth Log Collector
 # ---------------------------------------------------------------------------
@@ -1750,6 +1673,16 @@ def start_siem_collectors():
     try:
         from app.services.ids_watchdog import start_ids_watchdog
         start_ids_watchdog()
+    except Exception:
+        pass
+
+    # DNS self-healing watchdog — re-binds Unbound to the LAN when it isn't
+    # actually serving (e.g. localhost-only bootstrap config, or base
+    # local_unbound shadowing it). Same rate-limit policy; disable-able via the
+    # dns_resolver service_state JSON `watchdog_enabled`.
+    try:
+        from app.services.dns_watchdog import start_dns_watchdog
+        start_dns_watchdog()
     except Exception:
         pass
 

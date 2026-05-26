@@ -11,7 +11,6 @@
       </div>
     </div>
 
-    <!-- Navigation Pills -->
     <ul class="nav nav-pills mb-4">
         <li class="nav-item">
             <a class="nav-link" href="{{ url_for('routing.routing_index') }}">Gateways</a>
@@ -65,7 +64,7 @@
                                     </a>
                                     <form class="ext-5677b988" method="post"
                                           action="{{ url_for('routing.gateway_group_delete', group_id=g.id) }}"
-                                         
+
                                           data-action-submit="confirm-delete"
                                           data-confirm="Delete group {{ g.name }}?">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -100,4 +99,3 @@
 </script>
 <!-- /inline-handlers:auto -->
 {% endblock %}
-

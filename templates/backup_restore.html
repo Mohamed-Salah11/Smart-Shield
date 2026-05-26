@@ -248,7 +248,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const targetBtn = document.querySelector(`#backupRestoreTabs button[data-bs-target='${tabTarget}']`);
         if (targetBtn && window.bootstrap && bootstrap.Tab) {
             bootstrap.Tab.getOrCreateInstance(targetBtn).show();
-        }        
+        }
     }
 
     tabButtons.forEach((btn) => {
