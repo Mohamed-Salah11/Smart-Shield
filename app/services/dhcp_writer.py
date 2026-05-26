@@ -373,6 +373,31 @@ def write_dhcpd_conf(conn) -> dict:
 # Apply (write + service restart)
 # ---------------------------------------------------------------------------
 
+def _dhcp_ifaces(conn) -> str:
+    """Return the space-joined interface list dhcpd should bind, derived from the
+    enabled DHCP pools (LAN pool → lan_config.assigned_port, etc.).
+
+    Without this, ISC dhcpd binds *every* broadcast interface — including the WAN
+    — and logs "No subnet declaration for <wan> (...)" / "Ignoring requests on
+    <wan>" for interfaces that have no matching `subnet` declaration. Restricting
+    it to the LAN interface(s) silences that noise and stops the appliance from
+    answering DHCP on the WAN. Only interfaces that have a usable CIDR are
+    listed (mirrors the `if not subnet: continue` skip in generate_dhcpd_conf),
+    de-duplicated with order preserved.
+    """
+    ifaces: list = []
+    for pool in _rows(conn, "SELECT interface_type FROM dhcp_pools WHERE enabled=1 ORDER BY interface_type"):
+        itype = (pool.get("interface_type") or "LAN").upper()
+        table = "lan_config" if itype == "LAN" else "wan_config"
+        rows  = _rows(conn, f"SELECT ipv4_address, assigned_port FROM {table} LIMIT 1")
+        row   = rows[0] if rows else {}
+        port  = (row.get("assigned_port") or "").strip()
+        subnet, _ = _parse_cidr(row.get("ipv4_address") or "")
+        if port and subnet and port not in ifaces:
+            ifaces.append(port)
+    return " ".join(ifaces)
+
+
 def apply_dhcpd(conn) -> dict:
     """
     Validate config, atomically write dhcpd.conf, and restart isc-dhcpd.
@@ -394,6 +419,7 @@ def apply_dhcpd(conn) -> dict:
         from app.services.service_manager import service_action, sysrc_set
         # The pkg's rc script reads `dhcpd_enable` (not `isc_dhcpd_enable`).
         sysrc_set("dhcpd_enable", "NO")
+        sysrc_set("dhcpd_ifaces", "")   # clear stale interface binding
         service_action("isc-dhcpd", "stop")
         return {
             "ok": True, "skipped": True,
@@ -446,6 +472,10 @@ def apply_dhcpd(conn) -> dict:
     from app.services.service_manager import service_action, sysrc_set
     # The pkg's rc script reads `dhcpd_enable` (not `isc_dhcpd_enable`).
     sysrc_set("dhcpd_enable", "YES")
+    # Bind only the LAN interface(s) — otherwise dhcpd also listens on the WAN
+    # and floods the log with "No subnet declaration for <wan>" / "Ignoring
+    # requests on <wan>". Empty string is fine (dhcpd falls back to all ifaces).
+    sysrc_set("dhcpd_ifaces", _dhcp_ifaces(conn))
     result = service_action("isc-dhcpd", "restart")
     if not result["ok"]:
         rb = _rollback_dhcpd()

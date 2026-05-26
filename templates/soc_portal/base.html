@@ -620,6 +620,126 @@ SOC.bindHiddenBadge = function(hostEl) {
   });
 };
 
+/* ── Shared log-detail drawer ─────────────────────────────────────────────
+   Splunk-style detail for a security event, shown in a slide-in drawer (same
+   UX as the firewall-logs page) so the 3s alert auto-refresh can never close
+   it. Used by the Alert Queue (click a row) and the case page (View detail on
+   a linked log). `evt` is the full audit event: top-level fields merged with
+   its `details` object. Every column api_alerts() returns is reachable here;
+   anything unmapped is still in the raw-JSON block. */
+SOC.LOG_DETAIL_GROUPS = [
+  { title: 'Event',          fields: [['event_uuid','Event UUID','ioc'],
+                                      ['timestamp','Time'],['category','Category'],
+                                      ['action','Action'],['severity','Severity'],
+                                      ['effective_severity','Effective severity'],
+                                      ['source_type','Source type'],
+                                      ['source_name','Source name']] },
+  { title: 'Signature',      fields: [['signature','Rule'],
+                                      ['mitre_tactic','MITRE tactic'],
+                                      ['mitre_technique','MITRE technique'],
+                                      ['sig_category','Class'],
+                                      ['gid','GID'],['sid','SID'],
+                                      ['rule_id','Rule ID'],
+                                      ['rule_name','Rule name']] },
+  { title: 'Network policy', fields: [['interface','Interface'],
+                                      ['direction','Direction'],
+                                      ['policy_id','Policy ID'],
+                                      ['policy_name','Policy name']] },
+  { title: 'Source',         fields: [['src_ip','IP','ioc'],['src_port','Port'],
+                                      ['hostname','Hostname'],['mac','MAC','ioc']] },
+  { title: 'Destination',    fields: [['dest_ip','IP','ioc'],['dest_port','Port'],
+                                      ['proto','Protocol'],
+                                      ['domain','Domain','ioc'],
+                                      ['url','URL','ioc']] },
+  { title: 'HTTP',           fields: [['http_method','Method'],['http_status','Status'],
+                                      ['http_url','URL','ioc'],['http_host','Host','ioc'],
+                                      ['http_hostname','Hostname','ioc'],
+                                      ['http_agent','User-Agent']] },
+  { title: 'TLS',            fields: [['tls_sni','SNI','ioc']] },
+  { title: 'File',           fields: [['filename','Filename'],['extension','Extension'],
+                                      ['mime','MIME'],['magic','Magic'],['size','Size'],
+                                      ['md5','MD5','ioc'],['sha256','SHA-256','ioc'],
+                                      ['state','State']] },
+  { title: 'User',           fields: [['username','Username'],['remote_addr','Remote IP','ioc']] },
+];
+
+SOC._logFieldRow = function(label, value, kind) {
+  const esc  = SOC.esc(String(value));
+  const copy = (kind === 'ioc')
+    ? `<button class="soc-copy-btn" type="button" data-action="soc-copy-ioc" data-value="${esc}" title="Copy"><i class="fa-regular fa-copy"></i></button>`
+    : '';
+  return `<div class="soc-drawer-row"><span class="k">${SOC.esc(label)}</span>`
+       + `<span class="v soc-mono">${esc}${copy}</span></div>`;
+};
+
+SOC.renderLogDetailHTML = function(e) {
+  e = e || {};
+  const d    = (e.details && typeof e.details === 'object') ? e.details : {};
+  const flat = Object.assign({}, e, d);
+  const blocks = SOC.LOG_DETAIL_GROUPS.map(g => {
+    const rows = g.fields
+      .filter(([k]) => flat[k] !== undefined && flat[k] !== null && flat[k] !== '')
+      .map(([k, label, kind]) => SOC._logFieldRow(label, flat[k], kind));
+    if (!rows.length) return '';
+    return `<section class="soc-drawer-section">`
+         + `<div class="soc-drawer-section-title">${SOC.esc(g.title)}</div>${rows.join('')}</section>`;
+  }).filter(Boolean).join('');
+  const rawJson = SOC.esc(JSON.stringify(d, null, 2));
+  return `${blocks || '<div class="text-soc-muted">No structured fields. See raw event below.</div>'}`
+       + `<details class="soc-drawer-rawwrap"><summary><i class="fa-solid fa-code me-1"></i>Show raw event JSON</summary>`
+       + `<pre class="soc-mono soc-drawer-raw">${rawJson}</pre></details>`;
+};
+
+SOC.openLogDetail = function(evt) {
+  if (!evt) return;
+  const body = document.getElementById('socDrawerBody');
+  if (body) body.innerHTML = SOC.renderLogDetailHTML(evt);
+  const drawer   = document.getElementById('socDrawer');
+  const backdrop = document.getElementById('socDrawerBackdrop');
+  if (drawer)   { drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false'); }
+  if (backdrop) backdrop.classList.add('open');
+};
+
+SOC.closeLogDetail = function() {
+  const drawer   = document.getElementById('socDrawer');
+  const backdrop = document.getElementById('socDrawerBackdrop');
+  if (drawer)   { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); }
+  if (backdrop) backdrop.classList.remove('open');
+};
+
+SOC.isLogDetailOpen = function() {
+  const drawer = document.getElementById('socDrawer');
+  return !!(drawer && drawer.classList.contains('open'));
+};
+
+SOC.copyIoc = function(btn, value) {
+  if (!navigator.clipboard) return;
+  navigator.clipboard.writeText(value).then(() => {
+    const i = btn.querySelector('i');
+    if (!i) return;
+    const orig = i.className;
+    i.className = 'fa-solid fa-check';
+    btn.style.color = '#10b981';
+    setTimeout(() => { i.className = orig; btn.style.color = ''; }, 900);
+  });
+};
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && SOC.isLogDetailOpen()) SOC.closeLogDetail();
+});
+
+/* Drawer + IOC-copy actions registered globally so the shared drawer works on
+   every SOC page (Alert Queue, case detail). Delegated via inline-handlers.js,
+   so it also fires for the drawer body injected at runtime. */
+(function () {
+  var R = window.SSActions || (window.SSActions = {});
+  R['soc-drawer-close'] = function (event, el) {
+    if (el && el.id === 'socDrawerBackdrop' && event.target !== el) return; // backdrop: ignore child clicks
+    SOC.closeLogDetail();
+  };
+  R['soc-copy-ioc'] = function (event, el) { event.stopPropagation(); SOC.copyIoc(el, el.dataset.value); };
+})();
+
 /* Global keyboard shortcuts.
    Skips when typing in inputs / textareas / contenteditable. */
 (function() {
@@ -705,6 +825,20 @@ SOC.bindHiddenBadge = function(hostEl) {
     </div>
   </div>
 </div>
+
+<!-- ── Shared log-detail drawer (Alert Queue + case evidence) ──────────────── -->
+<div id="socDrawerBackdrop" class="soc-drawer-backdrop" data-action="soc-drawer-close"></div>
+<aside id="socDrawer" class="soc-drawer" aria-hidden="true">
+  <div class="soc-drawer-head">
+    <h3><i class="fa-solid fa-magnifying-glass-chart me-2"></i>Log detail</h3>
+    <button class="soc-drawer-close" type="button" data-action="soc-drawer-close" title="Close (Esc)">&times;</button>
+  </div>
+  <div class="soc-drawer-body" id="socDrawerBody"></div>
+  <div class="soc-drawer-foot">
+    <span class="soc-kbd">Esc</span>
+    <button type="button" class="btn-soc-secondary" data-action="soc-drawer-close">Close</button>
+  </div>
+</aside>
 
 {% block extra_js %}{% endblock %}
 </body>

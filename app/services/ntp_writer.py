@@ -91,6 +91,15 @@ def generate_ntp_conf(settings: dict) -> str:
         "",
         f"driftfile {_NTP_DRIFT_PATH}",
         "",
+        # Step the clock at ANY offset instead of exiting on a large one. On a VM
+        # (snapshot/suspend) or a box with a dead RTC battery the boot-time offset
+        # routinely exceeds ntpd's 1000s panic threshold, so without this ntpd
+        # logs "Clock offset exceeds panic threshold / Set system clock by hand"
+        # and dies — leaving the clock wrong, which breaks TLS cert validation
+        # (browsers reject HTTPS as "not yet valid"). Pairs with ntpd_sync_on_start
+        # (-g) so the clock self-corrects once a time server is reachable.
+        "tinker panic 0",
+        "",
     ]
 
     # Time servers
