@@ -29,9 +29,15 @@
 .db-status-chip.online { background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25); }
 
 /* ── KPI Strip ── */
-.db-kpi-strip { display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px; }
-@media(max-width:1200px){.db-kpi-strip{grid-template-columns:repeat(3,1fr)}}
+.db-kpi-strip { display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px; }
+@media(max-width:1400px){.db-kpi-strip{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px) {.db-kpi-strip{grid-template-columns:repeat(2,1fr)}}
+.db-kpi-drift-dot { display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#10b981; }
+.db-kpi-drift-dot.bad { background:#ef4444; }
+.db-kpi.has-drift { border-top-color:#ef4444; }
+.db-kpi.has-drift .db-kpi-val { color:#ef4444; }
+.db-kpi-link { color:inherit;text-decoration:none;display:block; }
+.db-kpi-link:hover { text-decoration:none;color:inherit; }
 .db-kpi { background:var(--panel);border:1px solid var(--border-color);border-top:3px solid var(--kpi-accent,var(--primary));border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-shadow:var(--shadow-soft);transition:box-shadow .15s,transform .15s; }
 .db-kpi:hover { box-shadow:var(--shadow-md);transform:translateY(-2px); }
 .db-kpi-val { font-size:1.7rem;font-weight:800;line-height:1;color:var(--text-color);font-variant-numeric:tabular-nums; }
@@ -228,6 +234,15 @@
         <div class="db-kpi-label">Auth Events</div>
         <div class="db-kpi-note"><span class="c-ok" id="kpiAuthOk">0 ok</span> · <span id="kpiAuthFail">0 failed</span></div>
       </div>
+    </div>
+    <div class="db-kpi" id="kpiDriftTile" data-wid="kpi_config_drift">
+      <a class="db-kpi-link" id="kpiDriftLink" href="{{ url_for('system.preflight') }}">
+        <div>
+          <div class="db-kpi-val" id="kpiDrift">—</div>
+          <div class="db-kpi-label">Config Drift</div>
+          <div class="db-kpi-note" id="kpiDriftNote">Checking…</div>
+        </div>
+      </a>
     </div>
   </div>
 
@@ -720,6 +735,30 @@ const render=p=>{
   else tb.innerHTML=rows.map(r=>`<tr><td class="td-t">${esc(fmt(r.timestamp))}</td><td><strong class="ext-0de4e77b">${esc(r.username||'—')}</strong></td><td>${actBadge(r.action)}</td><td class="td-ip">${esc(r.remote_addr||'—')}</td><td class="ext-0de4e77b">${esc(r.details?.reason||'—')}</td></tr>`).join('');
 };
 
+/* ── Config Drift KPI ── */
+const refreshDrift=async()=>{
+  const tile=$('kpiDriftTile'); if(!tile) return;
+  try{
+    const r=await fetch('/status/api/config-drift',{cache:'no-store'});
+    const b=await r.json();
+    const drift=(b&&b.drift)||{};
+    const drifted=Object.entries(drift).filter(([,v])=>v&&v.drifted).map(([k])=>k);
+    const val=$('kpiDrift'), note=$('kpiDriftNote');
+    if(drifted.length===0){
+      tile.classList.remove('has-drift');
+      if(val)val.textContent='0';
+      if(note)note.innerHTML='<span class="db-kpi-drift-dot"></span>All configs match DB';
+    }else{
+      tile.classList.add('has-drift');
+      if(val)val.textContent=String(drifted.length);
+      if(note)note.innerHTML=drifted.map(s=>`<span class="db-kpi-drift-dot bad"></span>${esc(s)}`).join(' · ');
+    }
+  }catch(e){
+    const note=$('kpiDriftNote');
+    if(note)note.textContent='Drift check failed';
+  }
+};
+
 /* ── Refresh ── */
 let busy=false;
 const refresh=async()=>{
@@ -732,6 +771,7 @@ const refresh=async()=>{
     if(b.status==='success')render(b.data);
   }catch(e){console.error('Dashboard',e);}
   finally{busy=false;if(btn)btn.disabled=false;if(ico)ico.classList.remove('spin');}
+  refreshDrift();
 };
 
 /* ── Widget visibility / collapse ── */
@@ -742,6 +782,7 @@ const ALL_WIDS=[
   {id:'kpi_users',    cat:'system',    label:'KPI – Users',            desc:'User and group counts'},
   {id:'kpi_security', cat:'security',  label:'KPI – Security Rules',   desc:'DNS/Web/App filter rule count'},
   {id:'kpi_auth',     cat:'system',    label:'KPI – Auth Events',      desc:'Login success and failure counts'},
+  {id:'kpi_config_drift', cat:'system', label:'KPI – Config Drift',   desc:'Services whose live config differs from the DB'},
   {id:'policy',       cat:'firewall',  label:'Firewall Policy',        desc:'Rule counts per interface + NAT summary'},
   {id:'auth_summary', cat:'system',    label:'Authentication',         desc:'Login success, failure and logout counts'},
   {id:'interfaces',   cat:'network',   label:'Interface Status',       desc:'WAN and LAN port, mode and address'},
@@ -911,6 +952,7 @@ tick();setInterval(tick,1000);
 /* ── Init ── */
 restoreGridOrder();restoreKpiOrder();applyVis();applyCol();render(P);
 evPoll(true);setInterval(()=>evPoll(false),5000);
+refreshDrift();
 })();
 </script>
 {% endblock %}

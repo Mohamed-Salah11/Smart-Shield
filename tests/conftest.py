@@ -127,9 +127,17 @@ def _login(client, username, password):
 
 @pytest.fixture()
 def superuser(app, client):
-    """A logged-in superuser client."""
+    """A logged-in superuser client with a fresh reauth window.
+
+    The fresh ``reauth_time`` means tests can exercise routes that carry
+    ``@reauth_required`` without each one having to stamp the session itself.
+    Tests that want to verify the reauth gate explicitly should pop the key
+    before posting (see tests/integration/test_security_hardening.py)."""
+    from datetime import datetime, timezone
     uid = _create_user(app, "superadmin", "superpass", is_superuser=1)
     _login(client, "superadmin", "superpass")
+    with client.session_transaction() as sess:
+        sess["reauth_time"] = datetime.now(timezone.utc).isoformat()
     return client, uid
 
 

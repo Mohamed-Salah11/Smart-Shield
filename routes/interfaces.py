@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, request, jsonify, current_app, redirect, url_for
 import sqlite3
-from app.auth_utils import login_required
+from app.auth_utils import login_required, reauth_required
 from app.api_auth import api_permission_required
 from app.db_utils import db_cursor
 from app.database import get_db
 from app.secret_store import encrypt_secret
-from app.validators import validate_ip, validate_cidr, validate_interface_name, collect_errors
+from app.validators import validate_ip, validate_cidr, validate_interface_name, validate_no_overlap, collect_errors
 
 interfaces_bp = Blueprint("interfaces", __name__, url_prefix="/interfaces")
 
@@ -1097,11 +1097,51 @@ def get_wan_config():
 
 @interfaces_bp.route("/save-wan-config", methods=['POST'])
 @api_permission_required("api.network.edit")
+@reauth_required(reason="change WAN interface configuration")
 def save_wan_config():
     try:
         data = request.get_json(silent=True) or {}
-        encrypted_password = encrypt_secret(data.get('password')) if data.get('password') else None
         conn = get_db()
+        mode = (data.get('ipv4ConfigType') or '').lower()
+
+        # Reject a static address that overlaps another interface's subnet.
+        if mode == 'static':
+            row = conn.execute("SELECT assigned_port FROM wan_config WHERE id=1").fetchone()
+            skip = (row["assigned_port"] if row else "") or ""
+            try:
+                validate_no_overlap(conn, skip, data.get('ipv4Address') or "")
+            except ValueError as exc:
+                return jsonify({'status': 'error', 'message': str(exc)}), 400
+
+        # PPPoE validation up-front so bad credentials / missing NIC are caught
+        # before the WAN row is touched. Validates the EFFECTIVE post-save
+        # state — empty username/password in the payload mean "keep what's in
+        # the DB" (matching the COALESCE(NULLIF(...)) behavior below), so we
+        # fall back to the stored values for the check.
+        if mode == 'pppoe':
+            from app.services.pppoe_writer import validate_pppoe
+            from app.services.network_service import list_physical_nics
+            db_row = conn.execute(
+                "SELECT assigned_port, username, password FROM wan_config WHERE id=1"
+            ).fetchone()
+            db_row = dict(db_row) if db_row else {}
+            wan_payload = {
+                "assigned_port": (data.get("assignedPort") or data.get("assigned_port")
+                                  or db_row.get("assigned_port") or ""),
+                "username":      data.get("username") or db_row.get("username") or "",
+                "password":      data.get("password") or db_row.get("password") or "",
+                "service":       data.get("service") or "",
+            }
+            errors = validate_pppoe(wan_payload, physical_nics=list_physical_nics())
+            if errors:
+                return jsonify({'status': 'error',
+                                'message': "; ".join(errors)}), 400
+
+        # Snapshot the pre-save WAN row so we can revert if the live apply fails.
+        snapshot = conn.execute("SELECT * FROM wan_config WHERE id=1").fetchone()
+        snapshot = dict(snapshot) if snapshot else None
+
+        encrypted_password = encrypt_secret(data.get('password')) if data.get('password') else None
         cursor = conn.cursor()
         cursor.execute('''UPDATE wan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, username = ?, password = COALESCE(NULLIF(?, ''), password), dial_on_demand = ?, idle_timeout = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['username'], encrypted_password, data['dialOnDemand'], data['idleTimeout'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
@@ -1109,6 +1149,7 @@ def save_wan_config():
         # Auto-apply to BSD so changes take effect immediately
         bsd_applied = False
         bsd_message = ""
+        rolled_back = False
         try:
             from app.services.network_service import apply_interface_config
             from app.services.rc_conf_writer import apply_rc_conf
@@ -1116,12 +1157,44 @@ def save_wan_config():
             res = apply_interface_config(conn)
             bsd_applied = res.get("ok", False)
             bsd_message = res.get("message", "")
+
+            # If a PPPoE bring-up failed, revert the WAN row to the snapshot so
+            # the operator isn't stranded with a broken config saved.
+            if mode == "pppoe" and snapshot and not _wan_apply_ok(res, "WAN"):
+                _revert_wan_row(conn, snapshot)
+                rolled_back = True
+                bsd_message = (bsd_message + " | PPPoE bring-up failed — "
+                               "wan_config rolled back to previous state.").strip(" |")
         except Exception as exc:
             bsd_message = str(exc)
+            if mode == "pppoe" and snapshot:
+                try:
+                    _revert_wan_row(conn, snapshot)
+                    rolled_back = True
+                except Exception:
+                    pass
         return jsonify({'status': 'success', 'message': 'Config saved',
-                        'bsd_applied': bsd_applied, 'bsd_message': bsd_message})
+                        'bsd_applied': bsd_applied, 'bsd_message': bsd_message,
+                        'rolled_back': rolled_back})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 400
+
+
+def _wan_apply_ok(res: dict, label: str) -> bool:
+    """Return True iff the per-iface detail for ``label`` in apply_interface_config's
+    result is ok. Falls back to the top-level ``ok`` when no details are present."""
+    for d in (res or {}).get("details", []) or []:
+        if d.get("iface") == label:
+            return bool(d.get("ok"))
+    return bool((res or {}).get("ok"))
+
+
+def _revert_wan_row(conn, snap: dict) -> None:
+    """Restore every wan_config column from a captured snapshot dict."""
+    cols = [k for k in snap.keys() if k != "id"]
+    sql = "UPDATE wan_config SET " + ", ".join(f"{c}=?" for c in cols) + " WHERE id=1"
+    conn.execute(sql, [snap[c] for c in cols])
+    conn.commit()
 
 
 @interfaces_bp.route("/bsd-state/<interface_type>", methods=["GET"])
@@ -1178,10 +1251,19 @@ def get_lan_config():
 
 @interfaces_bp.route("/save-lan-config", methods=['POST'])
 @api_permission_required("api.network.edit")
+@reauth_required(reason="change LAN interface configuration")
 def save_lan_config():
     try:
         data = request.get_json(silent=True) or {}
         conn = get_db()
+        # Reject a static address that overlaps another interface's subnet.
+        if (data.get('ipv4ConfigType') or '').lower() == 'static':
+            row = conn.execute("SELECT assigned_port FROM lan_config WHERE id=1").fetchone()
+            skip = (row["assigned_port"] if row else "") or ""
+            try:
+                validate_no_overlap(conn, skip, data.get('ipv4Address') or "")
+            except ValueError as exc:
+                return jsonify({'status': 'error', 'message': str(exc)}), 400
         cursor = conn.cursor()
         cursor.execute('''UPDATE lan_config SET enable_interface = ?, description = ?, ipv4_config_type = ?, ipv6_config_type = ?, mac_address = ?, mtu = ?, mss = ?, speed_and_duplex = ?, ipv4_address = ?, ipv4_upstream_gateway = ?, block_private_networks = ?, block_bogon_networks = ? WHERE id = 1''',
                        (data['enableInterface'], data['description'], data['ipv4ConfigType'], data['ipv6ConfigType'], data['macAddress'], data['mtu'], data['mss'], data['speedAndDuplex'], data['ipv4Address'], data['ipv4UpstreamGateway'], data['blockPrivateNetworks'], data['blockBogonNetworks']))
@@ -1216,6 +1298,7 @@ def save_lan_config():
 
 @interfaces_bp.route("/api/apply-network", methods=["POST"])
 @api_permission_required("api.network.edit")
+@reauth_required(reason="apply live network configuration")
 def api_apply_network():
     """
     Persist the current interface configuration to /etc/rc.conf.local so it

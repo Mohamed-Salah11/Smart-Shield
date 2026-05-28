@@ -1381,18 +1381,23 @@ def get_ids_status(conn=None) -> dict:
     """Return running status + today's alert count (from eve.json)."""
     mode = "ids"
     cfg_enabled = False
+    ips_fallback_reason = ""
     if conn is not None:
         try:
-            row = conn.execute("SELECT mode, enabled FROM ids_config WHERE id=1").fetchone()
+            row = conn.execute(
+                "SELECT mode, enabled, ips_fallback_reason FROM ids_config WHERE id=1"
+            ).fetchone()
             if row:
                 mode = (row["mode"] or "ids").lower()
                 cfg_enabled = bool(row["enabled"])
+                ips_fallback_reason = (row["ips_fallback_reason"] or "")
         except Exception:
             pass
 
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "running": False, "mode": mode, "message": "Non-FreeBSD host",
-                "alerts_today": 0, "cfg_enabled": cfg_enabled}
+                "alerts_today": 0, "cfg_enabled": cfg_enabled,
+                "ips_fallback_reason": ips_fallback_reason}
 
     # Check if process is running
     result = run_command(["pgrep", "-x", "suricata"], check=False)
@@ -1438,6 +1443,7 @@ def get_ids_status(conn=None) -> dict:
         "rules_path": _SURICATA_UPDATE_RULES,
         "rules_size": rules_size,
         "rules_degraded": rules_degraded,
+        "ips_fallback_reason": ips_fallback_reason,
     }
 
 
@@ -1797,6 +1803,54 @@ def recover_ids_service(conn, actor: str = "system") -> dict:
     return _enable_pipeline(conn, actor=actor)
 
 
+def _set_ips_fallback_reason(conn, reason: str) -> None:
+    """Best-effort persist of the IPS→IDS fallback marker (``''`` clears it).
+
+    A DB hiccup here must never mask the (more important) restart/retry outcome,
+    so failures are swallowed.
+    """
+    try:
+        conn.execute(
+            "UPDATE ids_config SET ips_fallback_reason=?, updated_at=CURRENT_TIMESTAMP WHERE id=1",
+            (reason,),
+        )
+        conn.commit()
+    except Exception:
+        pass
+
+
+def _demote_ips_to_ids(conn, reason: str) -> None:
+    """Flip persisted mode to IDS and record why, in one best-effort UPDATE.
+
+    Done before the fallback retry so ``generate_suricata_yaml`` regenerates a
+    pcap (IDS) config, and so a crash mid-retry can't leave ``mode='ips'``
+    persisted while Suricata is down.
+    """
+    try:
+        conn.execute(
+            "UPDATE ids_config SET mode='ids', ips_fallback_reason=?, "
+            "updated_at=CURRENT_TIMESTAMP WHERE id=1",
+            (reason,),
+        )
+        conn.commit()
+    except Exception:
+        pass
+
+
+def _log_ips_fallback(reason: str, *, ok: bool, message: str) -> None:
+    """High-severity audit trail for an IPS→IDS demotion. Never raises."""
+    try:
+        from app.audit_log import log_event
+        log_event(
+            category="security", action="ids_ips_fallback",
+            severity="high", username="system", remote_addr="",
+            details={"reason": reason, "fallback_ok": bool(ok),
+                     "message": (message or "")[:512]},
+        )
+    except Exception:
+        pass
+
+
 def apply_ids(conn) -> dict:
     """
     Re-apply the current IDS configuration to a running Suricata.
@@ -1806,14 +1860,39 @@ def apply_ids(conn) -> dict:
     bootstrap → readiness → validate → write → verified restart), and never
     restarts into an unverified config or leaves stale enabled state behind.
     A no-op when ``ids_config.enabled`` is 0.
+
+    IPS→IDS safe fallback: if an IPS-mode apply cannot bring Suricata up and
+    netmap is unavailable, demote to IDS (pcap), retry the same safe pipeline,
+    and surface the demotion — never leave the daemon dead with ``mode='ips'``
+    persisted.
     """
     cfg = _cfg(conn)
     if not cfg.get("enabled"):
         return {"ok": True, "message": "IDS disabled; skipped"}
 
+    mode = (cfg.get("mode") or "ids").lower()
     result = _enable_pipeline(conn, actor="apply")
-    return {"ok": bool(result.get("ok")),
-            "message": result.get("message", "")}
+
+    if result.get("ok"):
+        # Clean apply — clear any stale IPS-fallback marker so the UI stops
+        # showing a demotion the operator has since resolved.
+        if (cfg.get("ips_fallback_reason") or ""):
+            _set_ips_fallback_reason(conn, "")
+        return {"ok": True, "message": result.get("message", "")}
+
+    # The IPS enable failed. If netmap is unavailable this box simply cannot run
+    # inline IPS — fall back to IDS rather than sit dead with mode=ips.
+    if mode == "ips" and not _netmap_available():
+        _demote_ips_to_ids(conn, "netmap_unavailable")
+        retry = _enable_pipeline(conn, actor="apply-ips-fallback")
+        message = (retry.get("message", "").strip()
+                   + " IPS unavailable — fell back to IDS.").strip()
+        _log_ips_fallback("netmap_unavailable", ok=bool(retry.get("ok")),
+                          message=message)
+        return {"ok": bool(retry.get("ok")), "message": message,
+                "ips_fallback": True, "ips_fallback_reason": "netmap_unavailable"}
+
+    return {"ok": False, "message": result.get("message", "")}
 
 
 # ---------------------------------------------------------------------------

@@ -304,6 +304,12 @@ def check_all_services(conn) -> dict:
     return health
 
 
+def check_config_drift(conn) -> dict:
+    """Public alias for :func:`_check_config_drift` (used by the
+    ``/status/api/config-drift`` route and the dashboard tile)."""
+    return _check_config_drift(conn)
+
+
 def _check_config_drift(conn) -> dict:
     """
     Compare the most-recently-applied config hash to the currently generated one.
@@ -478,58 +484,83 @@ def prune_health_history(conn, keep: int = 168) -> int:
 # Daemon process checks (pgrep-based)
 # ---------------------------------------------------------------------------
 
+# (key, pgrep_executable_name, rc.d_service_name)
+# The pgrep name and the rc.d name diverge for daemons launched under a
+# wrapper — e.g. strongSwan's charon is started by ``service strongswan
+# start``, and on FreeBSD pkg builds pgrep -x may not match the in-kernel
+# exe name.
 _DAEMON_CHECKS = [
-    ("dhcpd",      "dhcpd"),
-    ("unbound",    "unbound"),
-    ("openvpn",    "openvpn"),
-    ("charon",     "charon"),      # strongSwan / IPsec
-    ("mpd5",       "mpd5"),
-    ("suricata",   "suricata"),
-    ("ddclient",   "ddclient"),
-    ("miniupnpd",  "miniupnpd"),
-    ("igmpproxy",  "igmpproxy"),
-    ("kea-dhcp6",  "kea-dhcp6"),
-    ("rtadvd",     "rtadvd"),
-    ("bsnmpd",     "bsnmpd"),
-    ("ntpd",       "ntpd"),
-    ("nginx",      "nginx"),
+    ("dhcpd",      "dhcpd",     "isc-dhcpd"),
+    ("unbound",    "unbound",   "unbound"),
+    ("openvpn",    "openvpn",   "openvpn"),
+    ("charon",     "charon",    "strongswan"),  # strongSwan / IPsec wrapper
+    ("mpd5",       "mpd5",      "mpd5"),
+    ("suricata",   "suricata",  "suricata"),
+    ("ddclient",   "ddclient",  "ddclient"),
+    ("miniupnpd",  "miniupnpd", "miniupnpd"),
+    ("igmpproxy",  "igmpproxy", "igmpproxy"),
+    ("kea-dhcp6",  "kea-dhcp6", "kea-dhcp6"),
+    ("rtadvd",     "rtadvd",    "rtadvd"),
+    ("bsnmpd",     "bsnmpd",    "bsnmpd"),
+    ("ntpd",       "ntpd",      "ntpd"),
+    ("nginx",      "nginx",     "nginx"),
 ]
 
 
 def check_daemon_processes() -> dict:
     """
-    Check whether each known daemon is running via ``pgrep -x <name>``.
+    Cross-check each known daemon via ``pgrep -x <exe>`` AND
+    ``service <rc> status``. A daemon is reported ``running: true`` if
+    EITHER signal says it is up.
+
+    Each entry also exposes the underlying signals so the UI can surface
+    anomalies like "rc.d reports running, pgrep does not"::
+
+        {
+          "dhcpd":  {"running": true,  "pgrep": true,  "rc_state": "running"},
+          "charon": {"running": true,  "pgrep": false, "rc_state": "running"},
+          "ntpd":   {"running": false, "pgrep": false, "rc_state": "stopped"},
+          ...
+        }
 
     On non-FreeBSD returns ``{"running": false, "reason": "non-FreeBSD"}``
     for every entry.
-
-    Returns a dict keyed by daemon name::
-
-        {
-          "dhcpd":    {"running": true},
-          "unbound":  {"running": false},
-          ...
-        }
     """
     result: dict = {}
 
     if not sys.platform.startswith("freebsd"):
-        for name, _ in _DAEMON_CHECKS:
-            result[name] = {"running": False, "reason": "non-FreeBSD"}
+        for key, _proc, _rc in _DAEMON_CHECKS:
+            result[key] = {"running": False, "reason": "non-FreeBSD"}
         return result
 
     from app.services.network_service import run_command
+    from app.services.service_manager import service_status
 
-    for key, proc_name in _DAEMON_CHECKS:
+    for key, proc_name, rc_name in _DAEMON_CHECKS:
+        pgrep_running = False
+        rc_state = "unknown"
+
         try:
             r = run_command(
                 ["pgrep", "-x", proc_name],
                 check=False,
                 timeout_seconds=3,
             )
-            result[key] = {"running": r.returncode == 0}
-        except Exception as exc:
-            result[key] = {"running": False, "error": str(exc)}
+            pgrep_running = (r.returncode == 0)
+        except Exception:
+            pass
+
+        try:
+            s = service_status(rc_name)
+            rc_state = "running" if s.get("running") else "stopped"
+        except Exception:
+            pass
+
+        result[key] = {
+            "running":  pgrep_running or rc_state == "running",
+            "pgrep":    pgrep_running,
+            "rc_state": rc_state,
+        }
 
     return result
 

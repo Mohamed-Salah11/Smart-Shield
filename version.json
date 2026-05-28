@@ -2,6 +2,6 @@
   "name": "Smart Shield",
   "version": "1.0.0-fv12",
   "build": "2026.05.26",
-  "schema_version": 46,
+  "schema_version": 50,
   "channel": "rc"
 }

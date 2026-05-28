@@ -2,7 +2,7 @@ import sqlite3
 
 from flask import render_template, request, jsonify, session
 from app.database import get_db
-from app.auth_utils import login_required
+from app.auth_utils import login_required, reauth_required
 from app.api_auth import api_permission_required
 from app.validators import (
     validate_ip, validate_cidr, validate_protocol,
@@ -86,6 +86,7 @@ def firewall_rollback():
 
 @firewall_bp.route("/api/apply/all", methods=["POST"])
 @api_permission_required("api.firewall.edit")
+@reauth_required(reason="apply firewall policy")
 def firewall_apply_all():
     """
     Apply all policy layers together: PF firewall, Unbound DNS filter zones,
@@ -165,6 +166,7 @@ _REORDER_TABLES = {
 
 @firewall_bp.route("/api/rules/<table>/reorder", methods=["POST"])
 @api_permission_required("api.firewall.edit")
+@reauth_required(reason="reorder firewall rules")
 def reorder_rules(table):
     """
     Accept a JSON body ``{"order": [id1, id2, ...]}`` and update rule_order

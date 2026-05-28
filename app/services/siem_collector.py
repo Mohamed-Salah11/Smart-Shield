@@ -68,8 +68,13 @@ def _load_offset(key: str, default: int = 0) -> int:
     return default
 
 
-def _save_offset(key: str, value: int):
-    """Write a byte offset to the siem_state table. Silent on failure."""
+def _save_offset(key: str, value):
+    """Write a byte offset (or any string-coercible value) to ``siem_state``.
+
+    Silent on failure. Used both for the integer file offsets the other
+    collectors track and for the per-MAC DHCP watermark JSON the DHCP
+    collector checkpoints under ``dhcp_last_seen``.
+    """
     try:
         from app.database import get_db
         db = get_db()
@@ -81,6 +86,53 @@ def _save_offset(key: str, value: int):
         db.commit()
     except Exception:
         pass
+
+
+def _load_state(key: str, default: str = "") -> str:
+    """Read a persisted raw string from ``siem_state``.
+
+    Parallel to :func:`_load_offset` which coerces to int; this returns the
+    raw string so JSON-shaped state (e.g. ``dhcp_last_seen``) survives
+    restarts without losing precision.
+    """
+    try:
+        from app.database import get_db
+        row = get_db().execute(
+            "SELECT value FROM siem_state WHERE key=?", (key,)
+        ).fetchone()
+        if row and row["value"] is not None:
+            return row["value"]
+    except Exception:
+        pass
+    return default
+
+
+def _parse_dhcpd_ts(s: str):
+    """Parse an ISC dhcpd lease timestamp into a unix-epoch float.
+
+    dhcpd.leases writes two forms depending on the ``db-time-format`` setting:
+
+      * ``<weekday> YYYY/MM/DD HH:MM:SS``  — default, always UTC
+      * ``epoch <seconds>``                 — when ``db-time-format epoch;`` is set
+
+    Returns ``None`` for blanks or unparseable input.
+    """
+    s = (s or "").strip()
+    if not s:
+        return None
+    if s.lower().startswith("epoch "):
+        try:
+            return float(s.split(None, 1)[1])
+        except (ValueError, IndexError):
+            return None
+    parts = s.split(None, 2)
+    if len(parts) >= 3:
+        try:
+            dt = datetime.strptime(parts[1] + " " + parts[2], "%Y/%m/%d %H:%M:%S")
+            return dt.replace(tzinfo=timezone.utc).timestamp()
+        except ValueError:
+            return None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +337,9 @@ def _run_ids_collector(state: dict):
     while True:
         try:
             _collect_ids_alerts(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-ids", restart=True, last_error=str(exc)[:200])
         time.sleep(10)
 
 
@@ -325,6 +378,27 @@ def _handle_alert_event(evt: dict):
 
     event_uuid = _log("ids", "ids_alert", remote_addr=src_ip,
                       severity=sev, details=details)
+
+    # Block-on-alert: high/critical (or an admin-listed signature) alerts get
+    # the source IP dropped into the live <ss_ids_blocks> PF table via
+    # ids_blocker. Best-effort and self-gating — maybe_block decides whether to
+    # act and never raises into the collector loop.
+    try:
+        from app.services.ids_blocker import maybe_block
+        from app.audit_log import _events_db
+        bc = _events_db()
+        if bc is not None:
+            try:
+                maybe_block(
+                    bc, src_ip=src_ip, severity=sev,
+                    signature=alert.get("signature", ""),
+                    signature_id=str(alert.get("signature_id") or alert.get("gid") or ""),
+                    source_alert_id=event_uuid or "",
+                )
+            finally:
+                bc.close()
+    except Exception:
+        pass
 
     # Wave C: route high-severity IDS alerts through alert_service so the
     # SOC queue is deduplicated. We only mint an alert for medium-and-up
@@ -528,8 +602,9 @@ def _run_dhcp_collector(state: dict):
     while True:
         try:
             _collect_dhcp_events(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-dhcp", restart=True, last_error=str(exc)[:200])
         time.sleep(30)
 
 
@@ -537,22 +612,67 @@ _LEASE_BLOCK_RE = re.compile(
     r'lease\s+([\d.]+)\s*\{([^}]*)\}',
     re.DOTALL,
 )
-_FIELD_RE = re.compile(r'^\s*(\S+)\s+(.*?);', re.MULTILINE)
+
+# Per-MAC watermark cap — LRU-evict by bind timestamp once exceeded so a busy
+# subnet can't make the persisted state grow without bound.
+_DHCP_SEEN_CAP = 5000
 
 
 def _parse_leases(text: str) -> list:
+    """Parse the ``binding state active`` leases out of dhcpd.leases.
+
+    dhcpd uses multi-word keys (``hardware ethernet``, ``binding state``,
+    ``client-hostname``) so we walk each lease block line-by-line — splitting
+    key/value on the first whitespace token used to silently drop every lease
+    because the parser keyed on ``hardware`` instead of ``hardware ethernet``.
+
+    Each lease dict carries ``bind_ts`` (unix-epoch float, parsed from
+    ``cltt`` if present else ``starts``); ``bind_ts`` may be ``None`` if the
+    lease has neither timestamp.
+    """
     leases = []
     for m in _LEASE_BLOCK_RE.finditer(text):
-        ip = m.group(1)
+        ip   = m.group(1)
         body = m.group(2)
-        fields = {k: v.strip('"') for k, v in _FIELD_RE.findall(body)}
-        mac      = fields.get("hardware ethernet", "").strip()
-        hostname = fields.get("client-hostname", "").strip()
-        ends     = fields.get("ends", "").strip()
-        binding  = fields.get("binding state", "").strip()
+        mac = hostname = binding = ends = ""
+        bind_ts = None
+        for raw in body.splitlines():
+            line = raw.strip().rstrip(";").strip()
+            if not line:
+                continue
+            if line.startswith("hardware ethernet"):
+                mac = line[len("hardware ethernet"):].strip().lower()
+            elif line.startswith("binding state"):
+                binding = line[len("binding state"):].strip().lower()
+            elif line.startswith("client-hostname"):
+                hostname = line[len("client-hostname"):].strip().strip('"')
+            elif line.startswith("cltt"):
+                ts = _parse_dhcpd_ts(line[len("cltt"):].strip())
+                if ts is not None:
+                    bind_ts = ts
+            elif line.startswith("starts") and bind_ts is None:
+                bind_ts = _parse_dhcpd_ts(line[len("starts"):].strip())
+            elif line.startswith("ends"):
+                ends = line[len("ends"):].strip()
         if binding == "active" and mac:
-            leases.append({"ip": ip, "mac": mac, "hostname": hostname, "expires": ends})
+            leases.append({
+                "ip":       ip,
+                "mac":      mac,
+                "hostname": hostname,
+                "expires":  ends,
+                "bind_ts":  bind_ts,
+            })
     return leases
+
+
+def _evict_seen(seen: dict, cap: int = _DHCP_SEEN_CAP) -> None:
+    """Drop the oldest entries by bind_ts until ``seen`` holds at most ``cap``."""
+    excess = len(seen) - cap
+    if excess <= 0:
+        return
+    by_age = sorted(seen.items(), key=lambda kv: (kv[1] or 0))
+    for mac, _ in by_age[:excess]:
+        seen.pop(mac, None)
 
 
 def _collect_dhcp_events(state: dict):
@@ -566,14 +686,29 @@ def _collect_dhcp_events(state: dict):
         return
 
     leases = _parse_leases(text)
-    seen: set = state.setdefault("dhcp_seen", set())
+    # state["dhcp_seen"] is a {mac: bind_ts} watermark dict checkpointed to
+    # siem_state.dhcp_last_seen so a restart doesn't re-emit every active
+    # lease as a "new" event.
+    seen = state.setdefault("dhcp_seen", {})
+    if not isinstance(seen, dict):
+        seen = {}
+        state["dhcp_seen"] = seen
 
+    changed = False
     for lease in leases:
-        key = (lease["ip"], lease["mac"])
-        if key in seen:
-            continue
-        seen.add(key)
-        _log("connection", "dhcp_lease_assigned", remote_addr=lease["ip"], details=lease)
+        mac     = lease["mac"]
+        bind_ts = lease.get("bind_ts")
+        prev    = seen.get(mac)
+        # Skip if we've already reported this MAC at this-or-newer bind time —
+        # or, if the lease has no parseable timestamp, treat any prior sighting
+        # of the MAC as a duplicate so a restart can't replay it.
+        if prev is not None:
+            if bind_ts is None or bind_ts <= prev:
+                continue
+        _log("connection", "dhcp_lease_assigned",
+             remote_addr=lease["ip"], details=lease)
+        seen[mac] = bind_ts if bind_ts is not None else (prev or 0)
+        changed = True
 
         # Update tracked_hosts as a side-effect.
         # The unique index is on (interface_type, ip_address) — not just ip_address.
@@ -599,6 +734,16 @@ def _collect_dhcp_events(state: dict):
         except Exception:
             pass
 
+    if len(seen) > _DHCP_SEEN_CAP:
+        _evict_seen(seen)
+        changed = True
+
+    if changed:
+        try:
+            _save_offset("dhcp_last_seen", json.dumps(seen))
+        except Exception:
+            pass
+
 
 # ---------------------------------------------------------------------------
 # 3. DNS Query Collector (requires Unbound query logging enabled)
@@ -610,8 +755,9 @@ def _run_dns_collector(state: dict):
     while True:
         try:
             _collect_dns_queries(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-dns", restart=True, last_error=str(exc)[:200])
         _refresh_counter += 1
         if _refresh_counter >= 20:           # every 20 × 15s = 5 minutes
             try:
@@ -847,8 +993,9 @@ def _run_pf_collector(state: dict):
     while True:
         try:
             _collect_pf_connections(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-pf", restart=True, last_error=str(exc)[:200])
         time.sleep(60)
 
 
@@ -1152,8 +1299,9 @@ def _run_pflog_collector(state: dict):
                     _handle_pflog_line(state, line)
                 except Exception:
                     pass
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-pflog", restart=True, last_error=str(exc)[:200])
         finally:
             if proc is not None:
                 try:
@@ -1176,8 +1324,9 @@ def _run_anomaly_detector(state: dict):
         try:
             from app.services.correlation_engine import evaluate
             evaluate()
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-anomaly", restart=True, last_error=str(exc)[:200])
         time.sleep(60)
 
 
@@ -1200,8 +1349,9 @@ def _run_syslog_collector(state: dict):
     while True:
         try:
             _collect_syslog_events(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-syslog", restart=True, last_error=str(exc)[:200])
         time.sleep(15)
 
 
@@ -1281,8 +1431,9 @@ def _run_system_collector(state: dict):
     while True:
         try:
             _collect_system_events(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-system", restart=True, last_error=str(exc)[:200])
         time.sleep(30)
 
 
@@ -1371,8 +1522,9 @@ def _run_vpn_log_tailer(state: dict):
         try:
             _collect_strongswan_lines(state)
             _collect_mpd5_lines(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-vpn-log", restart=True, last_error=str(exc)[:200])
         time.sleep(30)
 
 
@@ -1463,8 +1615,9 @@ def _run_vpn_collector(state: dict):
     while True:
         try:
             _collect_vpn_sessions(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-vpn", restart=True, last_error=str(exc)[:200])
         time.sleep(30)
 
 
@@ -1521,8 +1674,9 @@ def _run_health_collector(state: dict):
     while True:
         try:
             _collect_health(state)
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.collector_health import heartbeat
+            heartbeat("siem-health", restart=True, last_error=str(exc)[:200])
         time.sleep(60)
 
 
@@ -1614,6 +1768,15 @@ def start_siem_collectors():
         return
     _STARTED.set()
 
+    # Hydrate the DHCP per-MAC watermark from siem_state so a restart doesn't
+    # re-emit every active lease as a "new" dhcp_lease_assigned event.
+    try:
+        _dhcp_seen = json.loads(_load_state("dhcp_last_seen", "{}"))
+        if not isinstance(_dhcp_seen, dict):
+            _dhcp_seen = {}
+    except Exception:
+        _dhcp_seen = {}
+
     shared_state: dict = {
         "ids_offset":        _load_offset("ids_offset",        0),
         "dns_offset":        _load_offset("dns_offset",        0),
@@ -1621,7 +1784,7 @@ def start_siem_collectors():
         "messages_offset":   _load_offset("messages_offset",   0),
         "strongswan_offset": _load_offset("strongswan_offset", 0),
         "mpd5_offset":       _load_offset("mpd5_offset",       0),
-        "dhcp_seen":         set(),
+        "dhcp_seen":         _dhcp_seen,
         "pf_seen":           set(),
         "pflog_seen":        {},
         "alerted":           {},
