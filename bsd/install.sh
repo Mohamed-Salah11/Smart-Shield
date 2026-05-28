@@ -228,31 +228,76 @@ if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
         cat "${_PKG_PROBE_LOG}" >&2 || true
 
         if grep -q -i -e 'ssl' -e 'certificate' -e 'remote key' "${_PKG_PROBE_LOG}"; then
+            _CA_INSTALLED=$(pkg info ca_root_nss >/dev/null 2>&1 && echo yes || echo no)
+            _CA_BUNDLE="/usr/local/share/certs/ca-root-nss.crt"
             warn "TLS verification failed. Diagnosing:"
-            warn "  * System clock: $(date)"
-            warn "  * ca_root_nss installed: $(pkg info ca_root_nss >/dev/null 2>&1 && echo yes || echo NO)"
-            warn "  Bootstrapping ca_root_nss over HTTP (one-shot escape hatch)..."
+            warn "  * System clock        : $(date)"
+            warn "  * ca_root_nss package : ${_CA_INSTALLED}"
+            warn "  * Trust bundle file   : $([ -f "${_CA_BUNDLE}" ] && echo present || echo MISSING)"
+            warn "  * /etc/ssl/cert.pem   : $([ -L /etc/ssl/cert.pem ] && readlink /etc/ssl/cert.pem || ([ -f /etc/ssl/cert.pem ] && echo "regular file" || echo MISSING))"
 
-            _ABI=$(pkg config ABI 2>/dev/null)
-            if [ -z "${_ABI}" ]; then
-                _ABI="FreeBSD:$(uname -r | cut -d. -f1 | tr -d -):$(uname -m)"
-            fi
-            _CA_URL="http://pkg.FreeBSD.org/${_ABI}/quarterly/Latest/ca_root_nss.pkg"
-            _CA_TMP=$(mktemp -t ss_caroot.XXXXXX 2>/dev/null || echo /tmp/ss_caroot.$$).pkg
-            info "  Fetching: ${_CA_URL}"
-            if fetch -q -o "${_CA_TMP}" "${_CA_URL}" && pkg add "${_CA_TMP}"; then
-                info "  ca_root_nss installed — retrying pkg update."
-                rm -f "${_CA_TMP}"
-                if ! pkg update -q; then
-                    fatal "pkg update still failing after ca_root_nss bootstrap. The system clock or upstream link is broken. Current date: $(date)"
+            _PKG_RECOVERED=0
+
+            # ── Recovery path 1: trust bundle exists but the symlink is
+            # missing/wrong. This is the ca_root_nss-installed-but-pkg-still-
+            # fails case — the package ships the bundle but the post-install
+            # symlink at /etc/ssl/cert.pem may not have been created (custom
+            # FreeBSD images, manual pkg add, etc.). libfetch reads
+            # /etc/ssl/cert.pem; without it, every cert chain looks unsigned.
+            if [ -f "${_CA_BUNDLE}" ]; then
+                _CURRENT_TARGET=""
+                [ -L /etc/ssl/cert.pem ] && _CURRENT_TARGET=$(readlink /etc/ssl/cert.pem 2>/dev/null || echo "")
+                if [ "${_CURRENT_TARGET}" != "${_CA_BUNDLE}" ]; then
+                    info "  Repairing /etc/ssl/cert.pem -> ${_CA_BUNDLE}"
+                    mkdir -p /etc/ssl
+                    ln -sf "${_CA_BUNDLE}" /etc/ssl/cert.pem
+                    if pkg update -q 2>/dev/null; then
+                        info "  Recovery successful — trust-store symlink fixed."
+                        _PKG_RECOVERED=1
+                    else
+                        warn "  Symlink repaired but pkg still failing — falling through."
+                    fi
                 fi
-                info "  Recovery successful — pkg repository reachable now."
-            else
-                rm -f "${_CA_TMP}"
-                fatal "Could not bootstrap ca_root_nss over HTTP. Either the WAN link is down or DNS is broken. Verify with:
-            ping -c1 8.8.8.8         # routing
-            host pkg.FreeBSD.org     # DNS
-        then re-run install.sh."
+            fi
+
+            # ── Recovery path 2: ca_root_nss missing entirely. Bootstrap it
+            # by downloading the package over HTTP (the only safe way out of
+            # the chicken-and-egg). Resolve a real version-pinned filename
+            # from the public packagesite index instead of guessing a path.
+            if [ "${_PKG_RECOVERED}" -ne 1 ] && [ "${_CA_INSTALLED}" != "yes" ]; then
+                _ABI=$(pkg config ABI 2>/dev/null)
+                if [ -z "${_ABI}" ]; then
+                    _ABI="FreeBSD:$(uname -r | cut -d. -f1 | tr -d -):$(uname -m)"
+                fi
+                _ALL_URL="http://pkg.FreeBSD.org/${_ABI}/quarterly/All/"
+                info "  Bootstrapping ca_root_nss over HTTP from ${_ALL_URL}"
+                _CA_FILE=$(fetch -q -o - "${_ALL_URL}" 2>/dev/null \
+                    | grep -o 'ca_root_nss-[0-9][^"]*\.\(pkg\|txz\)' \
+                    | head -1)
+                if [ -n "${_CA_FILE}" ]; then
+                    _CA_TMP=$(mktemp -t ss_caroot.XXXXXX 2>/dev/null || echo /tmp/ss_caroot.$$)
+                    if fetch -q -o "${_CA_TMP}" "${_ALL_URL}${_CA_FILE}" && pkg add "${_CA_TMP}"; then
+                        rm -f "${_CA_TMP}"
+                        # Symlink might still need fixing after the manual add.
+                        [ -f "${_CA_BUNDLE}" ] && ln -sf "${_CA_BUNDLE}" /etc/ssl/cert.pem
+                        if pkg update -q; then
+                            info "  Recovery successful — pkg repository reachable now."
+                            _PKG_RECOVERED=1
+                        fi
+                    else
+                        rm -f "${_CA_TMP}"
+                    fi
+                fi
+            fi
+
+            if [ "${_PKG_RECOVERED}" -ne 1 ]; then
+                fatal "Could not repair pkg TLS. Manual recovery:
+            ls -l /etc/ssl/cert.pem
+            ln -sf ${_CA_BUNDLE} /etc/ssl/cert.pem   # if symlink broken
+            pkg install -f ca_root_nss               # if bundle missing
+            pkg update                                # retry
+        then re-run install.sh. If pkg still fails, the WAN may be behind
+        a TLS-inspecting proxy that's rewriting the cert chain."
             fi
         elif grep -q -i -e 'name resolution' -e 'no address' -e 'host not found' -e 'no such host' "${_PKG_PROBE_LOG}"; then
             fatal "DNS resolution failed for pkg.FreeBSD.org. Fix /etc/resolv.conf or WAN routing, then re-run install.sh."
