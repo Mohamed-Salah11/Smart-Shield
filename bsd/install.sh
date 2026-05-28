@@ -169,9 +169,108 @@ for f in requirements.txt wsgi.py app/__init__.py bsd/rc.d/smart_shield; do
 done
 info "Source tree validated at ${SRC_ROOT}"
 
+section "0. Live-Mode Preflight (clock & pkg trust)"
+
+# The most common reason a fresh appliance fails the FIRST pkg fetch is one
+# of two things, neither of which the rest of install.sh diagnoses:
+#
+#   * System clock skew (BIOS battery dead, VM snapshot rewound, etc.). A
+#     date off by months/years makes every TLS cert look expired and pkg
+#     fails with "SSL peer certificate or SSH remote key was not OK" on
+#     every URL.
+#   * ca_root_nss missing from the base image. It's in CRITICAL_PKGS below,
+#     but that's chicken-and-egg: pkg can't fetch it over TLS without it.
+#
+# Both surface as the same opaque SSL error. This block detects each up
+# front, attempts an automatic fix where one is safe, and aborts with a
+# specific remediation message otherwise. Prepare/validate-only modes
+# skip the network entirely.
+if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+    # --- Clock sanity check ------------------------------------------
+    _SYS_YEAR=$(date +%Y 2>/dev/null || echo 1970)
+    # Smart Shield F24 ships in 2026; anything older than 2024 is wrong
+    # enough to break TLS verification.
+    if [ "${_SYS_YEAR}" -lt 2024 ]; then
+        warn "System clock reports year ${_SYS_YEAR} — TLS verification will fail."
+        info "Attempting NTP sync via pool.ntp.org..."
+        _CLOCK_FIXED=0
+        if command -v ntpdate >/dev/null 2>&1; then
+            if ntpdate -b pool.ntp.org 2>/dev/null; then
+                _CLOCK_FIXED=1
+            fi
+        fi
+        if [ "${_CLOCK_FIXED}" -ne 1 ] && command -v service >/dev/null 2>&1; then
+            if service ntpd onestart 2>/dev/null; then
+                sleep 6   # give ntpd a moment to step the clock
+                _NEW_YEAR=$(date +%Y 2>/dev/null || echo 1970)
+                [ "${_NEW_YEAR}" -ge 2024 ] && _CLOCK_FIXED=1
+            fi
+        fi
+        if [ "${_CLOCK_FIXED}" -ne 1 ]; then
+            fatal "Could not set the clock automatically. Set it manually:
+            date YYYYMMDDhhmm   # e.g. date 202605290900
+        then re-run install.sh. The current date is: $(date)"
+        fi
+        info "Clock now: $(date)"
+    fi
+
+    # --- pkg repository reachability probe ---------------------------
+    # If pkg can't talk to the repo, the CRITICAL_PKGS install at §1
+    # below fails with no useful diagnostics beyond pkg's own output.
+    # Probe here so the operator sees the failure mode immediately —
+    # AND we have a chance to recover ca_root_nss over HTTP.
+    info "Probing pkg repository connectivity..."
+    _PKG_PROBE_LOG=$(mktemp -t ss_pkg_probe.XXXXXX 2>/dev/null || echo /tmp/ss_pkg_probe.$$)
+    if pkg update -q 2>"${_PKG_PROBE_LOG}"; then
+        info "  OK — pkg repository reachable, trust store healthy."
+    else
+        warn "pkg update failed. Error output:"
+        cat "${_PKG_PROBE_LOG}" >&2 || true
+
+        if grep -q -i -e 'ssl' -e 'certificate' -e 'remote key' "${_PKG_PROBE_LOG}"; then
+            warn "TLS verification failed. Diagnosing:"
+            warn "  * System clock: $(date)"
+            warn "  * ca_root_nss installed: $(pkg info ca_root_nss >/dev/null 2>&1 && echo yes || echo NO)"
+            warn "  Bootstrapping ca_root_nss over HTTP (one-shot escape hatch)..."
+
+            _ABI=$(pkg config ABI 2>/dev/null)
+            if [ -z "${_ABI}" ]; then
+                _ABI="FreeBSD:$(uname -r | cut -d. -f1 | tr -d -):$(uname -m)"
+            fi
+            _CA_URL="http://pkg.FreeBSD.org/${_ABI}/quarterly/Latest/ca_root_nss.pkg"
+            _CA_TMP=$(mktemp -t ss_caroot.XXXXXX 2>/dev/null || echo /tmp/ss_caroot.$$).pkg
+            info "  Fetching: ${_CA_URL}"
+            if fetch -q -o "${_CA_TMP}" "${_CA_URL}" && pkg add "${_CA_TMP}"; then
+                info "  ca_root_nss installed — retrying pkg update."
+                rm -f "${_CA_TMP}"
+                if ! pkg update -q; then
+                    fatal "pkg update still failing after ca_root_nss bootstrap. The system clock or upstream link is broken. Current date: $(date)"
+                fi
+                info "  Recovery successful — pkg repository reachable now."
+            else
+                rm -f "${_CA_TMP}"
+                fatal "Could not bootstrap ca_root_nss over HTTP. Either the WAN link is down or DNS is broken. Verify with:
+            ping -c1 8.8.8.8         # routing
+            host pkg.FreeBSD.org     # DNS
+        then re-run install.sh."
+            fi
+        elif grep -q -i -e 'name resolution' -e 'no address' -e 'host not found' -e 'no such host' "${_PKG_PROBE_LOG}"; then
+            fatal "DNS resolution failed for pkg.FreeBSD.org. Fix /etc/resolv.conf or WAN routing, then re-run install.sh."
+        elif grep -q -i -e 'connection refused' -e 'no route to host' -e 'timed out' "${_PKG_PROBE_LOG}"; then
+            fatal "Network unreachable. Check WAN cable / default gateway / firewall rules upstream, then re-run install.sh."
+        else
+            fatal "pkg update failed for an unrecognised reason — see error above. Common causes: corporate TLS-inspecting proxy on the WAN, exhausted /var disk, or a stale /var/db/pkg lock."
+        fi
+    fi
+    rm -f "${_PKG_PROBE_LOG}"
+fi
+
 section "1. Package Installation"
 
 info "Updating pkg repository..."
+# In live mode the §0 preflight already exercised pkg update successfully;
+# this re-run is harmless (pkg's catalog is cached) but kept so the dry-run
+# trace shows the same step a live install performs.
 run_live pkg update -q
 
 # Phase 5.2 — split into three package tiers (Fv11 review §P1-04):
