@@ -79,7 +79,7 @@ pkg update && pkg upgrade -y
 pkg install -y python311 py311-pip openvpn strongswan mpd5 suricata sudo git curl
 
 # Create dedicated service user (no shell, no home login)
-pw useradd -n smartshield -s /usr/sbin/nologin -d /var/db/smart-shield -m -c "Smart Shield Daemon"
+pw useradd -n smartshield -s /usr/sbin/nologin -d /var/db/smartshield -m -c "Smart Shield Daemon"
 ```
 
 ### 2.2 Transfer the Codebase
@@ -89,13 +89,13 @@ pw useradd -n smartshield -s /usr/sbin/nologin -d /var/db/smart-shield -m -c "Sm
 ```sh
 # On your Windows dev machine (PowerShell):
 scp -r "C:\Users\m7med\OneDrive\Desktop\A3OOOOOOOOOOOOOO\NIGGA\Smart-Shield" \
-    root@<freebsd-ip>:/usr/local/share/smart-shield
+    root@<freebsd-ip>:/usr/local/share/smartshield
 ```
 
 **Option B — Git clone:**
 
 ```sh
-git clone https://github.com/your-org/smart-shield.git /usr/local/share/smart-shield
+git clone https://github.com/your-org/smart-shield.git /usr/local/share/smartshield
 ```
 
 **Option C — Tarball:**
@@ -106,13 +106,13 @@ tar -czf smart-shield.tar.gz -C "C:\Users\m7med\OneDrive\Desktop\A3OOOOOOOOOOOOO
 
 # On FreeBSD:
 tar -xzf smart-shield.tar.gz -C /usr/local/share/
-mv /usr/local/share/Smart-Shield /usr/local/share/smart-shield
+mv /usr/local/share/Smart-Shield /usr/local/share/smartshield
 ```
 
 ### 2.3 Python Environment
 
 ```sh
-cd /usr/local/share/smart-shield
+cd /usr/local/share/smartshield
 
 # Create virtualenv with FreeBSD python311
 python3.11 -m venv .venv
@@ -132,25 +132,25 @@ python -c "import flask, cryptography, gunicorn; print('OK')"
 
 ```sh
 # Runtime directories
-install -d -o smartshield -g smartshield -m 750 /var/db/smart-shield
-install -d -o smartshield -g smartshield -m 750 /var/db/smart-shield/uploads
-install -d -o smartshield -g smartshield -m 750 /var/db/smart-shield/uploads/profile_pictures
-install -d -o smartshield -g smartshield -m 750 /var/log/smart-shield
-install -d -o root         -g smartshield -m 750 /usr/local/etc/smart-shield
+install -d -o smartshield -g smartshield -m 750 /var/db/smartshield
+install -d -o smartshield -g smartshield -m 750 /var/db/smartshield/uploads
+install -d -o smartshield -g smartshield -m 750 /var/db/smartshield/uploads/profile_pictures
+install -d -o smartshield -g smartshield -m 750 /var/log/smartshield
+install -d -o root         -g smartshield -m 750 /usr/local/etc/smartshield
 
 # Application source (read-only for smartshield user)
-chown -R root:smartshield /usr/local/share/smart-shield
-chmod -R 750 /usr/local/share/smart-shield
+chown -R root:smartshield /usr/local/share/smartshield
+chmod -R 750 /usr/local/share/smartshield
 ```
 
 ### 2.5 Environment & Configuration Files
 
 ```sh
 # Copy the example env file
-cp /usr/local/share/smart-shield/.env.example \
-   /usr/local/etc/smart-shield/smart-shield.env
+cp /usr/local/share/smartshield/.env.example \
+   /usr/local/etc/smartshield/smartshield.env
 
-vi /usr/local/etc/smart-shield/smart-shield.env
+vi /usr/local/etc/smartshield/smartshield.env
 ```
 
 Set these values:
@@ -158,10 +158,10 @@ Set these values:
 ```ini
 SECRET_KEY=<at-least-64-random-chars>
 FLASK_DEBUG=0
-SMARTSHIELD_DB_PATH=/var/db/smart-shield/data.db
-SMARTSHIELD_CONFIG_PATH=/usr/local/etc/smart-shield/config.json
-SMARTSHIELD_UPLOAD_DIR=/var/db/smart-shield/uploads/profile_pictures
-SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smart-shield/audit.log
+SMARTSHIELD_DB_PATH=/var/db/smartshield/data.db
+SMARTSHIELD_CONFIG_PATH=/usr/local/etc/smartshield/config.json
+SMARTSHIELD_UPLOAD_DIR=/var/db/smartshield/uploads/profile_pictures
+SMARTSHIELD_AUDIT_LOG_PATH=/var/log/smartshield/audit.log
 SMARTSHIELD_ENABLE_NETWORK_APPLY=1
 SMARTSHIELD_NETWORK_DRY_RUN=0
 BOOTSTRAP_ADMIN_USERNAME=admin
@@ -170,13 +170,13 @@ BOOTSTRAP_ADMIN_PASSWORD=<strong-password-change-immediately>
 
 ```sh
 # Copy system config
-cp /usr/local/share/smart-shield/config.example.json \
-   /usr/local/etc/smart-shield/config.json
+cp /usr/local/share/smartshield/config.example.json \
+   /usr/local/etc/smartshield/config.json
 
-chown root:smartshield /usr/local/etc/smart-shield/smart-shield.env \
-                        /usr/local/etc/smart-shield/config.json
-chmod 640 /usr/local/etc/smart-shield/smart-shield.env \
-           /usr/local/etc/smart-shield/config.json
+chown root:smartshield /usr/local/etc/smartshield/smartshield.env \
+                        /usr/local/etc/smartshield/config.json
+chmod 640 /usr/local/etc/smartshield/smartshield.env \
+           /usr/local/etc/smartshield/config.json
 ```
 
 ### 2.6 Master Encryption Key
@@ -185,11 +185,11 @@ The master key encrypts VPN pre-shared keys and L2TP/PPPoE passwords at rest.
 
 ```sh
 # Auto-generate on first run (preferred)
-# The app writes /usr/local/etc/smart-shield/master.key automatically
+# The app writes /usr/local/etc/smartshield/master.key automatically
 
 # OR generate manually and set env var:
 python3.11 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
-# Add to smart-shield.env:
+# Add to smartshield.env:
 # SMARTSHIELD_MASTER_KEY=<output above>
 ```
 
@@ -199,7 +199,7 @@ The project ships with `bsd/smart-shield.rc` (the rc.d script). Install it:
 
 ```sh
 install -o root -g wheel -m 555 \
-    /usr/local/share/smart-shield/bsd/smart-shield.rc \
+    /usr/local/share/smartshield/bsd/smart-shield.rc \
     /usr/local/etc/rc.d/smart_shield
 
 # Add to /etc/rc.conf
@@ -213,13 +213,13 @@ The rc script should call gunicorn as the `smartshield` user:
 
 ```sh
 # Manual start for first-time verification:
-su -m smartshield -c "cd /usr/local/share/smart-shield && \
+su -m smartshield -c "cd /usr/local/share/smartshield && \
     .venv/bin/gunicorn \
-    --env-file /usr/local/etc/smart-shield/smart-shield.env \
+    --env-file /usr/local/etc/smartshield/smartshield.env \
     --workers 2 \
     --bind 0.0.0.0:443 \
-    --certfile /usr/local/etc/smart-shield/ssl/server.crt \
-    --keyfile  /usr/local/etc/smart-shield/ssl/server.key \
+    --certfile /usr/local/etc/smartshield/ssl/server.crt \
+    --keyfile  /usr/local/etc/smartshield/ssl/server.key \
     wsgi:app"
 ```
 
@@ -230,7 +230,7 @@ su -m smartshield -c "cd /usr/local/share/smart-shield && \
 ```sh
 # Install the sudoers fragment from the bsd/ directory
 install -o root -g wheel -m 440 \
-    /usr/local/share/smart-shield/bsd/sudoers.d/smartshield \
+    /usr/local/share/smartshield/bsd/sudoers.d/smartshield \
     /usr/local/etc/sudoers.d/smartshield
 
 # Verify it parses cleanly
@@ -243,11 +243,11 @@ The file grants `smartshield` user privilege to run specific system commands (pf
 
 ```sh
 install -o root -g wheel -m 644 \
-    /usr/local/share/smart-shield/bsd/newsyslog.d/smart-shield.conf \
+    /usr/local/share/smartshield/bsd/newsyslog.d/smart-shield.conf \
     /usr/local/etc/newsyslog.conf.d/smart-shield.conf
 
 # Test rotation immediately
-newsyslog -v /var/log/smart-shield/audit.log
+newsyslog -v /var/log/smartshield/audit.log
 ```
 
 ### 2.10 First Boot Verification
@@ -257,7 +257,7 @@ newsyslog -v /var/log/smart-shield/audit.log
 service smart_shield start
 
 # Tail the application log
-tail -f /var/log/smart-shield/app.log &
+tail -f /var/log/smartshield/app.log &
 
 # Verify gunicorn workers are up
 ps aux | grep gunicorn
@@ -312,15 +312,29 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/login
 
 ## 4. Testing: Setup Wizard
 
-> Run this on a fresh DB (`rm /var/db/smart-shield/data.db`) or a test instance.
+> Run this on a fresh DB (`rm /var/db/smartshield/data.db`) or a test instance.
 
 ### 4.1 Step 1 — Interface Assignment
 
+> **Match by MAC address, not device name.** The wizard auto-detects
+> whatever physical NICs are present, but the labels are
+> platform-dependent: VMware names them `em0`, `em1`, …; libvirt/QEMU
+> shows `vtnet0`, `vtnet1`; Intel server NICs are `igb0`, `igb1`; Realtek
+> appears as `re0`; etc. The dropdown shows each port's MAC next to its
+> name — pick the MAC of the cable that runs upstream for WAN and the
+> MAC of the cable that runs to your LAN switch for LAN. If you guess by
+> name on a non-VMware host you will swap the roles and lock yourself
+> out of the GUI.
+
 1. Navigate to `/setup/step1`.
-2. Assign WAN to the first physical port (e.g., `em0`), LAN to `em1`.
-3. Click **Next**.
-4. **Expected:** Redirect to `/setup/step2`.
-5. **DB check:** `SELECT * FROM interface_assignments;` — rows present.
+2. From the WAN dropdown, pick the port whose **MAC** matches the
+   upstream cable (the example below uses `em0`, but you may see
+   `vtnet0` / `igb0` / `re0` depending on the host).
+3. From the LAN dropdown, pick the port whose **MAC** matches the
+   downstream switch cable (example: `em1`).
+4. Click **Next**.
+5. **Expected:** Redirect to `/setup/step2`.
+6. **DB check:** `SELECT * FROM interface_assignments;` — rows present.
 
 ### 4.2 Step 2 — LAN Configuration
 
@@ -390,7 +404,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/login
 
 1. Edit `testuser` → upload a small PNG as profile picture.
 2. **Expected:** Image appears in the user card.
-3. **File check:** `ls /var/db/smart-shield/uploads/profile_pictures/`
+3. **File check:** `ls /var/db/smartshield/uploads/profile_pictures/`
 
 ### 6.4 Disable / Delete User
 
@@ -942,7 +956,7 @@ tail -f /var/log/suricata/fast.log | grep EICAR
 1. Login, make a config change, apply it.
 2. Navigate to `/status/audit-log`.
 3. **Expected:** Log entries for login, config save, and apply — each with timestamp, username, action, category.
-4. **File check:** `tail -50 /var/log/smart-shield/audit.log | python3 -m json.tool`
+4. **File check:** `tail -50 /var/log/smartshield/audit.log | python3 -m json.tool`
 
 ### 19.2 Application Log
 
@@ -1025,7 +1039,7 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 ```sh
 # After saving an IPsec PSK via the UI:
-sqlite3 /var/db/smart-shield/data.db \
+sqlite3 /var/db/smartshield/data.db \
     "SELECT pre_shared_key FROM ipsec_phase1 LIMIT 1;"
 ```
 
@@ -1112,15 +1126,15 @@ service mpd5 status
 tail -f /var/log/suricata/fast.log
 
 # Smart Shield app log
-tail -f /var/log/smart-shield/app.log
+tail -f /var/log/smartshield/app.log
 
 # Smart Shield audit log (pretty-printed NDJSON)
-tail -100 /var/log/smart-shield/audit.log | while read line; do echo "$line" | python3 -m json.tool; done
+tail -100 /var/log/smartshield/audit.log | while read line; do echo "$line" | python3 -m json.tool; done
 
 # SQLite quick queries
-sqlite3 /var/db/smart-shield/data.db ".tables"
-sqlite3 /var/db/smart-shield/data.db "SELECT * FROM users;"
-sqlite3 /var/db/smart-shield/data.db "SELECT key_name, value_json FROM service_state;"
+sqlite3 /var/db/smartshield/data.db ".tables"
+sqlite3 /var/db/smartshield/data.db "SELECT * FROM users;"
+sqlite3 /var/db/smartshield/data.db "SELECT key_name, value_json FROM service_state;"
 ```
 
 ---
@@ -1257,7 +1271,7 @@ In GUI: Status → Traffic History
 
 ```bash
 # On BSD:
-ls /var/db/smart-shield/mrtg/*.png   # should show em0-day.png etc.
+ls /var/db/smartshield/mrtg/*.png   # should show em0-day.png etc.
 crontab -l | grep mrtg               # should show */5 cron entry
 ```
 
@@ -1279,7 +1293,7 @@ unbound-checkconf /usr/local/etc/unbound/unbound.conf
 service unbound reload
 
 # BSD: Smart Shield logs
-tail -f /var/log/smart-shield/app.log
+tail -f /var/log/smartshield/app.log
 ```
 
 ---

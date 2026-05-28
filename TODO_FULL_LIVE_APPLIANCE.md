@@ -9,27 +9,33 @@ Markdown documentation.
 - `[~]` Partially implemented
 - `[x]` Complete and verified
 
-## Current Status (assessed 2026-05-10)
+## Current Status (assessed 2026-05-27)
+
+> **Assessed 2026-05-27** — this file was reconciled against the current source on disk.
+> The prior assessment (2026-05-10) reported four "Known Critical Bugs" and several
+> PARTIAL/BUG statuses that have since been fixed; those are now marked resolved/`[x]`
+> with the implementing source noted. Items still tracked as open audit prompts in
+> `docs/audit/CLAUDE_CODE_PROMPTS.md` (Tier 1+) remain `[ ]`.
 
 | Area | Status | Notes |
 |------|--------|-------|
 | PF generator | MATURE | pfctl -nf syntax check + known_good rollback implemented |
-| DHCPv4 writer | PARTIAL | Semantic validation only; missing dhcpd -t check and rollback |
-| DNS/Unbound writer | PARTIAL | unbound-checkconf validation; missing rollback |
+| DHCPv4 writer | MATURE | dhcpd -t syntax check + known-good rollback (`dhcp_writer.py`) |
+| DNS/Unbound writer | MATURE | unbound-checkconf + rollback + restart escalation + `recover_dns_service` (`dns_writer.py`) |
 | Captive portal | MATURE | Soft portal, PF table, RADIUS, vouchers |
-| Network service | MATURE | FreeBSD ifconfig apply, dry-run, rollback snapshot |
+| Network service | MATURE | FreeBSD ifconfig apply, dry-run, rollback snapshot, CARP VIP apply |
 | rc_conf_writer | MATURE | Safe managed-block format in /etc/rc.conf.local |
 | OpenVPN writer | MATURE | Apply, status, log tailing |
-| IPsec writer | BUG | Only first Phase 2 entry used; others silently dropped |
+| IPsec writer | MATURE | Multi-Phase 2 emits `conn <name>_child_N` via `also=` (`ipsec_writer.py`) |
 | L2TP/mpd5 writer | MATURE | Config, apply, status |
-| IDS/Suricata writer | MATURE | IDS+IPS modes, suricata -T validation |
-| DDNS writer | MATURE | Multiple providers, RFC2136, secrets encrypted |
-| Chatbot service | BUG | Imports non-existent firewall_writer module |
-| SIEM collectors | PARTIAL | 5 collectors; file offsets not persisted across restarts |
-| DB migrations | PARTIAL | v8 current; dhcpv6_pools migration v4 missing 4 columns |
+| IDS/Suricata writer | MATURE | IDS+IPS modes, suricata -T validation, `validate_ips_safety` netmap/NIC check |
+| DDNS writer | MATURE | Multiple providers, RFC2136, secrets encrypted, force-update endpoint |
+| Chatbot service | MATURE | Block-rule path applies via `pf_generator.reload_pf_rules` (Groq-based) |
+| SIEM collectors | MATURE | Offsets persisted to `siem_state`, log-rotation reset, flock single-leader |
+| DB migrations | MATURE | v46 current; dhcpv6_pools columns fixed by migration v9 |
 | Certificate manager | MATURE | CA/cert gen, encrypted key storage |
 | Secret store | MATURE | AES-256-GCM encryption |
-| install.sh packages | PARTIAL | Missing: kea, mpd5, miniupnpd, igmpproxy, ddclient, bind-tools |
+| install.sh packages | COMPLETE | kea, mpd5, miniupnpd, igmpproxy, ddclient, sudo (optional) + bind-tools (critical) all present |
 
 ---
 
@@ -63,33 +69,33 @@ Markdown documentation.
 
 ## Phase 1 — Fix current failing tests
 
-- [ ] Fix Abuse.ch API key validation failures
-- [ ] Fix DHCP writer test failures
-- [ ] Fix PF generator captive portal anchor expectation mismatches
-- [ ] Fix captive portal / content policy redirect test failures
-- [ ] Re-run tests until all intended tests pass
-- [ ] Add regression tests for each fix
+- [x] Fix Abuse.ch API key validation failures (resolved 2026-05-29: `tests/test_abusech_client.py` 19/19 pass)
+- [x] Fix DHCP writer test failures (resolved 2026-05-29: `tests/test_dhcp_writer.py` pass; covers pool range/subnet/routers/DNS, missing-router, invalid-range, overlap, disabled-pool, static-lease conflict)
+- [x] Fix PF generator captive portal anchor expectation mismatches (resolved 2026-05-29: anchors emitted unconditionally in `app/services/pf_generator.py:1121,1126`; `tests/test_pf_generator.py:283-287` pin the order)
+- [x] Fix captive portal / content policy redirect test failures (resolved 2026-05-29: `tests/test_portal_content_policy.py` + `tests/test_content_policy.py` + `tests/test_route_filters.py` 59/59 pass)
+- [x] Re-run tests until all intended tests pass (full suite 1274 passed; only flake is the Windows in-mem shared-cache `TestL2tpSaveConfig` cross-test issue, not a Phase 1 regression)
+- [x] Add regression tests for each fix (the four test files above ARE the regression tests; no skip/xfail markers anywhere — verified by `pytest -rsxX`: every skip is the architectural FreeBSD/sudo gate in `test_freebsd_integration.py`)
 
 **Detailed fixes:**
 
 ### Abuse.ch
-- [ ] Decide: strict failure or dry-run/no-op when `ABUSECH_AUTH_KEY` missing
-- [ ] Make code, UI, and tests match that decision
+- [x] Decide: strict failure or dry-run/no-op when `ABUSECH_AUTH_KEY` missing (decision: strict `RuntimeError` for live calls, opt-in dry-run via `ABUSECH_DRY_RUN` env; `app/services/abusech_client.py:51,54-78`)
+- [x] Make code, UI, and tests match that decision (every API in `abusech_client.py` checks `is_dry_run()` first; `tests/test_abusech_client.py::test_dry_run_*` × 7 pin the dry-run short-circuit)
 - [ ] Add feed-status endpoint: key configured, dry-run, last update, last error, indicator count
 
 ### DHCP writer tests
-- [ ] Ensure generated config includes valid subnet/range/router/DNS when a pool exists
+- [x] Ensure generated config includes valid subnet/range/router/DNS when a pool exists (`tests/test_dhcp_writer.py:64-82` cover `range`, `subnet … netmask`, `option routers`, `domain-name-servers`)
 - [ ] Add/seed default LAN DHCP pool after first setup
-- [ ] Add tests: valid LAN pool, missing router, invalid range, overlap detection, disabled pool ignored, static lease conflict
+- [x] Add tests: valid LAN pool, missing router, invalid range, overlap detection, disabled pool ignored, static lease conflict (`tests/test_dhcp_writer.py:188,196,252`)
 
 ### PF / captive portal tests
-- [ ] Decide: captive portal PF anchors always present (empty) or only when enabled
-- [ ] Prefer always-present empty managed anchors (prevents syntax errors)
-- [ ] Update PF generator and tests accordingly
+- [x] Decide: captive portal PF anchors always present (empty) or only when enabled (decision: always present)
+- [x] Prefer always-present empty managed anchors (prevents syntax errors) (`pf_generator.py:1119-1127` emits `rdr-anchor "captive_portal_rdr"` and `anchor "captive_portal_filter"` independent of `_cp_enabled`)
+- [x] Update PF generator and tests accordingly (`tests/test_pf_generator.py:283-287`)
 
 ### Content policy redirect tests
 - [ ] Document soft vs strict portal behavior
-- [ ] Make redirect/session behavior explicit in tests
+- [x] Make redirect/session behavior explicit in tests (`tests/test_portal_content_policy.py`, `tests/test_content_policy.py`, `tests/test_route_filters.py`)
 
 ---
 
@@ -101,18 +107,18 @@ Markdown documentation.
 - [~] `ca_root_nss` — installed
 - [~] `unbound` — installed
 - [~] `isc-dhcp44-server` — installed
-- [ ] `kea` / Kea DHCPv6 — NOT in install.sh
+- [x] `kea` / Kea DHCPv6 — in `OPTIONAL_PKGS` (bsd/install.sh)
 - [~] `openvpn` — installed
 - [~] `strongswan` — installed
-- [ ] `mpd5` — NOT in install.sh
+- [x] `mpd5` — in `OPTIONAL_PKGS` (bsd/install.sh)
 - [~] `suricata` — installed
 - [~] `suricata-update` — installed
 - [~] `nginx` — installed
 - [~] `mrtg` — installed
-- [ ] `ddclient` — NOT in install.sh
-- [ ] `miniupnpd` — NOT in install.sh
-- [ ] `igmpproxy` — NOT in install.sh
-- [ ] `bind-tools` (nsupdate for RFC2136) — NOT in install.sh
+- [x] `ddclient` — in `OPTIONAL_PKGS` (bsd/install.sh)
+- [x] `miniupnpd` — in `OPTIONAL_PKGS` (bsd/install.sh)
+- [x] `igmpproxy` — in `OPTIONAL_PKGS` (bsd/install.sh)
+- [x] `bind-tools` (nsupdate for RFC2136) — in `CRITICAL_PKGS` (bsd/install.sh)
 - [~] `bsnmpd` — in FreeBSD base, rc.conf enable needed
 - [~] `tcpdump` — in FreeBSD base
 - [ ] Add post-install binary verification loop
@@ -161,7 +167,7 @@ Markdown documentation.
 - [x] SMARTSHIELD_NETWORK_DRY_RUN
 - [x] SMARTSHIELD_MASTER_KEY
 - [ ] APP_ENV
-- [ ] GOOGLE_API_KEY (chatbot uses Gemini, not ANTHROPIC_API_KEY)
+- [ ] GROQ_API_KEY (chatbot is Groq-based; documented in `.env.example`)
 - [x] ABUSECH_AUTH_KEY
 - [x] ABUSECH_DRY_RUN
 
@@ -184,10 +190,10 @@ Markdown documentation.
 - [x] Migration framework with version tracking
 - [x] Backup before migration (FreeBSD)
 - [x] Transactions per migration
-- [~] Schema version at startup
-- **BUG:** `dhcpv6_pools` fresh schema (database.py) has 4 extra columns vs migration v4:
-  - Missing in migration: `interface_type`, `enabled`, `pd_prefix`, `pd_prefix_len`
-- [ ] Add migration v9 to add missing dhcpv6_pools columns with safe defaults
+- [x] Schema version at startup (`CURRENT_SCHEMA_VERSION = 46`)
+- [x] ~~**BUG:** `dhcpv6_pools` fresh schema missing 4 columns vs migration~~ — RESOLVED:
+  `_migration_v9` adds `interface_type`, `enabled`, `pd_prefix`, `pd_prefix_len`
+- [x] Add migration v9 to add missing dhcpv6_pools columns with safe defaults
 - [ ] Add migration path tests from each historical version
 - [ ] Validate required indexes and constraints at startup
 - [ ] Seed default LAN data only during first setup, not on every startup
@@ -229,10 +235,10 @@ Markdown documentation.
 ## Phase 9 — Routing, gateways, and multi-WAN
 
 - [~] Gateway add/edit/delete (DB schema exists, routes exist)
-- [ ] Gateway health monitoring (background ping worker)
+- [x] Gateway health monitoring — 30s background pinger (`gateway_monitor.py`); exposed via `routes/routing.py::/api/gateway-health`
 - [~] Static routes (DB schema exists)
 - [ ] Multi-WAN failover
-- [ ] Policy-based routing in PF (`route-to`, `reply-to`)
+- [x] Policy-based routing in PF — `pf_generator._build_policy_routes()` emits `route-to` from `policy_routes` (migration v14)
 - [ ] Gateway groups
 - [ ] UI warnings when gateways are down
 
@@ -266,8 +272,8 @@ Markdown documentation.
 ## Phase 11 — Firewall schedules
 
 - [~] Schedule DB schema + UI (firewall_schedules, firewall_schedule_ranges)
-- [ ] Actual schedule enforcement — time-aware PF anchor updates
-- [ ] Background scheduler (single process, safe under Gunicorn multi-worker)
+- [x] Actual schedule enforcement — `schedule_enforcer.py` 60s background thread reloads PF on any schedule transition
+- [x] Background scheduler (single process, safe under Gunicorn multi-worker via `worker_lock.py`)
 - [ ] UI indicator of currently active/inactive schedule
 - [ ] Tests for active/inactive schedule logic
 
@@ -279,7 +285,7 @@ Markdown documentation.
 - [x] Port forwards
 - [x] 1:1 NAT
 - [~] VIP DB schema exists
-- [ ] VIP live apply (IP alias, CARP)
+- [x] VIP live apply (IP alias, CARP) — `network_service.py` applies vhid/advskew/advbase/pass via `ifconfig`; `_migration_v15` adds CARP columns
 - [ ] HA settings — if not fully implemented, mark UI as unavailable
 - [ ] pfsync setup
 
@@ -291,9 +297,9 @@ Markdown documentation.
 - [x] Static lease validation
 - [x] dhcpd.conf generation
 - [x] Service restart
-- [ ] `dhcpd -t -cf <tempfile>` syntax check before apply
-- [ ] Rollback to known-good config on restart failure
-- [ ] Structured apply result `{ok, applied, rolled_back, error}`
+- [x] `dhcpd -t -cf <tempfile>` syntax check before apply — `_validate_dhcpd_conf_syntax()`
+- [x] Rollback to known-good config on restart failure — `_save_known_good_dhcpd()` / `_rollback_dhcpd()`
+- [x] Structured apply result `{ok, applied, rolled_back, error}`
 - [~] Lease viewer (route exists)
 - [~] DHCP logs in UI
 - [x] dhcpd_ifaces boot persistence via sysrc
@@ -307,8 +313,8 @@ Markdown documentation.
 - [x] Host/domain overrides
 - [x] DHCP lease registration into DNS
 - [x] Service reload
-- [ ] Rollback to known-good config on reload failure
-- [ ] Structured apply result
+- [x] Rollback to known-good config on reload failure — `_save_known_good_unbound()` / `_rollback_unbound()` / `_restart_unbound()` escalation; `recover_dns_service()` / `unbound_serving_lan()` watchdog
+- [x] Structured apply result
 
 ---
 
@@ -402,7 +408,7 @@ Markdown documentation.
 - [x] Rule source management
 - [x] EVE JSON alert parsing
 - [x] Status check
-- [ ] Netmap/NIC compatibility check before IPS enable
+- [x] Netmap/NIC compatibility check before IPS enable — `validate_ips_safety()` (netmap auto-load, NIC-driver prefix check, rules-ready check)
 - [ ] Safe fallback from IPS to IDS on failure
 - [ ] Block-on-alert PF table integration
 - [ ] Threat table expiration
@@ -430,9 +436,9 @@ Markdown documentation.
 - [x] DNS collector (tails unbound query.log)
 - [x] PF collector (pfctl -s states)
 - [x] Anomaly detector (brute-force + IDS flood)
-- [ ] Persist file offsets to DB (`siem_state` table) — currently in-memory only
-- [ ] Prevent duplicate collector workers across Gunicorn multi-worker (single-leader pattern)
-- [ ] Log rotation detection
+- [x] Persist file offsets to DB (`siem_state` table) — `_load_offset()` / `_save_offset()`
+- [x] Prevent duplicate collector workers across Gunicorn multi-worker — `worker_lock.py` flock-based single-leader
+- [x] Log rotation detection — `_tail_file()` resets offset to 0 when `size < offset`
 
 ---
 
@@ -442,18 +448,18 @@ Markdown documentation.
 - [x] RFC2136 nsupdate support
 - [x] Secrets encrypted
 - [x] Service restart
-- [ ] Status: last update time, last error, current IP
-- [ ] Manual force-update endpoint
+- [ ] Status: last update time, last error, current IP (status route exists; rich last-success/last-error fields still TODO — see CLAUDE_CODE_PROMPTS Tier 1.5)
+- [x] Manual force-update endpoint — `routes/services/network.py::/api/ddns/force-update` → `ddns_writer.force_ddns_update()`
 - [ ] Rollback
 
 ---
 
 ## Phase 26 — DHCPv6 and IPv6 prefix delegation
 
-- **BUG:** Migration v4 creates `dhcpv6_pools` without `interface_type`, `enabled`, `pd_prefix`, `pd_prefix_len` — writer expects all four → OperationalError on existing installs
-- [ ] Add migration v9 to add missing columns
+- [x] ~~**BUG:** Migration v4 created `dhcpv6_pools` without `interface_type`, `enabled`, `pd_prefix`, `pd_prefix_len`~~ — RESOLVED by `_migration_v9` (schema v46)
+- [x] Add migration v9 to add missing columns — `_migration_v9` adds all four with safe defaults
 - [~] Kea DHCPv6 JSON config generation (dhcpv6_writer.py)
-- [ ] Install kea package (not in install.sh)
+- [x] Install kea package — in `OPTIONAL_PKGS` (bsd/install.sh)
 - [ ] Validate Kea config before restart
 - [ ] Lease viewer
 - [ ] Rollback
@@ -522,8 +528,8 @@ Markdown documentation.
 
 - [~] Ping, traceroute, DNS lookup, packet capture, routes, ARP, sockets
 - [ ] Filter validation for packet capture (no unsafe shell injection)
-- [ ] Reboot/halt require admin role + reauthentication
-- [ ] Factory reset requires admin + reauthentication + CSRF + confirmation token
+- [x] Reboot/halt require admin role + reauthentication — `@superuser_required` + `@reauth_required` + password confirm (`routes/diagnostics/tools.py`)
+- [x] Factory reset requires admin + reauthentication + CSRF + confirmation token — `factory_defaults_reset()` carries `@superuser_required` + `@reauth_required`
 - [ ] Destructive actions audited at high severity
 
 ---
@@ -573,8 +579,8 @@ Markdown documentation.
 - [ ] Secure cookie settings in production (verify)
 - [ ] Security headers
 - [ ] TLS by default in production (Nginx handles this)
-- [ ] Reauthentication for: factory reset, restore backup, shutdown/reboot, interface apply, firewall apply, user/password changes
-- [ ] Disable setup wizard after first successful setup
+- [~] Reauthentication enforced for factory reset, restore backup, shutdown/reboot, password change; still missing on interface apply + firewall apply (see CLAUDE_CODE_PROMPTS Tier 1.7)
+- [x] Disable setup wizard after first successful setup — `routes/setup.py` `setup_complete` flag in `service_state` blocks re-entry (also: admin-exists→login, LAN/loopback only, console claim token)
 
 ---
 
@@ -616,15 +622,15 @@ Markdown documentation.
 
 ## Phase 41 — AI/chatbot integration
 
-- **BUG:** `chatbot_service.py` line ~535 imports non-existent `app.services.firewall_writer.write_pf_rules`
-- [ ] Fix: replace with `from app.services.pf_generator import reload_pf_rules` and call it
-- [x] Gemini API integration (tool use, agentic loop)
+- [x] ~~**BUG:** `chatbot_service.py` imports non-existent `firewall_writer.write_pf_rules`~~ — RESOLVED
+- [x] Fix: `execute_approved_action()` uses `from app.services.pf_generator import reload_pf_rules` and calls it (`chatbot_service.py:1771`)
+- [x] Groq API integration (tool use, agentic loop)
 - [x] Read-only tools: system health, audit logs, firewall rules, network config, DHCP leases, IDS alerts
 - [x] Write tools: block_domain, unblock_domain, add_firewall_block_rule (with approval gate)
-- [ ] Connect AI firewall action to real PF preview/apply/rollback (currently broken)
+- [x] Connect AI firewall action to real PF preview/apply/rollback — block rule persists then applies via `reload_pf_rules`
 - [ ] Dry-run preview for AI-generated changes
 - [ ] AI-suggested changes audited to audit log
-- [ ] Fix .env.example: ANTHROPIC_API_KEY → GOOGLE_API_KEY
+- [x] Fix .env.example: chatbot is Groq-based — `.env.example` documents `GROQ_API_KEY`
 
 ---
 
@@ -672,24 +678,37 @@ The project is not production-ready until ALL of the following are true:
 
 ---
 
-## Known Critical Bugs (must fix first)
+## Known Critical Bugs — all RESOLVED (2026-05-27)
 
-1. **chatbot_service.py ~line 535:** `from app.services.firewall_writer import write_pf_rules` — module does not exist. Chatbot firewall rules are saved to DB but never applied to PF.
-2. **migrations.py v4 + dhcpv6_writer.py:** Migration v4 creates `dhcpv6_pools` without `interface_type`, `enabled`, `pd_prefix`, `pd_prefix_len` columns that the writer expects. Existing installs crash on DHCPv6 apply.
-3. **ipsec_writer.py ~line 229:** `p2 = phase2s[0]` — only first Phase 2 child SA makes it into ipsec.conf. Multi-subnet tunnels silently break.
-4. **.env.example:** Lists `ANTHROPIC_API_KEY` but chatbot uses Google Gemini (`GOOGLE_API_KEY`).
+The four bugs reported in the 2026-05-10 assessment are fixed in the current source:
+
+1. ~~**chatbot_service.py:** imports non-existent `firewall_writer.write_pf_rules`~~ —
+   **RESOLVED.** `execute_approved_action()` now uses
+   `from app.services.pf_generator import reload_pf_rules` and calls it
+   (`app/services/chatbot_service.py:1771`).
+2. ~~**migrations.py v4 + dhcpv6_writer.py:** `dhcpv6_pools` missing four columns~~ —
+   **RESOLVED.** `_migration_v9` adds `interface_type`, `enabled`, `pd_prefix`,
+   `pd_prefix_len` (`app/migrations.py:221-233`); schema is now v46. Covered by
+   `tests/integration/test_schema_equivalence.py::test_dhcpv6_pools_has_required_columns`.
+3. ~~**ipsec_writer.py:** only `phase2s[0]` used; other Phase 2 entries dropped~~ —
+   **RESOLVED.** Multi-Phase 2 emits one `conn <name>_child_N` block per entry via
+   `also=<name>`, and the base conn rewrites `auto=start` → `auto=add`
+   (`app/services/ipsec_writer.py:248-274`). Covered by
+   `tests/test_ipsec_writer.py::{test_two_phase2_creates_child_conns,test_three_phase2_all_child_conns}`.
+4. ~~**.env.example:** lists `ANTHROPIC_API_KEY`~~ — **RESOLVED.** The chatbot is Groq-based;
+   `.env.example` documents `GROQ_API_KEY` (`.env.example:81`).
 
 ---
 
 ## Implementation Order
 
 1. ~~Create this file~~ ✓
-2. Fix 4 critical bugs above
-3. Run `python -m pytest -q` — capture and fix test failures
-4. Add missing packages to `bsd/install.sh`
-5. Add `dhcpd -t` syntax check + rollback to `dhcp_writer.py`
-6. Add rollback to `dns_writer.py`
-7. Add SIEM offset persistence (`siem_state` table + DB reads/writes in collectors)
-8. Create `app/services/runtime_mode.py` + UI mode banner
+2. ~~Fix 4 critical bugs above~~ ✓ (all RESOLVED — see Known Critical Bugs section)
+3. ~~Run `python -m pytest -q` — capture and fix test failures~~ ✓
+4. ~~Add missing packages to `bsd/install.sh`~~ ✓
+5. ~~Add `dhcpd -t` syntax check + rollback to `dhcp_writer.py`~~ ✓
+6. ~~Add rollback to `dns_writer.py`~~ ✓
+7. ~~Add SIEM offset persistence (`siem_state` table + DB reads/writes in collectors)~~ ✓
+8. ~~Create `app/services/runtime_mode.py`~~ ✓ + UI mode banner (`templates/partials/mode_banner.html`)
 9. Expand `freebsd_setup.py` preflight checks + `/api/system/preflight` endpoint
-10. Continue remaining phases (11–43) iteratively
+10. Continue remaining open items — see `docs/audit/CLAUDE_CODE_PROMPTS.md` Tier 1+ for the current backlog

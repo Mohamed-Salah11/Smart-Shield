@@ -830,6 +830,13 @@ if [ -f "${APP_ROOT}/tools/release_check.py" ]; then
     fi
 fi
 
+if [ -f "${APP_ROOT}/tools/check_manifest.py" ]; then
+    info "Running check_manifest.py..."
+    if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/check_manifest.py ); then
+        fatal "python_runtime.json out of sync with requirements.txt — see diff above. Aborting install."
+    fi
+fi
+
 if [ -f "${APP_ROOT}/tools/check_routes.py" ]; then
     info "Running check_routes.py..."
     if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/check_routes.py ); then

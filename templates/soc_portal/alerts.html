@@ -132,12 +132,6 @@ const CAT_COLOR = {
 // Keys to surface in the Details column, in priority order.
 const DETAIL_KEYS = ['cmd', 'domain', 'signature', 'dest_ip', 'port', 'reason', 'url', 'mac', 'auth_type'];
 
-function htmlEscape(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
 function detailSummary(details) {
   if (!details || typeof details !== 'object') return '';
   for (const k of DETAIL_KEYS) {
@@ -179,11 +173,11 @@ function assignCell(e, ts) {
   for (const a of activeAnalysts) {
     const sel = (String(a.user_id) === cur) ? ' selected' : '';
     if (sel) curIsActive = true;
-    opts += `<option value="${a.user_id}"${sel}>${htmlEscape(a.username)} (${htmlEscape(a.tier)})</option>`;
+    opts += `<option value="${a.user_id}"${sel}>${SOC.esc(a.username)} (${SOC.esc(a.tier)})</option>`;
   }
   // Keep a current assignee visible even if they have since logged out.
   if (cur && !curIsActive) {
-    opts += `<option value="${htmlEscape(cur)}" selected>${htmlEscape(e.assignment.assignee_name)} (offline)</option>`;
+    opts += `<option value="${SOC.esc(cur)}" selected>${SOC.esc(e.assignment.assignee_name)} (offline)</option>`;
   }
   const key  = ts.replace(/'/g, "\\'");
   const uuid = (e.event_uuid || '').replace(/'/g, "\\'");
@@ -257,24 +251,24 @@ function renderRows(data) {
     const aa   = e.analyst_action;
     const det  = detailSummary(e.details);
     const sevStyle = SEV_COLOR[sev] || SEV_COLOR.info;
-    const sevBadge = `<span class="ext-b19834c2">${sev}</span>`;
+    const sevBadge = `<span class="ext-b19834c2">${SOC.esc(sev)}</span>`;
     const statusBadge = aa
-      ? `<span class="ext-f59a3da2">${aa.action}</span>`
+      ? `<span class="ext-f59a3da2">${SOC.esc(aa.action)}</span>`
       : `<span class="ext-b267534b">New</span>`;
     const caseLink = aa && aa.case_id
-      ? `<a class="ext-00d74da7" href="/soc-portal/cases/${aa.case_id}">#${aa.case_id}</a>`
-      : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${htmlEscape(ts)}" data-event-uuid="${htmlEscape(e.event_uuid || '')}" data-action-name="${htmlEscape(act)}">+ Case</button>`;
+      ? `<a class="ext-00d74da7" href="/soc-portal/cases/${encodeURIComponent(aa.case_id)}">#${SOC.esc(aa.case_id)}</a>`
+      : `<button type="button" class="btn-soc-secondary ext-da62bb76" data-action="soc-open-case" data-ts="${SOC.esc(ts)}" data-event-uuid="${SOC.esc(e.event_uuid || '')}" data-action-name="${SOC.esc(act)}">+ Case</button>`;
     const ipCell = (ip && ip !== '—')
-      ? `<a href="#" data-soc-pivot-ip="${htmlEscape(ip)}" title="Filter by ${htmlEscape(ip)}">${htmlEscape(ip)}</a>`
+      ? `<a href="#" data-soc-pivot-ip="${SOC.esc(ip)}" title="Filter by ${SOC.esc(ip)}">${SOC.esc(ip)}</a>`
       : '—';
     const enterCls = newKeys.has(keys[idx]) ? ' soc-row-enter' : '';
     return `<tr class="alert-row ext-b202c6d4${enterCls}" data-idx="${idx}" data-action="alert-open-detail" title="Click for full detail">
-      <td class="soc-mono ext-6c660c40">${timeFmt(ts)}</td>
+      <td class="soc-mono ext-6c660c40">${SOC.esc(timeFmt(ts))}</td>
       <td>${sevBadge}</td>
-      <td><span class="ext-179624b7">${cat}</span></td>
-      <td class="ext-15e075a4" title="${htmlEscape(act)}">${htmlEscape(act)}</td>
-      <td class="soc-mono ext-f01908f1" title="${htmlEscape(det)}">${htmlEscape(det)}</td>
-      <td class="ext-76b0e39b">${htmlEscape(user)}</td>
+      <td><span class="ext-179624b7">${SOC.esc(cat)}</span></td>
+      <td class="ext-15e075a4" title="${SOC.esc(act)}">${SOC.esc(act)}</td>
+      <td class="soc-mono ext-f01908f1" title="${SOC.esc(det)}">${SOC.esc(det)}</td>
+      <td class="ext-76b0e39b">${SOC.esc(user)}</td>
       <td class="ext-76b0e39b">${ipCell}</td>
       <td>${statusBadge}</td>
       <td>${caseLink}</td>
@@ -383,11 +377,6 @@ loadAnalysts().then(loadAlerts);
 setInterval(() => loadAnalysts().then(loadAlerts), 3000);
 
 // ── IOC lookup ───────────────────────────────────────────────────────────
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 async function lookupIOC() {
   var input  = document.getElementById('ioc-input');
   var result = document.getElementById('ioc-result');
@@ -404,22 +393,22 @@ async function lookupIOC() {
     if (data.ti_hit) {
       pieces.push('<span class="ext-dd0f2908">'
                  + '<i class="fa-solid fa-circle-radiation me-1"></i>TI HIT</span> ('
-                 + escapeHtml(data.feed || '') + ')');
+                 + SOC.esc(data.feed || '') + ')');
     } else {
       pieces.push('<span class="ext-29fb9df2"><i class="fa-solid fa-circle-check me-1"></i>Not in TI cache</span>');
     }
-    pieces.push(escapeHtml(data.event_count) + ' matching event(s)');
+    pieces.push(SOC.esc(data.event_count) + ' matching event(s)');
     result.innerHTML = pieces.join(' &middot; ');
     if (data.events && data.events.length) {
       var rows = data.events.map(function (e) {
         return '<tr>'
-             + '<td class="ext-4ddbe905">' + escapeHtml(e.timestamp) + '</td>'
-             + '<td>' + escapeHtml(e.severity) + '</td>'
-             + '<td>' + escapeHtml(e.category) + '</td>'
-             + '<td>' + escapeHtml(e.action)   + '</td>'
-             + '<td>' + escapeHtml(e.remote_addr) + '</td>'
+             + '<td class="ext-4ddbe905">' + SOC.esc(e.timestamp) + '</td>'
+             + '<td>' + SOC.esc(e.severity) + '</td>'
+             + '<td>' + SOC.esc(e.category) + '</td>'
+             + '<td>' + SOC.esc(e.action)   + '</td>'
+             + '<td>' + SOC.esc(e.remote_addr) + '</td>'
              + '<td class="ext-8767e6a8">'
-             + escapeHtml(JSON.stringify(e.details)) + '</td>'
+             + SOC.esc(JSON.stringify(e.details)) + '</td>'
              + '</tr>';
       }).join('');
       events.innerHTML =

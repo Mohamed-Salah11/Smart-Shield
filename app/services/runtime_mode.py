@@ -202,6 +202,57 @@ def production_ready() -> tuple:
     return (len(issues) == 0, issues)
 
 
+def env_file_world_readable() -> str:
+    """Return the path of the smartshield env file when it exists and is
+    world-readable, else "". FreeBSD-only — on a non-FreeBSD host the env file
+    is a dev convenience and we never want to abort dev boots, so this returns
+    "" off-platform.
+
+    The env file holds ``SECRET_KEY`` and ``SMARTSHIELD_MASTER_KEY``; any
+    ``S_IROTH`` bit means every local user can read the cookies-signing and
+    secrets-encryption keys.
+    """
+    import stat
+    if not sys.platform.startswith("freebsd"):
+        return ""
+    from app.config import _ss_dir
+    env_dir = _ss_dir("/usr/local/etc")
+    env_path = os.path.join(env_dir, "smartshield.env")
+    if not os.path.exists(env_path):
+        legacy = os.path.join(env_dir, "smart-shield.env")
+        if os.path.exists(legacy):
+            env_path = legacy
+        else:
+            return ""
+    try:
+        if os.stat(env_path).st_mode & stat.S_IROTH:
+            return env_path
+    except OSError:
+        pass
+    return ""
+
+
+def assert_env_file_safe() -> None:
+    """Refuse to boot in 'live' mode when the appliance env file is world-
+    readable. Logged at CRITICAL and exits 78 (``EX_CONFIG``). Dev/dry-run /
+    degraded keep booting — those modes don't run on a hardened appliance and
+    the warning still surfaces through ``startup_warnings()``.
+
+    Called from ``app/__init__.py::create_app`` after ``init_db()``.
+    """
+    if current_mode() != "live":
+        return
+    bad = env_file_world_readable()
+    if not bad:
+        return
+    _log.critical(
+        "[startup] refusing to boot in 'live' mode: %s is world-readable "
+        "(holds SECRET_KEY / SMARTSHIELD_MASTER_KEY). Fix: chmod 600 %s",
+        bad, bad,
+    )
+    raise SystemExit(78)
+
+
 def mode_badge() -> dict:
     """Return display info for the UI mode banner."""
     mode = current_mode()

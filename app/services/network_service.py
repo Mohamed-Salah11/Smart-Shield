@@ -667,6 +667,7 @@ def apply_interface_with_rollback(
     new_cidr: str,
     new_gateway: str = "",
     verify_host: str = "",
+    mtu="",
 ) -> dict:
     """
     Apply a new IPv4 address (CIDR) and optional default gateway to an interface.
@@ -680,6 +681,10 @@ def apply_interface_with_rollback(
     new_gateway  : Default gateway IP (optional). Leave blank to skip.
     verify_host  : IP/hostname to ping after applying to verify reachability.
                    Falls back to new_gateway if empty.
+    mtu          : Interface MTU to set (optional). Applied live via
+                   ``ifconfig <iface> mtu <N>`` and persisted to rc.conf only
+                   after the address/connectivity checks pass, so a rolled-back
+                   apply never leaves a stale MTU behind.
 
     Returns
     -------
@@ -771,6 +776,21 @@ def apply_interface_with_rollback(
                 "rolled_back": True,
                 "old_state": old_state,
             }
+
+    # 5. Address + connectivity confirmed — now set the MTU (best-effort) and
+    #    persist it to rc.conf so it survives a reboot. Done last so a rolled
+    #    back apply above never leaves a changed MTU behind.
+    mtu_str = str(mtu or "").strip()
+    if mtu_str:
+        try:
+            run_command(["ifconfig", iface_name, "mtu", mtu_str], check=False)
+        except Exception:
+            pass
+        try:
+            from app.services.rc_conf_writer import set_iface_mtu
+            set_iface_mtu(iface_name, mtu_str)
+        except Exception:
+            pass
 
     return {
         "ok": True,
@@ -979,12 +999,12 @@ def apply_interface_config(conn) -> dict:
     results = []
 
     lan = conn.execute(
-        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type "
+        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type, mtu "
         "FROM lan_config LIMIT 1"
     ).fetchone()
 
     wan = conn.execute(
-        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type "
+        "SELECT assigned_port, ipv4_address, ipv4_upstream_gateway, ipv4_config_type, mtu "
         "FROM wan_config LIMIT 1"
     ).fetchone()
 
@@ -995,6 +1015,7 @@ def apply_interface_config(conn) -> dict:
         cidr    = (row["ipv4_address"] or "").strip()
         gateway = (row["ipv4_upstream_gateway"] or "").strip()
         mode    = (row["ipv4_config_type"] or "static").lower()
+        mtu     = (row["mtu"] or "").strip()
 
         # Router mode requires real interfaces — missing assignment / address /
         # mode is a hard failure rather than a silently-skipped success.
@@ -1021,7 +1042,7 @@ def apply_interface_config(conn) -> dict:
                     "message": f"{label}: static WAN requires an upstream gateway",
                 })
                 continue
-            r = apply_interface_with_rollback(iface, cidr, gateway)
+            r = apply_interface_with_rollback(iface, cidr, gateway, mtu=mtu)
             results.append({"iface": label, **r})
             continue
 

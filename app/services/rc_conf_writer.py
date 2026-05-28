@@ -108,12 +108,16 @@ def generate_rc_conf_block(conn) -> str:
         lan = lan_rows[0]
         lan_iface   = (lan.get("assigned_port") or "em1").strip()
         lan_ip_cidr = (lan.get("ipv4_address") or "").strip()
+        lan_mtu     = (lan.get("mtu") or "").strip()
         if lan_ip_cidr:
             try:
                 iface_obj = ipaddress.ip_interface(lan_ip_cidr)
                 ip      = str(iface_obj.ip)
                 netmask = str(iface_obj.network.netmask)
-                lines.append(f'ifconfig_{_rc_iface(lan_iface)}="inet {ip} netmask {netmask}"')
+                cfg = f"inet {ip} netmask {netmask}"
+                if lan_mtu:
+                    cfg += f" mtu {lan_mtu}"
+                lines.append(f'ifconfig_{_rc_iface(lan_iface)}="{cfg}"')
                 lines.append('smart_shield_bind="127.0.0.1:5000"')
             except ValueError:
                 pass
@@ -300,6 +304,67 @@ def get_current_rc_conf_block() -> str:
         return m.group(1).strip() if m else ""
     except OSError:
         return ""
+
+
+def set_iface_mtu(iface: str, mtu) -> dict:
+    """Persist an interface MTU into the rc.conf.local managed block.
+
+    Adds or replaces the ``mtu N`` token on the matching ``ifconfig_<iface>=``
+    line so the MTU survives a reboot, complementing the live
+    ``ifconfig <iface> mtu N`` applied by ``network_service``. This is a
+    surgical in-place edit (it does not regenerate the whole block) so it can
+    be called right after a live apply without waiting for the next
+    ``apply_rc_conf``.
+
+    No-op (``ok=True``) off FreeBSD, when ``rc.conf.local`` is absent, or when
+    there is no ``ifconfig_<iface>`` line yet — in those cases the next full
+    ``apply_rc_conf`` regeneration carries the DB value forward.
+
+    Returns ``{"ok": bool, "message": str}``.
+    """
+    rc_iface = _rc_iface((iface or "").strip())
+    try:
+        mtu_n = int(str(mtu).strip())
+    except (TypeError, ValueError):
+        return {"ok": False, "message": f"invalid MTU: {mtu!r}"}
+    if not rc_iface or mtu_n <= 0:
+        return {"ok": False, "message": "iface and positive MTU required"}
+
+    if not _on_freebsd():
+        return {"ok": True, "message": f"Non-FreeBSD — MTU {mtu_n} for {iface} not written"}
+    if not os.path.exists(_RC_CONF_LOCAL):
+        return {"ok": True, "message": f"{_RC_CONF_LOCAL} absent — MTU deferred to next apply"}
+
+    try:
+        with open(_RC_CONF_LOCAL) as fh:
+            content = fh.read()
+    except OSError as exc:
+        return {"ok": False, "message": f"cannot read {_RC_CONF_LOCAL}: {exc}"}
+
+    line_re = re.compile(
+        rf'^(ifconfig_{re.escape(rc_iface)}\s*=\s*")([^"]*)(")',
+        re.MULTILINE,
+    )
+    m = line_re.search(content)
+    if not m:
+        return {"ok": True, "message": f"no ifconfig_{rc_iface} line yet — MTU deferred to next apply"}
+
+    value = m.group(2)
+    if re.search(r"\bmtu\s+\d+", value):
+        new_value = re.sub(r"\bmtu\s+\d+", f"mtu {mtu_n}", value)
+    else:
+        new_value = f"{value.rstrip()} mtu {mtu_n}".strip()
+    if new_value == value:
+        return {"ok": True, "message": f"MTU {mtu_n} already set for {iface}"}
+
+    new_content = content[:m.start()] + m.group(1) + new_value + m.group(3) + content[m.end():]
+    try:
+        from app.services.config_file_utils import atomic_write, backup_config
+        backup_config(_RC_CONF_LOCAL)
+        atomic_write(_RC_CONF_LOCAL, new_content, mode=0o644)
+    except OSError as exc:
+        return {"ok": False, "message": f"cannot write {_RC_CONF_LOCAL}: {exc}"}
+    return {"ok": True, "message": f"MTU {mtu_n} persisted for {iface}"}
 
 
 def _validate_rc_conf_local(text: str) -> list:

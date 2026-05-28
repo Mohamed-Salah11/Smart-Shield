@@ -207,3 +207,65 @@ class TestSessionTimeout:
             sess["_last_active"] = time.time() - 7200
         r = sec_client.get("/system/dashboard", follow_redirects=False)
         assert r.status_code in (302, 401)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1.7: reauth-required gate on destructive admin endpoints
+# ---------------------------------------------------------------------------
+
+# (method, path, json_body) — the routes that previously required only
+# login+permission; Phase 1.7 added @reauth_required to each.
+_DESTRUCTIVE_ROUTES = [
+    ("/firewall/api/apply/all",                  {}),
+    ("/firewall/api/rules/wan/reorder",          {"order": []}),
+    ("/interfaces/save-lan-config",              {}),
+    ("/interfaces/save-wan-config",              {}),
+    ("/interfaces/api/apply-network",            {}),
+    ("/system/api/packages/install",             {"name": "curl"}),
+    ("/system/api/certificates/1/revoke",        {}),
+]
+
+
+def _superuser_no_reauth_client(sec_app):
+    client = sec_app.test_client()
+    _create_user(sec_app, "sec_super", "superpass123!", is_superuser=1)
+    _login(client, "sec_super", "superpass123!")
+    with client.session_transaction() as sess:
+        sess.pop("reauth_time", None)
+    return client
+
+
+def _superuser_with_reauth_client(sec_app):
+    client = sec_app.test_client()
+    _create_user(sec_app, "sec_super", "superpass123!", is_superuser=1)
+    _login(client, "sec_super", "superpass123!")
+    with client.session_transaction() as sess:
+        sess["reauth_time"] = datetime.now(timezone.utc).isoformat()
+    return client
+
+
+class TestReauthRequiredOnDestructiveRoutes:
+
+    @pytest.mark.parametrize("path,body", _DESTRUCTIVE_ROUTES)
+    def test_returns_403_reauth_required_when_session_lacks_reauth(self, sec_app, path, body):
+        client = _superuser_no_reauth_client(sec_app)
+        r = client.post(path, json=body)
+        assert r.status_code == 403, (
+            f"{path} should 403 without a fresh reauth (got {r.status_code})"
+        )
+        data = r.get_json() or {}
+        assert data.get("reauth_required") is True, (
+            f"{path} should set reauth_required:true in the 403 body"
+        )
+
+    @pytest.mark.parametrize("path,body", _DESTRUCTIVE_ROUTES)
+    def test_reauth_gate_lifts_when_session_is_fresh(self, sec_app, path, body):
+        # The route may still return 400/404/500 for downstream reasons
+        # (missing DB rows, FreeBSD-only ops, etc.) — we only assert that the
+        # reauth gate itself is no longer the blocker.
+        client = _superuser_with_reauth_client(sec_app)
+        r = client.post(path, json=body)
+        data = r.get_json() or {}
+        assert not (r.status_code == 403 and data.get("reauth_required") is True), (
+            f"{path} still blocked by reauth gate after a fresh re-auth"
+        )

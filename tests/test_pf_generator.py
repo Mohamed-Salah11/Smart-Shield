@@ -83,6 +83,28 @@ class TestGeneratePfConf:
         conf = generate_pf_conf(conn)
         assert "set block-policy drop" in conf
 
+    def test_ids_block_table_and_rule_present(self, conn):
+        # The IDS block-on-alert table (populated live by ids_blocker) and its
+        # drop rule must always be in the ruleset so members are dropped the
+        # instant they are added to the table.
+        from app.services.pf_generator import generate_pf_conf
+        conf = generate_pf_conf(conn)
+        assert "table <ss_ids_blocks> persist" in conf
+        assert "from <ss_ids_blocks>" in conf
+
+    def test_scrub_max_mss_emitted_when_set(self, fresh_conn):
+        # A per-interface MSS clamp on wan_config.mss must be emitted as a
+        # `scrub on $WAN all max-mss <N>` rule, ahead of the global scrub so
+        # pf's first-match scrub picks it on the WAN link (PMTUD black-hole
+        # fix for PPPoE/low-MTU uplinks).
+        from app.services.pf_generator import generate_pf_conf
+        fresh_conn.execute("UPDATE wan_config SET mss='1452' WHERE id=1")
+        fresh_conn.commit()
+        conf = generate_pf_conf(fresh_conn)
+        assert "scrub on $WAN all max-mss 1452" in conf
+        # Per-interface clamp must precede the global `scrub in all`.
+        assert conf.index("scrub on $WAN all max-mss 1452") < conf.index("scrub in all")
+
     def test_default_masquerade_when_no_outbound_nat(self, conn):
         from app.services.pf_generator import generate_pf_conf
         conf = generate_pf_conf(conn)

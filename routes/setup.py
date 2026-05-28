@@ -22,6 +22,7 @@ configured from the browser before any users exist.  Once complete, all
 import json
 import os
 import ipaddress
+from functools import wraps
 from hmac import compare_digest
 
 from flask import (
@@ -35,6 +36,7 @@ from flask import (
     url_for,
 )
 
+from app.auth_utils import reauth_is_fresh
 from app.database import get_db
 from app.validators import validate_interface_name
 
@@ -122,26 +124,56 @@ def _get_saved_setup_ports(conn):
     return ports.get("WAN", ""), ports.get("LAN", "")
 
 
+def _is_authenticated_superuser() -> bool:
+    """Return True iff the session is logged in as a superuser.
+
+    Shared by ``_wizard_guard`` (lets admins re-enter the wizard) and
+    ``_conditional_reauth`` (gates that re-entry behind a fresh reauth once
+    setup is complete). Falls back to False on any DB / session error so we
+    never treat a flaky lookup as proof of admin identity."""
+    try:
+        user_id = session.get("user_id")
+        if not user_id:
+            return False
+        row = get_db().execute(
+            "SELECT is_superuser FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+        return bool(row and row["is_superuser"])
+    except Exception:
+        return False
+
+
 def _wizard_guard():
     """Redirect non-admin users away from wizard if it's already done."""
     if _is_setup_complete():
         # Admins (superusers) may re-enter the wizard after completion.
-        from flask import session as _session
-        from app.database import get_db as _get_db
-        try:
-            user_id = _session.get("user_id")
-            if user_id:
-                conn = _get_db()
-                row  = conn.execute(
-                    "SELECT is_superuser FROM users WHERE id=?", (user_id,)
-                ).fetchone()
-                if row and row["is_superuser"]:
-                    return None  # Admins can always re-run setup
-        except Exception:
-            pass
+        if _is_authenticated_superuser():
+            return None
         flash("Setup has already been completed.", "info")
         return redirect(url_for("system.dashboard"))
     return None
+
+
+def _conditional_reauth(view):
+    """Require a fresh reauthentication for an authenticated superuser who is
+    re-running the setup wizard after it has already been marked complete.
+
+    Re-running the wizard reassigns WAN/LAN ports and can knock the appliance
+    off the network — too destructive to leave behind a single logged-in
+    session. The first-boot path (no admin yet, or ``setup_complete`` not set)
+    is unaffected, as is an unauthenticated wizard run that is still gated by
+    the claim-token flow in ``_wizard_guard``."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if _is_setup_complete() and _is_authenticated_superuser():
+            if not reauth_is_fresh():
+                return jsonify({
+                    "ok": False,
+                    "reauth_required": True,
+                    "message": "Please re-authenticate to re-run setup.",
+                }), 403
+        return view(*args, **kwargs)
+    return wrapped
 
 
 # ---------------------------------------------------------------------------
@@ -336,6 +368,7 @@ def api_step1_ports():
 
 
 @setup_bp.route("/api/step1/save", methods=["POST"])
+@_conditional_reauth
 def api_step1_save():
     guard = _wizard_guard()
     if guard:
@@ -438,6 +471,7 @@ def step2():
 
 
 @setup_bp.route("/api/step2/save", methods=["POST"])
+@_conditional_reauth
 def api_step2_save():
     guard = _wizard_guard()
     if guard:
@@ -555,6 +589,7 @@ def step3():
 
 
 @setup_bp.route("/api/step3/save", methods=["POST"])
+@_conditional_reauth
 def api_step3_save():
     guard = _wizard_guard()
     if guard:
@@ -621,6 +656,7 @@ def step4():
 
 
 @setup_bp.route("/api/step4/apply", methods=["POST"])
+@_conditional_reauth
 def api_step4_apply():
     guard = _wizard_guard()
     if guard:

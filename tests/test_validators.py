@@ -1,14 +1,25 @@
 """
 tests/test_validators.py
 ------------------------
-Unit tests for app/validators.py.  No database or Flask context needed.
+Unit tests for app/validators.py.  Most validators need no database or Flask
+context; ``validate_no_overlap`` walks the interface tables, so its tests use a
+per-test in-memory DB.
 """
 
+import os
+
 import pytest
+
+os.environ.setdefault("SMARTSHIELD_DB_PATH", "file:validators?mode=memory&cache=shared")
+os.environ.setdefault("SECRET_KEY", "test-validators-key")
+os.environ.setdefault("SMARTSHIELD_MASTER_KEY",
+    __import__("base64").b64encode(__import__("secrets").token_bytes(32)).decode())
+
 from app.validators import (
     validate_ip,
     validate_cidr,
     validate_network,
+    validate_no_overlap,
     validate_hostname,
     validate_port,
     validate_port_range,
@@ -300,3 +311,53 @@ class TestCollectErrors:
         )
         assert "ip" not in errors
         assert "port" in errors
+
+
+@pytest.fixture()
+def conn():
+    import secrets
+    os.environ["SMARTSHIELD_DB_PATH"] = f"file:validators_{secrets.token_hex(4)}?mode=memory&cache=shared"
+    from app.database import init_db, get_db
+    init_db()
+    db = get_db()
+    yield db
+    db.close()
+
+
+class TestValidateNoOverlap:
+
+    def test_overlap_rejects_lan_when_wan_already_covers(self, conn):
+        # WAN owns 192.168.1.0/24 on em0; a LAN address inside that /24 must be
+        # rejected even at a different host/prefix because the networks overlap.
+        conn.execute(
+            "UPDATE wan_config SET assigned_port='em0', ipv4_config_type='static', "
+            "ipv4_address='192.168.1.1/24' WHERE id=1"
+        )
+        conn.commit()
+        with pytest.raises(ValueError, match="overlap"):
+            validate_no_overlap(conn, "em1", "192.168.1.50/24")
+
+    def test_non_overlapping_subnet_is_accepted(self, conn):
+        conn.execute(
+            "UPDATE wan_config SET assigned_port='em0', ipv4_config_type='static', "
+            "ipv4_address='192.168.1.1/24' WHERE id=1"
+        )
+        conn.commit()
+        # A disjoint /24 is fine and is returned normalized.
+        assert validate_no_overlap(conn, "em1", "10.0.0.1/24") == "10.0.0.1/24"
+
+    def test_same_interface_is_skipped(self, conn):
+        # Re-saving the interface that already owns the subnet must not flag
+        # the subnet against itself.
+        conn.execute(
+            "UPDATE lan_config SET assigned_port='em1', ipv4_address='192.168.1.1/24' WHERE id=1"
+        )
+        conn.commit()
+        assert validate_no_overlap(conn, "em1", "192.168.1.1/24") == "192.168.1.1/24"
+
+    def test_blank_cidr_is_noop(self, conn):
+        assert validate_no_overlap(conn, "em0", "") == ""
+
+    def test_invalid_cidr_raises(self, conn):
+        with pytest.raises(ValueError, match="Invalid CIDR"):
+            validate_no_overlap(conn, "em0", "not-a-cidr")

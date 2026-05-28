@@ -185,5 +185,57 @@ pip install -r requirements.txt</pre>
   </div>
   {% endif %}
 
+  <!-- Config drift — fetched live from /status/api/config-drift -->
+  <div class="pf-section">
+    <div class="ss-card">
+      <div class="ss-card-head">
+        <div class="ss-card-icon"><i class="fa-solid fa-code-compare"></i></div>
+        <div><div class="ss-card-title">Config Drift</div></div>
+        <div class="ss-card-actions">
+          <a href="{{ url_for('status.status_home') }}" class="ext-eac8f080">View on dashboard</a>
+        </div>
+      </div>
+      <div id="pfDriftBody" class="ss-card-body">
+        <div class="pf-row">
+          <span class="pf-icon pf-warn"><i class="fa-solid fa-spinner fa-spin"></i></span>
+          <div class="pf-name">Checking generator output against saved DB hashes…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+<script nonce="{{ csp_nonce() }}">
+(async()=>{
+  const body=document.getElementById('pfDriftBody'); if(!body) return;
+  try{
+    const r=await fetch('/status/api/config-drift',{cache:'no-store'});
+    const b=await r.json();
+    const drift=(b&&b.drift)||{};
+    const rows=Object.entries(drift).map(([svc,v])=>{
+      const drifted=!!(v&&v.drifted);
+      const icon=drifted?'xmark':'check';
+      const cls =drifted?'pf-err':'pf-ok';
+      const badge=drifted?'<span class="pf-badge badge-missing">Drifted</span>'
+                         :'<span class="pf-badge badge-ok">In sync</span>';
+      const msg=(v&&v.message)||'';
+      return `<div class="pf-row">
+        <span class="pf-icon ${cls}"><i class="fa-solid fa-${icon}"></i></span>
+        <div style="flex:1">
+          <div class="pf-name">${svc}</div>
+          <div class="pf-meta">${msg.replace(/[<>]/g,'')}</div>
+        </div>
+        ${badge}
+      </div>`;
+    }).join('');
+    body.innerHTML = rows || '<div class="pf-row"><span class="pf-icon pf-warn">'+
+      '<i class="fa-solid fa-circle-info"></i></span>'+
+      '<div class="pf-name">No services have a saved version yet.</div></div>';
+  }catch(e){
+    body.innerHTML = '<div class="pf-row"><span class="pf-icon pf-err">'+
+      '<i class="fa-solid fa-xmark"></i></span>'+
+      '<div class="pf-name">Drift check failed.</div></div>';
+  }
+})();
+</script>
 {% endblock %}

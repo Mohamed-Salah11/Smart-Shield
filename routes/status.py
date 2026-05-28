@@ -200,6 +200,47 @@ def api_interface_stats():
 
 
 # --------------------------------------------------
+# RUNTIME MODE — JSON view of the banner already shown in the UI; gives
+# the chatbot, the operator CLI, and external monitors a single endpoint
+# they can poll to see whether the appliance is live / dry-run / degraded
+# and what (if anything) blocks production readiness.
+# --------------------------------------------------
+
+@status_bp.route("/api/mode", methods=["GET"])
+@login_required
+def api_mode():
+    from app.services.runtime_mode import current_mode, mode_badge, production_ready
+    ok, issues = production_ready()
+    return jsonify({
+        "ok": True,
+        "mode": current_mode(),
+        "badge": mode_badge(),
+        "production_ready": ok,
+        "issues": issues,
+    })
+
+
+# --------------------------------------------------
+# CONFIG DRIFT — surface health_monitor.check_config_drift to the UI
+# --------------------------------------------------
+
+@status_bp.route("/api/config-drift", methods=["GET"])
+@login_required
+def api_config_drift():
+    """Return the current generator-vs-DB drift state, one entry per service.
+
+    Shape: ``{"ok": True, "drift": {"pf": {"drifted": bool, "message": str},
+    "dhcpd": {...}, "unbound": {...}}, "drifted_count": int}``.
+    Powers the dashboard's Config Drift KPI tile and the preflight panel.
+    """
+    from app.database import get_db
+    from app.services.health_monitor import check_config_drift
+    drift = check_config_drift(get_db())
+    drifted_count = sum(1 for v in drift.values() if v.get("drifted"))
+    return jsonify({"ok": True, "drift": drift, "drifted_count": drifted_count})
+
+
+# --------------------------------------------------
 # SYSTEM QUEUES
 # --------------------------------------------------
 

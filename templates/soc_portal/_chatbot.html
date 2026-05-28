@@ -80,10 +80,6 @@
   let _minimized = false;
   let _msgs = [];   // message history in OpenAI format
 
-  function _esc(t) {
-    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
   // CSRF token for the JSON POSTs below — required when CSRF protection is
   // enforced globally, otherwise approvals/chat would be rejected.
   function _csrf() {
@@ -93,7 +89,7 @@
   function _addMsg(text, cls) {
     const el = document.createElement('div');
     el.className = 'ss-cm ' + cls;
-    el.innerHTML = _esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    el.innerHTML = SOC.esc(text).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     const box = document.getElementById('ss-chat-messages');
     box.appendChild(el);
     el.scrollIntoView({behavior:'smooth', block:'end'});
@@ -105,8 +101,8 @@
     card.className = 'ss-action-card';
     card.dataset.action = JSON.stringify(action);
     card.innerHTML =
-      '<div class="ss-action-summary"><i class="fa-solid fa-shield-halved"></i> ' + _esc(action.summary) + '</div>' +
-      '<div class="ss-action-detail">' + _esc(action.detail) + '</div>' +
+      '<div class="ss-action-summary"><i class="fa-solid fa-shield-halved"></i> ' + SOC.esc(action.summary) + '</div>' +
+      '<div class="ss-action-detail">' + SOC.esc(action.detail) + '</div>' +
       '<div class="ss-action-btns">' +
         '<button class="ss-action-approve" data-action="h_da8d188278"><i class="fa-solid fa-check"></i> Approve</button>' +
         '<button class="ss-action-cancel"  data-action="h_2c498503a6"><i class="fa-solid fa-xmark"></i> Cancel</button>' +
@@ -137,7 +133,7 @@
         _addMsg('⚠ ' + (data.reply || data.message || 'Action failed.'), 's');
       }
     } catch(e) {
-      card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status ext-c9e34862">Error: ' + _esc(e.message) + '</span>';
+      card.querySelector('.ss-action-btns').innerHTML = '<span class="ss-action-status ext-c9e34862">Error: ' + SOC.esc(e.message) + '</span>';
     }
   };
 

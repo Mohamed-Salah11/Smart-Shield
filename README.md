@@ -71,8 +71,8 @@ Browser (HTTPS)
   │     plus standalone: auth, status, ids, filters, portal, soc, soc_portal,
   │     terminal, setup, users, chatbot, interfaces, routing, hec, vpn_portal,
   │     dns_logs, firewall_logs
-  ├── SQLite database (/var/db/smart-shield/data.db)
-  ├── Audit log (/var/log/smart-shield/audit.log — NDJSON, indexed mirror in `events`)
+  ├── SQLite database (/var/db/smartshield/data.db)
+  ├── Audit log (/var/log/smartshield/audit.log — NDJSON, indexed mirror in `events`)
   └── Background threads
       ├── SIEM: IDS, DHCP, DNS, PF, anomaly collectors
       └── Threat intel updater (4h)
@@ -144,10 +144,10 @@ flask-sock>=0.7       gevent>=24.0          fpdf2>=2.7.9
 
 ```sh
 # 1. Clone onto the FreeBSD host (run as root).
-git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smart-shield
+git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smartshield
 
 # 2. Run the installer.
-cd /usr/local/share/smart-shield
+cd /usr/local/share/smartshield
 sh bsd/install.sh
 
 # 3. Open the GUI from any host on the LAN.
@@ -158,9 +158,9 @@ sh bsd/install.sh
 The installer:
 
 - `pkg install`s every required FreeBSD package.
-- Builds `/usr/local/share/smart-shield/.venv` and installs Python deps.
-- Creates `/var/db/smart-shield`, `/var/log/smart-shield`, `/var/run/smart-shield`, `/usr/local/etc/smart-shield`, `/usr/local/etc/mrtg`.
-- Writes `/usr/local/etc/smart-shield/smart-shield.env` with a generated `SECRET_KEY` and a generated `SMARTSHIELD_MASTER_KEY` (both root-owned, `0600`).
+- Builds `/usr/local/share/smartshield/.venv` and installs Python deps.
+- Creates `/var/db/smartshield`, `/var/log/smartshield`, `/var/run/smartshield`, `/usr/local/etc/smartshield`, `/usr/local/etc/mrtg`.
+- Writes `/usr/local/etc/smartshield/smartshield.env` with a generated `SECRET_KEY` and a generated `SMARTSHIELD_MASTER_KEY` (both root-owned, `0600`).
 - Installs the `smart_shield` rc.d service. The service exports `SMARTSHIELD_ENV_FILE` so the Flask app and every Gunicorn worker load the same env file regardless of working directory.
 - Generates a self-signed TLS certificate.
 - Writes the nginx reverse proxy + WebSocket upgrade configuration.
@@ -250,10 +250,10 @@ Smart-Shield/
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SMARTSHIELD_ENV_FILE` | `/usr/local/etc/smart-shield/smart-shield.env` | The Flask app loads this file before any local `.env`. Set explicitly when running outside FreeBSD or from a non-default install path |
+| `SMARTSHIELD_ENV_FILE` | `/usr/local/etc/smartshield/smartshield.env` | The Flask app loads this file before any local `.env`. Set explicitly when running outside FreeBSD or from a non-default install path |
 | `APP_ENV` | `development` | `production` enables strict config (`SECRET_KEY` required, secure cookies on) |
 | `SECRET_KEY` | *(required in production)* | Flask session signing key |
-| `SMARTSHIELD_DB_PATH` | `/var/db/smart-shield/data.db` | SQLite path |
+| `SMARTSHIELD_DB_PATH` | `/var/db/smartshield/data.db` | SQLite path |
 | `SMARTSHIELD_MASTER_KEY` | *(auto-generated)* | AES-256-GCM key for at-rest secret encryption |
 | `SMARTSHIELD_ENABLE_NETWORK_APPLY` | `0` | Set to `1` to allow live OS changes |
 | `SMARTSHIELD_NETWORK_DRY_RUN` | `1` | Set to `0` to leave dry-run mode |

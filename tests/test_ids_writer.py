@@ -523,6 +523,98 @@ class TestApplyIds:
 
 
 # ---------------------------------------------------------------------------
+# IPS → IDS safe fallback on apply failure
+# ---------------------------------------------------------------------------
+
+class TestApplyIpsFallback:
+    """apply_ids must demote IPS→IDS (and say so) when an IPS apply can't bring
+    Suricata up and netmap is unavailable — never leave it dead with mode=ips."""
+
+    def _ips_config(self, conn):
+        conn.execute(
+            "UPDATE ids_config SET enabled=1, mode='ips', interface='em0', "
+            "ips_peer_interface='em1', ips_fallback_reason='' WHERE id=1"
+        )
+        conn.commit()
+
+    def _stub_pipeline(self, iw, monkeypatch, *, restart_ok_by_mode):
+        """Stub the enable pipeline through to the verified restart.
+
+        ``restart_ok_by_mode`` maps the *persisted* mode ('ips'/'ids') to whether
+        the verified restart succeeds, so the fallback's mode flip drives the
+        outcome the way a real netmap-less box would: IPS won't start, IDS will.
+        """
+        monkeypatch.setattr(iw, "ensure_rules_present", lambda _c: {"ok": True, "message": ""})
+        monkeypatch.setattr(iw, "_rules_ready", lambda _c: (True, ""))
+        monkeypatch.setattr(iw, "generate_suricata_yaml",
+                            lambda _c, force_ids_mode=False: "%YAML 1.1\n")
+        monkeypatch.setattr(iw, "validate_suricata_yaml", lambda _t: (True, ""))
+        monkeypatch.setattr(iw, "write_suricata_config",
+                            lambda _c: {"ok": True, "message": "", "conf": ""})
+        monkeypatch.setattr(iw, "sysrc_set", lambda k, v: {"ok": True, "message": ""})
+
+        def _restart(c, action="restart"):
+            mode = (iw._cfg(c).get("mode") or "ids").lower()
+            ok = restart_ok_by_mode.get(mode, False)
+            return {"ok": ok, "message": f"{mode} restart",
+                    "phase": "RUNNING" if ok else "ERROR"}
+        monkeypatch.setattr(iw, "_restart_and_verify_suricata", _restart)
+
+    def test_apply_ips_falls_back_when_netmap_missing(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        self._ips_config(conn)
+        self._stub_pipeline(iw, monkeypatch, restart_ok_by_mode={"ips": False, "ids": True})
+        monkeypatch.setattr(iw, "_netmap_available", lambda: False)
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is True
+        assert "fell back to IDS" in result["message"]
+        # Demotion persisted so a restart/crash can't resurrect mode=ips, and so
+        # the UI can render why detection dropped to IDS.
+        row = conn.execute(
+            "SELECT mode, ips_fallback_reason FROM ids_config WHERE id=1"
+        ).fetchone()
+        assert row["mode"] == "ids"
+        assert row["ips_fallback_reason"] == "netmap_unavailable"
+
+    def test_fallback_event_logged_at_high_severity(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        import app.audit_log as al
+        self._ips_config(conn)
+        self._stub_pipeline(iw, monkeypatch, restart_ok_by_mode={"ips": False, "ids": True})
+        monkeypatch.setattr(iw, "_netmap_available", lambda: False)
+        events = []
+        monkeypatch.setattr(al, "log_event", lambda **kw: events.append(kw))
+
+        iw.apply_ids(conn)
+
+        fb = [e for e in events if e.get("action") == "ids_ips_fallback"]
+        assert len(fb) == 1, f"expected one ids_ips_fallback event, got {events}"
+        assert fb[0]["severity"] == "high"
+
+    def test_no_fallback_when_netmap_present_and_restart_ok(self, conn, monkeypatch):
+        import app.services.ids_writer as iw
+        import app.audit_log as al
+        self._ips_config(conn)
+        self._stub_pipeline(iw, monkeypatch, restart_ok_by_mode={"ips": True, "ids": True})
+        monkeypatch.setattr(iw, "_netmap_available", lambda: True)
+        events = []
+        monkeypatch.setattr(al, "log_event", lambda **kw: events.append(kw))
+
+        result = iw.apply_ids(conn)
+
+        assert result["ok"] is True
+        assert "fell back" not in result["message"]
+        row = conn.execute(
+            "SELECT mode, ips_fallback_reason FROM ids_config WHERE id=1"
+        ).fetchone()
+        assert row["mode"] == "ips"                         # not demoted
+        assert (row["ips_fallback_reason"] or "") == ""     # no marker set
+        assert not any(e.get("action") == "ids_ips_fallback" for e in events)
+
+
+# ---------------------------------------------------------------------------
 # Capture-interface resolver + rc.conf launch vars
 # ---------------------------------------------------------------------------
 

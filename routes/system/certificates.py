@@ -119,6 +119,7 @@ def add_certificate():
 @system_bp.route("/api/certificates/<int:cert_id>/revoke", methods=["POST"])
 @login_required
 @superuser_required
+@reauth_required(reason="revoke certificate")
 def api_revoke_cert(cert_id):
     from app.services.cert_manager import revoke_cert
     conn   = get_db()

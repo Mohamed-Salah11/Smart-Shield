@@ -509,7 +509,8 @@ def api_apply_ddns():
 @login_required
 def api_ddns_status():
     from app.services.ddns_writer import get_ddns_status
-    return jsonify({"ok": True, **get_ddns_status()})
+    from app.database import get_db
+    return jsonify({"ok": True, **get_ddns_status(get_db())})
 
 
 @services_bp.route("/api/ddns/force-update", methods=["POST"])
