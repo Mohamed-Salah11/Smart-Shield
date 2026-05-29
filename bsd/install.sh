@@ -186,32 +186,60 @@ section "0. Live-Mode Preflight (clock & pkg trust)"
 # specific remediation message otherwise. Prepare/validate-only modes
 # skip the network entirely.
 if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
-    # --- Clock sanity check ------------------------------------------
+    # --- Clock sync (always, best-effort) ---------------------------
+    # The clock doesn't have to be off by YEARS to break pkg's TLS — the
+    # Fastly cert that fronts pkg.FreeBSD.org rotates roughly every 60-90
+    # days, so a clock just *weeks* behind real time will see the current
+    # cert as "not yet valid" and reject every URL with the same opaque
+    # "peer certificate not OK" message. VM snapshots, dead BIOS batteries,
+    # and freshly-imaged appliances all hit this. So always try to sync.
+    info "Synchronising system clock (best-effort)..."
+    _CLOCK_BEFORE=$(date 2>/dev/null || echo unknown)
+    _CLOCK_OK=0
+    # 1) sntp -Ss is the most portable recipe: no config file required, one
+    #    sample, step the system clock, exit. Ships in FreeBSD base.
+    if command -v sntp >/dev/null 2>&1; then
+        if sntp -Ss pool.ntp.org 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+    fi
+    # 2) ntpd -gq with a one-shot config. -g allows large initial offset,
+    #    -q exits after the first sync. We write a temp config so this
+    #    works even when /etc/ntp.conf is empty on a custom image.
+    if [ "${_CLOCK_OK}" -ne 1 ] && command -v ntpd >/dev/null 2>&1; then
+        _NTP_CONF_TMP=$(mktemp -t ss_ntp_conf.XXXXXX 2>/dev/null || echo /tmp/ss_ntp_conf.$$)
+        printf 'server pool.ntp.org iburst\nserver time.cloudflare.com iburst\n' > "${_NTP_CONF_TMP}"
+        if ntpd -gq -c "${_NTP_CONF_TMP}" -p /var/run/ntpd.pid.preflight 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+        rm -f "${_NTP_CONF_TMP}"
+    fi
+    # 3) ntpdate is legacy (removed from FreeBSD 14 base) but still ships
+    #    on some custom images.
+    if [ "${_CLOCK_OK}" -ne 1 ] && command -v ntpdate >/dev/null 2>&1; then
+        if ntpdate -b pool.ntp.org 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+    fi
+    _CLOCK_AFTER=$(date 2>/dev/null || echo unknown)
+    if [ "${_CLOCK_OK}" -eq 1 ]; then
+        info "  Clock: ${_CLOCK_BEFORE}"
+        info "      -> ${_CLOCK_AFTER}"
+    else
+        warn "  Could not auto-sync clock; continuing with current time."
+        warn "  Clock: ${_CLOCK_AFTER}"
+    fi
+
+    # Final-floor sanity check — if the year is still obviously wrong
+    # after we tried our best, abort with a manual-fix message rather
+    # than letting pkg fail later with an opaque TLS error.
     _SYS_YEAR=$(date +%Y 2>/dev/null || echo 1970)
-    # Smart Shield F24 ships in 2026; anything older than 2024 is wrong
-    # enough to break TLS verification.
     if [ "${_SYS_YEAR}" -lt 2024 ]; then
-        warn "System clock reports year ${_SYS_YEAR} — TLS verification will fail."
-        info "Attempting NTP sync via pool.ntp.org..."
-        _CLOCK_FIXED=0
-        if command -v ntpdate >/dev/null 2>&1; then
-            if ntpdate -b pool.ntp.org 2>/dev/null; then
-                _CLOCK_FIXED=1
-            fi
-        fi
-        if [ "${_CLOCK_FIXED}" -ne 1 ] && command -v service >/dev/null 2>&1; then
-            if service ntpd onestart 2>/dev/null; then
-                sleep 6   # give ntpd a moment to step the clock
-                _NEW_YEAR=$(date +%Y 2>/dev/null || echo 1970)
-                [ "${_NEW_YEAR}" -ge 2024 ] && _CLOCK_FIXED=1
-            fi
-        fi
-        if [ "${_CLOCK_FIXED}" -ne 1 ]; then
-            fatal "Could not set the clock automatically. Set it manually:
+        fatal "System clock still reports year ${_SYS_YEAR} after NTP sync.
+        Most likely no NTP server is reachable (firewall? wrong DNS?).
+        Set the date manually then re-run install.sh:
             date YYYYMMDDhhmm   # e.g. date 202605290900
-        then re-run install.sh. The current date is: $(date)"
-        fi
-        info "Clock now: $(date)"
+        Current date: $(date)"
     fi
 
     # --- pkg repository reachability probe ---------------------------
