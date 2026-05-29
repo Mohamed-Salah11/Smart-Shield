@@ -76,9 +76,23 @@ def start_background_workers(app):
         start_schedule_enforcer(app)
     _try_start("schedule_enforcer", _schedule)
 
+    # IDS block-on-alert expirer (ages IPs out of the <ss_ids_blocks> PF table
+    # + the ids_blocked_ips bookkeeping every 60s; FreeBSD only)
+    def _ids_blocker_expirer():
+        from app.services.ids_blocker import start_ids_blocker_expirer
+        start_ids_blocker_expirer()
+    _try_start("ids_blocker_expirer", _ids_blocker_expirer)
+
     # SIEM log forwarder (sends events to an upstream syslog/CEF collector;
     # silent no-op until enabled in Log Forwarding settings)
     def _log_forwarder():
         from app.services.log_forwarder import start_log_forwarder
         start_log_forwarder()
     _try_start("log_forwarder", _log_forwarder)
+
+    # DDNS status poller (refreshes ddns_status every 60s by parsing
+    # ddclient.log + ddclient.cache; FreeBSD only)
+    def _ddns_status():
+        from app.services.ddns_writer import start_ddns_status_poller
+        start_ddns_status_poller()
+    _try_start("ddns_status_poller", _ddns_status)

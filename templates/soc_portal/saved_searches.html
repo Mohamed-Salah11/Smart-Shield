@@ -138,7 +138,6 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
-function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function runSearch(id) {
   var out = document.getElementById('run-result-' + id);
   out.textContent = 'Running…';
@@ -150,8 +149,8 @@ async function runSearch(id) {
     });
     var data = await r.json();
     if (!data.ok) { out.textContent = data.message || 'Failed.'; return; }
-    out.innerHTML = data.count + ' match(es)' +
-      (data.events.length ? ' — first: <code>' + escapeHtml(data.events[0].action) + '</code>' : '');
+    out.innerHTML = SOC.esc(data.count) + ' match(es)' +
+      (data.events.length ? ' — first: <code>' + SOC.esc(data.events[0].action) + '</code>' : '');
   } catch (e) { out.textContent = 'Request failed.'; }
 }
 </script>

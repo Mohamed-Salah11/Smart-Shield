@@ -14,6 +14,7 @@ Design
 
 Public API
 ----------
+validate_pppoe(wan, ...)  -> list[str]   (empty list = valid)
 generate_ppp_conf(conn)   -> str
 write_ppp_conf(conn)      -> {"ok": bool, "message": str, "conf": str}
 apply_pppoe(conn)         -> {"ok": bool, "message": str}
@@ -47,6 +48,45 @@ def _on_freebsd() -> bool:
 def _wan(conn) -> dict:
     rows = _rows(conn, "SELECT * FROM wan_config WHERE id=1")
     return rows[0] if rows else {}
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_pppoe(wan: dict, physical_nics=None) -> list:
+    """Validate a PPPoE WAN config payload before write/apply.
+
+    Returns a list of human-readable error messages (empty = valid). Accepts
+    a dict with the wan_config columns (``assigned_port``, ``username``,
+    ``password``, optional ``service``). ``physical_nics`` is the list
+    ``network_service.list_physical_nics()`` returns; pass an empty list /
+    ``None`` to skip the NIC-membership check (off-FreeBSD that helper
+    returns ``[]``, so we can't enforce membership there).
+    """
+    errors = []
+    if not (wan.get("username") or "").strip():
+        errors.append("PPPoE username is required.")
+    if not (wan.get("password") or "").strip():
+        errors.append("PPPoE password is required.")
+
+    iface = (wan.get("assigned_port") or "").strip()
+    if not iface:
+        errors.append("Assigned WAN port is required for PPPoE.")
+    elif physical_nics:
+        nic_names = {
+            (n.get("name") if isinstance(n, dict) else str(n)) for n in physical_nics
+        }
+        if iface not in nic_names:
+            errors.append(
+                f"Assigned port {iface!r} is not a physical NIC "
+                f"(detected: {', '.join(sorted(nic_names)) or 'none'})."
+            )
+
+    service = (wan.get("service") or "").strip()
+    if service and not re.fullmatch(r"[A-Za-z0-9_-]+", service):
+        errors.append("PPPoE service name must contain only letters, digits, '_' or '-'.")
+    return errors
 
 
 # ---------------------------------------------------------------------------

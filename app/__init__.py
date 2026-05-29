@@ -128,6 +128,14 @@ def create_app():
 
     init_db()
 
+    # ── Live-mode safety gate ────────────────────────────────────────────────
+    # Refuse to boot when /usr/local/etc/smartshield/smartshield.env is world-
+    # readable in 'live' mode — the file holds SECRET_KEY and
+    # SMARTSHIELD_MASTER_KEY. Dev / dry-run / degraded keep booting (the
+    # warning still surfaces via startup_warnings()).
+    from .services.runtime_mode import assert_env_file_safe
+    assert_env_file_safe()
+
     # ── Background workers (leader-elected) ──────────────────────────────────
     from .background import start_background_workers
     start_background_workers(app)

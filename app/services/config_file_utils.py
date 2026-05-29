@@ -66,7 +66,7 @@ def atomic_write(path: str, content: str, mode: int = 0o644) -> None:
 
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ss_tmp_")
     try:
-        with os.fdopen(fd, "w") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
         os.chmod(tmp_path, mode)
         os.replace(tmp_path, path)
@@ -164,7 +164,7 @@ def apply_with_rollback(
     os.makedirs(dir_name, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix=".ss_tmp_")
     try:
-        with os.fdopen(fd, "w") as fh:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
         os.chmod(tmp_path, mode)
         _log.debug("config_file_utils: staged %s -> %s (%d bytes)",

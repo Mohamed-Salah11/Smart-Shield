@@ -56,6 +56,15 @@
       Assign physical network ports to the WAN (internet-facing) and LAN
       (internal network) roles. Both must be different ports.
     </p>
+    <p class="ext-6d1d08dc">
+      <strong>Match by MAC address, not by device name.</strong> Port names
+      depend on the host: VMware shows <code>em0</code>/<code>em1</code>,
+      libvirt/QEMU shows <code>vtnet0</code>/<code>vtnet1</code>, Intel
+      server NICs are <code>igb0</code>/<code>igb1</code>, etc. The MAC
+      address shown next to each port in the dropdown is the only stable
+      identifier — pick the MAC of the cable that runs to your modem for
+      WAN and the MAC of the cable that runs to your switch for LAN.
+    </p>
 
     <div id="alert" class="alert"></div>
 

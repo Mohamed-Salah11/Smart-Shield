@@ -169,9 +169,181 @@ for f in requirements.txt wsgi.py app/__init__.py bsd/rc.d/smart_shield; do
 done
 info "Source tree validated at ${SRC_ROOT}"
 
+section "0. Live-Mode Preflight (clock & pkg trust)"
+
+# The most common reason a fresh appliance fails the FIRST pkg fetch is one
+# of two things, neither of which the rest of install.sh diagnoses:
+#
+#   * System clock skew (BIOS battery dead, VM snapshot rewound, etc.). A
+#     date off by months/years makes every TLS cert look expired and pkg
+#     fails with "SSL peer certificate or SSH remote key was not OK" on
+#     every URL.
+#   * ca_root_nss missing from the base image. It's in CRITICAL_PKGS below,
+#     but that's chicken-and-egg: pkg can't fetch it over TLS without it.
+#
+# Both surface as the same opaque SSL error. This block detects each up
+# front, attempts an automatic fix where one is safe, and aborts with a
+# specific remediation message otherwise. Prepare/validate-only modes
+# skip the network entirely.
+if [ "${DEPLOY_LIVE:-0}" -eq 1 ]; then
+    # --- Clock sync (always, best-effort) ---------------------------
+    # The clock doesn't have to be off by YEARS to break pkg's TLS — the
+    # Fastly cert that fronts pkg.FreeBSD.org rotates roughly every 60-90
+    # days, so a clock just *weeks* behind real time will see the current
+    # cert as "not yet valid" and reject every URL with the same opaque
+    # "peer certificate not OK" message. VM snapshots, dead BIOS batteries,
+    # and freshly-imaged appliances all hit this. So always try to sync.
+    info "Synchronising system clock (best-effort)..."
+    _CLOCK_BEFORE=$(date 2>/dev/null || echo unknown)
+    _CLOCK_OK=0
+    # 1) sntp -Ss is the most portable recipe: no config file required, one
+    #    sample, step the system clock, exit. Ships in FreeBSD base.
+    if command -v sntp >/dev/null 2>&1; then
+        if sntp -Ss pool.ntp.org 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+    fi
+    # 2) ntpd -gq with a one-shot config. -g allows large initial offset,
+    #    -q exits after the first sync. We write a temp config so this
+    #    works even when /etc/ntp.conf is empty on a custom image.
+    if [ "${_CLOCK_OK}" -ne 1 ] && command -v ntpd >/dev/null 2>&1; then
+        _NTP_CONF_TMP=$(mktemp -t ss_ntp_conf.XXXXXX 2>/dev/null || echo /tmp/ss_ntp_conf.$$)
+        printf 'server pool.ntp.org iburst\nserver time.cloudflare.com iburst\n' > "${_NTP_CONF_TMP}"
+        if ntpd -gq -c "${_NTP_CONF_TMP}" -p /var/run/ntpd.pid.preflight 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+        rm -f "${_NTP_CONF_TMP}"
+    fi
+    # 3) ntpdate is legacy (removed from FreeBSD 14 base) but still ships
+    #    on some custom images.
+    if [ "${_CLOCK_OK}" -ne 1 ] && command -v ntpdate >/dev/null 2>&1; then
+        if ntpdate -b pool.ntp.org 2>/dev/null; then
+            _CLOCK_OK=1
+        fi
+    fi
+    _CLOCK_AFTER=$(date 2>/dev/null || echo unknown)
+    if [ "${_CLOCK_OK}" -eq 1 ]; then
+        info "  Clock: ${_CLOCK_BEFORE}"
+        info "      -> ${_CLOCK_AFTER}"
+    else
+        warn "  Could not auto-sync clock; continuing with current time."
+        warn "  Clock: ${_CLOCK_AFTER}"
+    fi
+
+    # Final-floor sanity check — if the year is still obviously wrong
+    # after we tried our best, abort with a manual-fix message rather
+    # than letting pkg fail later with an opaque TLS error.
+    _SYS_YEAR=$(date +%Y 2>/dev/null || echo 1970)
+    if [ "${_SYS_YEAR}" -lt 2024 ]; then
+        fatal "System clock still reports year ${_SYS_YEAR} after NTP sync.
+        Most likely no NTP server is reachable (firewall? wrong DNS?).
+        Set the date manually then re-run install.sh:
+            date YYYYMMDDhhmm   # e.g. date 202605290900
+        Current date: $(date)"
+    fi
+
+    # --- pkg repository reachability probe ---------------------------
+    # If pkg can't talk to the repo, the CRITICAL_PKGS install at §1
+    # below fails with no useful diagnostics beyond pkg's own output.
+    # Probe here so the operator sees the failure mode immediately —
+    # AND we have a chance to recover ca_root_nss over HTTP.
+    info "Probing pkg repository connectivity..."
+    _PKG_PROBE_LOG=$(mktemp -t ss_pkg_probe.XXXXXX 2>/dev/null || echo /tmp/ss_pkg_probe.$$)
+    if pkg update -q 2>"${_PKG_PROBE_LOG}"; then
+        info "  OK — pkg repository reachable, trust store healthy."
+    else
+        warn "pkg update failed. Error output:"
+        cat "${_PKG_PROBE_LOG}" >&2 || true
+
+        if grep -q -i -e 'ssl' -e 'certificate' -e 'remote key' "${_PKG_PROBE_LOG}"; then
+            _CA_INSTALLED=$(pkg info ca_root_nss >/dev/null 2>&1 && echo yes || echo no)
+            _CA_BUNDLE="/usr/local/share/certs/ca-root-nss.crt"
+            warn "TLS verification failed. Diagnosing:"
+            warn "  * System clock        : $(date)"
+            warn "  * ca_root_nss package : ${_CA_INSTALLED}"
+            warn "  * Trust bundle file   : $([ -f "${_CA_BUNDLE}" ] && echo present || echo MISSING)"
+            warn "  * /etc/ssl/cert.pem   : $([ -L /etc/ssl/cert.pem ] && readlink /etc/ssl/cert.pem || ([ -f /etc/ssl/cert.pem ] && echo "regular file" || echo MISSING))"
+
+            _PKG_RECOVERED=0
+
+            # ── Recovery path 1: trust bundle exists but the symlink is
+            # missing/wrong. This is the ca_root_nss-installed-but-pkg-still-
+            # fails case — the package ships the bundle but the post-install
+            # symlink at /etc/ssl/cert.pem may not have been created (custom
+            # FreeBSD images, manual pkg add, etc.). libfetch reads
+            # /etc/ssl/cert.pem; without it, every cert chain looks unsigned.
+            if [ -f "${_CA_BUNDLE}" ]; then
+                _CURRENT_TARGET=""
+                [ -L /etc/ssl/cert.pem ] && _CURRENT_TARGET=$(readlink /etc/ssl/cert.pem 2>/dev/null || echo "")
+                if [ "${_CURRENT_TARGET}" != "${_CA_BUNDLE}" ]; then
+                    info "  Repairing /etc/ssl/cert.pem -> ${_CA_BUNDLE}"
+                    mkdir -p /etc/ssl
+                    ln -sf "${_CA_BUNDLE}" /etc/ssl/cert.pem
+                    if pkg update -q 2>/dev/null; then
+                        info "  Recovery successful — trust-store symlink fixed."
+                        _PKG_RECOVERED=1
+                    else
+                        warn "  Symlink repaired but pkg still failing — falling through."
+                    fi
+                fi
+            fi
+
+            # ── Recovery path 2: ca_root_nss missing entirely. Bootstrap it
+            # by downloading the package over HTTP (the only safe way out of
+            # the chicken-and-egg). Resolve a real version-pinned filename
+            # from the public packagesite index instead of guessing a path.
+            if [ "${_PKG_RECOVERED}" -ne 1 ] && [ "${_CA_INSTALLED}" != "yes" ]; then
+                _ABI=$(pkg config ABI 2>/dev/null)
+                if [ -z "${_ABI}" ]; then
+                    _ABI="FreeBSD:$(uname -r | cut -d. -f1 | tr -d -):$(uname -m)"
+                fi
+                _ALL_URL="http://pkg.FreeBSD.org/${_ABI}/quarterly/All/"
+                info "  Bootstrapping ca_root_nss over HTTP from ${_ALL_URL}"
+                _CA_FILE=$(fetch -q -o - "${_ALL_URL}" 2>/dev/null \
+                    | grep -o 'ca_root_nss-[0-9][^"]*\.\(pkg\|txz\)' \
+                    | head -1)
+                if [ -n "${_CA_FILE}" ]; then
+                    _CA_TMP=$(mktemp -t ss_caroot.XXXXXX 2>/dev/null || echo /tmp/ss_caroot.$$)
+                    if fetch -q -o "${_CA_TMP}" "${_ALL_URL}${_CA_FILE}" && pkg add "${_CA_TMP}"; then
+                        rm -f "${_CA_TMP}"
+                        # Symlink might still need fixing after the manual add.
+                        [ -f "${_CA_BUNDLE}" ] && ln -sf "${_CA_BUNDLE}" /etc/ssl/cert.pem
+                        if pkg update -q; then
+                            info "  Recovery successful — pkg repository reachable now."
+                            _PKG_RECOVERED=1
+                        fi
+                    else
+                        rm -f "${_CA_TMP}"
+                    fi
+                fi
+            fi
+
+            if [ "${_PKG_RECOVERED}" -ne 1 ]; then
+                fatal "Could not repair pkg TLS. Manual recovery:
+            ls -l /etc/ssl/cert.pem
+            ln -sf ${_CA_BUNDLE} /etc/ssl/cert.pem   # if symlink broken
+            pkg install -f ca_root_nss               # if bundle missing
+            pkg update                                # retry
+        then re-run install.sh. If pkg still fails, the WAN may be behind
+        a TLS-inspecting proxy that's rewriting the cert chain."
+            fi
+        elif grep -q -i -e 'name resolution' -e 'no address' -e 'host not found' -e 'no such host' "${_PKG_PROBE_LOG}"; then
+            fatal "DNS resolution failed for pkg.FreeBSD.org. Fix /etc/resolv.conf or WAN routing, then re-run install.sh."
+        elif grep -q -i -e 'connection refused' -e 'no route to host' -e 'timed out' "${_PKG_PROBE_LOG}"; then
+            fatal "Network unreachable. Check WAN cable / default gateway / firewall rules upstream, then re-run install.sh."
+        else
+            fatal "pkg update failed for an unrecognised reason — see error above. Common causes: corporate TLS-inspecting proxy on the WAN, exhausted /var disk, or a stale /var/db/pkg lock."
+        fi
+    fi
+    rm -f "${_PKG_PROBE_LOG}"
+fi
+
 section "1. Package Installation"
 
 info "Updating pkg repository..."
+# In live mode the §0 preflight already exercised pkg update successfully;
+# this re-run is harmless (pkg's catalog is cached) but kept so the dry-run
+# trace shows the same step a live install performs.
 run_live pkg update -q
 
 # Phase 5.2 — split into three package tiers (Fv11 review §P1-04):
@@ -827,6 +999,13 @@ if [ -f "${APP_ROOT}/tools/release_check.py" ]; then
     info "Running release_check.py..."
     if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/release_check.py --json ); then
         fatal "release_check.py failed — environment not production-ready. Aborting install."
+    fi
+fi
+
+if [ -f "${APP_ROOT}/tools/check_manifest.py" ]; then
+    info "Running check_manifest.py..."
+    if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/check_manifest.py ); then
+        fatal "python_runtime.json out of sync with requirements.txt — see diff above. Aborting install."
     fi
 fi
 

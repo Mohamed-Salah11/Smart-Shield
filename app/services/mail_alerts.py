@@ -106,6 +106,20 @@ _WORKER_STARTED = threading.Event()
 
 _HOUR_KEY = "mail_alert_hour_count"
 
+# Phase 2.2: per-source cooldown ring (separate from the global
+# (category, action, remote_addr) ring above so a noisy src_ip can be
+# squashed without hiding distinct alert kinds).
+_PER_SOURCE_FIRED: dict = {}
+
+# Phase 2.2: digest buffer + lock. Each entry is {"ts": int, "event": dict};
+# the digest ticker drains the buffer and enqueues a single ``kind=digest``
+# job whenever the configured window has elapsed.
+_DIGEST_BUFFER: list = []
+_DIGEST_LOCK = threading.Lock()
+_DIGEST_LAST_FLUSH: list = [0]
+_DIGEST_TICK_STARTED = threading.Event()
+_DIGEST_TICK_INTERVAL = 60   # poll the buffer once per minute
+
 
 # ---------------------------------------------------------------------------
 # DB helpers
@@ -320,6 +334,101 @@ def _cooldown_ok(event: dict, cooldown_minutes: int) -> bool:
         for k in [k for k, t in _FIRED.items() if now - t > 3600]:
             _FIRED.pop(k, None)
     return True
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.2: per-source cooldown + digest buffering
+# ---------------------------------------------------------------------------
+
+def _per_source_key(event: dict) -> str:
+    """Return the identifier used for per-source cooldown — prefer
+    ``details.src_ip`` (a single noisy attacker), then ``details.signature``
+    (a single noisy rule). Empty string means "no usable key, don't suppress"."""
+    details = event.get("details") or {}
+    if not isinstance(details, dict):
+        return ""
+    src = (details.get("src_ip") or "").strip()
+    if src:
+        return f"src:{src}"
+    sig = (details.get("signature") or "").strip()
+    if sig:
+        return f"sig:{sig}"
+    return ""
+
+
+def _per_source_cooldown_ok(event: dict, cooldown_minutes: int) -> bool:
+    """True if the event's per-source key is outside its cooldown window.
+
+    No-op (always True) when ``cooldown_minutes`` is 0 or the event has no
+    usable src_ip / signature — so disabling the feature or alerting on
+    sourceless events both still go through.
+    """
+    if cooldown_minutes <= 0:
+        return True
+    key = _per_source_key(event)
+    if not key:
+        return True
+    now = _now()
+    if now - _PER_SOURCE_FIRED.get(key, 0) < cooldown_minutes * 60:
+        return False
+    _PER_SOURCE_FIRED[key] = now
+    if len(_PER_SOURCE_FIRED) > _FIRED_CAP:
+        for k in [k for k, t in _PER_SOURCE_FIRED.items() if now - t > 3600]:
+            _PER_SOURCE_FIRED.pop(k, None)
+    return True
+
+
+def _buffer_for_digest(event: dict) -> None:
+    """Append an event to the digest buffer. Called instead of immediate enqueue
+    when ``digest_window_minutes`` > 0."""
+    with _DIGEST_LOCK:
+        _DIGEST_BUFFER.append({"ts": _now(), "event": dict(event)})
+
+
+def _digest_flush_due(window_minutes: int, now: int) -> bool:
+    """True iff the digest window has elapsed AND there's something buffered."""
+    if window_minutes <= 0:
+        return False
+    with _DIGEST_LOCK:
+        if not _DIGEST_BUFFER:
+            return False
+        # Seed the timer on the FIRST event so a digest fires reliably window
+        # minutes after the first buffered alert, not "first poll after startup".
+        if _DIGEST_LAST_FLUSH[0] == 0:
+            _DIGEST_LAST_FLUSH[0] = _DIGEST_BUFFER[0]["ts"]
+        return (now - _DIGEST_LAST_FLUSH[0]) >= window_minutes * 60
+
+
+def _flush_digest() -> int:
+    """Atomically drain the digest buffer and enqueue ONE digest job covering
+    every buffered event. Returns the number of events flushed."""
+    with _DIGEST_LOCK:
+        if not _DIGEST_BUFFER:
+            return 0
+        batch = [b["event"] for b in _DIGEST_BUFFER]
+        _DIGEST_BUFFER.clear()
+        _DIGEST_LAST_FLUSH[0] = _now()
+    try:
+        _QUEUE.put_nowait({"kind": "digest", "events": batch})
+    except queue.Full:
+        pass
+    return len(batch)
+
+
+def _digest_ticker() -> None:
+    """Background timer: every ``_DIGEST_TICK_INTERVAL`` seconds, flush the
+    digest buffer if the configured window has elapsed."""
+    while True:
+        time.sleep(_DIGEST_TICK_INTERVAL)
+        try:
+            cfg = _cached_config()
+            if not cfg or not cfg.get("enabled"):
+                continue
+            window = int(cfg.get("digest_window_minutes") or 0)
+            if _digest_flush_due(window, _now()):
+                _flush_digest()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -933,6 +1042,21 @@ def notify_event(event: dict) -> None:
         return
     if not _cooldown_ok(event, int(cfg.get("cooldown_minutes") or 0)):
         return
+    # Phase 2.2: per-source cooldown — a single noisy attacker / signature
+    # can't burn the global budget and starve other alerts.
+    if not _per_source_cooldown_ok(
+        event, int(cfg.get("per_source_cooldown_minutes") or 0)
+    ):
+        return
+
+    # Phase 2.2: digest mode — buffer matching events and let the digest
+    # ticker emit a single mail per window. The window itself is the rate
+    # limit, so we skip the per-event hour cap on this branch.
+    digest_window = int(cfg.get("digest_window_minutes") or 0)
+    if digest_window > 0:
+        _buffer_for_digest(event)
+        start_mail_alert_worker()
+        return
 
     conn = _open_conn()
     if conn is None:
@@ -1001,14 +1125,52 @@ def _worker() -> None:
     while True:
         job = _QUEUE.get()
         try:
-            if isinstance(job, dict) and job.get("kind") == "followup":
+            kind = job.get("kind") if isinstance(job, dict) else None
+            if kind == "followup":
                 _deliver_followup(job)
+            elif kind == "digest":
+                _deliver_digest((job or {}).get("events") or [])
             else:
                 _deliver_alert((job or {}).get("event") or {})
         except Exception:
             pass
         finally:
             _QUEUE.task_done()
+
+
+def _deliver_digest(events: list) -> None:
+    """Send a single mail summarizing every event in ``events``. Called by
+    ``_worker`` when ``digest_window_minutes`` > 0 batched matching alerts."""
+    if not events:
+        return
+    conn = _open_conn()
+    if conn is None:
+        return
+    try:
+        cfg = get_config(conn)
+        if not cfg or not cfg.get("enabled"):
+            return
+        recipients = resolve_recipients(conn)
+        if not recipients:
+            return
+        subject = f"[SmartShield] Alert digest — {len(events)} event(s)"
+        lines = [f"Smart Shield alert digest ({len(events)} events):", ""]
+        for ev in events:
+            title = _event_title(ev)
+            sev   = (ev.get("severity") or "info").upper()
+            ts    = ev.get("timestamp") or ev.get("created_at") or ""
+            src   = (ev.get("details") or {}).get("src_ip", "") if isinstance(ev.get("details"), dict) else ""
+            lines.append(f"  [{sev}] {ts} {title}" + (f" from {src}" if src else ""))
+        text = "\n".join(lines) + "\n"
+        ok, message = send_mail(cfg, recipients, subject, text)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    _audit("mail_alert_digest_sent" if ok else "mail_alert_digest_failed", ok,
+           {"recipients": len(recipients), "events": len(events),
+            "message": message})
 
 
 def _deliver_alert(event: dict) -> None:
@@ -1231,9 +1393,14 @@ def _audit(action: str, ok: bool, details: dict) -> None:
 
 
 def start_mail_alert_worker() -> None:
-    """Start the background sender thread (idempotent per process)."""
-    if _WORKER_STARTED.is_set():
-        return
-    _WORKER_STARTED.set()
-    threading.Thread(target=_worker, name="mail-alert-sender",
-                     daemon=True).start()
+    """Start the background sender thread + digest flush ticker (idempotent
+    per process). The digest ticker is a no-op until an operator sets
+    ``digest_window_minutes`` > 0 in mail_alerts_config."""
+    if not _WORKER_STARTED.is_set():
+        _WORKER_STARTED.set()
+        threading.Thread(target=_worker, name="mail-alert-sender",
+                         daemon=True).start()
+    if not _DIGEST_TICK_STARTED.is_set():
+        _DIGEST_TICK_STARTED.set()
+        threading.Thread(target=_digest_ticker, name="mail-alert-digest",
+                         daemon=True).start()

@@ -30,6 +30,49 @@ def conn():
     db.close()
 
 
+# ---------------------------------------------------------------------------
+# Shared rollback-test harness
+#
+# Each writer early-returns off FreeBSD, so to exercise the
+# apply_with_rollback path on a dev box we fake sys.platform, force
+# config_file_utils onto its FreeBSD branch (so .known_good is really
+# written/restored), point the writer at a temp config seeded with known-good
+# content, and stub the service restart to fail. apply_with_rollback must then
+# restore the temp file from its .known_good backup.
+# ---------------------------------------------------------------------------
+
+_KNOWN_GOOD = "ORIGINAL-KNOWN-GOOD\n"
+
+
+def _setup_rollback_env(monkeypatch, tmp_path, *, module_name, path_attr):
+    import importlib
+    mod = importlib.import_module(module_name)
+    monkeypatch.setattr(mod.sys, "platform", "freebsd14")
+
+    import app.services.config_file_utils as cfu
+    monkeypatch.setattr(cfu, "_on_freebsd", lambda: True)
+
+    # Hardcoded FreeBSD dirs (/usr/local/etc/...) must not be created on the
+    # dev box; the temp dir already exists so a no-op makedirs is safe.
+    monkeypatch.setattr(os, "makedirs", lambda *a, **k: None)
+
+    import app.services.service_manager as sm
+    monkeypatch.setattr(sm, "service_action",
+                        lambda *a, **k: {"ok": False, "message": "restart failed (stub)"})
+    monkeypatch.setattr(sm, "sysrc_set", lambda *a, **k: {"ok": True, "message": ""})
+
+    conf_path = str(tmp_path / "service.conf")
+    with open(conf_path, "w") as fh:
+        fh.write(_KNOWN_GOOD)
+    monkeypatch.setattr(mod, path_attr, conf_path)
+    return mod, conf_path
+
+
+def _assert_restored(conf_path):
+    with open(conf_path) as fh:
+        assert fh.read() == _KNOWN_GOOD, "live config must be restored from .known_good"
+
+
 # ===========================================================================
 # NTP Writer
 # ===========================================================================
@@ -107,6 +150,14 @@ class TestNtpWriter:
         status = get_ntp_sync_status()
         assert "peers" in status
 
+    def test_apply_ntp_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.ntp_writer", path_attr="_NTP_CONF_PATH")
+        result = mod.apply_ntp(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
+
 
 # ===========================================================================
 # DHCPv6 Writer
@@ -183,6 +234,14 @@ class TestDhcpv6Writer:
         from app.services.dhcpv6_writer import get_dhcpv6_leases
         assert get_dhcpv6_leases() == []
 
+    def test_apply_dhcpv6_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.dhcpv6_writer", path_attr="_KEA_DHCP6_CONF")
+        result = mod.apply_dhcpv6(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
+
 
 # ===========================================================================
 # rtadvd Writer
@@ -228,6 +287,14 @@ class TestRtadvdWriter:
     def test_status_dry_run(self):
         from app.services.rtadvd_writer import get_rtadvd_status
         assert get_rtadvd_status()["state"] == "dry-run"
+
+    def test_apply_rtadvd_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.rtadvd_writer", path_attr="_RTADVD_CONF_PATH")
+        result = mod.apply_rtadvd(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
 
 
 # ===========================================================================
@@ -329,6 +396,90 @@ class TestDdnsWriter:
 
 
 # ===========================================================================
+# DDNS Status Poller
+# ===========================================================================
+
+class TestDdnsStatusPoller:
+
+    _LOG_FIXTURE = (
+        "SUCCESS:  home.example.com: good: IP address set to 192.0.2.5\n"
+        "FAILED:   noip-foo.dyndns.org: cannot connect to dynupdate.no-ip.com:443\n"
+        "WARNING:  bar.example.org: no IP detected\n"
+        "SUCCESS:  home.example.com: skipped: IP was already set to 192.0.2.5\n"  # last success wins
+    )
+
+    _CACHE_FIXTURE = (
+        "## cache for ddclient\n"
+        "atime=1727789000,mtime=1727789000,v4=192.0.2.9,host=home.example.com\n"
+        "atime=1727789100,mtime=1727789100,v4=198.51.100.7,host=second.example.com\n"
+    )
+
+    def test_log_parser_extracts_success_and_failure(self):
+        from app.services.ddns_writer import _parse_ddclient_log
+        out = _parse_ddclient_log(self._LOG_FIXTURE, ts=1000.0)
+        # SUCCESS line wins for home.example.com (the later "skipped" SUCCESS).
+        assert out["home.example.com"]["last_success_at"] == 1000.0
+        assert out["home.example.com"]["last_ip"] == "192.0.2.5"
+        assert out["home.example.com"]["last_error"] == ""
+        # FAILED line captured for noip.
+        assert "cannot connect" in out["noip-foo.dyndns.org"]["last_error"]
+        assert out["noip-foo.dyndns.org"]["last_success_at"] is None
+        # WARNING also captured.
+        assert "no IP detected" in out["bar.example.org"]["last_error"]
+
+    def test_cache_parser_extracts_host_ip_mtime(self):
+        from app.services.ddns_writer import _parse_ddclient_cache
+        out = _parse_ddclient_cache(self._CACHE_FIXTURE)
+        assert out["home.example.com"]["ip"] == "192.0.2.9"
+        assert out["home.example.com"]["ts"] == 1727789000.0
+        assert out["second.example.com"]["ip"] == "198.51.100.7"
+
+    def test_poll_upserts_rows(self, conn, monkeypatch, tmp_path):
+        # Point the poller at fixture files in a temp dir.
+        log_path   = tmp_path / "ddclient.log"
+        cache_path = tmp_path / "ddclient.cache"
+        log_path.write_text(self._LOG_FIXTURE, encoding="utf-8")
+        cache_path.write_text(self._CACHE_FIXTURE, encoding="utf-8")
+        import app.services.ddns_writer as dw
+        monkeypatch.setattr(dw, "_DDCLIENT_LOG", str(log_path))
+        monkeypatch.setattr(dw, "_DDCLIENT_CACHE", str(cache_path))
+
+        result = dw.poll_ddns_status_once(conn)
+        assert result["ok"] is True
+        assert result["rows"] >= 3   # home.example.com, noip-foo.dyndns.org, bar.example.org, second.example.com
+
+        rows = {r["provider"]: r for r in
+                conn.execute("SELECT * FROM ddns_status").fetchall()}
+        # Cache is authoritative for IP on home.example.com (192.0.2.9 over log's .5).
+        assert rows["home.example.com"]["last_ip"] == "192.0.2.9"
+        assert rows["home.example.com"]["last_error"] == ""
+        # Failure row carries the error and no last_ip.
+        assert "cannot connect" in rows["noip-foo.dyndns.org"]["last_error"]
+        assert rows["noip-foo.dyndns.org"]["last_success_at"] is None
+        # Cache-only host shows up too.
+        assert rows["second.example.com"]["last_ip"] == "198.51.100.7"
+
+    def test_get_ddns_status_includes_providers_when_conn_passed(self, conn):
+        # Seed one row, then make sure get_ddns_status surfaces it under "providers".
+        conn.execute(
+            "INSERT OR REPLACE INTO ddns_status "
+            "(provider, last_attempt_at, last_success_at, last_ip, last_error, updated_at) "
+            "VALUES (?,?,?,?,?,?)",
+            ("home.example.com", 1000.0, 1000.0, "192.0.2.5", "", 1000.0),
+        )
+        conn.commit()
+        from app.services.ddns_writer import get_ddns_status
+        status = get_ddns_status(conn)
+        names = [p["name"] for p in status["providers"]]
+        assert "home.example.com" in names
+
+    def test_get_ddns_status_no_providers_when_conn_omitted(self):
+        from app.services.ddns_writer import get_ddns_status
+        status = get_ddns_status()
+        assert status["providers"] == []
+
+
+# ===========================================================================
 # SNMP Writer
 # ===========================================================================
 
@@ -383,6 +534,20 @@ class TestSnmpWriter:
     def test_status_dry_run(self):
         from app.services.snmp_writer import get_snmp_status
         assert get_snmp_status()["state"] == "dry-run"
+
+    def test_apply_snmp_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        import json
+        conn.execute(
+            "INSERT INTO service_state (key_name, value_json) VALUES ('snmp_settings', ?)",
+            (json.dumps({"community": "strongsecret", "enabled": True}),),
+        )
+        conn.commit()
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.snmp_writer", path_attr="_SNMPD_CONF_PATH")
+        result = mod.apply_snmp(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
 
 
 # ===========================================================================
@@ -455,6 +620,20 @@ class TestUpnpWriter:
         from app.services.upnp_writer import get_active_mappings
         assert get_active_mappings() == []
 
+    def test_apply_upnp_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        import json
+        conn.execute(
+            "INSERT INTO service_state (key_name, value_json) VALUES ('upnp_settings', ?)",
+            (json.dumps({"wan_interface": "em0", "lan_interface": "em1", "enabled": True}),),
+        )
+        conn.commit()
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.upnp_writer", path_attr="_UPNP_CONF_PATH")
+        result = mod.apply_upnp(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
+
 
 # ===========================================================================
 # IGMP Writer
@@ -508,6 +687,70 @@ class TestIgmpWriter:
     def test_status_dry_run(self):
         from app.services.igmp_writer import get_igmp_status
         assert get_igmp_status()["state"] == "dry-run"
+
+    def test_apply_igmp_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        import json
+        conn.execute(
+            "INSERT INTO service_state (key_name, value_json) VALUES ('igmp_settings', ?)",
+            (json.dumps({
+                "upstream_interfaces": [{"interface": "em0"}],
+                "downstream_interfaces": [{"interface": "em1"}],
+                "enabled": True,
+            }),),
+        )
+        conn.commit()
+        mod, path = _setup_rollback_env(monkeypatch, tmp_path,
+            module_name="app.services.igmp_writer", path_attr="_IGMPPROXY_CONF")
+        result = mod.apply_igmp(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(path)
+
+
+# ===========================================================================
+# MRTG Writer
+# ===========================================================================
+
+class TestMrtgWriter:
+
+    def test_apply_dry_run(self, conn):
+        from app.services.mrtg_writer import apply_mrtg
+        result = apply_mrtg(conn)
+        assert result["ok"] is True
+        assert "Non-FreeBSD" in result["message"]
+
+    def test_apply_mrtg_rolls_back_on_restart_failure(self, conn, monkeypatch, tmp_path):
+        # MRTG doesn't restart a daemon — its "apply" is a two-pass mrtg run that
+        # generates the graphs. A non-zero pass-2 exit must roll the cfg back to
+        # the .known_good backup.
+        import app.services.mrtg_writer as mod
+        import app.services.config_file_utils as cfu
+
+        monkeypatch.setattr(mod.sys, "platform", "freebsd14")
+        monkeypatch.setattr(cfu, "_on_freebsd", lambda: True)
+        monkeypatch.setattr(os, "makedirs", lambda *a, **k: None)
+        monkeypatch.setattr(mod, "_ensure_run_dir", lambda: None)
+        monkeypatch.setattr(mod, "_clear_stale_lock", lambda: False)
+        monkeypatch.setattr(mod, "_get_snmp_settings",
+                            lambda c: {"enabled": True, "community": "x"})
+        monkeypatch.setattr("time.sleep", lambda *_a, **_k: None)
+
+        class _FakeProc:
+            returncode = 1
+            stdout = ""
+            stderr = "mrtg blew up"
+
+        monkeypatch.setattr("subprocess.run", lambda *a, **k: _FakeProc())
+
+        conf_path = str(tmp_path / "mrtg.cfg")
+        with open(conf_path, "w") as fh:
+            fh.write(_KNOWN_GOOD)
+        monkeypatch.setattr(mod, "_MRTG_CONF_PATH", conf_path)
+
+        result = mod.apply_mrtg(conn)
+        assert result["ok"] is False
+        assert result["rolled_back"] is True
+        _assert_restored(conf_path)
 
 
 # ===========================================================================

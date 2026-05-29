@@ -3,7 +3,7 @@ from flask import (
     jsonify, flash, abort, current_app,
 )
 from app.database import get_db
-from app.auth_utils import login_required, superuser_required
+from app.auth_utils import login_required, superuser_required, reauth_required
 from app.audit_log import tail_events, log_event
 import json, os
 import sys

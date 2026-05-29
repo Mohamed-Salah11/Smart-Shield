@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 _log = logging.getLogger(__name__)
 
 # The highest schema version this codebase knows about.
-CURRENT_SCHEMA_VERSION = 46
+CURRENT_SCHEMA_VERSION = 50
 
 
 class SchemaVersionError(RuntimeError):
@@ -1925,6 +1925,113 @@ def _migration_v46(conn):
             pass  # column already exists
 
 
+def _migration_v47(conn):
+    """v47 — record why an IPS apply auto-demoted to IDS.
+
+    When an IPS-mode apply cannot bring Suricata up and netmap is unavailable,
+    ``ids_writer.apply_ids`` now falls back to IDS (pcap) mode so detection
+    coverage is preserved instead of leaving the daemon dead with ``mode='ips'``
+    persisted. ``ips_fallback_reason`` records the demotion cause (e.g.
+    ``'netmap_unavailable'``) so ``get_ids_status`` can surface it in the UI; an
+    empty string means there is no active fallback.
+
+    Idempotent: the ALTER no-ops when the column already exists.
+    """
+    try:
+        conn.execute(
+            "ALTER TABLE ids_config ADD COLUMN ips_fallback_reason TEXT DEFAULT ''"
+        )
+    except Exception:
+        pass  # column already exists
+
+
+def _migration_v48(conn):
+    """v48 — IDS block-on-alert bookkeeping for the <ss_ids_blocks> PF table.
+
+    ``ids_blocker.maybe_block`` adds an attacker IP to the live <ss_ids_blocks>
+    PF table (already declared + enforced by ``pf_generator`` via
+    ``block in log quick from <ss_ids_blocks>``) the moment a high/critical
+    Suricata alert — or an admin-listed signature — fires, and the
+    ``ids_blocker_expirer`` thread ages entries out. ``ids_blocked_ips`` is the
+    DB bookkeeping that backs the per-IP TTL, the audit trail and the
+    list/unblock UI; the PF table is the live enforcement copy.
+
+    Two ids_config knobs drive the policy:
+      * ``auto_block_ttl_seconds`` — how long an auto-block lasts (default 3600).
+      * ``auto_block_sids``        — comma-separated Suricata signature IDs that
+                                     always block regardless of severity.
+
+    Idempotent: CREATE TABLE/INDEX IF NOT EXISTS + ALTERs that no-op on re-run.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ids_blocked_ips (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip              TEXT    NOT NULL,
+            source_alert_id TEXT    DEFAULT '',
+            signature       TEXT    DEFAULT '',
+            severity        TEXT    DEFAULT '',
+            added_at        REAL    NOT NULL,
+            expires_at      REAL    NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ids_blocked_ips_ip ON ids_blocked_ips(ip)"
+    )
+    for ddl in (
+        "ALTER TABLE ids_config ADD COLUMN auto_block_ttl_seconds INTEGER DEFAULT 3600",
+        "ALTER TABLE ids_config ADD COLUMN auto_block_sids TEXT DEFAULT ''",
+    ):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists
+
+
+def _migration_v50(conn):
+    """v50 — mail-alert per-source cooldown + optional alert-digest window.
+
+    ``per_source_cooldown_minutes`` blocks a single noisy ``details.src_ip``
+    (or fallback ``details.signature``) from burning the global hourly mail
+    budget. ``digest_window_minutes`` is opt-in (default 0 = off); when set,
+    matching alerts are accumulated and emitted as a single digest mail every
+    N minutes by the existing mail-alert worker. Idempotent: ALTERs wrapped
+    in try/except.
+    """
+    for ddl in (
+        "ALTER TABLE mail_alerts_config ADD COLUMN per_source_cooldown_minutes INTEGER DEFAULT 10",
+        "ALTER TABLE mail_alerts_config ADD COLUMN digest_window_minutes INTEGER DEFAULT 0",
+    ):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # column already exists
+
+
+def _migration_v49(conn):
+    """v49 — ddns_status: per-hostname DDNS update bookkeeping.
+
+    ``ddns_status_poller`` parses ``/var/log/ddclient.log`` and
+    ``/var/cache/ddclient/ddclient.cache`` every 60s and upserts one row per
+    hostname (stored in the ``provider`` PK column) so the UI can show
+    "last successful update at" and the last error message — not just the
+    ddclient daemon's up/down flag. Idempotent: CREATE TABLE IF NOT EXISTS.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ddns_status (
+            provider        TEXT PRIMARY KEY,
+            last_attempt_at REAL,
+            last_success_at REAL,
+            last_ip         TEXT DEFAULT '',
+            last_error      TEXT DEFAULT '',
+            updated_at      REAL
+        )
+        """
+    )
+
+
 # Ordered list of (version, fn) pairs.  The runner applies all migrations
 # whose version > current DB version, in ascending order.
 MIGRATIONS = [
@@ -1973,6 +2080,10 @@ MIGRATIONS = [
     (44, _migration_v44),
     (45, _migration_v45),
     (46, _migration_v46),
+    (47, _migration_v47),
+    (48, _migration_v48),
+    (49, _migration_v49),
+    (50, _migration_v50),
 ]
 
 

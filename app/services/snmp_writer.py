@@ -208,9 +208,30 @@ def apply_snmp(conn) -> dict:
             sysrc_set("bsnmpd_enable", "NO")
             return service_action("bsnmpd", "stop")
 
-    result = apply_with_rollback(_SNMPD_CONF_PATH, conf, _restart, mode=0o600)
+    result = apply_with_rollback(_SNMPD_CONF_PATH, conf, _restart, mode=0o600,
+                                 validate_fn=_validate_snmpd_config)
     result["warnings"] = sec_warnings
     return {**result, "conf": conf}
+
+
+def _validate_snmpd_config(tmp_path: str) -> dict:
+    """Offline sanity check of a staged bsnmpd config before it goes live.
+
+    NB: FreeBSD's bsnmpd has no offline syntax-check flag — ``bsnmpd -t`` is a
+    usage error, not a validator — so running the daemon to check syntax isn't
+    safe here. Instead we do a lightweight Python check: the file must be
+    readable and carry the ``community :=`` directive that makes the daemon
+    answer queries.
+    """
+    try:
+        with open(tmp_path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        return {"ok": False, "message": f"cannot read staged snmpd config: {exc}", "output": ""}
+    if "community :=" not in text:
+        return {"ok": False,
+                "message": "snmpd config missing community directive", "output": ""}
+    return {"ok": True, "message": "snmpd config sanity check OK", "output": ""}
 
 
 # ---------------------------------------------------------------------------

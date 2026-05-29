@@ -166,8 +166,27 @@ def apply_rtadvd(conn) -> dict:
     def _restart():
         return service_action("rtadvd", "restart")
 
-    result = apply_with_rollback(_RTADVD_CONF_PATH, conf, _restart)
+    result = apply_with_rollback(_RTADVD_CONF_PATH, conf, _restart,
+                                 validate_fn=_validate_rtadvd_conf)
     return {**result, "conf": conf}
+
+
+def _validate_rtadvd_conf(tmp_path: str) -> dict:
+    """Offline preflight of a staged rtadvd.conf before it goes live.
+
+    rtadvd has no ``-t`` syntax-check mode, so this is a Python-only check: the
+    file must be readable and must not end on a dangling termcap-style line
+    continuation (a trailing ``\\``), which rtadvd would refuse to parse.
+    """
+    try:
+        with open(tmp_path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        return {"ok": False, "message": f"cannot read staged rtadvd.conf: {exc}", "output": ""}
+    if text.rstrip("\n").endswith("\\"):
+        return {"ok": False,
+                "message": "rtadvd.conf ends on a dangling line continuation", "output": ""}
+    return {"ok": True, "message": "rtadvd.conf preflight OK", "output": ""}
 
 
 # ---------------------------------------------------------------------------

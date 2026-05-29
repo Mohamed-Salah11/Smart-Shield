@@ -197,6 +197,10 @@ def validate_kea_conf(conf_path: str) -> dict:
     """
     if not sys.platform.startswith("freebsd"):
         return {"ok": True, "message": "dry-run — config not validated"}
+    import shutil
+    if not shutil.which("kea-dhcp6"):
+        # Don't block an apply just because the syntax-checker isn't installed.
+        return {"ok": True, "message": "kea-dhcp6 not installed — syntax check skipped"}
     try:
         from app.services.network_service import run_command
         r = run_command(["kea-dhcp6", "-t", conf_path], check=False)
@@ -216,40 +220,42 @@ def apply_dhcpv6(conn) -> dict:
     conf   = generate_kea_dhcp6_conf(conn)
 
     if errors:
-        return {"ok": False, "message": "Validation failed: " + " | ".join(errors),
+        return {"ok": False, "rolled_back": False,
+                "message": "Validation failed: " + " | ".join(errors),
                 "conf": conf, "errors": errors}
 
     if not sys.platform.startswith("freebsd"):
-        return {"ok": True, "message": "Non-FreeBSD — kea-dhcp6.conf generated but not written.",
+        return {"ok": True, "rolled_back": False,
+                "message": "Non-FreeBSD — kea-dhcp6.conf generated but not written.",
                 "conf": conf, "errors": []}
 
     import os
-    os.makedirs("/usr/local/etc/kea", exist_ok=True)
+    os.makedirs(os.path.dirname(_KEA_DHCP6_CONF), exist_ok=True)
     os.makedirs("/var/db/kea", exist_ok=True)
     os.makedirs("/var/log/kea", exist_ok=True)
 
-    try:
-        with open(_KEA_DHCP6_CONF, "w") as fh:
-            fh.write(conf)
-    except OSError as exc:
-        return {"ok": False, "message": str(exc), "conf": conf, "errors": []}
-
-    # Validate the written config before restarting the service
-    kea_check = validate_kea_conf(_KEA_DHCP6_CONF)
-    if not kea_check["ok"]:
-        return {"ok": False,
-                "message": "Kea config syntax error — service not restarted: " + kea_check["message"],
-                "conf": conf, "errors": [kea_check["message"]]}
-
+    from app.services.config_file_utils import apply_with_rollback
     from app.services.service_manager import service_action
-    r = service_action("kea-dhcp6", "restart")
-    if r["ok"]:
+
+    def _restart():
+        return service_action("kea-dhcp6", "restart")
+
+    # validate → backup → swap → restart → rollback-on-failure, all in one place.
+    # validate_kea_conf runs `kea-dhcp6 -t <tmp>` (skips cleanly if the binary
+    # isn't installed) so a syntax error never reaches the live config.
+    result = apply_with_rollback(
+        _KEA_DHCP6_CONF, conf, _restart, validate_fn=validate_kea_conf
+    )
+
+    # Prefix-delegation routes are installed only after a successful restart.
+    if result.get("ok"):
         pd_result = apply_pd_routes(conn)
-        if not pd_result["ok"]:
-            return {"ok": False,
-                    "message": r["message"] + " | PD routes: " + pd_result["message"],
+        if not pd_result.get("ok"):
+            return {"ok": False, "rolled_back": result.get("rolled_back", False),
+                    "message": (result.get("message", "") + " | PD routes: "
+                                + pd_result.get("message", "")).strip(" |"),
                     "conf": conf, "errors": []}
-    return {"ok": r["ok"], "message": r["message"], "conf": conf, "errors": []}
+    return {**result, "conf": conf, "errors": []}
 
 
 def apply_pd_routes(conn) -> dict:
