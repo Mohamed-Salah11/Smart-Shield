@@ -284,6 +284,34 @@ def ids_status():
     return jsonify(get_ids_status(get_db()))
 
 
+# ── Block-on-alert: list / unblock the <ss_ids_blocks> PF table ─────────────
+
+@ids_bp.route("/api/blocked", methods=["GET"])
+@login_required
+def ids_blocked_list():
+    """List currently active auto-blocked IPs (TTL not yet expired)."""
+    from app.services.ids_blocker import list_blocked
+    return jsonify({"ok": True, "blocked": list_blocked(get_db())})
+
+
+@ids_bp.route("/api/blocked", methods=["POST"])
+@api_permission_required("api.ids.edit")
+def ids_blocked_unblock():
+    """Manually clear an auto-blocked IP from the block table + live PF table."""
+    data = request.get_json(silent=True) or {}
+    ip = (data.get("ip") or "").strip()
+    if not ip:
+        return jsonify({"ok": False, "message": "ip is required"}), 400
+    from app.services.ids_blocker import unblock
+    result = unblock(get_db(), ip, actor=session.get("username") or "admin")
+    log_event(
+        category="security", action="ids_unblock_request",
+        username=session.get("username"), remote_addr=request.remote_addr,
+        details={"ip": ip, "result": result},
+    )
+    return jsonify(result)
+
+
 # ── Diagnostics API — one-call snapshot for the GUI panel ─────────────────
 
 @ids_bp.route("/api/diagnostics", methods=["GET"])

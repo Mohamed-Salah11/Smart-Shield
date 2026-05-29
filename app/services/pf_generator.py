@@ -570,6 +570,49 @@ def _build_dummynet_pipes(conn) -> str:
     return "\n".join(lines)
 
 
+def _build_scrub_rules(conn, wan_iface: str, lan_iface: str, afn: dict) -> str:
+    """Emit PF scrub (packet normalization + MSS clamp) rules.
+
+    Honors the global advanced-firewall settings (``disable_scrub`` /
+    ``enable_mss`` / ``maximum_mss``) AND the per-interface MSS clamp stored on
+    ``lan_config.mss`` / ``wan_config.mss``. A per-interface clamp is emitted as
+    ``scrub on $WAN all max-mss <N>`` ahead of the global ``scrub in all`` so
+    pf's first-match scrub selects the interface-specific MSS on that link —
+    e.g. clamping to 1452 on a PPPoE/1492-MTU WAN to stop PMTUD black holes.
+
+    Returns the scrub block (trailing blank line included), or "" when scrub is
+    disabled.
+    """
+    if afn.get("disable_scrub"):
+        return ""
+
+    lines = []
+
+    def _iface_mss(table: str, macro: str):
+        try:
+            row = conn.execute(f"SELECT mss FROM {table} WHERE id=1").fetchone()
+        except Exception:
+            return
+        raw = row["mss"] if (row and row["mss"] is not None) else ""
+        try:
+            mss = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return
+        if mss > 0:
+            lines.append(f"scrub on {macro} all max-mss {mss}")
+
+    _iface_mss("wan_config", "$WAN")
+    _iface_mss("lan_config", "$LAN")
+
+    # Global scrub — existing behavior, applied after the per-interface clamps.
+    if afn.get("enable_mss") and afn.get("maximum_mss"):
+        lines.append(f"scrub in all max-mss {int(afn['maximum_mss'])}")
+    else:
+        lines.append("scrub in all")
+
+    return "\n".join(lines) + "\n\n"
+
+
 def _run_dnctl_setup(conn) -> None:
     """
     Create dummynet pipes from limiters_configs via dnctl before applying
@@ -1050,12 +1093,7 @@ def generate_pf_conf(conn) -> str:
     _tv += [f"adaptive.start {_adp_start}", f"adaptive.end {_adp_end}"]
     timeouts = f"set timeout {{ {', '.join(_tv)} }}\n\n"
 
-    if _afn.get("disable_scrub"):
-        scrub = ""
-    elif _afn.get("enable_mss") and _afn.get("maximum_mss"):
-        scrub = f"scrub in all max-mss {int(_afn['maximum_mss'])}\n\n"
-    else:
-        scrub = "scrub in all\n\n"
+    scrub = _build_scrub_rules(conn, wan_iface, lan_iface, _afn)
 
     # Routing-only mode: disable all filtering when admin requests it
     if _afn.get("disable_firewall"):

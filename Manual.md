@@ -80,19 +80,19 @@ work and dry-run policy testing. Network enforcement requires FreeBSD.
 Clone to the target FreeBSD host and run the installer as root:
 
 ```sh
-git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smart-shield
-cd /usr/local/share/smart-shield
+git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smartshield
+cd /usr/local/share/smartshield
 sh bsd/install.sh
 ```
 
 What the installer does:
 
 1. Installs FreeBSD packages: `nginx python3 suricata unbound isc-dhcp44-server kea openvpn strongswan mpd5 mrtg miniupnpd igmpproxy ddclient sudo git sqlite3 ca_root_nss bind-tools tcpdump nano`.
-2. Creates `/usr/local/share/smart-shield/.venv` and installs `requirements.txt`.
+2. Creates `/usr/local/share/smartshield/.venv` and installs `requirements.txt`.
 3. Creates every required runtime directory (see §9).
-4. Generates a random `SECRET_KEY` (64 hex chars) and `SMARTSHIELD_MASTER_KEY` (AES-256, base64) and writes them to `/usr/local/etc/smart-shield/smart-shield.env` with mode `0600`, owner `root:wheel`.
+4. Generates a random `SECRET_KEY` (64 hex chars) and `SMARTSHIELD_MASTER_KEY` (AES-256, base64) and writes them to `/usr/local/etc/smartshield/smartshield.env` with mode `0600`, owner `root:wheel`.
 5. Installs the `smart_shield` rc.d unit and enables it with `sysrc`. The unit **exports** `SMARTSHIELD_ENV_FILE` so the Flask app and every Gunicorn worker read the same env file regardless of working directory.
-6. Generates a self-signed TLS cert at `/usr/local/etc/smart-shield/ssl/cert.pem`.
+6. Generates a self-signed TLS cert at `/usr/local/etc/smartshield/ssl/cert.pem`.
 7. Writes the nginx reverse proxy + WebSocket upgrade configuration and starts nginx.
 8. Installs the MRTG cron job (`*/5 * * * *`).
 9. Installs `smartshieldctl` to `/usr/local/sbin/smartshieldctl` and the recovery menu to `/usr/local/sbin/smart_shield_console`.
@@ -109,11 +109,11 @@ smartshieldctl health
 
 ### 2.4 Environment File
 
-The environment file lives at `/usr/local/etc/smart-shield/smart-shield.env`.
+The environment file lives at `/usr/local/etc/smartshield/smartshield.env`.
 Edit it to configure optional features (see §7):
 
 ```sh
-nano /usr/local/etc/smart-shield/smart-shield.env
+nano /usr/local/etc/smartshield/smartshield.env
 smartshieldctl restart
 ```
 
@@ -762,24 +762,25 @@ through Smart Shield's normal apply/rollback path.
 
 ## 7. Environment Variables Reference
 
-The environment file is at `/usr/local/etc/smart-shield/smart-shield.env`. To
+The environment file is at `/usr/local/etc/smartshield/smartshield.env`. To
 load a different file (development, custom path), set `SMARTSHIELD_ENV_FILE`
 **before** starting the app — `app/__init__.py` consults it before evaluating
 `config.py`.
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `SMARTSHIELD_ENV_FILE` | `/usr/local/etc/smart-shield/smart-shield.env` | No | Explicit env file path consulted first by the app |
+| `SMARTSHIELD_ENV_FILE` | `/usr/local/etc/smartshield/smartshield.env` | No | Explicit env file path consulted first by the app |
 | `APP_ENV` | `production` | No | `production` enables strict cookie + secret-key handling |
 | `SECRET_KEY` | *(none)* | **Yes** in production | Flask session signing key |
 | `FLASK_DEBUG` | `0` | No | `1` for dev hot-reload |
-| `SMARTSHIELD_DB_PATH` | `/var/db/smart-shield/data.db` | No | SQLite path |
-| `SMARTSHIELD_CONFIG_PATH` | `/usr/local/etc/smart-shield/config.json` | No | JSON config path |
-| `SMARTSHIELD_UPLOAD_DIR` | `/var/db/smart-shield/uploads/profile_pictures` | No | Profile picture storage |
-| `SMARTSHIELD_AUDIT_LOG_PATH` | `/var/log/smart-shield/audit.log` | No | Append-only SIEM log |
-| `SMARTSHIELD_APP_LOG_PATH` | `/var/log/smart-shield/app.log` | No | Application log |
+| `SMARTSHIELD_DB_PATH` | `/var/db/smartshield/data.db` | No | SQLite path |
+| `SMARTSHIELD_CONFIG_PATH` | `/usr/local/etc/smartshield/config.json` | No | JSON config path |
+| `SMARTSHIELD_UPLOAD_DIR` | `/var/db/smartshield/uploads/profile_pictures` | No | Profile picture storage |
+| `SMARTSHIELD_AUDIT_LOG_PATH` | `/var/log/smartshield/audit.log` | No | Append-only SIEM log |
+| `SMARTSHIELD_APP_LOG_PATH` | `/var/log/smartshield/app.log` | No | Application log |
 | `SMARTSHIELD_ENABLE_NETWORK_APPLY` | `0` | No | `1` to allow live OS changes |
 | `SMARTSHIELD_NETWORK_DRY_RUN` | `1` | No | `0` to leave dry-run mode |
+| `SMARTSHIELD_DISABLE_BACKGROUND` | `0` | No | `1` in CI / `tools/runtime_preflight.py` to skip starting daemon threads (SIEM collectors, threat-intel updater, mail-alert worker, gateway monitor, schedule enforcer, …) while still booting a full Flask app |
 | `SMARTSHIELD_MASTER_KEY` | *(auto-generated)* | No | AES-256-GCM key for at-rest secret encryption |
 | `ABUSECH_AUTH_KEY` | *(empty)* | No | abuse.ch personal Auth-Key |
 | `ABUSECH_DRY_RUN` | `1` | No | `0` to fetch live IOCs every 4h |
@@ -798,10 +799,10 @@ changes are applied immediately.
 
 | Path | Content | Rotation |
 |---|---|---|
-| `/var/log/smart-shield/audit.log` | SIEM event log — NDJSON, one event per line | Daily, 90-day retention, 10 MB max, bzip2 |
-| `/var/log/smart-shield/app.log` | Application log (gunicorn stdout) | Daily, 30-day retention, bzip2 |
-| `/var/log/smart-shield/access.log` | HTTP access log (gunicorn) | Daily, 30-day retention, 50 MB max, bzip2 |
-| `/var/log/smart-shield/error.log` | Application error log (gunicorn stderr) | Daily, 30-day retention, bzip2 |
+| `/var/log/smartshield/audit.log` | SIEM event log — NDJSON, one event per line | Daily, 90-day retention, 10 MB max, bzip2 |
+| `/var/log/smartshield/app.log` | Application log (gunicorn stdout) | Daily, 30-day retention, bzip2 |
+| `/var/log/smartshield/access.log` | HTTP access log (gunicorn) | Daily, 30-day retention, 50 MB max, bzip2 |
+| `/var/log/smartshield/error.log` | Application error log (gunicorn stderr) | Daily, 30-day retention, bzip2 |
 | `/var/log/nginx/access.log` | nginx access log | Managed by nginx |
 | `/var/log/nginx/error.log` | nginx error log | Managed by nginx |
 | `/var/log/suricata/eve.json` | Suricata EVE JSON alert / event stream | Configure via Suricata |
@@ -819,25 +820,25 @@ Log rotation is handled by newsyslog(8) via
 
 | Path | Purpose |
 |---|---|
-| `/usr/local/share/smart-shield/` | Application code root |
-| `/usr/local/share/smart-shield/.venv/` | Python virtual environment |
-| `/usr/local/etc/smart-shield/` | Env file, config.json, master.key, SSL certificates |
-| `/usr/local/etc/smart-shield/smart-shield.env` | Generated env file (root:wheel `0600`) |
-| `/usr/local/etc/smart-shield/master.key` | AES-256 master key (root:wheel `0600`) |
-| `/usr/local/etc/smart-shield/ssl/` | TLS cert / key |
+| `/usr/local/share/smartshield/` | Application code root |
+| `/usr/local/share/smartshield/.venv/` | Python virtual environment |
+| `/usr/local/etc/smartshield/` | Env file, config.json, master.key, SSL certificates |
+| `/usr/local/etc/smartshield/smartshield.env` | Generated env file (root:wheel `0600`) |
+| `/usr/local/etc/smartshield/master.key` | AES-256 master key (root:wheel `0600`) |
+| `/usr/local/etc/smartshield/ssl/` | TLS cert / key |
 | `/usr/local/etc/mrtg/` | MRTG configuration |
 | `/usr/local/etc/suricata/` | Suricata configuration / rules |
 | `/usr/local/etc/unbound/` | Unbound configuration |
 | `/usr/local/etc/openvpn/` | OpenVPN configuration |
 | `/usr/local/etc/openvpn/keys/` | OpenVPN key material (mode 0700) |
 | `/usr/local/etc/nginx/nginx.conf` | nginx TLS reverse proxy |
-| `/var/db/smart-shield/` | SQLite database + application data |
-| `/var/db/smart-shield/data.db` | SQLite database |
-| `/var/db/smart-shield/mrtg/` | MRTG PNG output |
-| `/var/db/smart-shield/uploads/` | User profile pictures |
-| `/var/db/smart-shield/threat_intel_ips.txt` | Latest threat intelligence IP list |
-| `/var/log/smart-shield/` | Application, audit, access, error logs |
-| `/var/run/smart-shield/` | PID file, worker lock, MRTG lock (tmpfs) |
+| `/var/db/smartshield/` | SQLite database + application data |
+| `/var/db/smartshield/data.db` | SQLite database |
+| `/var/db/smartshield/mrtg/` | MRTG PNG output |
+| `/var/db/smartshield/uploads/` | User profile pictures |
+| `/var/db/smartshield/threat_intel_ips.txt` | Latest threat intelligence IP list |
+| `/var/log/smartshield/` | Application, audit, access, error logs |
+| `/var/run/smartshield/` | PID file, worker lock, MRTG lock (tmpfs) |
 | `/etc/cron.d/smart-shield-mrtg` | MRTG cron job |
 | `/etc/pf.conf` | Active PF firewall ruleset |
 | `/usr/local/etc/rc.d/smart_shield` | FreeBSD rc.d service script |
@@ -890,11 +891,11 @@ Confirm:
 
 ```sh
 # Check syntax — every line should be KEY=VALUE.
-grep -n '=' /usr/local/etc/smart-shield/smart-shield.env
+grep -n '=' /usr/local/etc/smartshield/smartshield.env
 
 # Reload + tail logs.
 service smart_shield restart
-tail -50 /var/log/smart-shield/app.log
+tail -50 /var/log/smartshield/app.log
 ```
 
 In production, the app refuses to start if `SECRET_KEY` is missing (this is
@@ -913,16 +914,16 @@ The Traffic History status bar shows a specific badge per problem:
 
 | Badge | Cause | Fix |
 |---|---|---|
-| "Stale lock file detected" | `/var/run/smart-shield/mrtg.lock` left by a crashed run | Click **Reinitialize MRTG** |
+| "Stale lock file detected" | `/var/run/smartshield/mrtg.lock` left by a crashed run | Click **Reinitialize MRTG** |
 | "Cron job missing" | `/etc/cron.d/smart-shield-mrtg` not installed | Click **Regenerate Config** |
-| "Graph directory missing" | `/var/db/smart-shield/mrtg/` absent | `install -d -m 0755 /var/db/smart-shield/mrtg` |
+| "Graph directory missing" | `/var/db/smartshield/mrtg/` absent | `install -d -m 0755 /var/db/smartshield/mrtg` |
 | "No graphs yet" (cron installed) | MRTG hasn't run yet | Wait up to 5 minutes |
 
 Manual diagnostics:
 
 ```sh
 cat /etc/cron.d/smart-shield-mrtg
-ls /var/db/smart-shield/mrtg/*.png 2>/dev/null || echo "No PNGs"
+ls /var/db/smartshield/mrtg/*.png 2>/dev/null || echo "No PNGs"
 env LANG=C /usr/local/bin/mrtg /usr/local/etc/mrtg/mrtg.cfg --log-level 4
 ```
 
@@ -976,3 +977,93 @@ fails.
 
 Restore backups only to the same Smart Shield version that created them, or
 let the app's automatic schema migration run first.
+
+---
+
+## 11. Schema Migration Map
+
+Smart Shield carries its full migration history in `app/migrations.py`. On
+boot, `init_db()` runs every migration whose version number is greater than
+the value stored in the `schema_version` PRAGMA — so an appliance can be
+upgraded across many releases in one shot without operator intervention.
+
+**Safety model.** On FreeBSD, the migration runner snapshots the active
+database file to `data.db.bak-YYYYMMDDTHHMMSS` **once**, before applying any
+pending migration. Each individual migration is idempotent — every
+structural change is `ALTER TABLE … ADD COLUMN` (wrapped in `try/except` so
+re-runs on a fresh install are a no-op), `CREATE TABLE IF NOT EXISTS`, or
+`INSERT OR IGNORE`. There are no destructive `DROP` / `ALTER … RENAME` /
+`DELETE` operations in the migration history.
+
+That means every row below is **safe to apply in-place** without taking the
+appliance down for a manual backup-then-restore cycle. The pre-run snapshot
+gives you a recoverable artifact if the host loses power mid-migration.
+
+**Ship dates.** Per-migration ship dates are not tracked in source; the
+authoritative timeline is `git log app/migrations.py`. The version numbers
+are strictly increasing in the order migrations are added to the
+`MIGRATIONS` list at the bottom of `app/migrations.py`.
+
+| Version | What it adds / changes |
+|---|---|
+| v1 | Initial schema baseline — `users`, `lan_config`, `wan_config`, `pf_rules`, `dhcp_pools`, and every other table created by `init_db()` on a fresh install. Applied by `database.py`, not by a `_migration_v*` function. |
+| v2 | `pending_interface_changes` table — staging area for interface edits before `Apply`. |
+| v3 | `certificates` table — internal CA + per-cert metadata. |
+| v4 | DHCPv6, RA, WoL, and Captive Portal tables. |
+| v5 | `config_versions` and `health_snapshots` tables. |
+| v6 | `ids_threat_feeds` table for encrypted abuse.ch Auth-Key storage. |
+| v7 | Adds `disabled` flag to `captive_vouchers` for temporary suspension. |
+| v8 | Adds `abusech_dry_run` flag to `ids_threat_feeds` for GUI control of dry-run mode. |
+| v9 | Adds missing columns to `dhcpv6_pools` (fixes the v4 column-list gap). |
+| v10 | `siem_state` table for SIEM collector offset persistence. |
+| v11 | Fixes column-name mismatches in the `certificates` table. |
+| v12 | Adds firewall-hardening toggle columns to `advanced_firewall_nat`. |
+| v13 | Applied-state tracking tables (`config_apply_jobs`, `feature_applied_state`). |
+| v14 | Policy-based routing table + new columns on `advanced_firewall_nat`. |
+| v15 | Adds CARP-specific columns to `virtual_ips_configs` (vhid, advskew, password). |
+| v16 | Adds gateway health-tracking columns to the `gateways` table. |
+| v17 | SIEM case management tables for SOC incident tracking. |
+| v18 | `siem_alert_actions` table for SOC L1 triage tracking. |
+| v19 | SOC Team Portal — tier assignment on groups + `soc_portal_config` table. |
+| v20 | SOC case escalation + closure-type tracking. |
+| v21 | Per-user SOC tier assignment. |
+| v22 | Indexed event store. |
+| v23 | User-defined correlation rule engine. |
+| v24 | SOC portal binds to a dedicated virtual IP alias on LAN. |
+| v25 | SOC portal hardening — TOTP MFA per user account. |
+| v26 | SOC SIEM platform extensions. |
+| v27 | SOC maturity layer. |
+| v28 | IDS self-healing watchdog opt-out flag. |
+| v29 | VPN — finishes the OpenVPN server schema and adds a self-service portal user table. |
+| v30 | Outbound mail-alert service (Gmail app-password SMTP). |
+| v31 | SOC Team Portal improvements. |
+| v32 | SOC Portal Control runtime fields + response-recommendation table. |
+| v33 | Captive portal authentication rate-limit table. |
+| v34 | Stable `event_uuid` + normalized event fields (Wave A foundations). |
+| v35 | Stable `event_uuid` join key for SOC alert actions / assignments. |
+| v36 | Specialised `firewall_events` table + per-rule `log_enabled` toggle (Wave B foundations). |
+| v37 | Persistent SOC alerts lifecycle (Wave C foundations). |
+| v38 | Collector reliability — health table + dead-letter queue (Wave D foundations). |
+| v39 | Specialised `dns_events` table (Wave E). |
+| v40 | `dns_events.policy_source` for log classification via the unified domain-policy resolver (Wave J). |
+| v41 | `alert_observations` table so dedup doesn't hide per-event evidence (Wave K). |
+| v42 | Richer `firewall_events` columns (Wave L). |
+| v43 | Defaults abuse.ch threat feeds to safe dry-run mode for existing installs. |
+| v44 | Turns mail alerts on by default when the admin hasn't configured SMTP. |
+| v45 | IPS inline peer interface + degraded-rules opt-in for the IDS. |
+| v46 | Stores the full source log on a SOC case so it can be investigated end-to-end. |
+| v47 | Records why an IPS apply auto-demoted to IDS. |
+| v48 | IDS block-on-alert bookkeeping for the `<ss_ids_blocks>` PF table. |
+| v49 | `ddns_status` table — per-hostname DDNS update bookkeeping. |
+| v50 | Mail-alert per-source cooldown + optional alert-digest window. |
+
+If you are upgrading from an older release and want to know which
+migrations will run before they execute, query the live `schema_version`
+PRAGMA on the running appliance:
+
+```sh
+sqlite3 /var/db/smartshield/data.db "PRAGMA user_version;"
+```
+
+Any pending migration above that number will be applied on the next
+`service smart_shield restart`.

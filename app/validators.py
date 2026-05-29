@@ -59,6 +59,62 @@ def validate_network(value: str, *, allow_empty: bool = True) -> str:
     return v
 
 
+def validate_no_overlap(conn, iface_to_skip: str, new_cidr: str) -> str:
+    """Reject a new interface CIDR that overlaps another configured interface.
+
+    Walks every interface table that carries an IPv4 CIDR (``lan_config``,
+    ``wan_config`` — plus the vlan/bridge tables, which only contribute once
+    they gain an address column) and raises ``ValueError`` if ``new_cidr``'s
+    network overlaps an existing interface's network. ``iface_to_skip`` is the
+    ``assigned_port`` of the interface being edited, so re-saving an interface
+    without moving its subnet is never flagged against itself.
+
+    A blank ``new_cidr`` (DHCP/PPPoE/unconfigured) is a no-op and returns "";
+    only static IPv4 addresses are range-checked. Returns the normalized
+    ``new_cidr`` on success.
+    """
+    v = (new_cidr or "").strip()
+    if not v:
+        return v
+    try:
+        new_net = ipaddress.ip_interface(v).network
+    except ValueError:
+        raise ValueError(f"Invalid CIDR address: {v!r}")
+
+    skip = (iface_to_skip or "").strip()
+    # Each query aliases an interface identifier to `iface` and its address to
+    # `cidr`. Tables lacking an ipv4_address column (vlan/bridge in the current
+    # schema) simply raise and are skipped — the walk stays future-proof.
+    sources = (
+        "SELECT assigned_port AS iface, ipv4_address AS cidr FROM lan_config",
+        "SELECT assigned_port AS iface, ipv4_address AS cidr FROM wan_config",
+        "SELECT (parent_interface || '.' || vlan_tag) AS iface, ipv4_address AS cidr FROM vlan_configs",
+        "SELECT member_interfaces AS iface, ipv4_address AS cidr FROM bridge_configs",
+    )
+    for sql in sources:
+        try:
+            rows = conn.execute(sql).fetchall()
+        except Exception:
+            continue
+        for row in rows:
+            other_iface = (row["iface"] or "").strip()
+            other_cidr  = (row["cidr"] or "").strip()
+            if not other_cidr:
+                continue
+            if skip and other_iface == skip:
+                continue
+            try:
+                other_net = ipaddress.ip_interface(other_cidr).network
+            except ValueError:
+                continue
+            if new_net.overlaps(other_net):
+                raise ValueError(
+                    f"Subnet {v} overlaps interface "
+                    f"{other_iface or '(unassigned)'} ({other_cidr})"
+                )
+    return v
+
+
 # ── Hostname / Domain ─────────────────────────────────────────────────────────
 
 _HOSTNAME_RE = re.compile(

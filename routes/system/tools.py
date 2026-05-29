@@ -86,6 +86,7 @@ def api_packages_search():
 
 @system_bp.route("/api/packages/install", methods=["POST"])
 @superuser_required
+@reauth_required(reason="install package")
 def api_packages_install():
     """Install a package via pkg install. FreeBSD + priv_helper only."""
     import sys, re

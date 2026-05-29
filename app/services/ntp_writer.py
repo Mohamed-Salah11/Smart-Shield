@@ -190,8 +190,29 @@ def apply_ntp(conn) -> dict:
             sysrc_set("ntpd_enable", "NO")
             return service_action("ntpd", "stop")
 
-    result = apply_with_rollback(_NTP_CONF_PATH, conf, _restart)
+    result = apply_with_rollback(_NTP_CONF_PATH, conf, _restart,
+                                 validate_fn=_validate_ntp_conf)
     return {**result, "conf": conf}
+
+
+def _validate_ntp_conf(tmp_path: str) -> dict:
+    """Offline sanity check of a staged ntp.conf before it goes live.
+
+    ntpd has no cheap ``-t`` syntax-check mode (``ntpd -d -n -q`` actually
+    queries the network), so we do a lightweight Python check: the file must be
+    readable and carry at least one time source plus a driftfile line.
+    """
+    import re
+    try:
+        with open(tmp_path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        return {"ok": False, "message": f"cannot read staged ntp.conf: {exc}", "output": ""}
+    if not re.search(r"^\s*(server|pool)\s+\S+", text, re.MULTILINE):
+        return {"ok": False, "message": "ntp.conf has no server/pool directive", "output": ""}
+    if "driftfile" not in text:
+        return {"ok": False, "message": "ntp.conf missing driftfile directive", "output": ""}
+    return {"ok": True, "message": "ntp.conf sanity check OK", "output": ""}
 
 
 # ---------------------------------------------------------------------------

@@ -193,15 +193,45 @@ def apply_ddns(conn) -> dict:
 # Status
 # ---------------------------------------------------------------------------
 
-def get_ddns_status() -> dict:
+def get_ddns_status(conn=None) -> dict:
+    """Return DDNS daemon state plus per-hostname update status.
+
+    The daemon flag (running/stopped) still comes from the pidfile, but the
+    ``providers`` list is now populated from the ``ddns_status`` table that the
+    ``ddns_status_poller`` background thread maintains by parsing
+    ``ddclient.log`` and ``ddclient.cache``. ``conn`` is optional so existing
+    callers that just want the daemon flag keep working; pass ``get_db()`` from
+    a route handler to get the providers list too.
+    """
     if not sys.platform.startswith("freebsd"):
-        return {"running": False, "state": "dry-run", "message": "Non-FreeBSD host."}
-    try:
-        running = os.path.exists(_DDCLIENT_PID)
-        state   = "running" if running else "stopped"
-        return {"running": running, "state": state, "message": ""}
-    except Exception as exc:
-        return {"running": False, "state": "error", "message": str(exc)}
+        base = {"running": False, "state": "dry-run", "message": "Non-FreeBSD host."}
+    else:
+        try:
+            running = os.path.exists(_DDCLIENT_PID)
+            base = {"running": running,
+                    "state": "running" if running else "stopped",
+                    "message": ""}
+        except Exception as exc:
+            base = {"running": False, "state": "error", "message": str(exc)}
+
+    providers: list = []
+    if conn is not None:
+        try:
+            rows = conn.execute(
+                "SELECT provider, last_attempt_at, last_success_at, last_ip, "
+                "last_error, updated_at FROM ddns_status ORDER BY provider"
+            ).fetchall()
+            providers = [{
+                "name":            r["provider"],
+                "last_attempt_at": r["last_attempt_at"],
+                "last_success_at": r["last_success_at"],
+                "last_ip":         r["last_ip"] or "",
+                "last_error":      r["last_error"] or "",
+                "updated_at":      r["updated_at"],
+            } for r in rows]
+        except Exception:
+            providers = []
+    return {**base, "providers": providers}
 
 
 def force_ddns_update() -> dict:
@@ -265,3 +295,188 @@ def generate_nsupdate_script(client: dict) -> str:
         lines.append(f"update add {host}. {ttl} {rtype} {ip}")
     lines.append("send")
     return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# DDNS status poller — parses ddclient.log + ddclient.cache and refreshes the
+# ddns_status table so the UI can show per-hostname "last update" + last error
+# instead of just the daemon up/down flag.
+# ---------------------------------------------------------------------------
+
+import logging
+import threading
+import time as _time
+
+_logger = logging.getLogger(__name__)
+
+_DDCLIENT_LOG    = "/var/log/ddclient.log"
+_DDCLIENT_CACHE  = "/var/cache/ddclient/ddclient.cache"
+_POLL_INTERVAL   = 60
+
+_POLLER_STARTED  = False
+_POLLER_LOCK     = threading.Lock()
+
+# ``SUCCESS:`` / ``FAILED:`` / etc.  followed by ``<hostname>: <tail>``.
+# Hostname must contain at least one dot so we don't latch onto status words.
+_STATUS_RE = re.compile(
+    r"\b(SUCCESS|FAILED|FAILURE|ERROR|WARNING)\b\s*:\s*"
+    r"([A-Za-z0-9][A-Za-z0-9._-]*\.[A-Za-z0-9][A-Za-z0-9._-]*)\s*:\s*(.*)",
+    re.IGNORECASE,
+)
+_IP_RE = re.compile(
+    r"\b(\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){2,})\b"
+)
+
+
+def _parse_ddclient_log(text: str, ts=None) -> dict:
+    """Parse a ddclient log into per-hostname status records.
+
+    Recognizes lines of the form ``<STATUS>: <hostname>: <tail>`` where STATUS
+    is SUCCESS / FAILED / FAILURE / ERROR / WARNING. The IP is extracted from
+    the tail of a SUCCESS line; the tail itself is captured as the error
+    message for failure lines. Later entries overwrite earlier ones for the
+    same hostname, so the LAST line wins — which matches "what's the current
+    state?". ``ts`` is the timestamp stamped onto every match (typically the
+    log file's mtime, since ddclient lines don't carry their own timestamp).
+    """
+    per_host: dict = {}
+    for raw in text.splitlines():
+        m = _STATUS_RE.search(raw)
+        if not m:
+            continue
+        status, host, tail = m.group(1).upper(), m.group(2).lower(), m.group(3).strip()
+        row = per_host.setdefault(host, {
+            "last_success_at": None,
+            "last_attempt_at": None,
+            "last_ip":         "",
+            "last_error":      "",
+        })
+        row["last_attempt_at"] = ts
+        if status == "SUCCESS":
+            row["last_success_at"] = ts
+            row["last_error"] = ""
+            ipm = _IP_RE.search(tail)
+            if ipm:
+                row["last_ip"] = ipm.group(1)
+        else:
+            row["last_error"] = (tail[:500] or status)
+    return per_host
+
+
+def _parse_ddclient_cache(text: str) -> dict:
+    """Parse ddclient.cache into per-hostname records: ``{host: {ip, ts}}``.
+
+    Cache entries are comma-separated key=value pairs (``host=…,v4=…,
+    mtime=…``); empty/comment lines are skipped. Modern ddclient uses
+    ``v4=``/``v6=``; older versions used plain ``ip=``. Both are honored. The
+    last line per host wins (ddclient appends on each run).
+    """
+    per_host: dict = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        pairs = {}
+        for tok in line.split(","):
+            if "=" in tok:
+                k, v = tok.split("=", 1)
+                pairs[k.strip().lower()] = v.strip()
+        host = (pairs.get("host") or "").lower()
+        if not host:
+            continue
+        ip = pairs.get("v4") or pairs.get("ip") or pairs.get("v6") or ""
+        ts = None
+        for tkey in ("mtime", "atime"):
+            v = pairs.get(tkey)
+            if v:
+                try:
+                    ts = float(v)
+                    break
+                except ValueError:
+                    pass
+        per_host[host] = {"ip": ip, "ts": ts}
+    return per_host
+
+
+def poll_ddns_status_once(conn=None) -> dict:
+    """Read ddclient log + cache once and upsert per-hostname rows into
+    ``ddns_status``. Safe to call on any platform — missing files are a no-op.
+
+    Returns ``{"ok": bool, "rows": int, "message": str}``.
+    """
+    log_text = ""
+    cache_text = ""
+    log_ts = None
+    try:
+        if os.path.exists(_DDCLIENT_LOG):
+            with open(_DDCLIENT_LOG, encoding="utf-8", errors="replace") as fh:
+                log_text = fh.read()
+            log_ts = os.path.getmtime(_DDCLIENT_LOG)
+    except OSError:
+        pass
+    try:
+        if os.path.exists(_DDCLIENT_CACHE):
+            with open(_DDCLIENT_CACHE, encoding="utf-8", errors="replace") as fh:
+                cache_text = fh.read()
+    except OSError:
+        pass
+
+    from_log   = _parse_ddclient_log(log_text, ts=log_ts)
+    from_cache = _parse_ddclient_cache(cache_text)
+    hosts = set(from_log) | set(from_cache)
+    if not hosts:
+        return {"ok": True, "rows": 0, "message": "no ddclient activity yet"}
+
+    # Cache is authoritative for last_ip + last_success_at when present;
+    # the log fills in last_error and any host the cache hasn't recorded yet.
+    now = _time.time()
+    own_conn = False
+    if conn is None:
+        from app.audit_log import _events_db
+        conn = _events_db()
+        own_conn = True
+    try:
+        for host in hosts:
+            lr = from_log.get(host, {})
+            cr = from_cache.get(host, {})
+            last_ip      = cr.get("ip") or lr.get("last_ip") or ""
+            last_success = cr.get("ts") or lr.get("last_success_at")
+            last_attempt = lr.get("last_attempt_at") or last_success
+            last_error   = lr.get("last_error", "")
+            conn.execute(
+                "INSERT OR REPLACE INTO ddns_status "
+                "(provider, last_attempt_at, last_success_at, last_ip, last_error, updated_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (host, last_attempt, last_success, last_ip, last_error, now),
+            )
+        conn.commit()
+    finally:
+        if own_conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return {"ok": True, "rows": len(hosts), "message": f"refreshed {len(hosts)} provider(s)"}
+
+
+def start_ddns_status_poller() -> None:
+    """Spawn the per-60s ddns_status poller daemon thread. Idempotent and
+    FreeBSD-only (the log/cache paths don't exist elsewhere). Registered from
+    ``app/background.py``."""
+    global _POLLER_STARTED
+    with _POLLER_LOCK:
+        if _POLLER_STARTED:
+            return
+        if not sys.platform.startswith("freebsd"):
+            return
+        _POLLER_STARTED = True
+
+    def _loop():
+        while True:
+            try:
+                poll_ddns_status_once()
+            except Exception as exc:
+                _logger.warning("ddns status poll failed: %s", exc, exc_info=True)
+            _time.sleep(_POLL_INTERVAL)
+
+    threading.Thread(target=_loop, name="ddns_status_poller", daemon=True).start()

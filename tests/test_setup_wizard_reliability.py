@@ -225,3 +225,73 @@ def test_step4_success_marks_setup_complete_and_redirects(client, setup_conn, mo
         "SELECT value_json FROM service_state WHERE key_name='setup_complete'"
     ).fetchone()
     assert row["value_json"] == "true"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.1: superuser re-running the wizard after setup_complete must reauth
+# ---------------------------------------------------------------------------
+
+def _mark_setup_complete(conn):
+    conn.execute(
+        "INSERT INTO service_state (key_name, value_json, updated_at) "
+        "VALUES ('setup_complete', 'true', CURRENT_TIMESTAMP) "
+        "ON CONFLICT(key_name) DO UPDATE SET value_json='true', "
+        "updated_at=CURRENT_TIMESTAMP"
+    )
+    conn.commit()
+
+
+_STEP_ROUTES_BODIES = [
+    ("/setup/api/step1/save", {"wan_port": "em0", "lan_port": "em1"}),
+    ("/setup/api/step2/save", {"ipv4_config_type": "dhcp"}),
+    ("/setup/api/step3/save", {"username": "admin", "password": "x"}),
+    ("/setup/api/step4/apply", {}),
+]
+
+
+import pytest as _pytest
+from datetime import datetime, timezone
+
+
+@_pytest.mark.parametrize("path,body", _STEP_ROUTES_BODIES)
+def test_completed_wizard_blocks_superuser_without_reauth(app, superuser, setup_conn, path, body):
+    # Setup is complete + superuser is logged in but session lacks a fresh
+    # reauth → every step endpoint must return 403 reauth_required.
+    client, _ = superuser
+    with app.app_context():
+        _mark_setup_complete(get_db())
+    # The shared superuser fixture stamps reauth_time fresh — explicitly clear it.
+    with client.session_transaction() as sess:
+        sess.pop("reauth_time", None)
+    r = client.post(path, json=body)
+    assert r.status_code == 403, f"{path}: expected 403 (got {r.status_code})"
+    data = r.get_json() or {}
+    assert data.get("reauth_required") is True, f"{path}: missing reauth_required:true"
+
+
+@_pytest.mark.parametrize("path,body", _STEP_ROUTES_BODIES)
+def test_completed_wizard_admits_superuser_with_fresh_reauth(app, superuser, setup_conn, path, body):
+    # Same setup as above but with a fresh reauth_time — the reauth gate must
+    # NOT fire (the route may still 400/500 downstream for its own reasons).
+    client, _ = superuser
+    with app.app_context():
+        _mark_setup_complete(get_db())
+    with client.session_transaction() as sess:
+        sess["reauth_time"] = datetime.now(timezone.utc).isoformat()
+    r = client.post(path, json=body)
+    data = r.get_json() or {}
+    assert not (r.status_code == 403 and data.get("reauth_required") is True), \
+        f"{path}: still blocked by reauth gate after a fresh reauth"
+
+
+@_pytest.mark.parametrize("path,body", _STEP_ROUTES_BODIES)
+def test_first_boot_wizard_is_not_reauth_gated(app, client, setup_conn, path, body):
+    # First-boot path: setup_complete is NOT set (setup_conn deletes it). No
+    # superuser is in session. The reauth decorator must let the request fall
+    # through to the route's own first-boot handling — without flipping to 403.
+    # The route may still return 400 for missing fields, but never 403
+    # reauth_required.
+    r = client.post(path, json=body)
+    data = r.get_json() or {}
+    assert not (r.status_code == 403 and data.get("reauth_required") is True), \
+        f"{path}: first-boot request was wrongly reauth-gated"

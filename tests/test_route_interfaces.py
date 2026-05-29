@@ -157,6 +157,14 @@ class TestInterfaceRoutes:
         from app.database import get_db
         from app.secret_store import decrypt_secret
 
+        # PPPoE saves now validate the WAN port — seed a physical-looking
+        # assigned_port so the validator doesn't reject for a missing NIC.
+        with app.app_context():
+            get_db().execute(
+                "UPDATE wan_config SET assigned_port='em0' WHERE id=1"
+            )
+            get_db().commit()
+
         payload = {
             "enableInterface": True,
             "description": "WAN",
