@@ -8,7 +8,7 @@ Smart-Shield is network-security software, so we take vulnerability reports seri
 
 Instead, report them privately via GitHub's "Report a vulnerability" feature
 (Security → Advisories) on this repository, or by email to
-<<FILL_IN: security contact email>>.
+m7med.salah098@gmail.com
 
 Please include:
 - A description of the vulnerability and its impact.

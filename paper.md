@@ -130,7 +130,7 @@ Smart-Shield includes a test suite of more than 1,300 test cases covering unit, 
 
 # Availability
 
-The Smart-Shield source code is available on GitHub at [https://github.com/Mohamed-Salah11/Smart-Shield](https://github.com/Mohamed-Salah11/Smart-Shield) and is released under the Apache License 2.0. A software archive with a permanent DOI is available on Zenodo at [https://doi.org/10.5281/zenodo.<<FILL_IN: real Zenodo DOI minted at release>>](https://doi.org/10.5281/zenodo.<<FILL_IN: real Zenodo DOI minted at release>>).
+The Smart-Shield source code is available on GitHub at [https://github.com/Mohamed-Salah11/Smart-Shield](https://github.com/Mohamed-Salah11/Smart-Shield) and is released under the Apache License 2.0. A software archive with a permanent DOI is available on Zenodo at [https://doi.org/10.5281/zenodo.20463407](https://doi.org/10.5281/zenodo.20463407).
 
 # Acknowledgements
 

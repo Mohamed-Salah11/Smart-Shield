@@ -187,6 +187,9 @@ integrations steps of the vpns ids ips and every other service included in the p
 smart-shield-transfer-*.tar.gz
 _split*.py
 _*urlmap*.json
+# Internal submission/prep checklists — never publish.
+JOSS_SUBMISSION_PREP.md
+*_SUBMISSION_PREP.md
 
 # ── Generic archive outputs (release tarballs live under dist/) ─
 *.zip
