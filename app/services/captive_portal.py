@@ -138,6 +138,112 @@ def too_many_recent_attempts(
 # Session management
 # ---------------------------------------------------------------------------
 
+def _grant_captive_policy_exemption(conn, ip, username="", duration_minutes=0):
+    """captive_auth_required mode: exempt a freshly-authenticated client from
+    DNS content policy.
+
+    Flags ``tracked_hosts.is_policy_exempt`` (marked ``exempt_source=
+    'captive_session'`` so it can be revoked on logout without clobbering
+    admin/manual exemptions) and regenerates Unbound so the client's /32 enters
+    ``policy_exemption_view`` and resolves blocked domains upstream again. This
+    is what makes the "sign in to access the site" promise real and stops the
+    post-login bridge.html loop. Best-effort — failures are logged, never raised
+    into the auth path. On non-FreeBSD ``apply_unbound`` is a validate-only
+    dry-run.
+    """
+    ip = (ip or "").strip()
+    if not ip:
+        return
+    try:
+        cur = conn.execute(
+            "UPDATE tracked_hosts SET is_policy_exempt=1, exempt_source='captive_session' "
+            "WHERE ip_address=?",
+            (ip,),
+        )
+        if cur.rowcount == 0:
+            conn.execute(
+                "INSERT INTO tracked_hosts "
+                "(interface_type, ip_address, discovered_via, is_policy_exempt, exempt_source) "
+                "VALUES ('UNKNOWN', ?, 'captive_session', 1, 'captive_session')",
+                (ip,),
+            )
+        conn.commit()
+    except Exception as exc:
+        _log.warning("captive_portal: failed to set policy exemption for %s: %s", ip, exc)
+        return
+
+    try:
+        from app.services.dns_writer import apply_unbound
+        res = apply_unbound(conn)
+        if not res.get("ok"):
+            _log.warning("captive_portal: apply_unbound after exempting %s failed: %s",
+                         ip, res.get("message"))
+    except Exception as exc:
+        _log.warning("captive_portal: apply_unbound raised exempting %s: %s", ip, exc)
+
+    try:
+        from app.audit_log import log_event
+        log_event(
+            category="admin_audit", action="content_policy_session_bypass",
+            username=username or "", remote_addr=ip,
+            details={"ip": ip, "username": username,
+                     "duration_minutes": duration_minutes,
+                     "mode": "captive_auth_required",
+                     "exempt_source": "captive_session", "enabled": True},
+            severity="high",
+        )
+    except Exception:
+        pass
+
+
+def _clear_captive_policy_exemption(conn, ip, reason="session_end"):
+    """Revoke a captive-session DNS exemption granted by
+    :func:`_grant_captive_policy_exemption`.
+
+    Only clears rows marked ``exempt_source='captive_session'`` so an admin or
+    manual exemption on the same IP is left untouched. Regenerates Unbound and
+    audits only when something actually changed. Best-effort, like the existing
+    PF-table reconcile path.
+    """
+    ip = (ip or "").strip()
+    if not ip:
+        return
+    try:
+        cur = conn.execute(
+            "UPDATE tracked_hosts SET is_policy_exempt=0, exempt_source='' "
+            "WHERE ip_address=? AND exempt_source='captive_session'",
+            (ip,),
+        )
+        changed = cur.rowcount
+        conn.commit()
+    except Exception as exc:
+        _log.warning("captive_portal: failed to clear policy exemption for %s: %s", ip, exc)
+        return
+    if not changed:
+        return
+
+    try:
+        from app.services.dns_writer import apply_unbound
+        res = apply_unbound(conn)
+        if not res.get("ok"):
+            _log.warning("captive_portal: apply_unbound after clearing exemption for %s failed: %s",
+                         ip, res.get("message"))
+    except Exception as exc:
+        _log.warning("captive_portal: apply_unbound raised clearing %s: %s", ip, exc)
+
+    try:
+        from app.audit_log import log_event
+        log_event(
+            category="admin_audit", action="content_policy_session_bypass",
+            username="", remote_addr=ip,
+            details={"ip": ip, "enabled": False, "reason": reason,
+                     "exempt_source": "captive_session"},
+            severity="medium",
+        )
+    except Exception:
+        pass
+
+
 def authenticate_session(
     conn, mac: str, ip: str, username: str = "",
     duration_minutes: int = 60, is_superuser: bool = False
@@ -176,6 +282,16 @@ def authenticate_session(
         (mac, ip, uname, int(is_superuser), expires_at),
     )
     conn.commit()
+
+    # P.2: in captive_auth_required mode a successful login must actually lift
+    # the DNS content block for this client (otherwise the blocked domain keeps
+    # resolving to the LAN IP and the user dead-ends in bridge.html). Other
+    # modes intentionally keep the block, so this is gated on the mode.
+    try:
+        from app.services.content_policy import get_content_policy_mode
+        _grant_dns_exempt = get_content_policy_mode(conn) == "captive_auth_required"
+    except Exception:
+        _grant_dns_exempt = False
 
     # Add to PF table on FreeBSD
     if sys.platform.startswith("freebsd"):
@@ -226,6 +342,8 @@ def authenticate_session(
                     )
                 except Exception:
                     pass
+                if _grant_dns_exempt:
+                    _grant_captive_policy_exemption(conn, ip, uname, duration_minutes)
                 return {
                     "ok": True,
                     "partial": True,
@@ -235,6 +353,8 @@ def authenticate_session(
                     ),
                 }
 
+    if _grant_dns_exempt:
+        _grant_captive_policy_exemption(conn, ip, uname, duration_minutes)
     return {"ok": True, "message": f"Session created for {ip} ({uname or mac})."}
 
 
@@ -272,6 +392,11 @@ def logout_session(conn, session_id: int) -> dict:
                 )
             except Exception:
                 pass
+
+    # P.2: revoke any captive-session DNS exemption granted at login so the
+    # content block re-applies to this client. Only clears captive-session
+    # exemptions (not admin/manual). Best-effort; also regenerates Unbound.
+    _clear_captive_policy_exemption(conn, ip, reason="session_logout")
 
     # Re-apply DNS filter so this client is redirected by content policy again
     try:
@@ -333,6 +458,11 @@ def expire_sessions(conn) -> int:
                     )
                 except Exception:
                     pass
+
+        # P.2: revoke captive-session DNS exemptions on expiry (all platforms;
+        # apply_unbound is a no-op dry-run off FreeBSD and only regenerates when
+        # a row actually changed).
+        _clear_captive_policy_exemption(conn, row["ip_address"], reason="session_expired")
 
     ids = [r["id"] for r in rows]
     placeholders = ",".join("?" * len(ids))

@@ -538,3 +538,64 @@ class TestContentPolicyDnsFailOpen:
         finally:
             fresh_conn.execute("DELETE FROM filter_dns_rules")
             fresh_conn.commit()
+
+    # ── P.3: DNS-force is independent of the captive portal; DoT is blocked ────
+
+    def test_content_policy_only_forces_dns_to_unbound(self, fresh_conn, monkeypatch):
+        # Captive portal explicitly OFF, content policy ON → the port-53 rdr to
+        # Unbound (lan_ip) must still be present in the MAIN ruleset.
+        import app.services.pf_generator as pf
+        monkeypatch.setattr(pf, "_unbound_lan_ready", lambda conn: True)
+        self._activate_policy(fresh_conn)
+        import json
+        fresh_conn.execute(
+            "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES "
+            "('captive_portal_settings', ?)",
+            (json.dumps({"enabled": False}),),
+        )
+        fresh_conn.commit()
+        try:
+            conf = pf.generate_pf_conf(fresh_conn)
+            assert "rdr on em1 proto udp from 192.168.1.0/24 to ! 192.168.1.1 port 53 -> 192.168.1.1 port 53" in conf
+        finally:
+            fresh_conn.execute("DELETE FROM filter_dns_rules")
+            fresh_conn.execute("DELETE FROM service_state WHERE key_name='captive_portal_settings'")
+            fresh_conn.commit()
+
+    def test_dot_block_emitted_when_enabled(self, fresh_conn, monkeypatch):
+        # block_dot defaults to block_known_doh (block by default) → DoT/DoQ 853
+        # egress block present, with the dns_policy exemptions ahead of it.
+        import app.services.pf_generator as pf
+        monkeypatch.setattr(pf, "_unbound_lan_ready", lambda conn: True)
+        self._activate_policy(fresh_conn)
+        try:
+            conf = pf.generate_pf_conf(fresh_conn)
+            assert "smartshield:content_policy:dot_block" in conf
+            assert "port 853" in conf
+            # exemption pass must precede the block (PF 'quick' ordering)
+            assert conf.index("dot_exempt") < conf.index("dot_block")
+        finally:
+            fresh_conn.execute("DELETE FROM filter_dns_rules")
+            fresh_conn.commit()
+
+    def test_dot_block_absent_when_disabled(self, fresh_conn, monkeypatch):
+        import app.services.pf_generator as pf
+        import json
+        monkeypatch.setattr(pf, "_unbound_lan_ready", lambda conn: True)
+        self._activate_policy(fresh_conn)
+        fresh_conn.execute(
+            "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES "
+            "('content_policy_settings', ?)",
+            (json.dumps({"block_dot": False}),),
+        )
+        fresh_conn.commit()
+        try:
+            conf = pf.generate_pf_conf(fresh_conn)
+            assert "dot_block" not in conf
+            assert "port 853" not in conf
+            # the plain port-53 funnel is unaffected
+            assert "port 53 -> 192.168.1.1 port 53" in conf
+        finally:
+            fresh_conn.execute("DELETE FROM filter_dns_rules")
+            fresh_conn.execute("DELETE FROM service_state WHERE key_name='content_policy_settings'")
+            fresh_conn.commit()

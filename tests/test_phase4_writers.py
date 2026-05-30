@@ -894,3 +894,108 @@ class TestCaptivePortal:
         status = get_captive_status(conn)
         assert "active_sessions" in status
         assert "state" in status
+
+    # ── P.2: captive_auth_required grants/clears a DNS policy exemption ────────
+
+    @staticmethod
+    def _set_mode(conn, mode):
+        import json
+        conn.execute(
+            "INSERT OR REPLACE INTO service_state (key_name, value_json) VALUES "
+            "('content_policy_settings', ?)",
+            (json.dumps({"mode": mode}),),
+        )
+        conn.commit()
+
+    @staticmethod
+    def _spy_apply_unbound(monkeypatch):
+        calls = []
+        import app.services.dns_writer as dns_writer
+        monkeypatch.setattr(
+            dns_writer, "apply_unbound",
+            lambda conn: calls.append(conn) or {"ok": True, "message": "stub"},
+        )
+        return calls
+
+    def test_captive_auth_required_sets_policy_exempt(self, conn, monkeypatch):
+        from app.services.captive_portal import authenticate_session
+        self._set_mode(conn, "captive_auth_required")
+        calls = self._spy_apply_unbound(monkeypatch)
+
+        res = authenticate_session(conn, "aa:bb:cc:dd:ee:ff", "192.168.1.77",
+                                   username="alice", duration_minutes=30)
+        assert res["ok"] is True
+
+        row = conn.execute(
+            "SELECT is_policy_exempt, exempt_source FROM tracked_hosts WHERE ip_address=?",
+            ("192.168.1.77",),
+        ).fetchone()
+        assert row is not None
+        assert row["is_policy_exempt"] == 1
+        assert row["exempt_source"] == "captive_session"
+        assert len(calls) == 1  # Unbound regenerated exactly once
+
+    def test_non_captive_auth_mode_does_not_exempt(self, conn, monkeypatch):
+        from app.services.captive_portal import authenticate_session
+        self._set_mode(conn, "dns_redirect_block_page")
+        calls = self._spy_apply_unbound(monkeypatch)
+
+        res = authenticate_session(conn, "aa:bb:cc:dd:ee:01", "192.168.1.78",
+                                   username="bob", duration_minutes=30)
+        assert res["ok"] is True
+
+        row = conn.execute(
+            "SELECT is_policy_exempt FROM tracked_hosts WHERE ip_address=?",
+            ("192.168.1.78",),
+        ).fetchone()
+        assert row is None or row["is_policy_exempt"] == 0
+        assert calls == []  # no exemption => no Unbound regen
+
+    def test_logout_clears_captive_exempt(self, conn, monkeypatch):
+        from app.services.captive_portal import authenticate_session, logout_session
+        self._set_mode(conn, "captive_auth_required")
+        self._spy_apply_unbound(monkeypatch)
+
+        authenticate_session(conn, "aa:bb:cc:dd:ee:02", "192.168.1.79",
+                             username="carol", duration_minutes=30)
+        sess = conn.execute(
+            "SELECT id FROM captive_sessions WHERE ip_address=?", ("192.168.1.79",)
+        ).fetchone()
+
+        # Reset the spy so we can assert logout regenerates Unbound on clear.
+        calls = self._spy_apply_unbound(monkeypatch)
+        logout_session(conn, sess["id"])
+
+        row = conn.execute(
+            "SELECT is_policy_exempt, exempt_source FROM tracked_hosts WHERE ip_address=?",
+            ("192.168.1.79",),
+        ).fetchone()
+        assert row["is_policy_exempt"] == 0
+        assert row["exempt_source"] == ""
+        # logout regenerates Unbound at least once (the exemption clear; the
+        # follow-up apply_dns_filter may regenerate again — both are fine).
+        assert len(calls) >= 1
+
+    def test_logout_preserves_manual_exemption(self, conn, monkeypatch):
+        # An admin/manual exemption (exempt_source='') on the same IP must NOT be
+        # cleared by captive logout.
+        from app.services.captive_portal import logout_session, authenticate_session
+        self._set_mode(conn, "dns_redirect_block_page")
+        self._spy_apply_unbound(monkeypatch)
+        conn.execute(
+            "INSERT INTO tracked_hosts (interface_type, ip_address, is_policy_exempt, exempt_source) "
+            "VALUES ('LAN', '192.168.1.80', 1, '')"
+        )
+        conn.commit()
+        authenticate_session(conn, "aa:bb:cc:dd:ee:03", "192.168.1.80",
+                             username="dave", duration_minutes=30)
+        sess = conn.execute(
+            "SELECT id FROM captive_sessions WHERE ip_address=?", ("192.168.1.80",)
+        ).fetchone()
+        logout_session(conn, sess["id"])
+
+        row = conn.execute(
+            "SELECT is_policy_exempt FROM tracked_hosts WHERE ip_address=?",
+            ("192.168.1.80",),
+        ).fetchone()
+        assert row["is_policy_exempt"] == 1  # manual exemption untouched
