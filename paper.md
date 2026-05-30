@@ -14,27 +14,43 @@ tags:
   - SOC
 authors:
   - name: Mohamed Salah Eldein
+    orcid: <<FILL_IN: ORCID for corresponding author, e.g. 0000-0002-1825-0097>>
+    corresponding: true
+    affiliation: 1
   - name: Amin Abd El-Hamid Salem
+    affiliation: 1
   - name: Fady Ayman Metry
-  - name: Dr. Ahmed Gaber Abuabdullah
+    affiliation: 1
   - name: Yehia Mahmoud Mohamed
+    affiliation: 1
   - name: Ahmed Adel Mohamed
+    affiliation: 1
   - name: Kirollos Nader Hanna
+    affiliation: 1
   - name: Sami Khaled El Masri
+    affiliation: 1
   - name: Ahmed Sayed Younis
+    affiliation: 1
+  - name: Ahmed Gaber Abuabdullah
+    affiliation: 1
+affiliations:
+  - name: The Higher Canadian Institute for Engineering Technology and Business, Egypt
+    index: 1
+date: 30 May 2026
+bibliography: paper.bib
 ---
 
 # Summary
 
-Smart-Shield is a research prototype of an open-source, hardware-independent network security platform built on FreeBSD and administered through a web browser. It functions as a firewall appliance, a full-featured network router, and an integrated Security Operations Center (SOC) portal — three roles traditionally requiring separate products — in a single unified system. It targets small organizations, academic networks, research labs, and home users, replacing multiple commercial products: a stateful firewall, NAT and traffic shaping, intrusion detection and prevention (IDS/IPS), a built-in SIEM engine with seven concurrent log collectors, automated threat intelligence feeds from abuse.ch, VPN management (OpenVPN, IPsec/IKEv2, L2TP), DNSSEC-validating DNS, content filtering, a captive portal, high-availability failover, encrypted backup and rollback, role-based access control, and an AI-powered assistant that answers security questions in plain English. The integrated SOC module allows security teams to triage, assign, and resolve incidents without leaving the platform. The platform exposes approximately 300 REST API endpoints across 17 route blueprints, backed by a SQLite database, with an installer script, CLI control tool, and recovery console [@freebsd2024; @groq2024].
+Smart-Shield is a research prototype of an open-source, hardware-independent network security platform built on FreeBSD and administered through a web browser. It functions as a firewall appliance, a full-featured network router, and an integrated Security Operations Center (SOC) portal — three roles traditionally requiring separate products — in a single unified system. It targets small organizations, academic networks, research labs, and home users, replacing multiple commercial products: a stateful firewall, NAT and traffic shaping, intrusion detection and prevention (IDS/IPS), a built-in SIEM engine with seven concurrent log collectors, automated threat intelligence feeds from abuse.ch, VPN management (OpenVPN, IPsec/IKEv2, L2TP), DNSSEC-validating DNS, content filtering, a captive portal, high-availability failover, encrypted backup and rollback, role-based access control, and an AI-powered assistant that answers security questions in plain English. The integrated SOC module allows security teams to triage, assign, and resolve incidents without leaving the platform. The platform exposes approximately 700 routes across 23 route blueprints, backed by a SQLite database, with an installer script, CLI control tool, and recovery console [@freebsd2024; @groq2024].
 
 # Statement of Need
 
 Effective network security operations require a layered stack of capabilities — firewalling, intrusion detection, log aggregation and correlation, threat intelligence, encrypted remote access, and team-based incident response — that are typically delivered by separate commercial products at significant cost [@lamdakkar2024; @patel2024]. For small enterprises, university research networks, and independent security researchers, assembling and operating such a stack is prohibitively expensive and demands dedicated specialist staff.
 
-Existing open-source alternatives like pfSense and OPNsense address firewalling and VPN but do not provide an integrated SIEM, automated threat intelligence ingestion, SOC team workflows, or AI-assisted administration. Research on intelligent and adaptive security systems [@ahmadi2025; @haydari2023; @apruzzese2022] demonstrates the value of these capabilities but has not produced openly deployable, unified implementations with production-ready management interfaces.
+Existing open-source alternatives like pfSense and OPNsense address firewalling and VPN but do not provide an integrated SIEM, automated threat intelligence ingestion, SOC team workflows, or AI-assisted administration. Research on intelligent and adaptive security systems [@ahmadi2025; @haydari2023; @apruzzese2022] demonstrates the value of these capabilities but has not produced openly deployable, unified implementations with usable, integrated management interfaces.
 
-This gap creates a direct barrier for security research as well. Researchers studying firewall policy effectiveness, VPN fingerprinting attacks [@xue2024], anomaly detection algorithms, or AI-driven threat response need a fully instrumented, controllable security platform to run experiments on. Smart-Shield fills this gap by providing a freely deployable, fully open-source security operations platform that serves both as a production network gateway and as a research and education testbed. It is designed for network administrators, security researchers, system integrators, and students who need enterprise-grade capabilities without licensing costs.
+This gap creates a direct barrier for security research as well. Researchers studying firewall policy effectiveness, VPN fingerprinting attacks [@xue2024], anomaly detection algorithms, or AI-driven threat response need a fully instrumented, controllable security platform to run experiments on. Smart-Shield fills this gap by providing a freely deployable, fully open-source security operations platform that serves both as a network gateway and as a research and education testbed. It is designed for network administrators, security researchers, system integrators, and students who need comprehensive, integrated security capabilities without licensing costs.
 
 # State of the field
 
@@ -42,11 +58,11 @@ The most widely deployed open-source firewall distributions — **pfSense** and 
 
 Research on intelligent firewalls and adaptive security has proposed machine-learning-driven rule generation [@haydari2023], reinforcement learning for dynamic policy optimization [@ahmadi2025], machine-learning-based intrusion detection [@apruzzese2022], deep-learning anomaly detection [@almuhanna2025], NLP-based malware detection in firewalls [@moila2026], and ML-based firewall log classification [@faker2023]. These works establish compelling directions but have not produced publicly deployable systems with usable management interfaces. Research on VPN security has demonstrated real vulnerabilities such as traffic fingerprinting [@xue2024] that require integrated log monitoring and AI-assisted analysis to detect reliably.
 
-Smart-Shield's contribution is a unified, extensible, hardware-independent platform that integrates all of these capabilities into a single deployable system with a clean Python backend open to modification. Full documentation, installation instructions, usage examples, and a test suite of 646 test cases are provided in the repository.
+Smart-Shield's contribution is a unified, extensible, hardware-independent platform that integrates all of these capabilities into a single deployable system with a clean Python backend open to modification. Full documentation, installation instructions, usage examples, and a test suite of more than 1,300 test cases are provided in the repository.
 
 # Software Design and Functionality
 
-Smart-Shield is built around a Flask web application (Python 3, Gunicorn, Nginx reverse proxy) backed by a SQLite database. All system configuration is persisted in the database and applied to the OS through a transaction pipeline of more than 30 configuration writers that generate and atomically apply daemon configuration files, with syntax validation and automatic rollback to a known-good state on failure.
+Smart-Shield is built around a Flask web application (Python 3, Gunicorn, Nginx reverse proxy) backed by a SQLite database. All system configuration is persisted in the database and applied to the OS through a transaction pipeline of more than 15 configuration writers that generate and atomically apply daemon configuration files, with syntax validation and automatic rollback to a known-good state on failure.
 
 ![Smart-Shield login page providing secure administrator authentication before granting access to the management interface.](login.png)
 
@@ -110,11 +126,11 @@ The AI assistant is built on the Groq API (llama-3.3-70b-versatile model) [@groq
 
 # Testing and Validation
 
-Smart-Shield includes a test suite of 646 test cases, all passing, covering unit, integration, and acceptance tests executed in isolated virtual network environments. Benchmarks showed that the firewall adds less than 0.2 milliseconds of latency for LAN-to-LAN traffic and less than 0.6 milliseconds for LAN-to-WAN forwarded traffic; VPN tunnels operated at under 4 milliseconds round-trip; the web dashboard responded in under 300 milliseconds; and a ruleset of 200 rules applied in under 2 seconds. The system ran continuously for 48 hours without service failures and handled up to 50 VPN configurations without performance degradation. The full test suite is included in the repository and is executable by reviewers locally.
+Smart-Shield includes a test suite of more than 1,300 test cases covering unit, integration, and acceptance tests executed in isolated virtual network environments. Benchmarks showed that the firewall adds less than 0.2 milliseconds of latency for LAN-to-LAN traffic and less than 0.6 milliseconds for LAN-to-WAN forwarded traffic; VPN tunnels operated at under 4 milliseconds round-trip; the web dashboard responded in under 300 milliseconds; and a ruleset of 200 rules applied in under 2 seconds. The system ran continuously for 48 hours without service failures and handled up to 50 VPN configurations without performance degradation. The full test suite is included in the repository and is executable by reviewers locally.
 
 # Availability
 
-The Smart-Shield source code is available on GitHub at [https://github.com/Mohamed-Salah11/Smart-Shield](https://github.com/Mohamed-Salah11/Smart-Shield) and is released under the Apache License 2.0. A software archive with a permanent DOI is available on Zenodo at [https://doi.org/10.5281/zenodo.XXXXXXX](https://doi.org/10.5281/zenodo.XXXXXXX).
+The Smart-Shield source code is available on GitHub at [https://github.com/Mohamed-Salah11/Smart-Shield](https://github.com/Mohamed-Salah11/Smart-Shield) and is released under the Apache License 2.0. A software archive with a permanent DOI is available on Zenodo at [https://doi.org/10.5281/zenodo.<<FILL_IN: real Zenodo DOI minted at release>>](https://doi.org/10.5281/zenodo.<<FILL_IN: real Zenodo DOI minted at release>>).
 
 # Acknowledgements
 
