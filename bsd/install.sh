@@ -1009,6 +1009,13 @@ if [ -f "${APP_ROOT}/tools/check_manifest.py" ]; then
     fi
 fi
 
+if [ -f "${APP_ROOT}/tools/check_tab_render.py" ]; then
+    info "Running check_tab_render.py..."
+    if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/check_tab_render.py ); then
+        fatal "check_tab_render.py failed — blank-tab antipattern detected. Aborting install."
+    fi
+fi
+
 if [ -f "${APP_ROOT}/tools/check_routes.py" ]; then
     info "Running check_routes.py..."
     if ! ( cd "${APP_ROOT}" && "${PYBIN}" tools/check_routes.py ); then

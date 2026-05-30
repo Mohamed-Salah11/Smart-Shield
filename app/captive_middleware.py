@@ -15,6 +15,25 @@ from flask import redirect, request, session
 from app.audit_log import log_event
 
 
+def _dns_bypass_for_admin(conn) -> bool:
+    """True when captive_portal_settings.dns_bypass_for_admin is enabled.
+
+    When set, admin_bypass_clients reach upstream DNS directly (PF emits a
+    `no rdr` for them), so their browser resolves blocked domains to the real
+    IP and never lands on the middleware. Off by default — see
+    app/services/captive_portal.py::generate_pf_anchor.
+    """
+    try:
+        import json as _j
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='captive_portal_settings'"
+        ).fetchone()
+        cfg = _j.loads(row["value_json"]) if row and row["value_json"] else {}
+        return bool(cfg.get("dns_bypass_for_admin", False))
+    except Exception:
+        return False
+
+
 def register_captive_middleware(app):
     @app.before_request
     def _intercept_content_filter_blocked():
@@ -83,11 +102,35 @@ def register_captive_middleware(app):
 
             if not has_active_content_policy(conn):
                 return None
-            if is_admin_bypass_session(conn, request.remote_addr or ""):
-                return None
-            if is_device_whitelisted(conn, request.remote_addr or ""):
-                return None
-            if has_active_captive_session(conn, request.remote_addr or ""):
+
+            _ip = request.remote_addr or ""
+
+            # P.4: admin-bypass only earns a clean pass-through when DNS bypass
+            # is actually in effect for the client (dns_bypass_for_admin). With
+            # it, the browser resolves the domain upstream and reaches the real
+            # site, so the middleware won't see the request anyway. Without it,
+            # DNS still points the client at the LAN IP, so returning None makes
+            # Flask answer Host:<blocked-domain> with no matching route -> 404.
+            # In that case we fall through to the normal block-page redirect so
+            # the admin sees the (P.1) block page instead of a dead 404.
+            if is_admin_bypass_session(conn, _ip):
+                if _dns_bypass_for_admin(conn):
+                    return None
+                if not is_blocked_domain(conn, host):
+                    return None
+                # blocked domain + no DNS bypass → fall through to redirect.
+            elif is_device_whitelisted(conn, _ip):
+                # Device whitelist == captive-portal bypass only; content policy
+                # still applies (see is_device_whitelisted docstring). Same 404
+                # trap as admin-bypass, so only pass through non-blocked hosts.
+                if not is_blocked_domain(conn, host):
+                    return None
+            # The bridge.html branch is for authenticated NON-admin clients. An
+            # admin-bypass session is also a captive session, but it must not
+            # loop through bridge.html (no DNS exemption in this mode) — let it
+            # fall through to the block-page redirect instead (P.4).
+            if (has_active_captive_session(conn, _ip)
+                    and not is_admin_bypass_session(conn, _ip)):
                 if is_blocked_domain(conn, host):
                     # Authenticated user hitting a DNS-blocked domain — record
                     # the block so it shows up in the firewall logs and SOC.
@@ -176,8 +219,8 @@ def register_captive_middleware(app):
             ).fetchone()
             _cp_cfg = _json.loads(_cp_row["value_json"]) if _cp_row else {}
             _portal_ip = (_cp_cfg.get("portal_ip") or _default_portal_ip(conn) or "").strip()
-            portal_url = f"http://{_portal_ip}/portal/?{query}" if _portal_ip else f"/portal/?{query}"
+            portal_url = f"http://{_portal_ip}/portal/block?{query}" if _portal_ip else f"/portal/block?{query}"
         except Exception:
-            portal_url = f"/portal/?{query}"
+            portal_url = f"/portal/block?{query}"
 
         return redirect(portal_url)

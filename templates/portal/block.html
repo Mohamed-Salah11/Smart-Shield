@@ -231,17 +231,28 @@
     <span class="icon">🚫</span>
     <div>
       <h2>This site has been blocked</h2>
-      {% if domain %}
-      <p><code>{{ domain }}</code> is restricted by the Content Policy filter.<br>
-      Authorized users may sign in below to gain access.</p>
+      {% if policy_mode == 'captive_auth_required' %}
+        {% if domain %}
+        <p><code>{{ domain }}</code> is restricted by the Content Policy filter.<br>
+        Authorized users may sign in below to gain access.</p>
+        {% else %}
+        <p>The requested site is restricted by the Content Policy filter.<br>
+        Authorized users may sign in below to gain access.</p>
+        {% endif %}
       {% else %}
-      <p>The requested site is restricted by the Content Policy filter.<br>
-      Authorized users may sign in below to gain access.</p>
+        {% if domain %}
+        <p><code>{{ domain }}</code> is restricted by your network's content policy.<br>
+        If you believe this is a mistake, contact your administrator.</p>
+        {% else %}
+        <p>The requested site is restricted by your network's content policy.<br>
+        If you believe this is a mistake, contact your administrator.</p>
+        {% endif %}
       {% endif %}
     </div>
   </div>
 
   <div class="card-body ext-0be2bd5a">
+    {% if policy_mode == 'captive_auth_required' %}
     <p class="ext-aca85d04">
       Authorized users can sign in to bypass this restriction and access the site.
     </p>
@@ -252,6 +263,7 @@
     <p class="ext-1c0334b6" id="popupHint">
       ↗ Login window opened — sign in there, this page will update automatically.
     </p>
+    {% endif %}
     <p class="hint ext-da86a43b">
       HTTP websites can display this block page directly. HTTPS websites may
       show a browser certificate or connection warning unless TLS inspection

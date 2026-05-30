@@ -359,7 +359,10 @@ def generate_app_filter_dns_zones(conn) -> list:
             if action in ("block_all", "allow_whitelist_only"):
                 if block_ip:
                     lines.append(f'    local-zone: "{fqdn}" redirect')
-                    lines.append(f'    local-data: "{fqdn} A {block_ip}"')
+                    # 5s TTL matches content_policy.emit_unbound_policy_zones and
+                    # dns_filter.generate_dns_filter_zones so the block page isn't
+                    # cached for the default (long) TTL.
+                    lines.append(f'    local-data: "{fqdn} 5 A {block_ip}"')
                 else:
                     lines.append(f'    local-zone: "{fqdn}" always_nxdomain')
     return lines
