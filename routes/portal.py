@@ -354,9 +354,17 @@ def block():
     if authenticated:
         return render_template("portal/success.html", **context)
 
-    # Unauthenticated — redirect to the portal login page, preserving policy context
-    # so the login page can display the "blocked domain" message to the user.
-    return redirect(url_for("portal.login", **{k: v for k, v in context.items() if v}))
+    # Unauthenticated — render the branded block page. policy_mode tells the
+    # template whether a normal login can actually unblock the site (only in
+    # captive_auth_required mode); in the other modes the block is intentional
+    # and the page must not over-promise a login bypass.
+    try:
+        from app.services.content_policy import get_content_policy_mode
+        context["policy_mode"] = get_content_policy_mode(conn)
+    except Exception:
+        context["policy_mode"] = "dns_redirect_block_page"
+    context["authenticated"] = False
+    return render_template("portal/block.html", **context)
 
 
 @portal_bp.route("/logout", methods=["GET", "POST"])

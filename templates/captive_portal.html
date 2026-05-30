@@ -383,7 +383,7 @@ const _loaded = {};
 function showTab(tab) {
   document.querySelectorAll('[id^="content-"]').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-tabs .nav-link').forEach(a => a.classList.remove('active'));
-  document.getElementById('content-' + tab).style.display = '';
+  document.getElementById('content-' + tab).style.display = 'block';
   document.getElementById('tab-' + tab).classList.add('active');
   if (tab === 'vouchers' && !_loaded.vouchers)  { loadVouchers(); _loaded.vouchers = true; }
   if (tab === 'settings' && !_loaded.settings)  { loadSettings(); _loaded.settings = true; }

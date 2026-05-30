@@ -359,7 +359,7 @@ function showToast(msg, ok) {
 function showTab(tabId) {
   document.querySelectorAll('[id^="content-"]').forEach(el => el.style.display = 'none');
   document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-  document.getElementById('content-' + tabId).style.display = '';
+  document.getElementById('content-' + tabId).style.display = 'block';
   document.getElementById('tab-' + tabId).classList.add('active');
   if (tabId === 'status') loadNtpStatus();
 }

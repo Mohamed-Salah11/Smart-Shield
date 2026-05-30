@@ -54,6 +54,12 @@ BYPASS_MATRIX: dict[str, tuple[str, ...]] = {
         # Conservative: only admin bypass clients reach upstream DNS directly.
         # Authenticated and whitelisted clients still go through Unbound so
         # content policy remains effective.
+        #
+        # P.2 note: captive_auth_required mode grants a per-client DNS bypass on
+        # login via tracked_hosts.is_policy_exempt (which pulls the /32 into
+        # Unbound's policy_exemption_view), NOT via this PF table. That keeps the
+        # exemption mode-scoped and auto-revoked on logout/expiry, so this matrix
+        # intentionally stays limited to admin_bypass_clients.
         "admin_bypass_clients",
     ),
     "dns_policy": (

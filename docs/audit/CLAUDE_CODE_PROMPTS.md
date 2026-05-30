@@ -816,6 +816,7 @@ Verify:
 . .venv/bin/activate
 python tools/release_check.py
 python tools/check_routes.py
+python tools/check_tab_render.py
 python tools/security_lint_routes.py
 python tools/runtime_preflight.py
 pytest tests/ -q

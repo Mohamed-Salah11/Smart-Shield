@@ -859,6 +859,27 @@ def _build_hardening_rules(conn, wan_iface: str, lan_iface: str) -> str:
             f'label "smartshield:content_policy:dns_egress_tcp"'
         )
 
+        # P.3 — DoT (DNS-over-TLS, 853) / DoQ (DNS-over-QUIC, 853/udp) egress
+        # block. DoH hostnames are already NXDOMAIN'd by Unbound, but DoT/DoQ
+        # connect straight to a resolver IP and would tunnel DNS past Unbound.
+        # Gated on content_policy_settings.block_dot (defaults to block_known_doh)
+        # so the two encrypted-DNS escape hatches stay in lockstep. dns_policy
+        # bypass tables (admin_bypass_clients, policy_exemption) are passed FIRST
+        # so exempt clients still reach upstream — 'quick' makes order matter.
+        if _dot_blocking_enabled(conn):
+            from app.services.bypass_policy import bypass_tables_for
+            lines.append("")
+            lines.append("# Block LAN→WAN DoT/DoQ (853) when content filtering is active (P.3).")
+            for _table in bypass_tables_for("dns_policy"):
+                lines.append(
+                    f"pass  out quick on {wan_iface} proto {{ tcp udp }} from <{_table}> to any port 853 "
+                    f'label "smartshield:content_policy:dot_exempt" keep state'
+                )
+            lines.append(
+                f"block out log quick on {wan_iface} proto {{ tcp udp }} from {lan_net} to any port 853 "
+                f'label "smartshield:content_policy:dot_block"'
+            )
+
     # Phase 4.1 — opt-in QUIC block (UDP/443).
     # YouTube/Google services prefer HTTP/3 over QUIC and can stream video over
     # UDP/443, sidestepping DNS-based block pages because the browser already
@@ -999,6 +1020,29 @@ def _unbound_lan_ready(conn) -> bool:
     try:
         from app.services.dns_writer import unbound_listening_on_lan
         return bool(unbound_listening_on_lan(conn))
+    except Exception:
+        return True
+
+
+def _dot_blocking_enabled(conn) -> bool:
+    """True when DNS-over-TLS (853) blocking is enabled for content policy.
+
+    Mirrors ``dns_filter._doh_blocking_enabled``: gated on
+    ``content_policy_settings.block_dot``, which itself defaults to whatever
+    ``block_known_doh`` is set to (block by default). Closing the DoT hole
+    alongside the DoH NXDOMAIN zones keeps the two encrypted-DNS escape hatches
+    in lockstep.
+    """
+    try:
+        import json as _json
+        row = conn.execute(
+            "SELECT value_json FROM service_state WHERE key_name='content_policy_settings'"
+        ).fetchone()
+        if not row:
+            return True
+        cfg = _json.loads(row["value_json"]) or {}
+        doh_default = bool(cfg.get("block_known_doh", True))
+        return bool(cfg.get("block_dot", doh_default))
     except Exception:
         return True
 

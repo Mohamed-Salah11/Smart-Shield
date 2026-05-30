@@ -1473,6 +1473,12 @@ ON static_leases(mac_address)
     # (policy_exemption PF table + Unbound policy_exemption_view).
     if _th_cols and "is_policy_exempt" not in _th_cols:
         cursor.execute("ALTER TABLE tracked_hosts ADD COLUMN is_policy_exempt INTEGER DEFAULT 0")
+    # P.2: records WHO set is_policy_exempt so transient grants can be cleaned
+    # up without clobbering admin/manual exemptions. 'captive_session' marks an
+    # exemption auto-granted on captive-auth login (captive_auth_required mode)
+    # and auto-cleared on logout/expiry; '' (default) means admin/manual.
+    if _th_cols and "exempt_source" not in _th_cols:
+        cursor.execute("ALTER TABLE tracked_hosts ADD COLUMN exempt_source TEXT DEFAULT ''")
 
     # Migration: add pre_shared_key to l2tp_config (for L2TP/IPsec PSK)
     cursor.execute("PRAGMA table_info(l2tp_config)")

@@ -57,13 +57,13 @@
             else if (scope === 'Name only') { match = name.includes(term); }
             else if (scope === 'Description only') { match = desc.includes(term); }
             else { match = name.includes(term) || desc.includes(term); }
-            row.style.display = match ? '' : 'none';
+            row.style.display = match ? 'table-row' : 'none';
         });
     }
 
     function clearSearch() {
         document.getElementById('pkg-search-input').value = '';
-        document.querySelectorAll('#pkg-table-body tr').forEach(row => { row.style.display = ''; });
+        document.querySelectorAll('#pkg-table-body tr').forEach(row => { row.style.display = 'table-row'; });
     }
 </script>
 
