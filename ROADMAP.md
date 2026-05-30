@@ -1,8 +1,9 @@
-# Smart Shield F24 — Full Live Appliance TODO
+# Smart Shield — Roadmap
 
-This file tracks implementation status for turning Smart Shield F24 into a fully live FreeBSD
-firewall appliance. Use actual code, config files, and schemas as the source of truth — not
-Markdown documentation.
+> This is a forward-looking roadmap of planned and in-progress work toward a fully live FreeBSD
+> firewall appliance — not a list of known defects. It tracks implementation status against the
+> current source; use the actual code, config files, and schemas as the source of truth, not this
+> Markdown summary.
 
 ## Implementation Status Legend
 - `[ ]` Not started
@@ -14,8 +15,8 @@ Markdown documentation.
 > **Assessed 2026-05-27** — this file was reconciled against the current source on disk.
 > The prior assessment (2026-05-10) reported four "Known Critical Bugs" and several
 > PARTIAL/BUG statuses that have since been fixed; those are now marked resolved/`[x]`
-> with the implementing source noted. Items still tracked as open audit prompts in
-> `docs/audit/CLAUDE_CODE_PROMPTS.md` (Tier 1+) remain `[ ]`.
+> with the implementing source noted. Items still tracked as open backlog tasks in
+> `docs/DEVELOPMENT_BACKLOG.md` (Tier 1+) remain `[ ]`.
 
 | Area | Status | Notes |
 |------|--------|-------|
@@ -448,7 +449,7 @@ Markdown documentation.
 - [x] RFC2136 nsupdate support
 - [x] Secrets encrypted
 - [x] Service restart
-- [ ] Status: last update time, last error, current IP (status route exists; rich last-success/last-error fields still TODO — see CLAUDE_CODE_PROMPTS Tier 1.5)
+- [ ] Status: last update time, last error, current IP (status route exists; rich last-success/last-error fields still TODO — see DEVELOPMENT_BACKLOG Tier 1.5)
 - [x] Manual force-update endpoint — `routes/services/network.py::/api/ddns/force-update` → `ddns_writer.force_ddns_update()`
 - [ ] Rollback
 
@@ -579,7 +580,7 @@ Markdown documentation.
 - [ ] Secure cookie settings in production (verify)
 - [ ] Security headers
 - [ ] TLS by default in production (Nginx handles this)
-- [~] Reauthentication enforced for factory reset, restore backup, shutdown/reboot, password change; still missing on interface apply + firewall apply (see CLAUDE_CODE_PROMPTS Tier 1.7)
+- [~] Reauthentication enforced for factory reset, restore backup, shutdown/reboot, password change; still missing on interface apply + firewall apply (see DEVELOPMENT_BACKLOG Tier 1.7)
 - [x] Disable setup wizard after first successful setup — `routes/setup.py` `setup_complete` flag in `service_state` blocks re-entry (also: admin-exists→login, LAN/loopback only, console claim token)
 
 ---
@@ -711,4 +712,4 @@ The four bugs reported in the 2026-05-10 assessment are fixed in the current sou
 7. ~~Add SIEM offset persistence (`siem_state` table + DB reads/writes in collectors)~~ ✓
 8. ~~Create `app/services/runtime_mode.py`~~ ✓ + UI mode banner (`templates/partials/mode_banner.html`)
 9. Expand `freebsd_setup.py` preflight checks + `/api/system/preflight` endpoint
-10. Continue remaining open items — see `docs/audit/CLAUDE_CODE_PROMPTS.md` Tier 1+ for the current backlog
+10. Continue remaining open items — see `docs/DEVELOPMENT_BACKLOG.md` Tier 1+ for the current backlog

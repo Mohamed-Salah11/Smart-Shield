@@ -4,7 +4,7 @@ tests/test_chatbot_pf_integration.py
 Phase 3.2 — regression test for the
 ``chatbot writes block rule → pf_generator.reload_pf_rules`` flow.
 
-This is the exact code path that was broken in TODO_FULL_LIVE_APPLIANCE.md
+This is the exact code path that was broken in ROADMAP.md
 ("Known Critical Bug — chatbot reload"). Three things have to stay wired
 together for it to keep working:
 

@@ -1,24 +1,23 @@
-# Smart Shield — Claude Code Prompts for Gaps & Bugs
+# Smart Shield — Development Backlog
 
-> Each section is **one actionable prompt** you can paste into Claude Code (`claude` CLI / IDE plugin).
-> Prompts are **independent** and **idempotent** — re-running them is safe. Order is loosely by
-> impact, but you can run them in any order. Every prompt ends with the verification commands
-> Claude Code should run before declaring success.
+> Each section is **one self-contained task**. Tasks are **independent** and **idempotent** —
+> re-doing them is safe. Order is loosely by impact, but they can be tackled in any order. Every
+> task ends with the verification commands a developer should run before declaring it complete.
 >
 > All findings below were re-verified against the current source on **2026-05-27**.
-> Items already fixed since `TODO_FULL_LIVE_APPLIANCE.md` (dated 2026-05-10) are intentionally
+> Items already fixed since `ROADMAP.md` (dated 2026-05-10) are intentionally
 > not repeated here. This list contains only **real, currently-open** issues.
 
 ---
 
 ## Tier 0 — Stale-doc / scoreboard drift (do this first; cheap)
 
-### Prompt 0.1 — Rewrite `TODO_FULL_LIVE_APPLIANCE.md` to match current source
+### Task 0.1 — Rewrite `ROADMAP.md` to match current source
 
 ```
-You are working in the Smart Shield repo on FreeBSD 14.x.
+Target: the Smart Shield repo on FreeBSD 14.x.
 
-Rewrite `TODO_FULL_LIVE_APPLIANCE.md` so it matches the current source on disk.
+Rewrite `ROADMAP.md` so it matches the current source on disk.
 The file is dated "assessed 2026-05-10" and is wrong about all four "Known Critical Bugs" plus
 many phase statuses. Use the source as ground truth, not the doc.
 
@@ -79,11 +78,11 @@ Keep the remaining open items (listed in this file's Tier 1+) as `[ ]` and add a
 new "Assessed 2026-05-27" line at the top.
 
 Verify:
-  git diff --stat TODO_FULL_LIVE_APPLIANCE.md
+  git diff --stat ROADMAP.md
   pytest tests/ -q -k 'ipsec or dhcpv6 or chatbot or migrations'
 ```
 
-### Prompt 0.2 — Reconcile path naming (`smart-shield` vs `smartshield`)
+### Task 0.2 — Reconcile path naming (`smart-shield` vs `smartshield`)
 
 ```
 The repo has inconsistent path naming. The installer (`bsd/install.sh`) deploys to
@@ -119,7 +118,7 @@ Verify:
 
 ## Tier 1 — Truly open functional gaps
 
-### Prompt 1.1 — Add IPS → IDS safe fallback on apply failure
+### Task 1.1 — Add IPS → IDS safe fallback on apply failure
 
 ```
 Goal: when an operator enables IPS mode and the `suricata -T` test fails OR the
@@ -153,7 +152,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.2 — Add block-on-alert PF table integration for IDS
+### Task 1.2 — Add block-on-alert PF table integration for IDS
 
 ```
 Goal: persist IDS alert source IPs into a PF table (`ss_ids_blocked`) so the
@@ -195,7 +194,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.3 — Add MTU/MSS apply and overlapping-subnet validation for interfaces
+### Task 1.3 — Add MTU/MSS apply and overlapping-subnet validation for interfaces
 
 ```
 The interfaces UI exposes MTU and MSS fields (templates/interfaces_lan.html and
@@ -228,7 +227,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.4 — Add Kea, rtadvd, UPnP, IGMP, SNMP, NTP, MRTG writer rollback
+### Task 1.4 — Add Kea, rtadvd, UPnP, IGMP, SNMP, NTP, MRTG writer rollback
 
 ```
 PF, DNS, DHCPv4 already do validate → backup → atomic write → reload → rollback
@@ -266,7 +265,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.5 — Make DDNS surface last-update timestamp and last error
+### Task 1.5 — Make DDNS surface last-update timestamp and last error
 
 ```
 `ddns_writer.get_ddns_status()` currently only returns running/state/message
@@ -306,7 +305,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.6 — Persist DHCP collector offset across restarts
+### Task 1.6 — Persist DHCP collector offset across restarts
 
 ```
 `app/services/siem_collector._run_dhcp_collector` uses a process-local
@@ -338,7 +337,7 @@ Verify:
   pytest tests/ -q -k 'siem'
 ```
 
-### Prompt 1.7 — Reauthenticate on firewall and interface apply
+### Task 1.7 — Reauthenticate on firewall and interface apply
 
 ```
 `@reauth_required` is enforced on factory reset, halt/reboot, password change,
@@ -367,7 +366,7 @@ Verify:
   pytest tests/integration/test_security_hardening.py -q
 ```
 
-### Prompt 1.8 — Add config drift dashboard tile
+### Task 1.8 — Add config drift dashboard tile
 
 ```
 `health_monitor.check_config_drift(conn)` already computes whether the generator
@@ -393,13 +392,13 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 1.9 — Verify PPPoE WAN live-apply path end to end
+### Task 1.9 — Verify PPPoE WAN live-apply path end to end
 
 ```
 `pppoe_writer.py` generates `/etc/ppp/ppp.conf` and the `mpd.conf` fragment, but
 the live apply path is untested. Confirm or fix:
 
-Steps for Claude Code:
+Steps:
   1. Read `app/services/pppoe_writer.py` and `routes/interfaces.py` end to end.
      Identify whether `wan_config.ipv4_config_type='pppoe'` actually invokes
      `apply_pppoe(conn)` from the save endpoint, or only writes DB rows.
@@ -428,7 +427,7 @@ Verify:
 
 ## Tier 2 — Hardening, observability, ergonomics
 
-### Prompt 2.1 — Reject setup wizard re-entry after `setup_complete` even for superusers without reauth
+### Task 2.1 — Reject setup wizard re-entry after `setup_complete` even for superusers without reauth
 
 ```
 `routes/setup.py::_wizard_guard` lets any authenticated superuser re-enter the
@@ -462,7 +461,7 @@ Verify:
   python tools/security_lint_routes.py
 ```
 
-### Prompt 2.2 — Per-source mail-alert cooldown + alert digest
+### Task 2.2 — Per-source mail-alert cooldown + alert digest
 
 ```
 `app/services/mail_alerts.py::notify_event` currently rate-limits globally
@@ -494,7 +493,7 @@ Verify:
   pytest tests/ -q -k 'mail'
 ```
 
-### Prompt 2.3 — Add `/api/system/mode` endpoint
+### Task 2.3 — Add `/api/system/mode` endpoint
 
 ```
 The UI banner consumes `runtime_mode_badge` from the template context, but
@@ -525,7 +524,7 @@ Verify:
   pytest tests/ -q -k 'mode or runtime'
 ```
 
-### Prompt 2.4 — Reject world-readable env files at startup (fatal)
+### Task 2.4 — Reject world-readable env files at startup (fatal)
 
 ```
 `runtime_mode.startup_warnings()` warns about a world-readable smartshield.env
@@ -551,7 +550,7 @@ Verify:
   pytest tests/ -q -k 'runtime_mode or env_file'
 ```
 
-### Prompt 2.5 — Surface SIEM collector restart count in `/status/collector-health`
+### Task 2.5 — Surface SIEM collector restart count in `/status/collector-health`
 
 ```
 `collector_health.heartbeat()` accepts a `restart=True` argument but the
@@ -578,7 +577,7 @@ Verify:
   pytest tests/ -q -k 'collector_health'
 ```
 
-### Prompt 2.6 — Replace process-pgrep daemon checks with `service status` where reliable
+### Task 2.6 — Replace process-pgrep daemon checks with `service status` where reliable
 
 ```
 `health_monitor.check_daemon_processes` uses `pgrep -x <name>` for every daemon.
@@ -598,7 +597,7 @@ Verify:
   pytest tests/ -q -k 'health_monitor or daemon'
 ```
 
-### Prompt 2.7 — `python_runtime.json` drift check against `requirements.txt`
+### Task 2.7 — `python_runtime.json` drift check against `requirements.txt`
 
 ```
 The installer reads `app/manifests/python_runtime.json` to do post-install
@@ -623,7 +622,7 @@ Verify:
   python tools/release_check.py
 ```
 
-### Prompt 2.8 — Pin SOC-portal templates against stored XSS via `details` field
+### Task 2.8 — Pin SOC-portal templates against stored XSS via `details` field
 
 ```
 SOC-portal `templates/soc_portal/saved_searches.html`, `cases.html` etc. render
@@ -652,10 +651,10 @@ Verify:
 
 ## Tier 3 — Test-suite hygiene
 
-### Prompt 3.1 — Re-enable the "Phase 1" formerly-failing tests in the TODO
+### Task 3.1 — Re-enable the "Phase 1" formerly-failing tests in the TODO
 
 ```
-`TODO_FULL_LIVE_APPLIANCE.md::Phase 1` lists four classes of failing tests. The
+`ROADMAP.md::Phase 1` lists four classes of failing tests. The
 underlying bugs have all been fixed since (verify by reading the relevant
 modules), but the tests themselves may be `pytest.skip`-marked or `xfail`.
 
@@ -679,12 +678,12 @@ Verify:
   pytest tests/ -q --collect-only 2>&1 | grep -c SKIPPED   # should not increase
 ```
 
-### Prompt 3.2 — Add a regression test for the "chatbot writes block rule then applies PF" flow
+### Task 3.2 — Add a regression test for the "chatbot writes block rule then applies PF" flow
 
 ```
 The chatbot block-rule path (`chatbot_service.execute_approved_action` →
 `firewall_rules_floating` insert → `pf_generator.reload_pf_rules`) is the
-exact place that was broken in TODO_FULL_LIVE_APPLIANCE.md. There is no
+exact place that was broken in ROADMAP.md. There is no
 regression test for it.
 
 Add `tests/test_chatbot_pf_integration.py`:
@@ -702,7 +701,7 @@ Verify:
   pytest tests/test_chatbot_pf_integration.py -q
 ```
 
-### Prompt 3.3 — Add a smoke test that proves `runtime_preflight.py` survives a `live` env
+### Task 3.3 — Add a smoke test that proves `runtime_preflight.py` survives a `live` env
 
 ```
 `tools/runtime_preflight.py` already overrides
@@ -723,7 +722,7 @@ Verify:
   pytest tests/test_runtime_preflight.py -q
 ```
 
-### Prompt 3.4 — Add a fast PF static-validator regression test
+### Task 3.4 — Add a fast PF static-validator regression test
 
 ```
 `app/services/pf_static_validator.py` already implements the captive-portal-
@@ -744,7 +743,7 @@ Verify:
 
 ## Tier 4 — Documentation polish
 
-### Prompt 4.1 — Add a "Schema Migration Map" to `Manual.md`
+### Task 4.1 — Add a "Schema Migration Map" to `Manual.md`
 
 ```
 The repo is at schema v46. Operators upgrading from an older release have no
@@ -763,7 +762,7 @@ Verify:
   grep -c '^| v' Manual.md   # row count matches CURRENT_SCHEMA_VERSION
 ```
 
-### Prompt 4.2 — Document `SMARTSHIELD_DISABLE_BACKGROUND=1` in env reference
+### Task 4.2 — Document `SMARTSHIELD_DISABLE_BACKGROUND=1` in env reference
 
 ```
 The variable is used by `tools/runtime_preflight.py` and the CI fixtures but
@@ -780,7 +779,7 @@ Verify:
   grep -q SMARTSHIELD_DISABLE_BACKGROUND Manual.md .env.example
 ```
 
-### Prompt 4.3 — Note ports vs interfaces in setup wizard step 1 docs
+### Task 4.3 — Note ports vs interfaces in setup wizard step 1 docs
 
 ```
 `Testing.md §4.1` and `templates/setup/step1_interfaces.html` both say
@@ -800,19 +799,16 @@ Verify:
 
 ---
 
-## How to drive Claude Code through this list
+## How to work through this list
 
 ```sh
-# From the repo root, install Claude Code if you don't have it:
-#   curl -fsSL https://anthropic.com/install.sh | sh
-
-# Then for each prompt, paste it into Claude Code. Suggested order:
+# Suggested order:
 #   Tier 0 first (cheap & high-signal — fixes the scoreboard).
 #   Tier 1 next (real functional gaps).
 #   Tier 2 + 3 in parallel.
 #   Tier 4 last (docs).
 
-# After every Claude Code session, re-run the gate:
+# After every change, re-run the gate:
 . .venv/bin/activate
 python tools/release_check.py
 python tools/check_routes.py
@@ -824,8 +820,8 @@ pytest tests/ -q
 
 ## What I deliberately did NOT include
 
-The following items appear in `TODO_FULL_LIVE_APPLIANCE.md` but are **already
-done** in the current source — adding them as Claude Code prompts would create
+The following items appear in `ROADMAP.md` but are **already
+done** in the current source — re-opening them as tasks would create
 busywork or, worse, regress working code:
 
 - chatbot_service `firewall_writer` import bug (fixed; uses `pf_generator.reload_pf_rules`)

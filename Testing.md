@@ -1,7 +1,7 @@
 # Smart Shield — FreeBSD Deployment & Manual Testing Guide
 
 > **Platform target:** FreeBSD 14.x (amd64)  
-> **Tested stack:** Python 3.11, Gunicorn 22, PF, OpenVPN, strongSwan, mpd5  
+> **Tested stack:** Python 3.10+, Gunicorn 22, PF, OpenVPN, strongSwan, mpd5  
 > **Author:** Smart Shield Project Team
 
 ---
@@ -50,8 +50,8 @@
 | Requirement | Version |
 |-------------|---------|
 | FreeBSD | 14.0-RELEASE or 14.1-RELEASE |
-| Python | 3.11+ (`pkg install python311`) |
-| pip | bundled with python311 |
+| Python | 3.10+ (`pkg install python3`) |
+| pip | bundled with python3 |
 | OpenVPN | 2.6+ (`pkg install openvpn`) |
 | strongSwan | 5.9+ (`pkg install strongswan`) |
 | mpd5 | 5.9+ (`pkg install mpd5`) |
@@ -76,7 +76,7 @@
 pkg update && pkg upgrade -y
 
 # Install all runtime dependencies
-pkg install -y python311 py311-pip openvpn strongswan mpd5 suricata sudo git curl
+pkg install -y python3 openvpn strongswan mpd5 suricata sudo git curl
 
 # Create dedicated service user (no shell, no home login)
 pw useradd -n smartshield -s /usr/sbin/nologin -d /var/db/smartshield -m -c "Smart Shield Daemon"
@@ -84,27 +84,27 @@ pw useradd -n smartshield -s /usr/sbin/nologin -d /var/db/smartshield -m -c "Sma
 
 ### 2.2 Transfer the Codebase
 
-**Option A — SCP from dev machine:**
+**Option A — Git clone (recommended):**
 
 ```sh
-# On your Windows dev machine (PowerShell):
-scp -r "C:\Users\m7med\OneDrive\Desktop\A3OOOOOOOOOOOOOO\NIGGA\Smart-Shield" \
-    root@<freebsd-ip>:/usr/local/share/smartshield
+git clone https://github.com/Mohamed-Salah11/Smart-Shield.git \
+    /usr/local/share/smartshield
 ```
 
-**Option B — Git clone:**
+**Option B — SCP from a local checkout:**
 
 ```sh
-git clone https://github.com/your-org/smart-shield.git /usr/local/share/smartshield
+# From the directory that contains your local Smart-Shield checkout:
+scp -r ./Smart-Shield root@<freebsd-ip>:/usr/local/share/smartshield
 ```
 
 **Option C — Tarball:**
 
 ```sh
-# On dev machine — create tarball (PowerShell):
-tar -czf smart-shield.tar.gz -C "C:\Users\m7med\OneDrive\Desktop\A3OOOOOOOOOOOOOO\NIGGA" Smart-Shield
+# On the source machine, from the parent of your checkout:
+tar -czf smart-shield.tar.gz Smart-Shield
 
-# On FreeBSD:
+# On the FreeBSD host:
 tar -xzf smart-shield.tar.gz -C /usr/local/share/
 mv /usr/local/share/Smart-Shield /usr/local/share/smartshield
 ```
@@ -114,8 +114,8 @@ mv /usr/local/share/Smart-Shield /usr/local/share/smartshield
 ```sh
 cd /usr/local/share/smartshield
 
-# Create virtualenv with FreeBSD python311
-python3.11 -m venv .venv
+# Create virtualenv (Python 3.10+)
+python3 -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies
@@ -188,7 +188,7 @@ The master key encrypts VPN pre-shared keys and L2TP/PPPoE passwords at rest.
 # The app writes /usr/local/etc/smartshield/master.key automatically
 
 # OR generate manually and set env var:
-python3.11 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
+python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"
 # Add to smartshield.env:
 # SMARTSHIELD_MASTER_KEY=<output above>
 ```
