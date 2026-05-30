@@ -14,7 +14,7 @@ tags:
   - SOC
 authors:
   - name: Mohamed Salah Eldein
-    orcid: <<FILL_IN: ORCID for corresponding author, e.g. 0000-0002-1825-0097>>
+    orcid: 0009-0005-1129-6454
     corresponding: true
     affiliation: 1
   - name: Amin Abd El-Hamid Salem
@@ -64,11 +64,11 @@ Smart-Shield's contribution is a unified, extensible, hardware-independent platf
 
 Smart-Shield is built around a Flask web application (Python 3, Gunicorn, Nginx reverse proxy) backed by a SQLite database. All system configuration is persisted in the database and applied to the OS through a transaction pipeline of more than 15 configuration writers that generate and atomically apply daemon configuration files, with syntax validation and automatic rollback to a known-good state on failure.
 
-![Smart-Shield login page providing secure administrator authentication before granting access to the management interface.](login.png)
+![Smart-Shield login page providing secure administrator authentication before granting access to the management interface.](figures/login.png)
 
-![Smart-Shield main dashboard with the navigation sidebar expanded, showing system status widgets for firewall rules, VPN servers, users, security rules, and interface status.](dashboard.png)
+![Smart-Shield main dashboard with the navigation sidebar expanded, showing system status widgets for firewall rules, VPN servers, users, security rules, and interface status.](figures/dashboard.png)
 
-![Smart-Shield widget manager allowing administrators to customize the dashboard by enabling or disabling monitoring widgets for firewall rules, VPN servers, users, security rules, and traffic monitoring.](widgets.png)
+![Smart-Shield widget manager allowing administrators to customize the dashboard by enabling or disabling monitoring widgets for firewall rules, VPN servers, users, security rules, and traffic monitoring.](figures/widgets.png)
 
 ## Firewall, NAT, and Traffic Shaping
 
@@ -82,9 +82,9 @@ The platform manages the full range of FreeBSD virtual interface types: VLANs (8
 
 Smart-Shield integrates Suricata [@suricata2024], which operates in passive IDS mode via BPF packet capture or in active inline IPS mode via netmap for wire-speed in-path blocking. Suricata YAML configuration is generated programmatically and validated with `suricata -T` before being applied. Rule sets are managed through the Emerging Threats feed via suricata-update, with support for additional custom URL sources.
 
-![Smart-Shield IDS/IPS configuration page showing mode selection between passive IDS (BPF capture) and inline IPS (netmap bridging), interface assignment, HOME_NET and EXTERNAL_NET definitions, and EVE JSON logging options.](ids_ips_config.png)
+![Smart-Shield IDS/IPS configuration page showing mode selection between passive IDS (BPF capture) and inline IPS (netmap bridging), interface assignment, HOME_NET and EXTERNAL_NET definitions, and EVE JSON logging options.](figures/ids_ips_config.png)
 
-![Smart-Shield Threat Detection status page showing Suricata running in IDS mode on interface em1 with 49,874 active signatures across 2 rulesets, zero alerts today, and a live-refreshing daemon log.](ids_ips_status.png)
+![Smart-Shield Threat Detection status page showing Suricata running in IDS mode on interface em1 with 49,874 active signatures across 2 rulesets, zero alerts today, and a live-refreshing daemon log.](figures/ids_ips_status.png)
 
 ## SIEM and Anomaly Detection
 
@@ -114,11 +114,11 @@ An integrated certificate authority supports CA creation, server and client cert
 
 The platform implements session-based authentication with signed cookies, PBKDF2 password hashing, per-IP and per-username brute-force lockout, CSRF protection on all state-changing requests, API key authentication with per-key permission scoping, idle session timeout, re-authentication for sensitive operations, and a complete NDJSON audit log of every state-changing action with user identity, IP address, and timestamp. Role-based access control allows multi-user deployments with per-group, page-level permissions and wildcard permission grants. The integrated SOC module provides a separate login realm for security operations staff, within which analysts can triage IDS and SIEM alerts, assign incidents to team members, track investigation status, and log response actions.
 
-![Smart-Shield SOC Portal Control page, where administrators configure the dedicated SOC analyst endpoint, bind IP address, HTTPS port, and TLS certificate separately from the main firewall console.](soc_portal_control.png)
+![Smart-Shield SOC Portal Control page, where administrators configure the dedicated SOC analyst endpoint, bind IP address, HTTPS port, and TLS certificate separately from the main firewall console.](figures/soc_portal_control.png)
 
-![Smart-Shield SOC Portal login screen, showing the dedicated authentication interface for L1, L2, and L3 analyst tiers, separate from the administrator UI.](soc_login.png)
+![Smart-Shield SOC Portal login screen, showing the dedicated authentication interface for L1, L2, and L3 analyst tiers, separate from the administrator UI.](figures/soc_login.png)
 
-![Smart-Shield SOC Overview dashboard displaying live case counts, alert queue, threat feed status, and open incidents for an authenticated L1 analyst.](soc_overview.png)
+![Smart-Shield SOC Overview dashboard displaying live case counts, alert queue, threat feed status, and open incidents for an authenticated L1 analyst.](figures/soc_overview.png)
 
 ## AI Assistant
 
@@ -134,6 +134,6 @@ The Smart-Shield source code is available on GitHub at [https://github.com/Moham
 
 # Acknowledgements
 
-The authors thank Dr. Ahmed Gaber Abuabdullah for his academic supervision, methodological guidance, and technical review throughout the development of this project. The authors also acknowledge the faculty and staff of The Higher Canadian Institute for Engineering Technology and Business for the academic environment and resources that supported this work.
+The authors acknowledge the faculty and staff of The Higher Canadian Institute for Engineering Technology and Business for the academic environment and resources that supported this work.
 
 # References
