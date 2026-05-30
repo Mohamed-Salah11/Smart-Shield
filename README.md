@@ -1,5 +1,7 @@
 # Smart Shield
 
+![CI](https://github.com/Mohamed-Salah11/Smart-Shield/actions/workflows/ci.yml/badge.svg)
+
 > A web-managed network security appliance built on FreeBSD — firewall, IDS/IPS, VPN, DNS, DHCP, SIEM, content policy, captive portal, a hardened appliance console, and a separate SOC team portal in a single platform.
 
 ---
@@ -144,7 +146,7 @@ flask-sock>=0.7       gevent>=24.0          fpdf2>=2.7.9
 
 ```sh
 # 1. Clone onto the FreeBSD host (run as root).
-git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smartshield
+git clone https://github.com/Mohamed-Salah11/Smart-Shield.git /usr/local/share/smartshield
 
 # 2. Run the installer.
 cd /usr/local/share/smartshield
@@ -267,7 +269,18 @@ Full reference is in [Manual.md](Manual.md) §7.
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+This project is licensed under the Apache License 2.0. See `LICENSE` for details.
+
+---
+
+## Testing
+
+The test suite runs offline on any OS (in-memory SQLite, mocked system calls):
+
+```sh
+pip install -r requirements-dev.txt
+pytest -q
+```
 
 ---
 
@@ -279,3 +292,13 @@ This project is licensed under the MIT License. See `LICENSE` for details.
 4. Submit a pull request describing the change and its purpose.
 
 All contributions must pass `pytest tests/` and must not introduce new dependencies without justification.
+
+See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+
+---
+
+## Support
+
+- Usage and installation: see `Manual.md` and `Testing.md`.
+- Questions / bugs: open a GitHub issue.
+- Security vulnerabilities: see `SECURITY.md` (do not open a public issue).

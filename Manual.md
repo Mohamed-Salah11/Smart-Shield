@@ -80,7 +80,7 @@ work and dry-run policy testing. Network enforcement requires FreeBSD.
 Clone to the target FreeBSD host and run the installer as root:
 
 ```sh
-git clone https://github.com/<org>/Smart-Shield.git /usr/local/share/smartshield
+git clone https://github.com/Mohamed-Salah11/Smart-Shield.git /usr/local/share/smartshield
 cd /usr/local/share/smartshield
 sh bsd/install.sh
 ```
