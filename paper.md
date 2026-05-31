@@ -33,7 +33,7 @@ authors:
     affiliation: 1
   - name: Ahmed Sayed Younis
     affiliation: 1
-  
+
 affiliations:
   - name: The Higher Canadian Institute for Engineering Technology and Business, Egypt
     index: 1
@@ -43,91 +43,65 @@ bibliography: paper.bib
 
 # Summary
 
-Smart-Shield is a research prototype of an open-source, hardware-independent network security platform built on FreeBSD and administered through a web browser. It functions as a firewall appliance, a full-featured network router, and an integrated Security Operations Center (SOC) portal — three roles traditionally requiring separate products — in a single unified system. It targets small organizations, academic networks, research labs, and home users, replacing multiple commercial products: a stateful firewall, NAT and traffic shaping, intrusion detection and prevention (IDS/IPS), a built-in SIEM engine with seven concurrent log collectors, automated threat intelligence feeds from abuse.ch, VPN management (OpenVPN, IPsec/IKEv2, L2TP), DNSSEC-validating DNS, content filtering, a captive portal, high-availability failover, encrypted backup and rollback, role-based access control, and an AI-powered assistant that answers security questions in plain English. The integrated SOC module allows security teams to triage, assign, and resolve incidents without leaving the platform. The platform exposes approximately 700 routes across 23 route blueprints, backed by a SQLite database, with an installer script, CLI control tool, and recovery console [@freebsd2024; @groq2024].
+Smart-Shield is a research prototype of an open-source, hardware-independent network security platform built on FreeBSD and administered through a web browser. In one system it combines three roles that traditionally require separate products: a stateful firewall appliance, a full-featured network router, and an integrated Security Operations Center (SOC) portal. It bundles intrusion detection and prevention (IDS/IPS), a built-in SIEM with seven log collectors, automated abuse.ch threat-intelligence feeds, VPN management (OpenVPN, IPsec/IKEv2, L2TP), DNSSEC-validating DNS, content filtering, a captive portal, high-availability failover, encrypted backup and rollback, role-based access control, and an AI assistant that answers security questions in plain English [@freebsd2024; @groq2024].
 
 # Statement of Need
 
-Effective network security operations require a layered stack of capabilities — firewalling, intrusion detection, log aggregation and correlation, threat intelligence, encrypted remote access, and team-based incident response — that are typically delivered by separate commercial products at significant cost [@lamdakkar2024; @patel2024]. For small enterprises, university research networks, and independent security researchers, assembling and operating such a stack is prohibitively expensive and demands dedicated specialist staff.
+Effective network security operations require a layered stack — firewalling, intrusion detection, log aggregation and correlation, threat intelligence, encrypted remote access, and team-based incident response — typically delivered by separate commercial products at significant cost [@lamdakkar2024; @patel2024]. For small enterprises, university research networks, and independent security researchers, assembling and operating such a stack is prohibitively expensive and demands dedicated specialist staff.
 
-Existing open-source alternatives like pfSense and OPNsense address firewalling and VPN but do not provide an integrated SIEM, automated threat intelligence ingestion, SOC team workflows, or AI-assisted administration. Research on intelligent and adaptive security systems [@ahmadi2025; @haydari2023; @apruzzese2022] demonstrates the value of these capabilities but has not produced openly deployable, unified implementations with usable, integrated management interfaces.
-
-This gap creates a direct barrier for security research as well. Researchers studying firewall policy effectiveness, VPN fingerprinting attacks [@xue2024], anomaly detection algorithms, or AI-driven threat response need a fully instrumented, controllable security platform to run experiments on. Smart-Shield fills this gap by providing a freely deployable, fully open-source security operations platform that serves both as a network gateway and as a research and education testbed. It is designed for network administrators, security researchers, system integrators, and students who need comprehensive, integrated security capabilities without licensing costs.
+Open-source alternatives like pfSense and OPNsense address firewalling and VPN but provide no integrated SIEM, automated threat-intelligence ingestion, SOC team workflows, or AI-assisted administration. Research on intelligent and adaptive security systems [@ahmadi2025; @haydari2023; @apruzzese2018] demonstrates the value of these capabilities but has not produced openly deployable, unified implementations with usable management interfaces. Smart-Shield fills this gap as a freely deployable, fully open-source platform that serves both as a network gateway and as a research and education testbed for network administrators, security researchers, system integrators, and students who need comprehensive, integrated security without licensing costs.
 
 # State of the field
 
-The most widely deployed open-source firewall distributions — **pfSense** and its fork **OPNsense** — offer capable packet filtering, NAT, and VPN support, but are packaged as closed, self-contained operating system distributions that are difficult to extend with custom application logic, external AI services, or integrated SOC workflows. Studies confirm that despite their capabilities, these tools present significant usability and integration barriers in resource-constrained environments [@lamdakkar2024].
-
-Research on intelligent firewalls and adaptive security has proposed machine-learning-driven rule generation [@haydari2023], reinforcement learning for dynamic policy optimization [@ahmadi2025], machine-learning-based intrusion detection [@apruzzese2022], deep-learning anomaly detection [@almuhanna2025], NLP-based malware detection in firewalls [@moila2026], and ML-based firewall log classification [@faker2023]. These works establish compelling directions but have not produced publicly deployable systems with usable management interfaces. Research on VPN security has demonstrated real vulnerabilities such as traffic fingerprinting [@xue2024] that require integrated log monitoring and AI-assisted analysis to detect reliably.
-
-Smart-Shield's contribution is a unified, extensible, hardware-independent platform that integrates all of these capabilities into a single deployable system with a clean Python backend open to modification. Full documentation, installation instructions, usage examples, and a test suite of more than 1,300 test cases are provided in the repository.
+The most widely deployed open-source firewall distributions — **pfSense** and its fork **OPNsense** — offer capable packet filtering, NAT, and VPN, but are packaged as closed, self-contained operating systems that are hard to extend with custom application logic, external AI services, or integrated SOC workflows; studies confirm they present usability and integration barriers in resource-constrained environments [@lamdakkar2024]. Research on intelligent and adaptive security has proposed machine-learning-driven rule generation [@haydari2023], reinforcement learning for dynamic policy optimization [@ahmadi2025], machine-learning-based intrusion detection [@apruzzese2018], deep-learning anomaly detection [@almuhanna2025], NLP-based malware detection in firewalls [@moila2026], and ML-based firewall log classification [@faker2023], and has demonstrated real VPN vulnerabilities such as traffic fingerprinting [@xue2024] — but it has not produced publicly deployable systems with usable management interfaces. Smart-Shield's contribution is a unified, extensible, hardware-independent platform that integrates these capabilities into a single deployable system with a clean, modifiable Python backend, full documentation, and a suite of more than 1,300 tests.
 
 # Software Design and Functionality
 
-Smart-Shield is built around a Flask web application (Python 3, Gunicorn, Nginx reverse proxy) backed by a SQLite database. All system configuration is persisted in the database and applied to the OS through a transaction pipeline of more than 15 configuration writers that generate and atomically apply daemon configuration files, with syntax validation and automatic rollback to a known-good state on failure.
+Smart-Shield is a Flask web application (Python 3, Gunicorn, Nginx reverse proxy) backed by a SQLite database. All configuration is persisted in the database and applied to the OS through a transaction pipeline of more than 15 configuration writers that generate and atomically apply daemon configuration files, with syntax validation and automatic rollback to a known-good state on failure. The platform exposes roughly 700 routes across 23 blueprints, with an installer script, CLI control tool, and recovery console.
 
-![Smart-Shield login page providing secure administrator authentication before granting access to the management interface.](figures/login.png)
+![Smart-Shield administrator login page.](figures/login.png)
 
-![Smart-Shield main dashboard with the navigation sidebar expanded, showing system status widgets for firewall rules, VPN servers, users, security rules, and interface status.](figures/dashboard.png)
+![Main dashboard with status widgets and navigation sidebar.](figures/dashboard.png)
 
-![Smart-Shield widget manager allowing administrators to customize the dashboard by enabling or disabling monitoring widgets for firewall rules, VPN servers, users, security rules, and traffic monitoring.](figures/widgets.png)
+![Widget manager for customizing dashboard monitoring panels.](figures/widgets.png)
 
-## Firewall, NAT, and Traffic Shaping
+## Firewall, Routing, and High Availability
 
-The firewall module manages FreeBSD's PF packet filter through 43 API endpoints, supporting floating, WAN, and LAN rule sets; policy-based routing; anti-spoof protection; bogon blocking; and PF anchors for subsystem isolation. Every ruleset change is validated with `pfctl -nf` before applying, and a `.known_good` backup is restored automatically on failure. Network address translation covers port forwarding, 1:1 binat, outbound masquerade, IPv6 NPt, and NAT reflection. Traffic shaping is implemented through ALTQ queue disciplines (HFSC, CBQ, PRIQ, FAIRQ) and dummynet bandwidth limiters with per-flow pipe control for quality-of-service enforcement.
+The firewall manages FreeBSD's PF packet filter through 43 endpoints — floating, WAN, and LAN rule sets, policy-based routing, anti-spoof and bogon blocking, and PF anchors. Every change is validated with `pfctl -nf` before applying, with automatic restore of a `.known_good` backup on failure. NAT covers port forwarding, 1:1 binat, outbound masquerade, IPv6 NPt, and reflection; traffic shaping uses ALTQ disciplines (HFSC, CBQ, PRIQ, FAIRQ) and dummynet limiters. The platform manages VLANs, bridges, LAGG, GRE/GIF tunnels, and PPPoE, with tiered gateway failover, ECMP load balancing, an ICMP health monitor, and CARP/pfsync high availability.
 
-## Network Interfaces, Routing, and High Availability
+## Threat Detection: IDS/IPS, SIEM, and Threat Intelligence
 
-The platform manages the full range of FreeBSD virtual interface types: VLANs (802.1Q), bridges, LAGG bonding, GRE and GIF tunnels, and PPPoE WAN connections. An interface assignment wizard maps physical NICs to WAN, LAN, and optional interface roles. Gateway management supports static routes, tiered failover groups, load-balanced equal-cost multi-path routing, and a background ICMP health monitor that updates gateway status in the database every 30 seconds. High-availability deployments are supported through CARP virtual IP failover and pfsync state synchronization for active-passive node pairs.
+Smart-Shield integrates Suricata [@suricata2024] in passive IDS mode (BPF capture) or inline IPS mode (netmap), with YAML generated programmatically and validated via `suricata -T`; rules come from the Emerging Threats feed through suricata-update. A built-in SIEM runs seven concurrent collectors — IDS alerts, DHCP leases, DNS queries, PF states, authentication logs, system messages, and pattern-based anomaly detection for brute-force and IDS-flood patterns — all using persistent file-offset tracking to avoid duplicate ingestion across restarts. Threat intelligence is ingested every four hours from three abuse.ch feeds (URLhaus, MalwareBazaar, ThreatFox); newly identified malicious IPs are pushed atomically into a live PF table, blocking them without administrator intervention.
 
-## Intrusion Detection and Prevention
+![IDS/IPS configuration: mode selection, interface assignment, and network definitions.](figures/ids_ips_config.png)
 
-Smart-Shield integrates Suricata [@suricata2024], which operates in passive IDS mode via BPF packet capture or in active inline IPS mode via netmap for wire-speed in-path blocking. Suricata YAML configuration is generated programmatically and validated with `suricata -T` before being applied. Rule sets are managed through the Emerging Threats feed via suricata-update, with support for additional custom URL sources.
+![Threat-detection status: Suricata running with active signatures and a live log.](figures/ids_ips_status.png)
 
-![Smart-Shield IDS/IPS configuration page showing mode selection between passive IDS (BPF capture) and inline IPS (netmap bridging), interface assignment, HOME_NET and EXTERNAL_NET definitions, and EVE JSON logging options.](figures/ids_ips_config.png)
+## VPN, DNS, and Network Services
 
-![Smart-Shield Threat Detection status page showing Suricata running in IDS mode on interface em1 with 49,874 active signatures across 2 rulesets, zero alerts today, and a live-refreshing daemon log.](figures/ids_ips_status.png)
+The VPN module manages OpenVPN (multi-instance, TUN/TAP, AES-256-GCM), IPsec/IKEv2 via strongSwan, and L2TP/IPsec via mpd5, with a wizard that automates certificate-authority creation and certificate signing; all keys and secrets are encrypted at rest. The DNS module provides an Unbound recursive resolver with DNSSEC, DNS-over-TLS, per-subnet ACLs, overrides, and query logging, alongside ISC DHCPd and Kea DHCPv6. Content filtering operates at the DNS, URL, and application layers with cross-layer conflict detection. An integrated certificate authority handles signing, revocation, ACME issuance, and OCSP stapling; a captive portal adds voucher-based authenticated access; and additional services include Dynamic DNS, NTP, SNMP, UPnP, and traffic graphs.
 
-## SIEM and Anomaly Detection
+## Security, SOC Collaboration, and AI Assistant
 
-A built-in SIEM engine runs seven concurrent background collection threads covering: IDS alerts (EVE JSON, polled every 10 seconds), DHCP lease events (30 seconds), DNS query logs (15 seconds), PF connection states (60 seconds), SSH and authentication logs (15 seconds), system messages (30 seconds), and pattern-based anomaly detection targeting brute-force attempts and IDS flood patterns (60 seconds). All collectors use persistent file-offset tracking in the database to prevent duplicate event ingestion across restarts. A live SIEM event stream is available from the dashboard, and the complete audit log is exportable as filtered JSON.
+The platform implements session-based authentication with signed cookies, PBKDF2 hashing, per-IP and per-username brute-force lockout, CSRF protection, scoped API keys, and a complete NDJSON audit log of every state-changing action. Role-based access control supports multi-user deployments with page-level permissions. The integrated SOC module provides a separate login realm in which L1–L3 analysts triage IDS and SIEM alerts, assign incidents, and log response actions. The AI assistant, built on the Groq API (llama-3.3-70b-versatile) [@groq2024], answers natural-language questions using more than 12 read-only tools over live system state; write actions such as blocking a domain or adding a firewall rule require explicit two-stage user confirmation, so no change occurs without human approval.
 
-## Threat Intelligence
+![SOC portal control: dedicated analyst endpoint and TLS settings.](figures/soc_portal_control.png)
 
-Smart-Shield automatically ingests threat intelligence from three abuse.ch feeds every four hours: URLhaus (malicious URLs and hosts), MalwareBazaar (file hashes), and ThreatFox (IP, domain, and hash indicators of compromise). Newly identified malicious IP addresses are atomically pushed into a live PF table (`ss_threat_intel`), causing the firewall to block them without administrator intervention and keeping defenses current against newly published threats.
+![SOC portal login for L1–L3 analyst tiers.](figures/soc_login.png)
 
-## VPN
-
-The VPN module manages OpenVPN server and client instances (multi-instance, TUN/TAP, AES-256-GCM), IPsec/IKEv2 via strongSwan (Phase 1 and 2, roadwarrior mobile clients, EAP-MSCHAPv2, PSK), and L2TP/IPsec via mpd5. A three-step OpenVPN setup wizard automates certificate authority creation, server certificate signing, and server configuration. All private keys and pre-shared secrets are encrypted at rest using AES-256-GCM. All VPN traffic passes through the same firewall and IDS/IPS enforcement pipeline as other network flows.
-
-## DNS, DHCP, and Content Filtering
-
-The DNS module provides an Unbound recursive resolver with DNSSEC validation, DNS-over-TLS upstream forwarding, per-subnet access control lists, host and domain overrides, and full query logging. DHCP services cover ISC DHCPd for IPv4 (address pools, static leases, relay) and Kea for DHCPv6 with prefix delegation and router advertisement. Content filtering operates at three layers: DNS-level blocking and redirection via Unbound local-zone directives applied without service restart through `unbound-control`, web URL pattern filtering, and application-layer blocking with 18 built-in signatures covering major consumer platforms. A conflict detection engine identifies cross-layer allow/block contradictions before applying policy.
-
-## Captive Portal and Network Services
-
-The captive portal provides HTTP/HTTPS redirect gateway functionality with soft and strict enforcement modes, local user authentication, time- and bandwidth-limited voucher codes, session tracking by MAC and IP address, and RADIUS authentication support. Additional network services include Dynamic DNS via ddclient (10+ providers and RFC 2136 nsupdate), NTP, SNMP via bsnmpd, UPnP/NAT-PMP via miniupnpd, IGMP multicast proxy, Wake-on-LAN, and MRTG traffic graphs at daily, weekly, monthly, and yearly resolutions.
-
-## Certificate Management
-
-An integrated certificate authority supports CA creation, server and client certificate signing with SAN support, certificate revocation and CRL generation, PKCS#12 and PEM export, Let's Encrypt / ACME certificate issuance via certbot, and OCSP stapling. All private keys are encrypted at rest.
-
-## Security, Authentication, and SOC Collaboration
-
-The platform implements session-based authentication with signed cookies, PBKDF2 password hashing, per-IP and per-username brute-force lockout, CSRF protection on all state-changing requests, API key authentication with per-key permission scoping, idle session timeout, re-authentication for sensitive operations, and a complete NDJSON audit log of every state-changing action with user identity, IP address, and timestamp. Role-based access control allows multi-user deployments with per-group, page-level permissions and wildcard permission grants. The integrated SOC module provides a separate login realm for security operations staff, within which analysts can triage IDS and SIEM alerts, assign incidents to team members, track investigation status, and log response actions.
-
-![Smart-Shield SOC Portal Control page, where administrators configure the dedicated SOC analyst endpoint, bind IP address, HTTPS port, and TLS certificate separately from the main firewall console.](figures/soc_portal_control.png)
-
-![Smart-Shield SOC Portal login screen, showing the dedicated authentication interface for L1, L2, and L3 analyst tiers, separate from the administrator UI.](figures/soc_login.png)
-
-![Smart-Shield SOC Overview dashboard displaying live case counts, alert queue, threat feed status, and open incidents for an authenticated L1 analyst.](figures/soc_overview.png)
-
-## AI Assistant
-
-The AI assistant is built on the Groq API (llama-3.3-70b-versatile model) [@groq2024] and is accessible from the dashboard as a natural language interface. More than 12 read-only tools give the assistant access to live system state: firewall rules, IDS alerts, DHCP leases, VPN status, audit logs, tracked hosts, content policy, and network configuration. Write tools (block/unblock a domain, add a firewall rule) use a two-stage confirmation flow in which the assistant presents its intended action and waits for explicit user approval before executing, ensuring no system modification occurs without human confirmation.
+![SOC overview: live case counts, alert queue, and open incidents.](figures/soc_overview.png)
 
 # Testing and Validation
 
-Smart-Shield includes a test suite of more than 1,300 test cases covering unit, integration, and acceptance tests executed in isolated virtual network environments. Benchmarks showed that the firewall adds less than 0.2 milliseconds of latency for LAN-to-LAN traffic and less than 0.6 milliseconds for LAN-to-WAN forwarded traffic; VPN tunnels operated at under 4 milliseconds round-trip; the web dashboard responded in under 300 milliseconds; and a ruleset of 200 rules applied in under 2 seconds. The system ran continuously for 48 hours without service failures and handled up to 50 VPN configurations without performance degradation. The full test suite is included in the repository and is executable by reviewers locally.
+Smart-Shield includes a test suite of more than 1,300 unit, integration, and acceptance tests run in isolated virtual networks. In benchmarks the firewall added under 0.2 milliseconds of latency for LAN-to-LAN traffic and under 0.6 milliseconds for LAN-to-WAN forwarded traffic, VPN tunnels stayed under 4 milliseconds round-trip, the dashboard responded in under 300 milliseconds, and a 200-rule set applied in under 2 seconds. The system ran continuously for 48 hours without service failures and handled 50 VPN configurations without degradation. The full suite is included in the repository and is executable by reviewers locally.
+
+# Research impact statement
+
+Smart-Shield lowers the barrier to empirical network-security research by exposing every subsystem — PF firewalling, Suricata IDS/IPS, the SIEM collectors, automated threat-intelligence feeds, VPN, and the LLM assistant — through a single documented Python backend. Researchers and educators can deploy one reproducible testbed instead of integrating several commercial tools, enabling controlled experiments on firewall-policy effectiveness, VPN fingerprinting, anomaly detection, and AI-assisted threat response. The same platform gives students a hands-on environment for learning integrated security operations without licensing costs.
+
+# AI usage disclosure
+
+Generative AI tools (large language models) were used during this project both to assist in drafting and editing this manuscript and as a coding aid during software development. All AI-assisted output — including text, source code, and reference metadata — was reviewed, tested, and verified by the authors, who take full responsibility for the final manuscript and software. The AI assistant integrated into Smart-Shield is a separate runtime feature of the software, described above, and is unrelated to the preparation of this work.
 
 # Availability
 
@@ -135,6 +109,6 @@ The Smart-Shield source code is available on GitHub at [https://github.com/Moham
 
 # Acknowledgements
 
-The authors acknowledge the faculty and staff of The Higher Canadian Institute for Engineering Technology and Business for the academic environment and resources that supported this work.
+The authors thank the faculty and staff of The Higher Canadian Institute for Engineering Technology and Business for the academic environment and resources that supported this work.
 
 # References
