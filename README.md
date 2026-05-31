@@ -1,5 +1,6 @@
 # Smart Shield
 
+![CI](https://github.com/Mohamed-Salah11/Smart-Shield/actions/workflows/ci.yml/badge.svg)
 
 > A web-managed network security appliance built on FreeBSD — firewall, IDS/IPS, VPN, DNS, DHCP, SIEM, content policy, captive portal, a hardened appliance console, and a separate SOC team portal in a single platform.
 
