@@ -29,22 +29,31 @@ from app.database import get_db  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _isolate_volatile_env():
-    """Restore the apply-gating env vars after every test.
+    """Restore leak-prone env vars after every test.
 
     Several writer/migration test modules (test_phase5, test_*_writer, …) flip
     ``SMARTSHIELD_NETWORK_DRY_RUN=1`` for isolation but never restore it. Because
     the ``app`` fixture is session-scoped and shared, the leak makes later
     modules order-dependent — the setup wizard's step-4 apply refuses to
     complete once it sees a stray ``DRY_RUN=1`` (routes/setup.py rejects dry-run
-    as a real apply). Snapshot/restore only these apply-gating keys.
+    as a real apply). Snapshot/restore these apply-gating keys.
 
-    NOTE: ``SMARTSHIELD_DB_PATH`` is deliberately NOT restored here — the
-    reload-based DB fixtures destroy their in-memory DB on teardown, so forcing
-    the path back would point the shared session app at a dead database.
+    ``SMARTSHIELD_DB_PATH`` is restored too. Many writer/cert/migration tests
+    repoint it at a throwaway in-memory DB inside a function-scoped fixture and
+    never restore it (e.g. test_cert_manager, test_pf_generator, test_phase5,
+    the per-writer fixtures). ``app.database.get_db()`` reads that variable live
+    on every call, so a leaked value makes the shared session ``app`` reconnect
+    to the wrong (and usually garbage-collected, schema-less) database — which
+    surfaced as ``no such table: users`` in TestL2tpSaveConfig. Because the
+    leaks all happen inside fixtures (every module-level assignment is a
+    no-op ``setdefault``), snapshotting at test start and restoring at teardown
+    reverts each leak, and the session ``app``'s ``file:testdb`` — kept alive by
+    the anchor in the ``app`` fixture — is always the value restored to.
     """
     keys = (
         "SMARTSHIELD_NETWORK_DRY_RUN",
         "SMARTSHIELD_ENABLE_NETWORK_APPLY",
+        "SMARTSHIELD_DB_PATH",
     )
     saved = {k: os.environ.get(k) for k in keys}
     yield
@@ -57,11 +66,28 @@ def _isolate_volatile_env():
 
 @pytest.fixture(scope="session")
 def app():
-    """Application instance backed by an in-memory database."""
+    """Application instance backed by an in-memory database.
+
+    A session-long *anchor* connection is held open to the configured DB URI so
+    the shared-cache in-memory database (and its schema) cannot be destroyed
+    mid-session. A shared-cache ``mode=memory`` database lives only while at
+    least one connection to it is open. Some migration tests
+    (TestEventUuidIndexUpgrade) repoint ``SMARTSHIELD_DB_PATH`` at a throwaway
+    memory DB and call ``init_db()``, which tears down the library's keep-alive
+    connection to the main test DB. Without an independent anchor the main
+    ``file:testdb`` database would be garbage-collected, and the next test to
+    touch it would hit a fresh, empty schema ("no such table: users"). The
+    anchor keeps it alive for the whole session.
+    """
+    import sqlite3
+
+    db_uri = os.environ["SMARTSHIELD_DB_PATH"]
+    anchor = sqlite3.connect(db_uri, uri=db_uri.startswith("file:"))
     application = create_app()
     application.config["TESTING"] = True
     application.config["WTF_CSRF_ENABLED"] = False
-    return application
+    yield application
+    anchor.close()
 
 
 @pytest.fixture()
