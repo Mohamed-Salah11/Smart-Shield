@@ -37,7 +37,7 @@ authors:
 affiliations:
   - name: The Higher Canadian Institute for Engineering Technology and Business, Egypt
     index: 1
-date: 30 May 2026
+date: 2026-05-31
 bibliography: paper.bib
 ---
 
