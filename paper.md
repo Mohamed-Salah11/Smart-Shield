@@ -97,7 +97,9 @@ Smart-Shield includes a test suite of more than 1,300 unit, integration, and acc
 
 # Research impact statement
 
-Smart-Shield lowers the barrier to empirical network-security research by exposing every subsystem — PF firewalling, Suricata IDS/IPS, the SIEM collectors, automated threat-intelligence feeds, VPN, and the LLM assistant — through a single documented Python backend. Researchers and educators can deploy one reproducible testbed instead of integrating several commercial tools, enabling controlled experiments on firewall-policy effectiveness, VPN fingerprinting, anomaly detection, and AI-assisted threat response. The same platform gives students a hands-on environment for learning integrated security operations without licensing costs.
+Smart-Shield lowers the barrier to empirical network-security research by exposing every subsystem — PF firewalling, Suricata IDS/IPS, SIEM collectors, automated threat-intelligence feeds, VPN, and an LLM assistant — through a single documented Python backend. Existing open-source platforms such as pfSense and OPNsense address firewalling and VPN but provide no integrated SIEM, threat-intelligence ingestion, or AI-assisted administration [@lamdakkar2024], leaving researchers without a unified, openly deployable testbed.
+
+Smart-Shield fills this gap by enabling controlled, reproducible experiments on firewall-policy effectiveness, VPN fingerprinting, anomaly detection, and AI-assisted threat response — research directions identified as valuable but previously lacking deployable implementations [@ahmadi2025; @haydari2023; @apruzzese2018]. The platform has been validated through internal deployment by the development team across a suite of more than 1,300 unit, integration, and acceptance tests in isolated virtual networks, confirming end-to-end functionality. Its documented Python backend and open Apache 2.0 license lower the barrier to extension, replication, and adoption by the broader research and education community.
 
 # AI usage disclosure
 
